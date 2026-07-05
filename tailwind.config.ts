@@ -1,0 +1,72 @@
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
+  content: [
+    './app/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './lib/**/*.{ts,tsx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#0A1628',
+        secondary: '#1B3A6B',
+        accent: '#F97316',
+        success: '#10B981',
+        warning: '#F59E0B',
+        danger: '#EF4444',
+        surface: {
+          1: '#FFFFFF',
+          2: '#F8FAFC',
+          3: '#F1F5F9',
+        },
+        line: '#E2E8F0',
+        ink: {
+          DEFAULT: '#0F172A',
+          secondary: '#475569',
+          muted: '#94A3B8',
+        },
+      },
+      fontFamily: {
+        display: ['var(--font-display)', 'sans-serif'],
+        body: ['var(--font-body)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+        khmer: ['var(--font-khmer)', 'sans-serif'],
+      },
+      borderRadius: {
+        card: '16px',
+        btn: '12px',
+      },
+      boxShadow: {
+        card: '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.04)',
+        'card-hover': '0 4px 12px rgba(0,0,0,0.10), 0 16px 40px rgba(0,0,0,0.08)',
+      },
+      transitionTimingFunction: {
+        smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      keyframes: {
+        'gradient-drift': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '33%': { transform: 'translate(4%, -3%) scale(1.05)' },
+          '66%': { transform: 'translate(-3%, 3%) scale(0.98)' },
+        },
+        'pulse-soft': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.55' },
+        },
+        'fade-up': {
+          from: { opacity: '0', transform: 'translateY(16px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'gradient-drift': 'gradient-drift 24s ease-in-out infinite',
+        'pulse-soft': 'pulse-soft 1.6s ease-in-out infinite',
+        'fade-up': 'fade-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) both',
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
