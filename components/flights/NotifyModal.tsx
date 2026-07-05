@@ -106,7 +106,7 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-orange-600 disabled:opacity-60"
+            className="liquid-glass-accent liquid-sheen inline-flex w-full items-center justify-center gap-2 rounded-btn px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <BellRing size={16} />}
             Set Alert

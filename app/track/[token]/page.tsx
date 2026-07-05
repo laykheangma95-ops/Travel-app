@@ -38,8 +38,9 @@ export default function PublicTrackPage() {
   };
 
   return (
-    <div className="min-h-screen bg-primary pb-28">
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_50%,#1B2A5B_100%)] pb-28">
+      <div className="stars" aria-hidden="true" />
+      <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="mb-8 text-center">
           <p className="font-display text-lg font-extrabold text-white">
             <span className="text-[#93B4E8]">Domner</span>
@@ -95,7 +96,7 @@ export default function PublicTrackPage() {
           </div>
           <Link
             href="/"
-            className="inline-flex shrink-0 items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+            className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
             <Download size={15} /> Open Domner
           </Link>

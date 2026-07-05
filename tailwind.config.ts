@@ -58,11 +58,35 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(16px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        twinkle: {
+          '0%, 100%': { opacity: '0.9' },
+          '50%': { opacity: '0.25' },
+        },
+        'float-y': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-14px)' },
+        },
+        'dash-flow': {
+          to: { strokeDashoffset: '-64' },
+        },
+        'orb-pulse': {
+          '0%, 100%': { boxShadow: '0 0 24px 6px rgba(96,165,250,0.45), 0 0 80px 20px rgba(59,130,246,0.25)' },
+          '50%': { boxShadow: '0 0 36px 12px rgba(96,165,250,0.65), 0 0 110px 32px rgba(59,130,246,0.35)' },
+        },
+        'globe-glow': {
+          '0%, 100%': { opacity: '0.7' },
+          '50%': { opacity: '1' },
+        },
       },
       animation: {
         'gradient-drift': 'gradient-drift 24s ease-in-out infinite',
         'pulse-soft': 'pulse-soft 1.6s ease-in-out infinite',
         'fade-up': 'fade-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) both',
+        twinkle: 'twinkle 4s ease-in-out infinite',
+        'float-y': 'float-y 7s ease-in-out infinite',
+        'dash-flow': 'dash-flow 3.2s linear infinite',
+        'orb-pulse': 'orb-pulse 3s ease-in-out infinite',
+        'globe-glow': 'globe-glow 6s ease-in-out infinite',
       },
     },
   },

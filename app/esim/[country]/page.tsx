@@ -36,8 +36,9 @@ export default function CountryPlansPage({ params }: PageProps) {
   return (
     <>
       {/* Hero */}
-      <section className="bg-primary py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#04070F_0%,#0A1628_55%,#14264D_100%)] py-16">
+        <div className="stars-far" aria-hidden="true" />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center gap-4">
@@ -56,7 +57,7 @@ export default function CountryPlansPage({ params }: PageProps) {
               </div>
             </div>
             {/* Coverage map placeholder */}
-            <div className="glass-panel hidden items-center gap-3 rounded-card px-6 py-4 md:flex">
+            <div className="liquid-glass hidden items-center gap-3 rounded-card px-6 py-4 md:flex">
               <MapPin size={20} className="text-accent" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-white">Nationwide coverage</p>

@@ -64,21 +64,60 @@ const testimonials = [
 export default function HomePage() {
   return (
     <>
-      {/* ── Hero ── */}
-      <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden bg-primary">
-        {/* Animated gradient mesh */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -left-1/4 top-0 h-[70%] w-[70%] animate-gradient-drift rounded-full bg-secondary/40 blur-[140px]" />
-          <div className="absolute -right-1/4 bottom-0 h-[60%] w-[60%] animate-gradient-drift rounded-full bg-accent/15 blur-[160px] [animation-delay:-8s]" />
-          <div className="absolute left-1/3 top-1/3 h-[40%] w-[40%] animate-gradient-drift rounded-full bg-[#1B3A6B]/50 blur-[120px] [animation-delay:-16s]" />
-        </div>
+      {/* ── Hero — dusk sky, starfield, network globe ── */}
+      <section className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_38%,#14264D_66%,#2A3A6E_84%,#0A1628_100%)]">
+        {/* Starfield */}
+        <div className="stars" aria-hidden="true" />
+        <div className="stars-far" aria-hidden="true" />
 
-        <div className="relative mx-auto max-w-4xl px-4 py-24 text-center sm:px-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-accent/25 animate-fade-up">
+        {/* Sunset horizon glow behind the globe */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] animate-globe-glow bg-[radial-gradient(60%_55%_at_50%_100%,rgba(249,115,22,0.22)_0%,rgba(59,130,246,0.10)_45%,transparent_75%)]"
+          aria-hidden="true"
+        />
+
+        {/* Globe rising from the bottom edge */}
+        <div
+          className="hero-globe pointer-events-none absolute left-1/2 top-full h-[46rem] w-[46rem] -translate-x-1/2 -translate-y-[30%] rounded-full sm:h-[62rem] sm:w-[62rem] sm:-translate-y-[34%]"
+          aria-hidden="true"
+        />
+
+        {/* Network arcs over the globe */}
+        <svg
+          className="pointer-events-none absolute bottom-0 left-1/2 h-[300px] w-[900px] max-w-none -translate-x-1/2 sm:h-[360px]"
+          viewBox="0 0 900 360"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path d="M120 330 Q 300 120 520 260" stroke="rgba(251,146,60,0.75)" strokeWidth="1.5" className="arc-line" />
+          <path d="M240 350 Q 480 60 760 300" stroke="rgba(251,146,60,0.55)" strokeWidth="1.5" className="arc-line" style={{ animationDelay: '-1.2s' }} />
+          <path d="M60 300 Q 420 180 830 340" stroke="rgba(147,197,253,0.5)" strokeWidth="1.2" className="arc-line" style={{ animationDelay: '-2.1s' }} />
+          <path d="M420 355 Q 600 150 880 260" stroke="rgba(251,146,60,0.45)" strokeWidth="1.2" className="arc-line" style={{ animationDelay: '-0.6s' }} />
+          {[
+            [120, 330], [520, 260], [240, 350], [760, 300], [60, 300], [830, 340], [880, 260],
+          ].map(([cx, cy]) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.5" fill="#FDBA74" className="arc-node" />
+          ))}
+        </svg>
+
+        {/* Floating jet above the globe */}
+        <svg
+          className="pointer-events-none absolute bottom-[280px] left-1/2 h-12 w-12 -translate-x-1/2 animate-float-y text-white/90 drop-shadow-[0_6px_18px_rgba(147,197,253,0.45)] sm:bottom-[330px] sm:h-16 sm:w-16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M21.5 15.5 13.5 11V4.75a1.5 1.5 0 0 0-3 0V11l-8 4.5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13.5 19v-4l8 2.5v-2Z" />
+        </svg>
+
+        <div className="relative mx-auto max-w-5xl px-4 pb-72 pt-24 text-center sm:px-6 sm:pb-80">
+          <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
             Cambodia&apos;s First Travel Super App 🇰🇭
           </span>
-          <h1 className="mt-8 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl animate-fade-up [animation-delay:100ms]">
-            Travel Confidently.
+          <h1 className="mt-8 font-display text-5xl font-extrabold leading-[1.02] tracking-tight text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
+            Travel
+            <span className="bg-gradient-to-r from-orange-300 via-accent to-orange-500 bg-clip-text text-transparent"> Confidently</span>
+            .
             <br />
             Stay Connected.
           </h1>
@@ -87,10 +126,10 @@ export default function HomePage() {
             Khmer.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row animate-fade-up [animation-delay:300ms]">
-            <Button href="/esim" size="lg">
+            <Button href="/esim" variant="liquid-accent" size="lg">
               Get Your eSIM
             </Button>
-            <Button href="/flights" variant="outline-light" size="lg">
+            <Button href="/flights" variant="liquid" size="lg">
               Track My Flight
             </Button>
           </div>
@@ -212,8 +251,9 @@ export default function HomePage() {
       </section>
 
       {/* ── Bottom CTA ── */}
-      <section className="bg-primary py-20">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0A1628_0%,#14264D_60%,#0A1628_100%)] py-20">
+        <div className="stars" aria-hidden="true" />
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
             Ready for your next trip?
           </h2>
@@ -221,10 +261,10 @@ export default function HomePage() {
             Join thousands of Cambodian travelers who fly with confidence.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button href="/esim" size="lg">
+            <Button href="/esim" variant="liquid-accent" size="lg">
               Get Your eSIM
             </Button>
-            <Button href="/checklist" variant="outline-light" size="lg">
+            <Button href="/checklist" variant="liquid" size="lg">
               Am I Ready? Checklist
             </Button>
           </div>

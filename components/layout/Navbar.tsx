@@ -140,7 +140,7 @@ export function Navbar() {
           </Link>
           <Link
             href="/sign-up"
-            className="hidden rounded-btn bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 ease-smooth hover:bg-orange-600 hover:shadow-md md:block"
+            className="liquid-glass-accent liquid-sheen hidden rounded-btn px-4 py-2 text-sm font-semibold text-white transition-all duration-200 ease-smooth hover:brightness-110 md:block"
           >
             Get Started
           </Link>

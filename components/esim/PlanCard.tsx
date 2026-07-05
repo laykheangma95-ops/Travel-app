@@ -68,7 +68,7 @@ export function PlanCard({ plan, destination }: PlanCardProps) {
           added
             ? 'bg-success text-white'
             : plan.popular
-              ? 'bg-accent text-white hover:bg-orange-600'
+              ? 'liquid-glass-accent liquid-sheen text-white hover:brightness-110'
               : 'bg-secondary text-white hover:bg-[#16305a]'
         )}
       >

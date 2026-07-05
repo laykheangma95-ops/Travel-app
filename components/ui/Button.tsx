@@ -2,20 +2,31 @@ import Link from 'next/link';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'outline-light' | 'ghost' | 'danger';
+type Variant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'outline-light'
+  | 'ghost'
+  | 'danger'
+  | 'liquid'
+  | 'liquid-accent';
 type Size = 'sm' | 'md' | 'lg';
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-accent text-white hover:bg-orange-600 focus-visible:ring-accent shadow-sm hover:shadow-md',
+    'liquid-glass-accent liquid-sheen text-white hover:brightness-110 focus-visible:ring-accent',
   secondary:
     'bg-secondary text-white hover:bg-[#16305a] focus-visible:ring-secondary shadow-sm',
   outline:
     'border border-line bg-white text-ink hover:border-secondary hover:text-secondary focus-visible:ring-secondary',
   'outline-light':
-    'border border-white/40 bg-transparent text-white hover:bg-white/10 focus-visible:ring-white',
+    'liquid-glass liquid-sheen text-white hover:brightness-110 focus-visible:ring-white',
   ghost: 'bg-transparent text-ink-secondary hover:bg-surface-3 focus-visible:ring-secondary',
   danger: 'bg-danger text-white hover:bg-red-600 focus-visible:ring-danger',
+  liquid: 'liquid-glass liquid-sheen text-white hover:brightness-110 focus-visible:ring-white',
+  'liquid-accent':
+    'liquid-glass-accent liquid-sheen text-white hover:brightness-110 focus-visible:ring-accent',
 };
 
 const sizeClasses: Record<Size, string> = {
