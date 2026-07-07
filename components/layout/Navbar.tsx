@@ -5,49 +5,50 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ChevronDown, Menu, ShoppingCart, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
+import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 interface NavGroup {
-  label: string;
+  labelKey: DictKey;
   href?: string;
-  items?: { label: string; href: string }[];
+  items?: { labelKey: DictKey; href: string }[];
 }
 
 const navGroups: NavGroup[] = [
   {
-    label: 'eSIM',
+    labelKey: 'nav.esim',
     items: [
-      { label: 'Buy eSIM', href: '/esim' },
-      { label: 'Destinations', href: '/esim' },
-      { label: 'My eSIMs', href: '/my-esims' },
+      { labelKey: 'nav.buyEsim', href: '/esim' },
+      { labelKey: 'nav.destinations', href: '/esim' },
+      { labelKey: 'nav.myEsims', href: '/my-esims' },
     ],
   },
   {
-    label: 'Flights',
+    labelKey: 'nav.flights',
     items: [
-      { label: 'Flight Tracker', href: '/flights' },
-      { label: 'Saved Flights', href: '/dashboard' },
+      { labelKey: 'nav.flightTracker', href: '/flights' },
+      { labelKey: 'nav.savedFlights', href: '/dashboard' },
     ],
   },
   {
-    label: 'Travel Tools',
+    labelKey: 'nav.tools',
     items: [
-      { label: 'Am I Ready? Checklist', href: '/checklist' },
-      { label: 'Airport Guide', href: '/airport-guide' },
-      { label: 'Emergency Phrases', href: '/emergency' },
+      { labelKey: 'nav.checklist', href: '/checklist' },
+      { labelKey: 'nav.airportGuide', href: '/airport-guide' },
+      { labelKey: 'nav.emergency', href: '/emergency' },
     ],
   },
-  { label: 'Support', href: '/affiliate' },
+  { labelKey: 'nav.support', href: '/affiliate' },
 ];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [lang, setLang] = useState<'EN' | 'KM'>('EN');
   const [cartCount, setCartCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const count = useCart((s) => s.count());
   const pathname = usePathname();
+  const { lang, setLang, t } = useLang();
 
   // Cart count is read after mount to avoid SSR/localStorage hydration mismatch.
   useEffect(() => setCartCount(count), [count]);
@@ -85,28 +86,28 @@ export function Navbar() {
           {navGroups.map((group) =>
             group.items ? (
               <div
-                key={group.label}
+                key={group.labelKey}
                 className="relative"
-                onMouseEnter={() => setOpenDropdown(group.label)}
+                onMouseEnter={() => setOpenDropdown(group.labelKey)}
                 onMouseLeave={() => setOpenDropdown(null)}
               >
                 <button
                   type="button"
                   className="flex items-center gap-1 rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
-                  aria-expanded={openDropdown === group.label}
+                  aria-expanded={openDropdown === group.labelKey}
                 >
-                  {group.label}
+                  {t(group.labelKey)}
                   <ChevronDown size={14} />
                 </button>
-                {openDropdown === group.label && (
-                  <div className="absolute left-0 top-full w-52 rounded-card border border-line bg-white p-2 shadow-card-hover animate-fade-up">
+                {openDropdown === group.labelKey && (
+                  <div className="absolute left-0 top-full w-56 rounded-card border border-line bg-white p-2 shadow-card-hover animate-fade-up">
                     {group.items.map((item) => (
                       <Link
-                        key={item.label}
+                        key={item.labelKey}
                         href={item.href}
                         className="block rounded-btn px-3.5 py-2.5 text-sm text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink"
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </Link>
                     ))}
                   </div>
@@ -114,11 +115,11 @@ export function Navbar() {
               </div>
             ) : (
               <Link
-                key={group.label}
+                key={group.labelKey}
                 href={group.href!}
                 className="rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
               >
-                {group.label}
+                {t(group.labelKey)}
               </Link>
             )
           )}
@@ -128,11 +129,11 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setLang(lang === 'EN' ? 'KM' : 'EN')}
-            className="hidden rounded-btn px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 sm:block"
-            aria-label="Toggle language"
+            onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
+            className="rounded-btn px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3"
+            aria-label={lang === 'en' ? 'ប្តូរទៅភាសាខ្មែរ' : 'Switch to English'}
           >
-            {lang === 'EN' ? '🇬🇧 EN' : '🇰🇭 KM'}
+            {lang === 'en' ? '🇬🇧 EN' : '🇰🇭 KM'}
           </button>
 
           <Link
@@ -152,13 +153,13 @@ export function Navbar() {
             href="/sign-in"
             className="hidden rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink md:block"
           >
-            Sign In
+            {t('nav.signIn')}
           </Link>
           <Link
             href="/sign-up"
             className="liquid-glass-accent liquid-sheen hidden rounded-btn px-4 py-2 text-sm font-semibold text-white transition-all duration-200 ease-smooth hover:brightness-110 md:block"
           >
-            Get Started
+            {t('nav.getStarted')}
           </Link>
 
           <button
@@ -178,19 +179,19 @@ export function Navbar() {
         <div className="border-t border-line bg-white lg:hidden animate-fade-up">
           <div className="space-y-1 px-4 py-4">
             {navGroups.map((group) => (
-              <div key={group.label}>
+              <div key={group.labelKey}>
                 {group.items ? (
                   <>
                     <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">
-                      {group.label}
+                      {t(group.labelKey)}
                     </p>
                     {group.items.map((item) => (
                       <Link
-                        key={item.label}
+                        key={item.labelKey}
                         href={item.href}
                         className="block rounded-btn px-3 py-2.5 text-sm font-medium text-ink-secondary hover:bg-surface-2"
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </Link>
                     ))}
                   </>
@@ -199,7 +200,7 @@ export function Navbar() {
                     href={group.href!}
                     className="block rounded-btn px-3 py-2.5 text-sm font-medium text-ink-secondary hover:bg-surface-2"
                   >
-                    {group.label}
+                    {t(group.labelKey)}
                   </Link>
                 )}
               </div>
@@ -209,13 +210,13 @@ export function Navbar() {
                 href="/sign-in"
                 className="flex-1 rounded-btn border border-line px-4 py-2.5 text-center text-sm font-semibold text-ink"
               >
-                Sign In
+                {t('nav.signIn')}
               </Link>
               <Link
                 href="/sign-up"
                 className="flex-1 rounded-btn bg-accent px-4 py-2.5 text-center text-sm font-semibold text-white"
               >
-                Get Started
+                {t('nav.getStarted')}
               </Link>
             </div>
           </div>

@@ -1,37 +1,42 @@
+'use client';
+
 import Link from 'next/link';
 import { Facebook, Send, Music2 } from 'lucide-react';
+import { useLang, type DictKey } from '@/lib/i18n';
 
-const columns = [
+const columns: { titleKey: DictKey; links: { labelKey: DictKey; href: string }[] }[] = [
   {
-    title: 'eSIM',
+    titleKey: 'footer.esim',
     links: [
-      { label: 'Destinations', href: '/esim' },
-      { label: 'How it works', href: '/#how-it-works' },
-      { label: 'Install guide', href: '/esim/vietnam#install' },
-      { label: 'FAQ', href: '/esim/vietnam#faq' },
+      { labelKey: 'footer.destinations', href: '/esim' },
+      { labelKey: 'footer.how', href: '/#how-it-works' },
+      { labelKey: 'footer.install', href: '/esim/vietnam#install' },
+      { labelKey: 'footer.faq', href: '/esim/vietnam#faq' },
     ],
   },
   {
-    title: 'Travel Tools',
+    titleKey: 'footer.tools',
     links: [
-      { label: 'Flight Tracker', href: '/flights' },
-      { label: 'Am I Ready? Checklist', href: '/checklist' },
-      { label: 'Airport Guide', href: '/airport-guide' },
-      { label: 'Emergency Phrases', href: '/emergency' },
+      { labelKey: 'footer.tracker', href: '/flights' },
+      { labelKey: 'footer.checklist', href: '/checklist' },
+      { labelKey: 'footer.guide', href: '/airport-guide' },
+      { labelKey: 'footer.phrases', href: '/emergency' },
     ],
   },
   {
-    title: 'Support',
+    titleKey: 'footer.support',
     links: [
-      { label: '24/7 Khmer Support', href: 'https://t.me/domnerapp' },
-      { label: 'Contact', href: 'https://t.me/domnerapp' },
-      { label: 'Affiliate Program', href: '/affiliate' },
-      { label: 'About', href: '/' },
+      { labelKey: 'footer.khmerSupport', href: 'https://t.me/domnerapp' },
+      { labelKey: 'footer.contact', href: 'https://t.me/domnerapp' },
+      { labelKey: 'footer.affiliate', href: '/affiliate' },
+      { labelKey: 'footer.about', href: '/' },
     ],
   },
 ];
 
 export function Footer() {
+  const { t } = useLang();
+
   return (
     <footer className="bg-primary text-white">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
@@ -41,9 +46,7 @@ export function Footer() {
               <span className="text-[#93B4E8]">Domner</span>
               <span className="text-accent">App</span>
             </p>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/60">
-              Cambodia&apos;s first travel super app. Travel confidently — stay connected, in Khmer.
-            </p>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/60">{t('footer.tagline')}</p>
             <div className="mt-5 flex gap-3">
               <a
                 href="https://facebook.com"
@@ -70,18 +73,18 @@ export function Footer() {
           </div>
 
           {columns.map((col) => (
-            <div key={col.title}>
+            <div key={col.titleKey}>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-white/50">
-                {col.title}
+                {t(col.titleKey)}
               </h3>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link.label}>
+                  <li key={link.labelKey}>
                     <Link
                       href={link.href}
                       className="text-sm text-white/70 transition-colors hover:text-accent"
                     >
-                      {link.label}
+                      {t(link.labelKey)}
                     </Link>
                   </li>
                 ))}
@@ -93,9 +96,9 @@ export function Footer() {
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-xs text-white/50 sm:flex-row">
           <p>© 2025 Domner App</p>
           <div className="flex items-center gap-6">
-            <Link href="/" className="transition-colors hover:text-white">Privacy Policy</Link>
-            <Link href="/" className="transition-colors hover:text-white">Terms</Link>
-            <p>All prices in USD</p>
+            <Link href="/" className="transition-colors hover:text-white">{t('footer.privacy')}</Link>
+            <Link href="/" className="transition-colors hover:text-white">{t('footer.terms')}</Link>
+            <p>{t('footer.prices')}</p>
           </div>
         </div>
       </div>

@@ -17,12 +17,22 @@ const categoryIcons: Record<string, typeof Stamp> = {
   around: Compass,
 };
 
+// Google Translate TTS language codes per phrase language.
+const GOOGLE_TTS_LANG: Record<string, string> = {
+  vi: 'vi',
+  th: 'th',
+  zh: 'zh-CN',
+  ja: 'ja',
+  en: 'en',
+};
+
 export default function EmergencyPhrasesPage() {
   const [langCode, setLangCode] = useState('vi');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [ttsUnavailable, setTtsUnavailable] = useState(false);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const lang = phraseLanguages.find((l) => l.code === langCode) ?? phraseLanguages[0];
 
@@ -37,7 +47,19 @@ export default function EmergencyPhrasesPage() {
     return () => {
       window.speechSynthesis.removeEventListener('voiceschanged', load);
       window.speechSynthesis.cancel();
+      audioRef.current?.pause();
     };
+  }, []);
+
+  const stopAllAudio = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setSpeakingId(null);
   }, []);
 
   const copyPhrase = async (id: string, text: string) => {
@@ -50,43 +72,69 @@ export default function EmergencyPhrasesPage() {
     }
   };
 
-  const speakPhrase = useCallback(
+  // Fallback: stream spoken audio from Google Translate. Used when the
+  // device has no built-in voice for the destination language (very common
+  // for Vietnamese/Thai on desktop browsers).
+  const playGoogleTts = useCallback(
     (id: string, text: string) => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-        setTtsUnavailable(true);
-        return;
-      }
-      const synth = window.speechSynthesis;
-
-      // Tapping the phrase that's currently playing stops it.
-      if (speakingId === id) {
-        synth.cancel();
-        setSpeakingId(null);
-        return;
-      }
-      synth.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang.speechLang;
-      utterance.rate = 0.85; // slightly slower so locals hear it clearly
-
-      // Prefer a voice that matches the destination language.
-      const base = lang.speechLang.slice(0, 2).toLowerCase();
-      const voice =
-        voicesRef.current.find((v) => v.lang.replace('_', '-').toLowerCase() === lang.speechLang.toLowerCase()) ??
-        voicesRef.current.find((v) => v.lang.toLowerCase().startsWith(base));
-      if (voice) utterance.voice = voice;
-
-      utterance.onstart = () => setSpeakingId(id);
-      utterance.onend = () => setSpeakingId(null);
-      utterance.onerror = () => {
+      const tl = GOOGLE_TTS_LANG[lang.code] ?? lang.speechLang.slice(0, 2);
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(text)}`;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setSpeakingId(null);
+      audio.onerror = () => {
         setSpeakingId(null);
         setTtsUnavailable(true);
       };
-      synth.speak(utterance);
-      setSpeakingId(id); // some browsers fire onstart late
+      audio
+        .play()
+        .then(() => setSpeakingId(id))
+        .catch(() => {
+          setSpeakingId(null);
+          setTtsUnavailable(true);
+        });
     },
-    [lang.speechLang, speakingId]
+    [lang.code, lang.speechLang]
+  );
+
+  const speakPhrase = useCallback(
+    (id: string, text: string) => {
+      // Tapping the phrase that's currently playing stops it.
+      if (speakingId === id) {
+        stopAllAudio();
+        return;
+      }
+      stopAllAudio();
+      setTtsUnavailable(false);
+
+      const synth =
+        typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
+
+      // Look for a device voice that truly matches the destination language.
+      const base = lang.speechLang.slice(0, 2).toLowerCase();
+      const voices = synth ? (voicesRef.current.length ? voicesRef.current : synth.getVoices()) : [];
+      const voice =
+        voices.find((v) => v.lang.replace('_', '-').toLowerCase() === lang.speechLang.toLowerCase()) ??
+        voices.find((v) => v.lang.replace('_', '-').toLowerCase().startsWith(base));
+
+      // No matching device voice → use Google Translate audio instead of
+      // letting the browser mispronounce it with an English voice (or play
+      // nothing at all).
+      if (!synth || !voice) {
+        playGoogleTts(id, text);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voice;
+      utterance.lang = lang.speechLang;
+      utterance.rate = 0.85; // slightly slower so locals hear it clearly
+      utterance.onend = () => setSpeakingId(null);
+      utterance.onerror = () => playGoogleTts(id, text); // device voice failed mid-way
+      synth.speak(utterance);
+      setSpeakingId(id);
+    },
+    [lang.speechLang, speakingId, stopAllAudio, playGoogleTts]
   );
 
   return (
@@ -115,8 +163,8 @@ export default function EmergencyPhrasesPage() {
             aria-selected={langCode === l.code}
             onClick={() => {
               setLangCode(l.code);
-              if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
-              setSpeakingId(null);
+              stopAllAudio();
+              setTtsUnavailable(false);
             }}
             className={cn(
               'rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-200',
@@ -133,8 +181,8 @@ export default function EmergencyPhrasesPage() {
       {ttsUnavailable && (
         <p className="mb-8 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-ink">
           <VolumeX size={16} className="shrink-0 text-warning" aria-hidden="true" />
-          Voice playback isn&apos;t available for this language on this device. The copy button still
-          works — show the phrase on your screen instead.
+          Voice playback needs an internet connection or a device voice for this language. The copy
+          button still works — show the phrase on your screen instead.
         </p>
       )}
 
@@ -209,8 +257,8 @@ export default function EmergencyPhrasesPage() {
       </div>
 
       <p className="mt-10 text-center text-xs text-ink-muted">
-        Voice playback uses your phone&apos;s built-in speech voices. For the best Vietnamese, Thai,
-        Chinese, and Japanese voices, keep your phone&apos;s language packs installed.
+        Voice playback uses your device&apos;s built-in speech voices when available, and Google
+        Translate audio otherwise. Phrases and copying always work offline.
       </p>
     </div>
   );

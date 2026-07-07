@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono, Noto_Sans_Khmer } from 'next/
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
+import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
 import './globals.css';
 
@@ -36,12 +37,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
-        <Suspense fallback={null}>
-          <ReferralTracker />
-        </Suspense>
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <LanguageProvider>
+          <Suspense fallback={null}>
+            <ReferralTracker />
+          </Suspense>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </LanguageProvider>
       </body>
     </html>
   );

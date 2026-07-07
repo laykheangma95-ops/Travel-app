@@ -30,6 +30,15 @@
     @apply bg-surface-2 font-body text-ink;
   }
 
+  /* Khmer mode: prefer the Khmer face everywhere so script renders correctly */
+  body.lang-km {
+    font-family: var(--font-khmer), var(--font-body), sans-serif;
+  }
+
+  body.lang-km .font-display {
+    font-family: var(--font-khmer), var(--font-display), sans-serif;
+  }
+
   ::selection {
     @apply bg-accent/20 text-ink;
   }
