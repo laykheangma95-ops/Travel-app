@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw, Plane } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Plane, MonitorSmartphone } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
 import { FlightLiveTracker } from '@/components/flights/FlightLiveTracker';
+import { TravelMode } from '@/components/flights/TravelMode';
 import { NotifyModal } from '@/components/flights/NotifyModal';
 import { ShareModal } from '@/components/flights/ShareModal';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
@@ -25,6 +26,31 @@ export default function FlightDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [savedToTrip, setSavedToTrip] = useState(false);
   const [liveProgress, setLiveProgress] = useState<number | null>(null);
+  const [travelMode, setTravelMode] = useState(false);
+  const prevRef = useRef<{ gate?: string; status?: string }>({});
+
+  // Fire a tray notification when the gate or status changes while tracking.
+  useEffect(() => {
+    if (!flight || typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+      if (flight) prevRef.current = { gate: flight.departure.gate, status: flight.status };
+      return;
+    }
+    const prev = prevRef.current;
+    if (prev.gate && flight.departure.gate && prev.gate !== flight.departure.gate) {
+      new Notification(`✈️ ${flight.flightNumber} — Gate change!`, {
+        body: `Gate ${prev.gate} → ${flight.departure.gate}. ជើងហោះហើរផ្លាស់ទ្វារ!`,
+        tag: 'domner-flight',
+        icon: '/icons/icon-192.png',
+      });
+    } else if (prev.status && prev.status !== flight.status) {
+      new Notification(`✈️ ${flight.flightNumber} — ${flight.status.replace('-', ' ').toUpperCase()}`, {
+        body: `${flight.departure.airport} → ${flight.arrival.airport}`,
+        tag: 'domner-flight',
+        icon: '/icons/icon-192.png',
+      });
+    }
+    prevRef.current = { gate: flight.departure.gate, status: flight.status };
+  }, [flight]);
 
   const saveToTrip = async () => {
     await fetch('/api/flights', {
@@ -94,6 +120,17 @@ export default function FlightDetailPage() {
               onShare={() => setShareOpen(true)}
               onSave={saveToTrip}
             />
+            {/* Travel Mode: full-screen always-awake card for the travel day */}
+            <button
+              type="button"
+              onClick={() => setTravelMode(true)}
+              className="liquid-glass liquid-sheen mt-4 flex w-full items-center justify-center gap-2.5 rounded-card px-5 py-4 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.99]"
+            >
+              <MonitorSmartphone size={18} className="text-accent" aria-hidden="true" />
+              Travel Mode — keep my flight on screen
+              <span className="hidden font-khmer text-xs text-white/50 sm:inline">· បង្ហាញនៅលើអេក្រង់ជានិច្ច</span>
+            </button>
+
             <FlightLiveTracker
               flightNumber={flightNumber}
               depIata={flight.departure.airport}
@@ -118,6 +155,13 @@ export default function FlightDetailPage() {
               <p className="mt-4 rounded-btn border border-success/40 bg-success/15 p-3.5 text-center text-sm font-medium text-emerald-300 animate-fade-up">
                 Saved! You&apos;ll find this flight in your dashboard.
               </p>
+            )}
+
+            {travelMode && (
+              <TravelMode
+                flight={liveProgress !== null ? { ...flight, progress: liveProgress, status: 'active' } : flight}
+                onClose={() => setTravelMode(false)}
+              />
             )}
 
             <NotifyModal

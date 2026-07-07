@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono, Noto_Sans_Khmer } from 'next/
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
+import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
@@ -32,6 +33,20 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Domner App — Travel Confidently. Stay Connected.',
   },
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Domner',
+  },
+};
+
+export const viewport = {
+  themeColor: '#0A1628',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
         <LanguageProvider>
+          <ServiceWorkerRegister />
           <Suspense fallback={null}>
             <ReferralTracker />
           </Suspense>
