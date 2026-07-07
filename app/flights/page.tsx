@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Plane, Search } from 'lucide-react';
 import { getRecentSearches, saveRecentSearch } from '@/hooks/useFlightTracking';
+import type { FlightSuggestion } from '@/lib/aeroDataBox';
 import { todayIso } from '@/lib/utils';
 
 export default function FlightTrackerPage() {
@@ -11,6 +12,9 @@ export default function FlightTrackerPage() {
   const [flightNumber, setFlightNumber] = useState('');
   const [date, setDate] = useState(todayIso());
   const [recent, setRecent] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<FlightSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setRecent(getRecentSearches()), []);
 
@@ -19,6 +23,29 @@ export default function FlightTrackerPage() {
     if (!cleaned) return;
     saveRecentSearch(cleaned);
     router.push(`/flights/${cleaned}?date=${date}`);
+  };
+
+  // Autocomplete: debounce keystrokes, then fetch matching flight numbers.
+  const onQueryChange = (value: string) => {
+    setFlightNumber(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = value.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/flights/suggest?q=${encodeURIComponent(q)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { suggestions: FlightSuggestion[] };
+        setSuggestions(data.suggestions);
+        setShowSuggestions(data.suggestions.length > 0);
+      } catch {
+        // suggestions are best-effort
+      }
+    }, 250);
   };
 
   return (
@@ -47,16 +74,58 @@ export default function FlightTrackerPage() {
             e.preventDefault();
             track(flightNumber);
           }}
-          className="liquid-glass mt-10 flex flex-col gap-3 rounded-card p-5 sm:flex-row"
+          className="glass-panel mt-10 flex flex-col gap-3 rounded-card p-5 sm:flex-row"
         >
-          <input
-            type="text"
-            value={flightNumber}
-            onChange={(e) => setFlightNumber(e.target.value)}
-            placeholder="Flight Number e.g. QH215"
-            aria-label="Flight number"
-            className="flex-1 rounded-btn border border-white/20 bg-white/10 px-4 py-3.5 font-mono text-sm uppercase text-white placeholder:text-white/40 backdrop-blur focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={flightNumber}
+              onChange={(e) => onQueryChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onKeyDown={(e) => e.key === 'Escape' && setShowSuggestions(false)}
+              placeholder="Flight Number e.g. QH215 or TG…"
+              aria-label="Flight number"
+              aria-expanded={showSuggestions}
+              aria-controls="flight-suggestions"
+              role="combobox"
+              autoComplete="off"
+              className="w-full rounded-btn border border-white/20 bg-white/10 px-4 py-3.5 font-mono text-sm uppercase text-white placeholder:text-white/40 backdrop-blur focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+            {/* Autocomplete dropdown */}
+            {showSuggestions && (
+              <ul
+                id="flight-suggestions"
+                role="listbox"
+                aria-label="Matching flights"
+                className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-card border border-white/15 bg-[#0A1930]/95 shadow-card-hover backdrop-blur-xl animate-fade-up"
+              >
+                {suggestions.map((s) => (
+                  <li key={s.number} role="option" aria-selected="false">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        track(s.number);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/10"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20">
+                        <Plane size={14} className="text-accent" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-mono text-sm font-bold text-white">{s.number}</span>
+                        <span className="block truncate text-xs text-white/50">{s.airline}</span>
+                      </span>
+                      {s.route && (
+                        <span className="shrink-0 font-mono text-xs font-semibold text-white/70">{s.route}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <input
             type="date"
             value={date}

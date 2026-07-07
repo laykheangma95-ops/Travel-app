@@ -147,6 +147,111 @@ function mapStatus(raw: string): FlightStatusKind {
   return 'scheduled';
 }
 
+// ─── Flight number autocomplete ─────────────────────────────────────────────
+
+export interface FlightSuggestion {
+  number: string;
+  airline: string;
+  route?: string;
+}
+
+// Popular flights touching Cambodia + regional favorites: gives instant,
+// route-annotated suggestions even before the API responds (and offline).
+const POPULAR_FLIGHTS: FlightSuggestion[] = [
+  { number: 'K6 720', airline: 'Cambodia Angkor Air', route: 'PNH → SGN' },
+  { number: 'K6 721', airline: 'Cambodia Angkor Air', route: 'SGN → PNH' },
+  { number: 'K6 130', airline: 'Cambodia Angkor Air', route: 'PNH → SAI' },
+  { number: 'KR 937', airline: 'Cambodia Airways', route: 'KTI → CAN' },
+  { number: 'KR 938', airline: 'Cambodia Airways', route: 'CAN → KTI' },
+  { number: 'QH 215', airline: 'Bamboo Airways', route: 'PNH → BKK' },
+  { number: 'TG 584', airline: 'Thai Airways', route: 'BKK → PNH' },
+  { number: 'TG 585', airline: 'Thai Airways', route: 'PNH → BKK' },
+  { number: 'TG 660', airline: 'Thai Airways', route: 'BKK → NRT' },
+  { number: 'TG 910', airline: 'Thai Airways', route: 'BKK → LHR' },
+  { number: 'PG 933', airline: 'Bangkok Airways', route: 'PNH → BKK' },
+  { number: 'PG 934', airline: 'Bangkok Airways', route: 'BKK → PNH' },
+  { number: 'FD 606', airline: 'Thai AirAsia', route: 'DMK → PNH' },
+  { number: 'FD 607', airline: 'Thai AirAsia', route: 'PNH → DMK' },
+  { number: 'VN 841', airline: 'Vietnam Airlines', route: 'PNH → HAN' },
+  { number: 'VN 920', airline: 'Vietnam Airlines', route: 'PNH → SGN' },
+  { number: 'VN 921', airline: 'Vietnam Airlines', route: 'SGN → PNH' },
+  { number: 'SQ 156', airline: 'Singapore Airlines', route: 'SIN → PNH' },
+  { number: 'SQ 157', airline: 'Singapore Airlines', route: 'PNH → SIN' },
+  { number: 'MH 754', airline: 'Malaysia Airlines', route: 'PNH → KUL' },
+  { number: 'MH 755', airline: 'Malaysia Airlines', route: 'KUL → PNH' },
+  { number: 'AK 542', airline: 'AirAsia', route: 'KUL → PNH' },
+  { number: 'CZ 324', airline: 'China Southern', route: 'PNH → CAN' },
+  { number: 'MU 2092', airline: 'China Eastern', route: 'PNH → KMG' },
+  { number: 'KE 690', airline: 'Korean Air', route: 'KTI → ICN' },
+  { number: 'KE 689', airline: 'Korean Air', route: 'ICN → KTI' },
+];
+
+const AIRLINE_NAMES: Record<string, string> = {
+  K6: 'Cambodia Angkor Air',
+  KR: 'Cambodia Airways',
+  QH: 'Bamboo Airways',
+  TG: 'Thai Airways',
+  PG: 'Bangkok Airways',
+  FD: 'Thai AirAsia',
+  VN: 'Vietnam Airlines',
+  VJ: 'VietJet Air',
+  SQ: 'Singapore Airlines',
+  TR: 'Scoot',
+  MH: 'Malaysia Airlines',
+  AK: 'AirAsia',
+  NH: 'All Nippon Airways',
+  JL: 'Japan Airlines',
+  KE: 'Korean Air',
+  OZ: 'Asiana Airlines',
+  CX: 'Cathay Pacific',
+  CI: 'China Airlines',
+  BR: 'EVA Air',
+  MU: 'China Eastern',
+  CA: 'Air China',
+  CZ: 'China Southern',
+  EK: 'Emirates',
+  QR: 'Qatar Airways',
+};
+
+function normalizeNumber(n: string): string {
+  return n.replace(/\s+/g, '').toUpperCase();
+}
+
+export async function suggestFlights(term: string): Promise<FlightSuggestion[]> {
+  const q = normalizeNumber(term);
+  if (q.length < 2) return [];
+
+  const local = POPULAR_FLIGHTS.filter((f) => normalizeNumber(f.number).startsWith(q));
+
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) return local.slice(0, 8);
+
+  try {
+    const res = await fetch(`https://${HOST}/flights/search/term?search=${encodeURIComponent(q)}&limit=10`, {
+      headers: { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': HOST },
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return local.slice(0, 8);
+
+    const data = (await res.json()) as { items?: Array<{ number?: string; airlineName?: string }> };
+    const seen = new Set(local.map((f) => normalizeNumber(f.number)));
+    const remote: FlightSuggestion[] = (data.items ?? [])
+      .filter((item): item is { number: string; airlineName?: string } => Boolean(item.number))
+      .filter((item) => !seen.has(normalizeNumber(item.number)))
+      .map((item) => ({
+        number: item.number,
+        airline:
+          item.airlineName ??
+          AIRLINE_NAMES[normalizeNumber(item.number).slice(0, 2)] ??
+          'Airline',
+      }));
+
+    return [...local, ...remote].slice(0, 8);
+  } catch {
+    return local.slice(0, 8);
+  }
+}
+
 // ─── Airport departure board (FIDS) ─────────────────────────────────────────
 
 export type BoardStage =
