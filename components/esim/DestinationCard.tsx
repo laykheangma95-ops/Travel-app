@@ -6,9 +6,13 @@ export function DestinationCard({ destination }: { destination: Destination }) {
   return (
     <Link
       href={`/esim/${destination.slug}`}
-      className="group relative flex flex-col rounded-card border border-line/60 bg-white p-6 shadow-card transition-all duration-200 ease-smooth hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
+      className="group relative flex h-full flex-col rounded-card border border-line/60 bg-white p-6 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
     >
-      <span className="text-5xl" role="img" aria-label={`${destination.name} flag`}>
+      <span
+        className="inline-block origin-bottom-left text-5xl transition-transform duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3"
+        role="img"
+        aria-label={`${destination.name} flag`}
+      >
         {destination.flag}
       </span>
       <h3 className="mt-4 font-display text-lg font-bold text-ink">{destination.name}</h3>

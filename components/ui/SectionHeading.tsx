@@ -14,7 +14,7 @@ export function SectionHeading({ eyebrow, title, description, align = 'center', 
       {eyebrow && (
         <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">{eyebrow}</p>
       )}
-      <h2 className={cn('font-display text-3xl font-bold sm:text-4xl', dark ? 'text-white' : 'text-ink')}>
+      <h2 className={cn('font-display text-3xl font-bold tracking-tight sm:text-4xl', dark ? 'text-white' : 'text-ink')}>
         {title}
       </h2>
       {description && (

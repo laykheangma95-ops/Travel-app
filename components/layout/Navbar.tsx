@@ -45,6 +45,7 @@ export function Navbar() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [lang, setLang] = useState<'EN' | 'KM'>('EN');
   const [cartCount, setCartCount] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
   const count = useCart((s) => s.count());
   const pathname = usePathname();
 
@@ -55,8 +56,23 @@ export function Navbar() {
     setOpenDropdown(null);
   }, [pathname]);
 
+  // Frosted bar gains depth once the page starts scrolling.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-line/60 bg-white/90 backdrop-blur-lg">
+    <header
+      className={cn(
+        'sticky top-0 z-40 transition-all duration-300 ease-smooth backdrop-blur-xl',
+        scrolled
+          ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
+          : 'border-b border-transparent bg-white/60'
+      )}
+    >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
         <Link href="/" className="font-display text-xl font-extrabold tracking-tight" aria-label="Domner App home">

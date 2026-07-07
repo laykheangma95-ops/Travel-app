@@ -23,6 +23,7 @@
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   body {
@@ -31,6 +32,38 @@
 
   ::selection {
     @apply bg-accent/20 text-ink;
+  }
+
+  /* Refined scrollbar — quiet, rounded, Apple-like */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 8px;
+    border: 2.5px solid #f8fafc;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -44,7 +77,22 @@
   }
 
   .section-pad {
-    @apply py-12 md:py-20;
+    @apply py-16 md:py-24;
+  }
+
+  /* Scroll-reveal: elements rise into place with a soft spring curve */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px) scale(0.99);
+    transition:
+      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-revealed {
+    opacity: 1;
+    transform: none;
   }
 
   /* ── Liquid Glass buttons ─────────────────────────────────────────────────

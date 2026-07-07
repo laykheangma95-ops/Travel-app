@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Smartphone, BellRing, MapPinned, ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { Reveal } from '@/components/ui/Reveal';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { popularDestinations } from '@/data/destinations';
 import Link from 'next/link';
@@ -114,7 +115,7 @@ export default function HomePage() {
           <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
             Cambodia&apos;s First Travel Super App 🇰🇭
           </span>
-          <h1 className="mt-8 font-display text-5xl font-extrabold leading-[1.02] tracking-tight text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
+          <h1 className="mt-8 font-display text-5xl font-extrabold leading-[1.02] tracking-[-0.03em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
             Travel
             <span className="bg-gradient-to-r from-orange-300 via-accent to-orange-500 bg-clip-text text-transparent"> Confidently</span>
             .
@@ -146,29 +147,30 @@ export default function HomePage() {
       {/* ── Feature showcase ── */}
       <section className="section-pad bg-surface-2">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHeading
-            eyebrow="Why Domner"
-            title="Everything a Cambodian traveler needs"
-            description="Three tools that work together, from booking to landing."
-          />
+          <Reveal>
+            <SectionHeading
+              eyebrow="Why Domner"
+              title="Everything a Cambodian traveler needs"
+              description="Three tools that work together, from booking to landing."
+            />
+          </Reveal>
           <div className="grid gap-6 md:grid-cols-3">
-            {features.map((f) => (
-              <div
-                key={f.name}
-                className="group rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-200 ease-smooth hover:-translate-y-0.5 hover:shadow-card-hover"
-              >
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-orange-50 transition-colors group-hover:bg-accent/15">
-                  <f.icon size={32} className="text-accent" aria-hidden="true" />
+            {features.map((f, i) => (
+              <Reveal key={f.name} delay={i * 110}>
+                <div className="group h-full rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-orange-50 transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
+                    <f.icon size={32} className="text-accent" aria-hidden="true" />
+                  </div>
+                  <h3 className="font-display text-lg font-bold tracking-tight text-ink">{f.name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{f.description}</p>
+                  <Link
+                    href={f.href}
+                    className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-secondary transition-all duration-200 hover:gap-2.5 hover:text-accent"
+                  >
+                    Learn more <ArrowRight size={14} />
+                  </Link>
                 </div>
-                <h3 className="font-display text-lg font-bold text-ink">{f.name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{f.description}</p>
-                <Link
-                  href={f.href}
-                  className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-secondary transition-colors hover:text-accent"
-                >
-                  Learn more <ArrowRight size={14} />
-                </Link>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -177,20 +179,24 @@ export default function HomePage() {
       {/* ── How it works ── */}
       <section id="how-it-works" className="section-pad bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHeading eyebrow="How it works" title="From your sofa to your destination" />
+          <Reveal>
+            <SectionHeading eyebrow="How it works" title="From your sofa to your destination" />
+          </Reveal>
           <div className="relative grid gap-10 md:grid-cols-4">
             {/* Connecting line on desktop */}
             <div
               className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-px bg-line md:block"
               aria-hidden="true"
             />
-            {steps.map((step) => (
-              <div key={step.n} className="relative flex flex-col items-center text-center">
-                <div className="z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-secondary font-display text-lg font-bold text-white shadow-card">
-                  {step.n}
+            {steps.map((step, i) => (
+              <Reveal key={step.n} delay={i * 130}>
+                <div className="relative flex flex-col items-center text-center">
+                  <div className="z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-secondary font-display text-lg font-bold text-white shadow-card transition-transform duration-300 ease-smooth hover:scale-110">
+                    {step.n}
+                  </div>
+                  <p className="mt-4 max-w-[200px] font-medium text-ink">{step.title}</p>
                 </div>
-                <p className="mt-4 max-w-[200px] font-medium text-ink">{step.title}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -199,52 +205,57 @@ export default function HomePage() {
       {/* ── Popular destinations ── */}
       <section className="section-pad bg-surface-2">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHeading
-            eyebrow="Popular destinations"
-            title="Where are you flying next?"
-            description="Instant eSIM delivery for the routes Cambodians travel most."
-          />
+          <Reveal>
+            <SectionHeading
+              eyebrow="Popular destinations"
+              title="Where are you flying next?"
+              description="Instant eSIM delivery for the routes Cambodians travel most."
+            />
+          </Reveal>
           <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-            {popularDestinations.map((dest) => (
-              <DestinationCard key={dest.slug} destination={dest} />
+            {popularDestinations.map((dest, i) => (
+              <Reveal key={dest.slug} delay={(i % 4) * 80}>
+                <DestinationCard destination={dest} />
+              </Reveal>
             ))}
           </div>
-          <div className="mt-10 text-center">
+          <Reveal className="mt-12 text-center">
             <Button href="/esim" variant="outline">
               View all destinations <ArrowRight size={16} />
             </Button>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* ── Testimonials ── */}
       <section className="section-pad bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHeading eyebrow="Travelers trust Domner" title="Stories from the road" />
+          <Reveal>
+            <SectionHeading eyebrow="Travelers trust Domner" title="Stories from the road" />
+          </Reveal>
           <div className="grid gap-6 md:grid-cols-3">
-            {testimonials.map((t) => (
-              <figure
-                key={t.name}
-                className="rounded-card border border-line/60 bg-surface-2 p-8 shadow-card"
-              >
-                <div className="flex gap-1" aria-label="5 out of 5 stars">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} size={16} className="fill-warning text-warning" aria-hidden="true" />
-                  ))}
-                </div>
-                <blockquote className="mt-4 text-sm leading-relaxed text-ink-secondary">
-                  “{t.quote}”
-                </blockquote>
-                <figcaption className="mt-6 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-white">
-                    {t.initials}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{t.name}</p>
-                    <p className="text-xs text-ink-muted">{t.trip}</p>
+            {testimonials.map((t, i) => (
+              <Reveal key={t.name} delay={i * 110}>
+                <figure className="h-full rounded-card border border-line/60 bg-surface-2 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:bg-white hover:shadow-card-hover">
+                  <div className="flex gap-1" aria-label="5 out of 5 stars">
+                    {Array.from({ length: 5 }).map((_, s) => (
+                      <Star key={s} size={16} className="fill-warning text-warning" aria-hidden="true" />
+                    ))}
                   </div>
-                </figcaption>
-              </figure>
+                  <blockquote className="mt-4 text-sm leading-relaxed text-ink-secondary">
+                    “{t.quote}”
+                  </blockquote>
+                  <figcaption className="mt-6 flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-white">
+                      {t.initials}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{t.name}</p>
+                      <p className="text-xs text-ink-muted">{t.trip}</p>
+                    </div>
+                  </figcaption>
+                </figure>
+              </Reveal>
             ))}
           </div>
         </div>
