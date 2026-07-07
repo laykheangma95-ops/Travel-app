@@ -66,6 +66,7 @@ function buildCategories(t: {
 export const phraseLanguages: PhraseLanguage[] = [
   {
     code: 'vi',
+    speechLang: 'vi-VN',
     name: 'Vietnamese',
     flag: '🇻🇳',
     categories: buildCategories({
@@ -84,6 +85,7 @@ export const phraseLanguages: PhraseLanguage[] = [
   },
   {
     code: 'th',
+    speechLang: 'th-TH',
     name: 'Thai',
     flag: '🇹🇭',
     categories: buildCategories({
@@ -102,6 +104,7 @@ export const phraseLanguages: PhraseLanguage[] = [
   },
   {
     code: 'zh',
+    speechLang: 'zh-CN',
     name: 'Chinese',
     flag: '🇨🇳',
     categories: buildCategories({
@@ -120,6 +123,7 @@ export const phraseLanguages: PhraseLanguage[] = [
   },
   {
     code: 'ja',
+    speechLang: 'ja-JP',
     name: 'Japanese',
     flag: '🇯🇵',
     categories: buildCategories({
@@ -138,6 +142,7 @@ export const phraseLanguages: PhraseLanguage[] = [
   },
   {
     code: 'en',
+    speechLang: 'en-SG',
     name: 'English (Singapore)',
     flag: '🇸🇬',
     categories: buildCategories({

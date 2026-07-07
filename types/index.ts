@@ -217,6 +217,8 @@ export interface PhraseLanguage {
   code: string;
   name: string;
   flag: string;
+  /** BCP-47 tag used for text-to-speech, e.g. 'vi-VN' */
+  speechLang: string;
   categories: PhraseCategory[];
 }
 
