@@ -27,6 +27,7 @@ const navGroups: NavGroup[] = [
     labelKey: 'nav.flights',
     items: [
       { labelKey: 'nav.flightTracker', href: '/flights' },
+      { labelKey: 'nav.airportBoard', href: '/airport-board/KTI' },
       { labelKey: 'nav.savedFlights', href: '/dashboard' },
     ],
   },

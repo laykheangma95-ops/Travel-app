@@ -10,6 +10,8 @@ import { FlightLiveTracker } from '@/components/flights/FlightLiveTracker';
 import { NotifyModal } from '@/components/flights/NotifyModal';
 import { ShareModal } from '@/components/flights/ShareModal';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
+import { getAirportCoords } from '@/lib/airportCoords';
+import { haversineKm } from '@/lib/liveFlight';
 import { todayIso } from '@/lib/utils';
 
 export default function FlightDetailPage() {
@@ -22,6 +24,7 @@ export default function FlightDetailPage() {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [savedToTrip, setSavedToTrip] = useState(false);
+  const [liveProgress, setLiveProgress] = useState<number | null>(null);
 
   const saveToTrip = async () => {
     await fetch('/api/flights', {
@@ -86,7 +89,7 @@ export default function FlightDetailPage() {
               </p>
             )}
             <FlightDashboard
-              flight={flight}
+              flight={liveProgress !== null ? { ...flight, progress: liveProgress, status: 'active' } : flight}
               onNotify={() => setNotifyOpen(true)}
               onShare={() => setShareOpen(true)}
               onSave={saveToTrip}
@@ -95,6 +98,21 @@ export default function FlightDetailPage() {
               flightNumber={flightNumber}
               depIata={flight.departure.airport}
               arrIata={flight.arrival.airport}
+              onLive={(live) => {
+                // Derive true progress from the aircraft's real position
+                // along the route (distance flown ÷ total route distance).
+                if (!live || live.onGround) {
+                  setLiveProgress(null);
+                  return;
+                }
+                const dep = getAirportCoords(flight.departure.airport);
+                const arr = getAirportCoords(flight.arrival.airport);
+                if (!dep || !arr) return;
+                const total = haversineKm(dep, arr);
+                if (total < 50) return;
+                const flown = haversineKm(dep, [live.lat, live.lon]);
+                setLiveProgress(Math.min(98, Math.max(2, Math.round((flown / total) * 100))));
+              }}
             />
             {savedToTrip && (
               <p className="mt-4 rounded-btn border border-success/40 bg-success/15 p-3.5 text-center text-sm font-medium text-emerald-300 animate-fade-up">

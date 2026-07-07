@@ -61,6 +61,15 @@ export function FlightDashboard({ flight, onNotify, onShare, onSave, compact = f
               >
                 <Plane size={22} className="rotate-45 text-white drop-shadow-[0_2px_10px_rgba(249,115,22,0.7)]" />
               </span>
+              {/* Percentage flown, riding along with the plane */}
+              {progress > 0 && progress < 100 && (
+                <span
+                  className="absolute top-2.5 -ml-5 rounded-full border border-white/15 bg-[#060B16]/90 px-2 py-0.5 font-mono text-[10px] font-bold text-accent transition-all duration-700 ease-smooth"
+                  style={{ left: `${Math.min(96, Math.max(2, progress))}%` }}
+                >
+                  {progress}%
+                </span>
+              )}
             </div>
 
             <div className="shrink-0 text-right">

@@ -25,6 +25,8 @@ export interface LiveFlightData {
   photographer: string | null;
   source: string;
   fetchedAt: string;
+  /** seconds since this fix was received; >0 means served from cache */
+  ageSeconds: number;
 }
 
 export interface NoLiveData {
@@ -101,7 +103,7 @@ function candidateCallsigns(flightNumber: string): string[] {
   return Array.from(new Set(candidates));
 }
 
-async function fetchJson<T>(url: string, timeoutMs = 8000): Promise<T | null> {
+async function fetchJson<T>(url: string, timeoutMs = 5000): Promise<T | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(timeoutMs),
@@ -121,57 +123,112 @@ const PROVIDERS = [
   { name: 'adsb.fi', url: (cs: string) => `https://opendata.adsb.fi/api/v2/callsign/${cs}` },
 ];
 
+// Caches survive between requests while the server process lives. The photo
+// cache avoids re-hitting planespotters for every position update; the fix
+// cache keeps the panel alive through short provider hiccups.
+const photoCache = new Map<string, { url: string; photographer: string } | null>();
+const fixCache = new Map<string, LiveFlightData>();
+const FIX_CACHE_TTL_MS = 10 * 60 * 1000;
+
 async function fetchAircraftPhoto(hex: string): Promise<{ url: string; photographer: string } | null> {
+  if (photoCache.has(hex)) return photoCache.get(hex) ?? null;
   const data = await fetchJson<{ photos?: { thumbnail_large?: { src?: string }; photographer?: string }[] }>(
     `https://api.planespotters.net/pub/photos/hex/${hex}`,
-    6000
+    5000
   );
   const photo = data?.photos?.[0];
-  if (!photo?.thumbnail_large?.src) return null;
-  return { url: photo.thumbnail_large.src, photographer: photo.photographer ?? 'planespotters.net' };
+  const result = photo?.thumbnail_large?.src
+    ? { url: photo.thumbnail_large.src, photographer: photo.photographer ?? 'planespotters.net' }
+    : null;
+  photoCache.set(hex, result);
+  return result;
+}
+
+interface ProviderHit {
+  aircraft: AdsbAircraft;
+  callsign: string;
+  provider: string;
+}
+
+// Query every provider × callsign combination in parallel and take the first
+// hit — worst case is one 5s timeout instead of six sequential ones.
+async function raceProviders(callsigns: string[]): Promise<{ hit: ProviderHit | null; anyResponse: boolean }> {
+  const attempts = PROVIDERS.flatMap((provider) =>
+    callsigns.map(async (cs): Promise<ProviderHit | 'responded' | null> => {
+      const data = await fetchJson<{ ac?: AdsbAircraft[] }>(provider.url(cs));
+      if (!data) return null;
+      const aircraft = (data.ac ?? []).find(
+        (a) => typeof a.lat === 'number' && typeof a.lon === 'number' && (a.seen ?? 0) < 120
+      );
+      return aircraft ? { aircraft, callsign: cs, provider: provider.name } : 'responded';
+    })
+  );
+
+  const settled = await Promise.all(attempts);
+  const hit = settled.find((r): r is ProviderHit => r !== null && r !== 'responded') ?? null;
+  const anyResponse = settled.some((r) => r !== null);
+  return { hit, anyResponse };
 }
 
 export async function fetchLiveFlight(flightNumber: string): Promise<LiveFlightResult> {
   const callsigns = candidateCallsigns(flightNumber);
-  let sawProviderResponse = false;
+  const cacheKey = callsigns[0];
 
-  for (const provider of PROVIDERS) {
-    for (const cs of callsigns) {
-      const data = await fetchJson<{ ac?: AdsbAircraft[] }>(provider.url(cs));
-      if (!data) continue;
-      sawProviderResponse = true;
+  const { hit, anyResponse } = await raceProviders(callsigns);
 
-      const aircraft = (data.ac ?? []).find(
-        (a) => typeof a.lat === 'number' && typeof a.lon === 'number' && (a.seen ?? 0) < 120
-      );
-      if (!aircraft) continue;
+  if (hit) {
+    const { aircraft, callsign, provider } = hit;
+    const photo = aircraft.hex ? await fetchAircraftPhoto(aircraft.hex) : null;
+    const onGround = aircraft.alt_baro === 'ground';
 
-      const photo = aircraft.hex ? await fetchAircraftPhoto(aircraft.hex) : null;
-      const onGround = aircraft.alt_baro === 'ground';
-
-      return {
-        live: true,
-        callsign: (aircraft.flight ?? cs).trim(),
-        hex: aircraft.hex ?? '',
-        lat: aircraft.lat!,
-        lon: aircraft.lon!,
-        altitudeFt: typeof aircraft.alt_baro === 'number' ? aircraft.alt_baro : onGround ? 0 : null,
-        groundSpeedKt: aircraft.gs ?? null,
-        headingDeg: aircraft.track ?? null,
-        verticalRateFpm: aircraft.baro_rate ?? null,
-        squawk: aircraft.squawk ?? null,
-        onGround,
-        aircraftType: aircraft.t ?? null,
-        registration: aircraft.r ?? null,
-        photoUrl: photo?.url ?? null,
-        photographer: photo?.photographer ?? null,
-        source: provider.name,
-        fetchedAt: new Date().toISOString(),
-      };
-    }
+    const fix: LiveFlightData = {
+      live: true,
+      callsign: (aircraft.flight ?? callsign).trim(),
+      hex: aircraft.hex ?? '',
+      lat: aircraft.lat!,
+      lon: aircraft.lon!,
+      altitudeFt: typeof aircraft.alt_baro === 'number' ? aircraft.alt_baro : onGround ? 0 : null,
+      groundSpeedKt: aircraft.gs ?? null,
+      headingDeg: aircraft.track ?? null,
+      verticalRateFpm: aircraft.baro_rate ?? null,
+      squawk: aircraft.squawk ?? null,
+      onGround,
+      aircraftType: aircraft.t ?? null,
+      registration: aircraft.r ?? null,
+      photoUrl: photo?.url ?? null,
+      photographer: photo?.photographer ?? null,
+      source: provider,
+      fetchedAt: new Date().toISOString(),
+      ageSeconds: 0,
+    };
+    fixCache.set(cacheKey, fix);
+    return fix;
   }
 
-  return { live: false, reason: sawProviderResponse ? 'not-airborne' : 'unavailable' };
+  // Providers hiccuped or lost the aircraft briefly — serve the last known
+  // fix (up to 10 min old) instead of blanking the panel.
+  const cached = fixCache.get(cacheKey);
+  if (cached) {
+    const ageMs = Date.now() - new Date(cached.fetchedAt).getTime();
+    if (ageMs < FIX_CACHE_TTL_MS) {
+      return { ...cached, ageSeconds: Math.round(ageMs / 1000) };
+    }
+    fixCache.delete(cacheKey);
+  }
+
+  return { live: false, reason: anyResponse ? 'not-airborne' : 'unavailable' };
+}
+
+// Great-circle distance (km) — used to place the plane on the route line
+// from its real position.
+export function haversineKm(a: [number, number], b: [number, number]): number {
+  const R = 6371;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLon = ((b[1] - a[1]) * Math.PI) / 180;
+  const la1 = (a[0] * Math.PI) / 180;
+  const la2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 export function headingToCompass(deg: number): string {

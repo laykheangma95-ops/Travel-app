@@ -147,6 +147,141 @@ function mapStatus(raw: string): FlightStatusKind {
   return 'scheduled';
 }
 
+// ─── Airport departure board (FIDS) ─────────────────────────────────────────
+
+export type BoardStage =
+  | 'scheduled'
+  | 'check-in'
+  | 'boarding'
+  | 'final-call'
+  | 'gate-closed'
+  | 'departed'
+  | 'delayed'
+  | 'cancelled';
+
+export interface BoardFlight {
+  number: string;
+  airline: string;
+  destination: string;
+  destinationIata: string;
+  scheduledTime: string; // HH:mm local
+  revisedTime?: string;
+  stage: BoardStage;
+  gate?: string;
+  terminal?: string;
+  checkIn?: string;
+  demo?: boolean;
+}
+
+function mapFidsStatus(raw: string, scheduledMs: number, now: number): BoardStage {
+  const s = raw.toLowerCase();
+  if (s.includes('cancel')) return 'cancelled';
+  if (s.includes('departed') || s.includes('enroute') || s.includes('airborne')) return 'departed';
+  if (s.includes('gateclos') || s.includes('gate clos')) return 'gate-closed';
+  if (s.includes('boarding')) return 'boarding';
+  if (s.includes('checkin') || s.includes('check-in')) return 'check-in';
+  if (s.includes('delay')) return 'delayed';
+  // No explicit stage from the airport — infer from time.
+  const minutesToGo = (scheduledMs - now) / 60000;
+  if (minutesToGo < -10) return 'departed';
+  if (minutesToGo < 20) return 'final-call';
+  if (minutesToGo < 45) return 'boarding';
+  if (minutesToGo < 180) return 'check-in';
+  return 'scheduled';
+}
+
+function hhmm(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Demo board so the page works before an API key is configured.
+export function getMockAirportBoard(iata: string): BoardFlight[] {
+  const now = Date.now();
+  const rows: Array<[string, string, string, string, number, BoardStage, string, string]> = [
+    ['K6 720', 'Cambodia Angkor Air', 'Ho Chi Minh City', 'SGN', -25, 'departed', 'A2', 'C01-C03'],
+    ['KR 937', 'Cambodia Airways', 'Guangzhou', 'CAN', 12, 'final-call', 'A35', 'B06-B09'],
+    ['QH 215', 'Bamboo Airways', 'Bangkok', 'BKK', 34, 'boarding', 'B3', 'C04-C08'],
+    ['SQ 157', 'Singapore Airlines', 'Singapore', 'SIN', 75, 'check-in', 'B7', 'D01-D05'],
+    ['VN 841', 'Vietnam Airlines', 'Hanoi', 'HAN', 95, 'check-in', 'A6', 'C09-C12'],
+    ['FD 607', 'Thai AirAsia', 'Bangkok Don Mueang', 'DMK', 140, 'check-in', 'B1', 'B01-B04'],
+    ['CZ 324', 'China Southern', 'Guangzhou', 'CAN', 205, 'scheduled', '—', 'opens 17:40'],
+    ['PG 934', 'Bangkok Airways', 'Bangkok', 'BKK', 260, 'scheduled', '—', 'opens 18:35'],
+  ];
+  return rows.map(([number, airline, destination, destinationIata, offsetMin, stage, gate, checkIn]) => ({
+    number,
+    airline,
+    destination,
+    destinationIata,
+    scheduledTime: hhmm(new Date(now + offsetMin * 60000)),
+    stage,
+    gate: gate === '—' ? undefined : gate,
+    terminal: iata === 'KTI' ? '1' : undefined,
+    checkIn,
+    demo: true,
+  }));
+}
+
+interface FidsLeg {
+  number: string;
+  status: string;
+  airline?: { name?: string };
+  movement: {
+    airport?: { iata?: string; name?: string; municipalityName?: string };
+    scheduledTime?: { local?: string };
+    revisedTime?: { local?: string };
+    gate?: string;
+    terminal?: string;
+    checkInDesk?: string;
+  };
+}
+
+export async function fetchAirportBoard(iata: string): Promise<BoardFlight[]> {
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) return getMockAirportBoard(iata);
+
+  // FIDS window: from 1h ago to 11h ahead (12h max per request).
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${hhmm(d)}`;
+  const from = new Date(Date.now() - 60 * 60000);
+  const to = new Date(Date.now() + 11 * 60 * 60000);
+
+  const res = await fetch(
+    `https://${HOST}/flights/airports/iata/${iata.toUpperCase()}/${fmt(from)}/${fmt(to)}?direction=Departure&withCancelled=true&withCodeshared=false&withCargo=false&withPrivate=false`,
+    {
+      headers: { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': HOST },
+      next: { revalidate: 60 },
+    }
+  );
+  if (!res.ok) return getMockAirportBoard(iata);
+
+  const data = (await res.json()) as { departures?: FidsLeg[] };
+  const departures = data.departures ?? [];
+  if (departures.length === 0) return getMockAirportBoard(iata);
+
+  const now = Date.now();
+  return departures
+    .map((leg): BoardFlight | null => {
+      const scheduled = leg.movement.scheduledTime?.local;
+      if (!scheduled) return null;
+      const scheduledMs = new Date(scheduled).getTime();
+      const revised = leg.movement.revisedTime?.local;
+      return {
+        number: leg.number,
+        airline: leg.airline?.name ?? '',
+        destination: leg.movement.airport?.municipalityName ?? leg.movement.airport?.name ?? '',
+        destinationIata: leg.movement.airport?.iata ?? '',
+        scheduledTime: hhmm(new Date(scheduled)),
+        revisedTime: revised ? hhmm(new Date(revised)) : undefined,
+        stage: mapFidsStatus(leg.status ?? '', scheduledMs, now),
+        gate: leg.movement.gate,
+        terminal: leg.movement.terminal,
+        checkIn: leg.movement.checkInDesk,
+      };
+    })
+    .filter((f): f is BoardFlight => f !== null)
+    .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+}
+
 export async function fetchFlightStatus(flightNumber: string, date: string): Promise<FlightStatus> {
   const apiKey = process.env.RAPIDAPI_KEY;
   if (!apiKey) return getMockFlightStatus(flightNumber, date);

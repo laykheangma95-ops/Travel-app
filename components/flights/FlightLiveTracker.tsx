@@ -12,12 +12,14 @@ interface FlightLiveTrackerProps {
   flightNumber: string;
   depIata?: string;
   arrIata?: string;
+  /** Called with each live fix (or null) so the parent can derive progress. */
+  onLive?: (data: (LiveFlightResult & { live: true }) | null) => void;
 }
 
 // Live aircraft telemetry panel — powered by the open ADS-B receiver network
 // (the same crowdsourced data FlightRadar24 is built on). Dark, premium,
 // Singapore-Airlines-style presentation.
-export function FlightLiveTracker({ flightNumber, depIata, arrIata }: FlightLiveTrackerProps) {
+export function FlightLiveTracker({ flightNumber, depIata, arrIata, onLive }: FlightLiveTrackerProps) {
   const [data, setData] = useState<LiveFlightResult | null>(null);
 
   useEffect(() => {
@@ -27,7 +29,10 @@ export function FlightLiveTracker({ flightNumber, depIata, arrIata }: FlightLive
         const res = await fetch(`/api/flights/live?number=${encodeURIComponent(flightNumber)}`);
         if (!res.ok) return;
         const json = (await res.json()) as LiveFlightResult;
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setData(json);
+          onLive?.(json.live ? json : null);
+        }
       } catch {
         // network hiccup — keep last known state
       }
@@ -38,9 +43,20 @@ export function FlightLiveTracker({ flightNumber, depIata, arrIata }: FlightLive
       cancelled = true;
       clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flightNumber]);
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="mt-6 flex items-center gap-4 rounded-card border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-accent" />
+        </span>
+        <p className="text-sm text-white/60">Connecting to the live tracking network…</p>
+      </div>
+    );
+  }
 
   if (!data.live) {
     return (
@@ -108,7 +124,9 @@ export function FlightLiveTracker({ flightNumber, depIata, arrIata }: FlightLive
           </h2>
         </div>
         <p className="hidden font-mono text-xs text-white/40 sm:block">
-          via {data.source} · updates every 20s
+          {data.ageSeconds > 30
+            ? `last signal ${Math.round(data.ageSeconds / 60) || 1} min ago`
+            : `via ${data.source} · updates every 20s`}
         </p>
       </div>
 
