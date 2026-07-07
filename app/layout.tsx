@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
+import 'leaflet/dist/leaflet.css';
 import './globals.css';
 
 const display = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' });

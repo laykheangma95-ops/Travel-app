@@ -239,4 +239,43 @@
   .ticket-notch::after {
     right: -12px;
   }
+
+  /* Dark-page variant: notches punch through to the night background */
+  .ticket-notch-dark::before,
+  .ticket-notch-dark::after {
+    background: #070d1c;
+  }
+
+  /* Leaflet dark-theme adjustments */
+  .live-plane-marker {
+    background: transparent;
+    border: none;
+  }
+
+  .leaflet-container {
+    font-family: var(--font-body), sans-serif;
+  }
+
+  .leaflet-control-zoom a {
+    background: #0a1930 !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+  }
+
+  .leaflet-control-attribution {
+    background: rgba(6, 11, 22, 0.75) !important;
+    color: rgba(255, 255, 255, 0.45) !important;
+  }
+
+  .leaflet-control-attribution a {
+    color: rgba(255, 255, 255, 0.6) !important;
+  }
+
+  .leaflet-tooltip {
+    background: #0a1930;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+  }
 }

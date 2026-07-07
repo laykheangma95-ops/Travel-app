@@ -4,12 +4,20 @@ import { useEffect, useState } from 'react';
 import { Gauge, MoveVertical, Compass, Radio, Radar, Camera } from 'lucide-react';
 import type { LiveFlightResult } from '@/lib/liveFlight';
 import { headingToCompass } from '@/lib/liveFlight';
+import { LiveMap } from './LiveMap';
 
 const POLL_MS = 20_000; // ADS-B positions refresh every few seconds; 20s is plenty
 
+interface FlightLiveTrackerProps {
+  flightNumber: string;
+  depIata?: string;
+  arrIata?: string;
+}
+
 // Live aircraft telemetry panel — powered by the open ADS-B receiver network
-// (the same crowdsourced data FlightRadar24 is built on).
-export function FlightLiveTracker({ flightNumber }: { flightNumber: string }) {
+// (the same crowdsourced data FlightRadar24 is built on). Dark, premium,
+// Singapore-Airlines-style presentation.
+export function FlightLiveTracker({ flightNumber, depIata, arrIata }: FlightLiveTrackerProps) {
   const [data, setData] = useState<LiveFlightResult | null>(null);
 
   useEffect(() => {
@@ -36,27 +44,24 @@ export function FlightLiveTracker({ flightNumber }: { flightNumber: string }) {
 
   if (!data.live) {
     return (
-      <div className="mt-6 flex items-center gap-4 rounded-card border border-line/60 bg-white p-6 shadow-card">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-3">
-          <Radar size={20} className="text-ink-muted" aria-hidden="true" />
+      <div className="mt-6 flex items-center gap-4 rounded-card border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10">
+          <Radar size={20} className="text-white/60" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-semibold text-ink">Live aircraft tracking on standby</p>
-          <p className="mt-0.5 text-sm text-ink-secondary">
+          <p className="text-sm font-semibold text-white">Live aircraft tracking on standby</p>
+          <p className="mt-0.5 text-sm text-white/60">
             {data.reason === 'not-airborne'
               ? 'The aircraft is not broadcasting right now — live position, altitude, and speed appear here automatically once it takes off.'
               : 'The live tracking network is unreachable from this connection. It activates automatically when available.'}
           </p>
-          <p className="mt-1 text-xs text-ink-muted">
+          <p className="mt-1 text-xs text-white/40">
             Data: open ADS-B receiver network — the same source FlightRadar24 uses.
           </p>
         </div>
       </div>
     );
   }
-
-  const bbox = [data.lon - 1.2, data.lat - 0.7, data.lon + 1.2, data.lat + 0.7].join('%2C');
-  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${data.lat}%2C${data.lon}`;
 
   const stats = [
     {
@@ -89,47 +94,51 @@ export function FlightLiveTracker({ flightNumber }: { flightNumber: string }) {
   ];
 
   return (
-    <article className="mt-6 overflow-hidden rounded-card border border-line/60 bg-white shadow-card">
+    <article className="mt-6 overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(170deg,#0A1930_0%,#060B16_100%)] shadow-card-hover">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-line px-6 py-4 sm:px-8">
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 sm:px-8">
         <div className="flex items-center gap-3">
           <span className="relative flex h-3 w-3">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
             <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
           </span>
-          <h2 className="font-display font-bold text-ink">
+          <h2 className="font-display font-bold text-white">
             LIVE — tracking {data.callsign}
-            {data.onGround && <span className="ml-2 text-sm font-medium text-ink-muted">(on the ground)</span>}
+            {data.onGround && <span className="ml-2 text-sm font-medium text-white/50">(on the ground)</span>}
           </h2>
         </div>
-        <p className="hidden font-mono text-xs text-ink-muted sm:block">
+        <p className="hidden font-mono text-xs text-white/40 sm:block">
           via {data.source} · updates every 20s
         </p>
       </div>
 
-      {/* Live map */}
-      <div className="relative h-72 w-full bg-surface-3 sm:h-80">
-        <iframe
-          key={`${data.lat.toFixed(3)}-${data.lon.toFixed(3)}`}
-          title={`Live position of flight ${data.callsign}`}
-          src={mapUrl}
-          className="h-full w-full border-0"
-          loading="lazy"
+      {/* Live dark map with rotated plane, route, and trail */}
+      <div className="relative">
+        <LiveMap
+          lat={data.lat}
+          lon={data.lon}
+          headingDeg={data.headingDeg}
+          depIata={depIata}
+          arrIata={arrIata}
+          callsign={data.callsign}
         />
-        <div className="pointer-events-none absolute left-3 top-3 rounded-btn bg-primary/85 px-3 py-1.5 font-mono text-xs text-white backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-3 z-[1000] rounded-btn bg-[#060B16]/85 px-3 py-1.5 font-mono text-xs text-white/80 backdrop-blur">
           {data.lat.toFixed(4)}, {data.lon.toFixed(4)}
         </div>
       </div>
 
-      {/* Telemetry */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line sm:grid-cols-4 sm:divide-y-0">
-        {stats.map((s) => (
-          <div key={s.label} className="p-5 text-center">
+      {/* Telemetry instruments */}
+      <div className="grid grid-cols-2 border-b border-t border-white/10 sm:grid-cols-4">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={`p-5 text-center ${i > 0 ? 'border-l border-white/10' : ''} ${i >= 2 ? 'max-sm:border-t max-sm:border-white/10' : ''} ${i === 2 ? 'max-sm:border-l-0' : ''}`}
+          >
             <s.icon size={18} className="mx-auto text-accent" aria-hidden="true" />
-            <p className="mt-2 font-mono text-lg font-bold text-ink">{s.value}</p>
-            <p className="text-xs text-ink-muted">
+            <p className="mt-2 font-mono text-xl font-bold tracking-tight text-white">{s.value}</p>
+            <p className="text-xs text-white/40">
               {s.label}
-              {s.sub && <span className="ml-1 text-ink-secondary">· {s.sub}</span>}
+              {s.sub && <span className="ml-1 text-white/60">· {s.sub}</span>}
             </p>
           </div>
         ))}
@@ -144,25 +153,25 @@ export function FlightLiveTracker({ flightNumber }: { flightNumber: string }) {
             <img
               src={data.photoUrl}
               alt={`Aircraft ${data.registration ?? data.callsign}`}
-              className="h-28 w-44 rounded-card border border-line object-cover"
+              className="h-28 w-44 rounded-card border border-white/15 object-cover"
             />
-            <figcaption className="mt-1 flex items-center gap-1 text-[10px] text-ink-muted">
+            <figcaption className="mt-1 flex items-center gap-1 text-[10px] text-white/40">
               <Camera size={10} aria-hidden="true" /> {data.photographer}
             </figcaption>
           </figure>
         )}
-        <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-muted">Registration</dt>
-            <dd className="font-mono font-semibold text-ink">{data.registration ?? 'Unknown'}</dd>
+            <dt className="text-xs uppercase tracking-wide text-white/40">Registration</dt>
+            <dd className="font-mono font-semibold text-white">{data.registration ?? 'Unknown'}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-muted">Aircraft type</dt>
-            <dd className="font-mono font-semibold text-ink">{data.aircraftType ?? 'Unknown'}</dd>
+            <dt className="text-xs uppercase tracking-wide text-white/40">Aircraft type</dt>
+            <dd className="font-mono font-semibold text-white">{data.aircraftType ?? 'Unknown'}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-muted">Transponder</dt>
-            <dd className="font-mono font-semibold text-ink">{data.hex.toUpperCase() || '—'}</dd>
+            <dt className="text-xs uppercase tracking-wide text-white/40">Transponder</dt>
+            <dd className="font-mono font-semibold text-white">{data.hex.toUpperCase() || '—'}</dd>
           </div>
         </dl>
       </div>
