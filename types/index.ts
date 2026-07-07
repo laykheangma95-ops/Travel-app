@@ -119,6 +119,8 @@ export interface FlightStatus {
   delayMinutes?: number;
   progress?: number; // 0-100
   trackerCount?: number;
+  /** true when schedule data is simulated (no AeroDataBox key configured) */
+  demo?: boolean;
 }
 
 export interface SavedFlight {

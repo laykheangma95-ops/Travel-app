@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
+import { FlightLiveTracker } from '@/components/flights/FlightLiveTracker';
 import { NotifyModal } from '@/components/flights/NotifyModal';
 import { ShareModal } from '@/components/flights/ShareModal';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
@@ -66,12 +67,20 @@ export default function FlightDetailPage() {
 
       {flight && (
         <>
+          {flight.demo && (
+            <p className="mb-4 rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-ink-secondary">
+              ℹ️ Schedule times/gates below are <strong>simulated</strong> (connect an AeroDataBox
+              key for real airline schedules). The <strong>live aircraft tracking</strong> further
+              down is real — it uses the ADS-B network and needs no key.
+            </p>
+          )}
           <FlightDashboard
             flight={flight}
             onNotify={() => setNotifyOpen(true)}
             onShare={() => setShareOpen(true)}
             onSave={saveToTrip}
           />
+          <FlightLiveTracker flightNumber={flightNumber} />
           {savedToTrip && (
             <p className="mt-4 rounded-btn bg-emerald-50 p-3.5 text-center text-sm font-medium text-success animate-fade-up">
               Saved! You&apos;ll find this flight in your dashboard.

@@ -108,6 +108,7 @@ export function getMockFlightStatus(flightNumber: string, date: string): FlightS
     delayMinutes,
     progress,
     trackerCount: (seed % 5) + 1,
+    demo: true,
   };
 }
 
