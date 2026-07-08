@@ -63,7 +63,7 @@ export default function FlightDetailPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_45%,#0B1B38_100%)]">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#1C3355_100%)]">
       <div className="stars" aria-hidden="true" />
       <div className="stars-far" aria-hidden="true" />
 
@@ -181,7 +181,7 @@ export default function FlightDetailPage() {
               </p>
               <Link
                 href={`/airport-guide?airport=${flight.departure.airport}`}
-                className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent transition-colors hover:text-orange-300"
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent transition-colors hover:text-gold-light"
               >
                 Open {flight.departure.airport} airport guide →
               </Link>

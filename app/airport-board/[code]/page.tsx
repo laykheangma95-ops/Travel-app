@@ -25,7 +25,7 @@ const AIRPORTS = [
 const stageConfig: Record<BoardStage, { label: string; labelKm: string; className: string; pulse?: boolean }> = {
   scheduled: { label: 'Scheduled', labelKm: 'តាមកាលវិភាគ', className: 'bg-white/10 text-white/70' },
   'check-in': { label: 'Check-in open', labelKm: 'បើកឆែកអ៊ីន', className: 'bg-emerald-500/20 text-emerald-300' },
-  boarding: { label: 'Boarding', labelKm: 'កំពុងឡើងយន្តហោះ', className: 'bg-accent/25 text-orange-300', pulse: true },
+  boarding: { label: 'Boarding', labelKm: 'កំពុងឡើងយន្តហោះ', className: 'bg-accent/25 text-gold-light', pulse: true },
   'final-call': { label: 'FINAL CALL', labelKm: 'ការហៅចុងក្រោយ', className: 'bg-red-500/25 text-red-300', pulse: true },
   'gate-closed': { label: 'Gate closed', labelKm: 'ទ្វារបិទ', className: 'bg-white/10 text-white/50' },
   departed: { label: 'Departed', labelKm: 'បានចេញដំណើរ', className: 'bg-blue-500/20 text-blue-300' },
@@ -80,7 +80,7 @@ export default function AirportBoardPage() {
   const isDemo = flights?.some((f) => f.demo);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_50%,#0B1B38_100%)]">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#1C3355_100%)]">
       <div className="stars" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -145,7 +145,7 @@ export default function AirportBoardPage() {
         )}
 
         {/* The board */}
-        <div className="overflow-hidden rounded-card border border-white/10 bg-[#060B16]/80 shadow-card-hover backdrop-blur">
+        <div className="overflow-hidden rounded-card border border-white/10 bg-[#0E1B30]/80 shadow-card-hover backdrop-blur">
           {/* Column headers */}
           <div className="hidden grid-cols-[64px_1fr_1.2fr_90px_70px_150px] gap-3 border-b border-white/10 px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-white/35 sm:grid">
             <span>Time</span>

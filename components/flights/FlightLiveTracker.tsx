@@ -110,7 +110,7 @@ export function FlightLiveTracker({ flightNumber, depIata, arrIata, onLive }: Fl
   ];
 
   return (
-    <article className="mt-6 overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(170deg,#0A1930_0%,#060B16_100%)] shadow-card-hover">
+    <article className="mt-6 overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(170deg,#1C3355_0%,#0E1B30_100%)] shadow-card-hover">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 sm:px-8">
         <div className="flex items-center gap-3">
@@ -140,7 +140,7 @@ export function FlightLiveTracker({ flightNumber, depIata, arrIata, onLive }: Fl
           arrIata={arrIata}
           callsign={data.callsign}
         />
-        <div className="pointer-events-none absolute left-3 top-3 z-[1000] rounded-btn bg-[#060B16]/85 px-3 py-1.5 font-mono text-xs text-white/80 backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-3 z-[1000] rounded-btn bg-[#0E1B30]/85 px-3 py-1.5 font-mono text-xs text-white/80 backdrop-blur">
           {data.lat.toFixed(4)}, {data.lon.toFixed(4)}
         </div>
       </div>

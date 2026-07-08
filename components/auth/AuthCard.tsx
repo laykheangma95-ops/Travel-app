@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { DomerLogo } from '@/components/brand/DomerMark';
 
 interface AuthCardProps {
   title: string;
@@ -13,9 +14,8 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
     <div className="flex min-h-[80vh] items-center justify-center bg-surface-2 px-4 py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <Link href="/" className="font-display text-2xl font-extrabold">
-            <span className="text-secondary">Domner</span>
-            <span className="text-accent">App</span>
+          <Link href="/" className="inline-flex justify-center">
+            <DomerLogo surface="light" size={36} />
           </Link>
           <h1 className="mt-6 font-display text-2xl font-bold text-ink">{title}</h1>
           <p className="mt-2 text-sm text-ink-secondary">{subtitle}</p>

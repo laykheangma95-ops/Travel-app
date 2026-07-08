@@ -67,13 +67,13 @@ export function ShareModal({ open, onClose, flight, date }: ShareModalProps) {
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center justify-center gap-1.5 rounded-btn bg-secondary px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#16305a]"
+          className="inline-flex items-center justify-center gap-1.5 rounded-btn bg-secondary px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#162c4a]"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? 'Copied!' : 'Copy Link'}
         </button>
         <a
-          href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Track flight ${flight.flightNumber} live on Domner App`)}`}
+          href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Track flight ${flight.flightNumber} live on Domer`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-btn bg-[#229ED9] px-3 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"

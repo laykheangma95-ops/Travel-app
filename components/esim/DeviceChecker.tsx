@@ -58,7 +58,7 @@ export function DeviceChecker() {
         />
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-btn bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#16305a]"
+          className="inline-flex items-center gap-2 rounded-btn bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#162c4a]"
         >
           <Search size={16} /> Check
         </button>

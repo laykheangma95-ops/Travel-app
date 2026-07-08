@@ -57,7 +57,7 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
                     type="checkbox"
                     checked={prefs[opt.key]}
                     onChange={(e) => setPrefs({ ...prefs, [opt.key]: e.target.checked })}
-                    className="h-4 w-4 rounded border-line text-accent accent-[#F97316]"
+                    className="h-4 w-4 rounded border-line text-accent accent-[#C69749]"
                   />
                   {opt.label}
                 </label>
@@ -92,7 +92,7 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
                   className={cn(
                     'flex-1 rounded-btn border-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200',
                     prefs.language === lang
-                      ? 'border-accent bg-orange-50 text-accent'
+                      ? 'border-accent bg-[#F5EEDC] text-accent'
                       : 'border-line text-ink-secondary hover:border-ink-muted'
                   )}
                 >

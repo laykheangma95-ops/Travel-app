@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Plane, BellRing } from 'lucide-react';
 import type { FlightStatus } from '@/types';
 import { FlightStatusBadge } from './FlightStatusBadge';
+import { DomerLogo } from '@/components/brand/DomerMark';
 import { formatTime } from '@/lib/utils';
 
 interface WakeLockSentinel {
@@ -64,7 +65,7 @@ export function TravelMode({ flight, onClose }: { flight: FlightStatus; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-[linear-gradient(180deg,#04070F_0%,#0A1628_55%,#0B1B38_100%)]"
+      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_55%,#1C3355_100%)]"
       role="dialog"
       aria-modal="true"
       aria-label={`Travel mode for flight ${flight.flightNumber}`}
@@ -73,9 +74,8 @@ export function TravelMode({ flight, onClose }: { flight: FlightStatus; onClose:
 
       {/* Top bar */}
       <div className="relative flex items-center justify-between px-5 pt-5">
-        <p className="font-display text-sm font-extrabold text-white/80">
-          <span className="text-[#93B4E8]">Domner</span>
-          <span className="text-accent">App</span>
+        <p className="flex items-center font-display text-sm font-extrabold text-white/80">
+          <DomerLogo surface="navy" size={22} kicker={false} />
           <span className="ml-2 font-body text-xs font-medium uppercase tracking-widest text-white/40">
             Travel Mode
           </span>
@@ -144,7 +144,7 @@ export function TravelMode({ flight, onClose }: { flight: FlightStatus; onClose:
               )}
             </div>
             <div className="rounded-card bg-accent/15 p-4 text-center">
-              <p className="text-[11px] uppercase tracking-widest text-orange-300/70">Gate</p>
+              <p className="text-[11px] uppercase tracking-widest text-gold-light/70">Gate</p>
               <p className="mt-1 font-mono text-3xl font-bold text-accent">{dep.gate ?? '—'}</p>
               {dep.terminal && <p className="text-xs text-white/40">Terminal {dep.terminal}</p>}
             </div>

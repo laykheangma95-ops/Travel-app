@@ -36,7 +36,7 @@ const dicts = {
     'hero.stat2': '24/7 Khmer Support',
     'hero.stat3': 'Instant Delivery',
     // Features
-    'features.eyebrow': 'Why Domner',
+    'features.eyebrow': 'Why Domer',
     'features.title': 'Everything a Cambodian traveler needs',
     'features.desc': 'Three tools that work together, from booking to landing.',
     'features.learnMore': 'Learn more',
@@ -61,7 +61,7 @@ const dicts = {
     'dest.from': 'From',
     'dest.viewPlans': 'View Plans',
     // Testimonials
-    'testi.eyebrow': 'Travelers trust Domner',
+    'testi.eyebrow': 'Travelers trust Domer',
     'testi.title': 'Stories from the road',
     // CTA
     'cta.title': 'Ready for your next trip?',
@@ -118,7 +118,7 @@ const dicts = {
     'hero.stat2': 'ជំនួយភាសាខ្មែរ 24/7',
     'hero.stat3': 'ដឹកជញ្ជូនភ្លាមៗ',
     // Features
-    'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domner',
+    'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domer',
     'features.title': 'អ្វីៗគ្រប់យ៉ាងដែលអ្នកដំណើរខ្មែរត្រូវការ',
     'features.desc': 'ឧបករណ៍បីដែលធ្វើការជាមួយគ្នា ពីការកក់រហូតដល់ការចុះចត។',
     'features.learnMore': 'ស្វែងយល់បន្ថែម',
@@ -143,7 +143,7 @@ const dicts = {
     'dest.from': 'ចាប់ពី',
     'dest.viewPlans': 'មើលគម្រោង',
     // Testimonials
-    'testi.eyebrow': 'អ្នកដំណើរទុកចិត្ត Domner',
+    'testi.eyebrow': 'អ្នកដំណើរទុកចិត្ត Domer',
     'testi.title': 'រឿងរ៉ាវពីដំណើរ',
     // CTA
     'cta.title': 'ត្រៀមខ្លួនសម្រាប់ដំណើរបន្ទាប់ហើយឬនៅ?',

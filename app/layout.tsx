@@ -1,37 +1,40 @@
 import type { Metadata } from 'next';
-import { Inter, Plus_Jakarta_Sans, JetBrains_Mono, Noto_Sans_Khmer } from 'next/font/google';
+import { Manrope, Marcellus, JetBrains_Mono, Noto_Serif_Khmer } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
+import { DomerSplash } from '@/components/brand/DomerLoader';
 import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
 
-const display = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' });
-const body = Inter({ subsets: ['latin'], variable: '--font-body' });
+// Domer brand type: Marcellus (display/wordmark), Manrope (UI/body),
+// Noto Serif Khmer (Khmer script), JetBrains Mono (flight data).
+const display = Marcellus({ subsets: ['latin'], weight: '400', variable: '--font-display' });
+const body = Manrope({ subsets: ['latin'], variable: '--font-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
-const khmer = Noto_Sans_Khmer({ subsets: ['khmer'], weight: ['400', '600'], variable: '--font-khmer' });
+const khmer = Noto_Serif_Khmer({ subsets: ['khmer'], weight: ['400', '600', '700'], variable: '--font-khmer' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://domnerapp.com'),
   title: {
-    default: 'Domner App — Travel Confidently. Stay Connected.',
-    template: '%s · Domner App',
+    default: 'Domer — Travel Confidently. Stay Connected.',
+    template: '%s · Domer',
   },
   description:
     "Cambodia's first Khmer-language travel super app. eSIM for 150+ countries, real-time flight alerts, and step-by-step airport guidance — all in Khmer.",
   openGraph: {
-    title: 'Domner App — Travel Confidently. Stay Connected.',
+    title: 'Domer — Travel Confidently. Stay Connected.',
     description:
       'eSIM for 150+ countries. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
     type: 'website',
-    siteName: 'Domner App',
+    siteName: 'Domer',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Domner App — Travel Confidently. Stay Connected.',
+    title: 'Domer — Travel Confidently. Stay Connected.',
   },
   manifest: '/manifest.webmanifest',
   icons: {
@@ -41,12 +44,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Domner',
+    title: 'Domer',
   },
 };
 
 export const viewport = {
-  themeColor: '#0A1628',
+  themeColor: '#14263F',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -54,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
         <LanguageProvider>
+          <DomerSplash />
           <ServiceWorkerRegister />
           <Suspense fallback={null}>
             <ReferralTracker />

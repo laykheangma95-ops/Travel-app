@@ -18,8 +18,8 @@ interface LiveMapProps {
 }
 
 function planeIconHtml(heading: number): string {
-  return `<div style="transform: rotate(${heading}deg); width:44px; height:44px; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0 0 8px rgba(249,115,22,0.85));">
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="#F97316" stroke="#0A1628" stroke-width="0.5" aria-hidden="true">
+  return `<div style="transform: rotate(${heading}deg); width:44px; height:44px; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0 0 8px rgba(198,151,73,0.85));">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="#C69749" stroke="#14263F" stroke-width="0.5" aria-hidden="true">
       <path d="M12 1.6 L13.4 8 L21.4 12.4 L21.4 14.3 L13.4 11.9 L13.4 17.2 L15.7 19.4 L15.7 21.3 L12 20 L8.3 21.3 L8.3 19.4 L10.6 17.2 L10.6 11.9 L2.6 14.3 L2.6 12.4 L10.6 8 Z"/>
     </svg>
   </div>`;
@@ -70,7 +70,7 @@ export function LiveMap({ lat, lon, headingDeg, depIata, arrIata, callsign }: Li
             dashArray: '5 9',
             opacity: 0.65,
           }).addTo(map);
-          L.circleMarker(dep, { radius: 5, color: '#F97316', fillColor: '#F97316', fillOpacity: 1, weight: 1 })
+          L.circleMarker(dep, { radius: 5, color: '#C69749', fillColor: '#C69749', fillOpacity: 1, weight: 1 })
             .addTo(map)
             .bindTooltip(depIata ?? '', { permanent: false });
           L.circleMarker(arr, { radius: 5, color: '#10B981', fillColor: '#10B981', fillOpacity: 1, weight: 1 })
@@ -105,7 +105,7 @@ export function LiveMap({ lat, lon, headingDeg, depIata, arrIata, callsign }: Li
       }
       if (!trailRef.current) {
         trailRef.current = L.polyline(trailPoints.current, {
-          color: '#F97316',
+          color: '#C69749',
           weight: 2.5,
           opacity: 0.9,
         }).addTo(mapRef.current);
@@ -138,7 +138,7 @@ export function LiveMap({ lat, lon, headingDeg, depIata, arrIata, callsign }: Li
   return (
     <div
       ref={containerRef}
-      className="h-80 w-full bg-[#0A1628] sm:h-96"
+      className="h-80 w-full bg-[#14263F] sm:h-96"
       role="img"
       aria-label={`Live map showing the position and heading of flight ${callsign}`}
     />

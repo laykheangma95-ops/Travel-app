@@ -40,10 +40,10 @@ export default function SignInPage() {
   return (
     <AuthCard
       title="Welcome back"
-      subtitle="Sign in to your Domner account"
+      subtitle="Sign in to your Domer account"
       footer={
         <>
-          New to Domner?{' '}
+          New to Domer?{' '}
           <Link href="/sign-up" className="font-semibold text-secondary hover:text-accent">
             Create an account
           </Link>
@@ -84,7 +84,7 @@ export default function SignInPage() {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-orange-600 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
           Sign In

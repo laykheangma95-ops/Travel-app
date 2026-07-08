@@ -50,7 +50,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
         </span>
         <h1 className="mt-5 font-display text-xl font-bold text-ink">Admin access</h1>
         <p className="mt-1.5 text-sm text-ink-secondary">
-          Enter the admin email to open the Domner control panel.
+          Enter the admin email to open the Domer control panel.
         </p>
         <form onSubmit={verify} className="mt-6 w-full space-y-3">
           <Input

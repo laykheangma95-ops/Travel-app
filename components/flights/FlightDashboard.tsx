@@ -22,7 +22,7 @@ export function FlightDashboard({ flight, onNotify, onShare, onSave, compact = f
   const progress = flight.progress ?? 0;
 
   return (
-    <article className="overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(170deg,#0E1D3C_0%,#081226_55%,#060B16_100%)] shadow-card-hover">
+    <article className="overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(170deg,#23406A_0%,#14263F_55%,#0E1B30_100%)] shadow-card-hover">
       {/* Ticket header */}
       <div className="relative px-6 py-6 text-white sm:px-8">
         <div className="stars-far" aria-hidden="true" />
@@ -59,12 +59,12 @@ export function FlightDashboard({ flight, onNotify, onShare, onSave, compact = f
                 className="absolute -top-[13px] -ml-3 transition-all duration-700 ease-smooth"
                 style={{ left: `${Math.min(96, Math.max(2, progress))}%` }}
               >
-                <Plane size={22} className="rotate-45 text-white drop-shadow-[0_2px_10px_rgba(249,115,22,0.7)]" />
+                <Plane size={22} className="rotate-45 text-white drop-shadow-[0_2px_10px_rgba(198,151,73,0.7)]" />
               </span>
               {/* Percentage flown, riding along with the plane */}
               {progress > 0 && progress < 100 && (
                 <span
-                  className="absolute top-2.5 -ml-5 rounded-full border border-white/15 bg-[#060B16]/90 px-2 py-0.5 font-mono text-[10px] font-bold text-accent transition-all duration-700 ease-smooth"
+                  className="absolute top-2.5 -ml-5 rounded-full border border-white/15 bg-[#0E1B30]/90 px-2 py-0.5 font-mono text-[10px] font-bold text-accent transition-all duration-700 ease-smooth"
                   style={{ left: `${Math.min(96, Math.max(2, progress))}%` }}
                 >
                   {progress}%

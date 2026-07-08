@@ -53,7 +53,7 @@ export default function EsimStorePage() {
         </div>
         <button
           type="submit"
-          className="rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+          className="rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:brightness-110"
           aria-label="Search"
         >
           <Search size={18} />

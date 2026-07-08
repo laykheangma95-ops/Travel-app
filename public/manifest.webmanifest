@@ -1,11 +1,11 @@
 {
-  "name": "Domner App — Travel Confidently",
-  "short_name": "Domner",
-  "description": "eSIM, live flight tracking, and airport guidance for Cambodian travelers — in Khmer.",
+  "name": "Domer — The Art of the Journey",
+  "short_name": "Domer",
+  "description": "Premium travel super app for Cambodian travelers — eSIM, live flight tracking, airport guidance, in Khmer.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A1628",
-  "theme_color": "#0A1628",
+  "background_color": "#14263F",
+  "theme_color": "#14263F",
   "orientation": "portrait",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

@@ -131,7 +131,7 @@ export default function DashboardPage() {
           {upcomingTrips.map((t) => (
             <Card key={t.title} className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <span className="flex h-11 w-11 items-center justify-center rounded-card bg-orange-50">
+                <span className="flex h-11 w-11 items-center justify-center rounded-card bg-[#F5EEDC]">
                   <Map size={20} className="text-accent" aria-hidden="true" />
                 </span>
                 <div>

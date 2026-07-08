@@ -178,7 +178,7 @@ export default function CheckoutPage() {
                   className={cn(
                     'flex w-full items-center gap-3 rounded-btn border-2 p-4 text-left transition-all duration-200 ease-smooth',
                     payMethod === 'stripe'
-                      ? 'border-accent bg-orange-50/50'
+                      ? 'border-accent bg-[#F5EEDC]/60'
                       : 'border-line hover:border-ink-muted'
                   )}
                   aria-pressed={payMethod === 'stripe'}
@@ -196,7 +196,7 @@ export default function CheckoutPage() {
                   className={cn(
                     'flex w-full items-center gap-3 rounded-btn border-2 p-4 text-left transition-all duration-200 ease-smooth',
                     payMethod === 'aba'
-                      ? 'border-accent bg-orange-50/50'
+                      ? 'border-accent bg-[#F5EEDC]/60'
                       : 'border-line hover:border-ink-muted'
                   )}
                   aria-pressed={payMethod === 'aba'}
@@ -216,7 +216,7 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 disabled={processing}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 ease-smooth hover:bg-orange-600 hover:shadow-md disabled:opacity-60"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 ease-smooth hover:brightness-110 hover:shadow-md disabled:opacity-60"
               >
                 {processing ? (
                   <>

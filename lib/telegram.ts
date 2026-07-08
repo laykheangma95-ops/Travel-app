@@ -1,6 +1,6 @@
 import type { EsimOrder } from '@/types';
 
-// Sends admin notifications to the Domner ops Telegram channel via bot API.
+// Sends admin notifications to the Domer ops Telegram channel via bot API.
 export async function notifyAdminNewOrder(order: EsimOrder): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;

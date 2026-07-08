@@ -49,7 +49,7 @@ export default function TripMemoriesPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-white/60">Trip Memory</p>
           <h1 className="mt-2 font-display text-3xl font-bold">{tripTitle} 🇹🇭</h1>
           <p className="mt-1.5 text-sm text-white/70">
-            My {tripStats.flights + 2} days in Thailand with Domner App
+            My {tripStats.flights + 2} days in Thailand with Domer
           </p>
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[

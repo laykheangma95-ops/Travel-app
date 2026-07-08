@@ -36,7 +36,7 @@ export default function CountryPlansPage({ params }: PageProps) {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#04070F_0%,#0A1628_55%,#14264D_100%)] py-16">
+      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#0E1B30_0%,#14263F_55%,#1C3355_100%)] py-16">
         <div className="stars-far" aria-hidden="true" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
@@ -133,7 +133,7 @@ export default function CountryPlansPage({ params }: PageProps) {
               The validity period starts when the eSIM first connects to a local network.
             </AccordionItem>
             <AccordionItem title="Can I share data with my travel partner?">
-              Yes — all Domner plans include hotspot/tethering, so you can share your connection
+              Yes — all Domer plans include hotspot/tethering, so you can share your connection
               with family members&apos; phones.
             </AccordionItem>
             <AccordionItem title={`Which networks will I connect to in ${dest.name}?`}>

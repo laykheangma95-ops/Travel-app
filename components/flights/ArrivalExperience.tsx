@@ -102,7 +102,7 @@ export function ArrivalExperience({ flight }: { flight: FlightStatus }) {
         </p>
         <Link
           href="https://t.me/domnerapp"
-          className="rounded-btn bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+          className="rounded-btn bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:brightness-110"
         >
           Khmer support →
         </Link>

@@ -8,7 +8,7 @@ const toneClasses: Record<Tone, string> = {
   warning: 'bg-amber-50 text-warning border-amber-200',
   danger: 'bg-red-50 text-danger border-red-200',
   info: 'bg-blue-50 text-blue-600 border-blue-200',
-  accent: 'bg-orange-50 text-accent border-orange-200',
+  accent: 'bg-[#F5EEDC] text-accent border-[#E2CFA0]',
   neutral: 'bg-surface-3 text-ink-secondary border-line',
 };
 

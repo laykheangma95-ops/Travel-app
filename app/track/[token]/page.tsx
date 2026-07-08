@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Download, Users } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
+import { DomerLogo } from '@/components/brand/DomerMark';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
 import { todayIso } from '@/lib/utils';
 
@@ -38,14 +39,13 @@ export default function PublicTrackPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_50%,#1B2A5B_100%)] pb-28">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#23406A_100%)] pb-28">
       <div className="stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="mb-8 text-center">
-          <p className="font-display text-lg font-extrabold text-white">
-            <span className="text-[#93B4E8]">Domner</span>
-            <span className="text-accent">App</span>
-          </p>
+          <span className="inline-flex justify-center">
+            <DomerLogo surface="navy" />
+          </span>
           <p className="mt-1 text-sm text-white/60">Live flight tracking · ការតាមដានជើងហោះហើរផ្ទាល់</p>
         </div>
 
@@ -91,14 +91,14 @@ export default function PublicTrackPage() {
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-primary/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <p className="text-sm font-semibold text-white">Get Domner App</p>
+            <p className="text-sm font-semibold text-white">Get Domer</p>
             <p className="text-xs text-white/60">eSIM + flight alerts + airport guide, in Khmer</p>
           </div>
           <Link
             href="/"
             className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
-            <Download size={15} /> Open Domner
+            <Download size={15} /> Open Domer
           </Link>
         </div>
       </div>

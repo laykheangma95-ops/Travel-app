@@ -56,7 +56,7 @@ function generateChecklist(setup: Setup): GeneratedItem[] {
   if (setup.destination === 'singapore') add('important', 'Submit the SG Arrival Card online');
   if (setup.destination === 'malaysia') add('important', 'Complete the Malaysia Digital Arrival Card (MDAC)');
   if (setup.destination === 'japan') add('important', 'Complete Visit Japan Web for faster entry');
-  add('important', 'Check flight status on Domner App');
+  add('important', 'Check flight status on Domer');
   if (customs) add('important', `Confirm: max cash $${customs.maxCashUsd.toLocaleString()} USD allowed into ${name}`);
   add('important', `Screenshot hotel address in the local language for the taxi driver`);
   add('important', 'Download offline maps of your destination city');
@@ -74,7 +74,7 @@ function generateChecklist(setup: Setup): GeneratedItem[] {
   add('day-of', `Arrive airport ${setup.flownBefore === 'yes' ? '2.5' : '3'} hours early`);
   add('day-of', 'Check in online');
   add('day-of', 'Activate eSIM only after landing');
-  if (setup.firstTimeAbroad === 'yes') add('day-of', 'Open the Domner Airport Guide when you arrive at the airport');
+  if (setup.firstTimeAbroad === 'yes') add('day-of', 'Open the Domer Airport Guide when you arrive at the airport');
 
   return items;
 }
@@ -118,7 +118,7 @@ export default function ChecklistPage() {
           className={cn(
             'rounded-btn border-2 px-4 py-2.5 text-sm font-medium transition-all duration-200',
             setup[field] === opt.value
-              ? 'border-accent bg-orange-50 text-accent'
+              ? 'border-accent bg-[#F5EEDC] text-accent'
               : 'border-line text-ink-secondary hover:border-ink-muted'
           )}
           aria-pressed={setup[field] === opt.value}
@@ -292,7 +292,7 @@ export default function ChecklistPage() {
                           type="checkbox"
                           checked={checked.has(item.id)}
                           onChange={() => toggle(item.id)}
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#F97316]"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#C69749]"
                         />
                         {item.label}
                       </label>

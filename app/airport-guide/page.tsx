@@ -67,7 +67,7 @@ function AirportGuideContent() {
             className={cn(
               'rounded-card border-2 p-4 text-left transition-all duration-200 ease-smooth hover:-translate-y-0.5',
               selected?.code === airport.code
-                ? 'border-accent bg-orange-50/60 shadow-card'
+                ? 'border-accent bg-[#F5EEDC]/70 shadow-card'
                 : 'border-line bg-white hover:border-ink-muted'
             )}
             aria-pressed={selected?.code === airport.code}
@@ -188,7 +188,7 @@ function AirportGuideContent() {
                               e.stopPropagation();
                               setActiveStep(i + 1);
                             }}
-                            className="rounded-btn bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600"
+                            className="rounded-btn bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:brightness-110"
                           >
                             Done — next step →
                           </button>

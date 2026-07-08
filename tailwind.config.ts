@@ -9,9 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: '#0A1628',
-        secondary: '#1B3A6B',
-        accent: '#F97316',
+        // Domer brand — Temple Night / Angkor Gold (see design_handoff_domer_brand)
+        primary: '#14263F', // Temple Night
+        'primary-deep': '#0E1B30',
+        secondary: '#1C3355', // Navy tint
+        'secondary-high': '#23406A',
+        accent: '#C69749', // Angkor Gold
+        gold: {
+          light: '#E6CB8B',
+          bright: '#F7EAC0',
+          dark: '#7A5A1E',
+        },
+        jade: '#1F7A66', // Mekong Jade
+        clay: '#B14A34', // Silk Clay
+        sandstone: '#F6F1E7',
         success: '#10B981',
         warning: '#F59E0B',
         danger: '#EF4444',
@@ -34,7 +45,7 @@ const config: Config = {
         khmer: ['var(--font-khmer)', 'sans-serif'],
       },
       borderRadius: {
-        card: '16px',
+        card: '18px',
         btn: '12px',
       },
       boxShadow: {

@@ -29,7 +29,7 @@ const testimonials = [
     name: 'Dara M.',
     trip: 'Japan trip',
     quote:
-      'The gate change notification saved me. I was in the coffee shop and Domner told me before the screen did.',
+      'The gate change notification saved me. I was in the coffee shop and Domer told me before the screen did.',
   },
   {
     initials: 'CS',
@@ -46,14 +46,14 @@ export function HomeContent() {
   return (
     <>
       {/* ── Hero — dusk sky, starfield, network globe ── */}
-      <section className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_38%,#14264D_66%,#2A3A6E_84%,#0A1628_100%)]">
+      <section className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)]">
         {/* Starfield */}
         <div className="stars" aria-hidden="true" />
         <div className="stars-far" aria-hidden="true" />
 
         {/* Sunset horizon glow behind the globe */}
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] animate-globe-glow bg-[radial-gradient(60%_55%_at_50%_100%,rgba(249,115,22,0.22)_0%,rgba(59,130,246,0.10)_45%,transparent_75%)]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] animate-globe-glow bg-[radial-gradient(60%_55%_at_50%_100%,rgba(198,151,73,0.22)_0%,rgba(59,130,246,0.10)_45%,transparent_75%)]"
           aria-hidden="true"
         />
 
@@ -70,14 +70,14 @@ export function HomeContent() {
           fill="none"
           aria-hidden="true"
         >
-          <path d="M120 330 Q 300 120 520 260" stroke="rgba(251,146,60,0.75)" strokeWidth="1.5" className="arc-line" />
-          <path d="M240 350 Q 480 60 760 300" stroke="rgba(251,146,60,0.55)" strokeWidth="1.5" className="arc-line" style={{ animationDelay: '-1.2s' }} />
+          <path d="M120 330 Q 300 120 520 260" stroke="rgba(230,203,139,0.75)" strokeWidth="1.5" className="arc-line" />
+          <path d="M240 350 Q 480 60 760 300" stroke="rgba(230,203,139,0.55)" strokeWidth="1.5" className="arc-line" style={{ animationDelay: '-1.2s' }} />
           <path d="M60 300 Q 420 180 830 340" stroke="rgba(147,197,253,0.5)" strokeWidth="1.2" className="arc-line" style={{ animationDelay: '-2.1s' }} />
-          <path d="M420 355 Q 600 150 880 260" stroke="rgba(251,146,60,0.45)" strokeWidth="1.2" className="arc-line" style={{ animationDelay: '-0.6s' }} />
+          <path d="M420 355 Q 600 150 880 260" stroke="rgba(230,203,139,0.45)" strokeWidth="1.2" className="arc-line" style={{ animationDelay: '-0.6s' }} />
           {[
             [120, 330], [520, 260], [240, 350], [760, 300], [60, 300], [830, 340], [880, 260],
           ].map(([cx, cy]) => (
-            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.5" fill="#FDBA74" className="arc-node" />
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.5" fill="#E6CB8B" className="arc-node" />
           ))}
         </svg>
 
@@ -97,7 +97,7 @@ export function HomeContent() {
           </span>
           <h1 className="mt-8 font-display text-5xl font-extrabold leading-[1.1] tracking-[-0.03em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
             {t('hero.t1')}
-            <span className="bg-gradient-to-r from-orange-300 via-accent to-orange-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-gold-bright via-gold-light to-accent bg-clip-text text-transparent">
               {' '}
               {t('hero.t2')}
             </span>
@@ -139,7 +139,7 @@ export function HomeContent() {
             {features.map((f, i) => (
               <Reveal key={f.nameKey} delay={i * 110}>
                 <div className="group h-full rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
-                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-orange-50 transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-[#F5EEDC] transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
                     <f.icon size={32} className="text-accent" aria-hidden="true" />
                   </div>
                   <h3 className="font-display text-lg font-bold tracking-tight text-ink">{t(f.nameKey)}</h3>
@@ -239,7 +239,7 @@ export function HomeContent() {
       </section>
 
       {/* ── Bottom CTA ── */}
-      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0A1628_0%,#14264D_60%,#0A1628_100%)] py-20">
+      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)] py-20">
         <div className="stars" aria-hidden="true" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">{t('cta.title')}</h2>

@@ -55,7 +55,7 @@ export default function AffiliatePage() {
             Earn 30% on every eSIM you refer
           </h1>
           <p className="mt-4 text-white/70">
-            Share Domner with your friends, followers, or tour groups — get paid in USD via ABA every
+            Share Domer with your friends, followers, or tour groups — get paid in USD via ABA every
             month.
           </p>
         </div>
@@ -110,7 +110,7 @@ export default function AffiliatePage() {
                   />
                   <Textarea
                     id="plan"
-                    label="How do you plan to promote Domner?"
+                    label="How do you plan to promote Domer?"
                     required
                     placeholder="e.g. My Facebook travel group with 12,000 members…"
                     value={form.plan}

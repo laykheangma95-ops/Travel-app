@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { FileDown, ImagePlus, QrCode } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { DomerLogo } from '@/components/brand/DomerMark';
 import { Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { destinations } from '@/data/destinations';
@@ -54,12 +55,12 @@ export default function GenerateEsimPage() {
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html>
-<html><head><title>${form.orderNumber} — Domner eSIM</title>
+<html><head><title>${form.orderNumber} — Domer eSIM</title>
 <style>
   body { font-family: Arial, sans-serif; color: #0F172A; max-width: 640px; margin: 0 auto; padding: 32px; }
-  .header { background: #0A1628; border-radius: 16px; padding: 28px; text-align: center; }
+  .header { background: #14263F; border-radius: 16px; padding: 28px; text-align: center; }
   .logo { font-size: 26px; font-weight: 800; }
-  .logo .d { color: #93B4E8; } .logo .a { color: #F97316; }
+  .logo .d { color: #E6CB8B; } .logo .a { color: #C69749; }
   h2 { margin-top: 32px; }
   table { width: 100%; border-collapse: collapse; margin: 16px 0; }
   td { padding: 10px 0; border-bottom: 1px solid #E2E8F0; }
@@ -68,9 +69,9 @@ export default function GenerateEsimPage() {
   .qr img { width: 240px; height: 240px; border: 1px solid #E2E8F0; border-radius: 16px; padding: 12px; }
   .steps { background: #F8FAFC; border-radius: 16px; padding: 20px 28px; }
   .footer { margin-top: 32px; text-align: center; color: #475569; font-size: 13px; }
-  .accent { color: #F97316; }
+  .accent { color: #C69749; }
 </style></head><body>
-  <div class="header"><div class="logo"><span class="d">Domner</span><span class="a">App</span></div></div>
+  <div class="header"><div class="logo"><span class="d">Domer</span></div></div>
   <h2>Your ${dest?.name ?? form.country} eSIM ${dest?.flag ?? ''}</h2>
   <table>
     <tr><td>Order number</td><td>${form.orderNumber}</td></tr>
@@ -150,11 +151,8 @@ export default function GenerateEsimPage() {
       <div>
         <h2 className="mb-5 font-display font-bold text-ink">Preview</h2>
         <Card className="overflow-hidden">
-          <div className="bg-primary p-6 text-center">
-            <p className="font-display text-xl font-extrabold">
-              <span className="text-[#93B4E8]">Domner</span>
-              <span className="text-accent">App</span>
-            </p>
+          <div className="flex justify-center bg-primary p-6">
+            <DomerLogo surface="navy" />
           </div>
           <div className="p-7">
             <h3 className="font-display text-lg font-bold text-ink">

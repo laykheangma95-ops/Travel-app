@@ -193,7 +193,7 @@ export default function EmergencyPhrasesPage() {
           return (
             <section key={cat.id} aria-labelledby={`cat-${cat.id}`}>
               <h2 id={`cat-${cat.id}`} className="mb-4 flex items-center gap-2.5 font-display text-lg font-bold text-ink">
-                <span className="flex h-9 w-9 items-center justify-center rounded-card bg-orange-50">
+                <span className="flex h-9 w-9 items-center justify-center rounded-card bg-[#F5EEDC]">
                   <Icon size={18} className="text-accent" aria-hidden="true" />
                 </span>
                 {cat.title} <span className="font-khmer text-sm font-normal text-ink-muted">{cat.titleKm}</span>
@@ -209,7 +209,7 @@ export default function EmergencyPhrasesPage() {
                       className={cn(
                         'flex w-full items-center justify-between gap-4 rounded-card border p-5 transition-all duration-200 ease-smooth',
                         speaking
-                          ? 'border-accent bg-orange-50/60 shadow-card'
+                          ? 'border-accent bg-[#F5EEDC]/70 shadow-card'
                           : copied
                             ? 'border-success bg-emerald-50'
                             : 'border-line/60 bg-white shadow-card hover:-translate-y-0.5 hover:border-secondary hover:shadow-card-hover'

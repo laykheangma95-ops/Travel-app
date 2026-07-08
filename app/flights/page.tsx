@@ -49,7 +49,7 @@ export default function FlightTrackerPage() {
   };
 
   return (
-    <div className="relative min-h-[80vh] overflow-hidden bg-[linear-gradient(180deg,#04070F_0%,#0A1628_45%,#1B2A5B_100%)]">
+    <div className="relative min-h-[80vh] overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#23406A_100%)]">
       <div className="stars" aria-hidden="true" />
       <div className="stars-far" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-20 sm:px-6">
@@ -64,7 +64,7 @@ export default function FlightTrackerPage() {
             Track any flight, live.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-white/70">
-            Gate changes, delays, boarding calls — Domner tells you before the airport screens do.
+            Gate changes, delays, boarding calls — Domer tells you before the airport screens do.
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export default function FlightTrackerPage() {
                 id="flight-suggestions"
                 role="listbox"
                 aria-label="Matching flights"
-                className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-card border border-white/15 bg-[#0A1930]/95 shadow-card-hover backdrop-blur-xl animate-fade-up"
+                className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-card border border-white/15 bg-[#1C3355]/95 shadow-card-hover backdrop-blur-xl animate-fade-up"
               >
                 {suggestions.map((s) => (
                   <li key={s.number} role="option" aria-selected="false">

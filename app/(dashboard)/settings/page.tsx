@@ -88,7 +88,7 @@ export default function SettingsPage() {
             (label) => (
               <label key={label} className="flex cursor-pointer items-center justify-between text-sm text-ink-secondary">
                 {label}
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#F97316]" />
+                <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#C69749]" />
               </label>
             )
           )}

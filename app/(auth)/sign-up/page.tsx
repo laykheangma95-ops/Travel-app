@@ -76,7 +76,7 @@ export default function SignUpPage() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Travel confidently with Domner"
+      subtitle="Travel confidently with Domer"
       footer={
         <>
           Already have an account?{' '}
@@ -143,7 +143,7 @@ export default function SignUpPage() {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-orange-600 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
           Create Account
