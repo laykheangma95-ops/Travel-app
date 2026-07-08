@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 import { DomerSplash } from '@/components/brand/DomerLoader';
+import { TripCopilot } from '@/components/copilot/TripCopilot';
 import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />
+          <TripCopilot />
         </LanguageProvider>
       </body>
     </html>

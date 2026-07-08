@@ -7,6 +7,7 @@ import { ArrowLeft, RefreshCw, Plane, MonitorSmartphone } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
 import { FlightLiveTracker } from '@/components/flights/FlightLiveTracker';
+import { DelayIntelligence } from '@/components/flights/DelayIntelligence';
 import { TravelMode } from '@/components/flights/TravelMode';
 import { NotifyModal } from '@/components/flights/NotifyModal';
 import { ShareModal } from '@/components/flights/ShareModal';
@@ -120,6 +121,7 @@ export default function FlightDetailPage() {
               onShare={() => setShareOpen(true)}
               onSave={saveToTrip}
             />
+            <DelayIntelligence flightNumber={flightNumber} date={date} />
             {/* Travel Mode: full-screen always-awake card for the travel day */}
             <button
               type="button"
