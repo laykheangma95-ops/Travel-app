@@ -96,12 +96,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ reply: reply || demoReply(turns, body?.context), demo: false });
   } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: typeof error.status === 'number' ? error.status : 500 }
-      );
-    }
-    return NextResponse.json({ error: 'Copilot is temporarily unavailable' }, { status: 500 });
+    // A configured key can still fail — invalid/expired key, exhausted credits,
+    // a spend cap, a rate limit, or a network hiccup. Rather than surface a raw
+    // error to the traveler (which reads as "the chatbot is broken"), log it and
+    // serve the same helpful bilingual demo reply we use when no key is set, so
+    // the Copilot always answers something useful.
+    console.error('[copilot] AI call failed, serving demo reply:', error instanceof Error ? error.message : error);
+    return NextResponse.json({ reply: demoReply(turns, body?.context), demo: true });
   }
 }
