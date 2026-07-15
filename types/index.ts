@@ -194,6 +194,10 @@ export interface AirportGuide {
   city: string;
   country: string;
   flag: string;
+  /** Link to the airport's official/interactive digital terminal map. */
+  digitalMapUrl?: string;
+  /** Short label describing the map source, e.g. "Official interactive map". */
+  digitalMapLabel?: string;
   departureSteps: AirportStep[];
   arrivalSteps: AirportStep[];
 }
