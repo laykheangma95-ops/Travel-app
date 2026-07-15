@@ -344,6 +344,7 @@ export async function fetchAirportBoard(iata: string): Promise<BoardFlight[]> {
   const apiKey = process.env.RAPIDAPI_KEY;
   if (!apiKey) return getMockAirportBoard(iata);
 
+  try {
   // FIDS window: from 1h ago to 11h ahead (12h max per request).
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${hhmm(d)}`;
@@ -385,12 +386,17 @@ export async function fetchAirportBoard(iata: string): Promise<BoardFlight[]> {
     })
     .filter((f): f is BoardFlight => f !== null)
     .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  } catch (error) {
+    console.error('[fids] AeroDataBox board request failed, serving mock:', error instanceof Error ? error.message : error);
+    return getMockAirportBoard(iata);
+  }
 }
 
 export async function fetchFlightStatus(flightNumber: string, date: string): Promise<FlightStatus> {
   const apiKey = process.env.RAPIDAPI_KEY;
   if (!apiKey) return getMockFlightStatus(flightNumber, date);
 
+  try {
   const cleaned = flightNumber.replace(/\s+/g, '').toUpperCase();
   const res = await fetch(`https://${HOST}/flights/number/${cleaned}/${date}?withAircraftImage=false&withLocation=false`, {
     headers: { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': HOST },
@@ -446,4 +452,11 @@ export async function fetchFlightStatus(flightNumber: string, date: string): Pro
     delayMinutes,
     progress,
   };
+  } catch (error) {
+    // A configured key can still fail — expired subscription, quota, rate
+    // limit, timeout, or a network hiccup on the serverless host. Fall back to
+    // stable mock data so the tracker keeps working instead of 404-ing.
+    console.error('[flights] AeroDataBox request failed, serving mock:', error instanceof Error ? error.message : error);
+    return getMockFlightStatus(flightNumber, date);
+  }
 }
