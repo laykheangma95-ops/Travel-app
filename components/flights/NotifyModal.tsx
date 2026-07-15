@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { BellRing, Check, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useNotifications, defaultAlertPreferences, type FlightAlertPreferences } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 
@@ -90,13 +91,14 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
                   aria-checked={prefs.language === lang}
                   onClick={() => setPrefs({ ...prefs, language: lang })}
                   className={cn(
-                    'flex-1 rounded-btn border-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200',
+                    'flex flex-1 items-center justify-center gap-2 rounded-btn border-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200',
                     prefs.language === lang
                       ? 'border-accent bg-[#F5EEDC] text-accent'
                       : 'border-line text-ink-secondary hover:border-ink-muted'
                   )}
                 >
-                  {lang === 'km' ? '🇰🇭 Khmer' : '🇬🇧 English'}
+                  <WavyFlag flag={lang === 'km' ? '🇰🇭' : '🇬🇧'} label={lang === 'km' ? 'Khmer' : 'English'} size={22} />
+                  {lang === 'km' ? 'Khmer' : 'English'}
                 </button>
               ))}
             </div>

@@ -5,6 +5,7 @@ import { destinations, getDestination } from '@/data/destinations';
 import { getPlansForCountry } from '@/data/esimPlans';
 import { getCustomsRule } from '@/data/customsRules';
 import { PlanCard } from '@/components/esim/PlanCard';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 import { DeviceChecker } from '@/components/esim/DeviceChecker';
 import { Accordion, AccordionItem } from '@/components/ui/Accordion';
 import { Badge } from '@/components/ui/Badge';
@@ -42,9 +43,7 @@ export default function CountryPlansPage({ params }: PageProps) {
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center gap-4">
-                <span className="text-6xl" role="img" aria-label={`${dest.name} flag`}>
-                  {dest.flag}
-                </span>
+                <WavyFlag flag={dest.flag} label={`${dest.name} flag`} size={92} />
                 <div>
                   <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">
                     {dest.name} eSIM Plans

@@ -5,6 +5,7 @@ import { Trash2, ShoppingCart, Tag } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 import { formatKhr, formatUsd } from '@/lib/utils';
 
 export default function CartPage() {
@@ -49,9 +50,7 @@ export default function CartPage() {
                 key={item.planId}
                 className="flex items-center gap-4 rounded-card border border-line/60 bg-white p-5 shadow-card"
               >
-                <span className="text-4xl" role="img" aria-label={`${item.countryName} flag`}>
-                  {item.flag}
-                </span>
+                <WavyFlag flag={item.flag} label={`${item.countryName} flag`} size={52} />
                 <div className="flex-1">
                   <p className="font-display font-bold text-ink">
                     {item.countryName} — {item.planName}

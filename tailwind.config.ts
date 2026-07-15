@@ -41,7 +41,10 @@ const config: Config = {
       fontFamily: {
         display: ['var(--font-display)', 'sans-serif'],
         body: ['var(--font-body)', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
+        // No separate monospace face — flight/order data uses the body font
+        // with tabular numerals (see .font-mono in globals.css) to keep the
+        // site to 3 font families instead of 4.
+        mono: ['var(--font-body)', 'sans-serif'],
         khmer: ['var(--font-khmer)', 'sans-serif'],
       },
       borderRadius: {

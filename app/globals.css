@@ -42,6 +42,13 @@
     font-family: var(--font-khmer), var(--font-display), sans-serif;
   }
 
+  /* font-mono has no dedicated typeface (see layout.tsx) — tabular numerals
+     keep flight/order numbers quietly aligned without a 4th font file. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
   ::selection {
     @apply bg-accent/20 text-ink;
   }
@@ -179,6 +186,65 @@
       inset 0 1px 0 rgba(255, 253, 244, 0.65),
       inset 0 -8px 18px rgba(90, 64, 10, 0.35),
       0 10px 32px rgba(198, 151, 73, 0.38);
+  }
+
+  /* ── Wavy premium flag medallion ───────────────────────────────────────────
+     Dark navy-to-black glass badge with a gold-foil rim (Singapore Airlines–
+     style dark/gold premium look) and a rippling, cloth-like wave on the
+     flag glyph itself. */
+  .wavy-flag {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 30%;
+    overflow: hidden;
+    isolation: isolate;
+    background: radial-gradient(120% 130% at 28% 15%, #24406b 0%, #14263f 45%, #060b16 100%);
+    border: 1px solid rgba(230, 203, 139, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -8px 16px rgba(0, 0, 0, 0.55),
+      0 6px 16px rgba(2, 8, 23, 0.4),
+      0 0 0 1px rgba(198, 151, 73, 0.18);
+  }
+
+  .wavy-flag-sheen {
+    position: absolute;
+    inset: -25% -45%;
+    z-index: 2;
+    background: linear-gradient(115deg, transparent 32%, rgba(230, 203, 139, 0.4) 50%, transparent 64%);
+    transform: translateX(-70%);
+    animation: wavyFlagSheen 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .wavy-flag-cloth {
+    display: inline-block;
+    line-height: 1;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+    animation: wavyFlagRipple 3.4s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @keyframes wavyFlagSheen {
+    0%, 100% { transform: translateX(-70%); }
+    50% { transform: translateX(70%); }
+  }
+
+  @keyframes wavyFlagRipple {
+    0%, 100% { transform: perspective(140px) rotateY(0deg) rotateX(0deg) skewY(0deg); }
+    25% { transform: perspective(140px) rotateY(12deg) rotateX(3deg) skewY(2deg); }
+    50% { transform: perspective(140px) rotateY(0deg) rotateX(-3deg) skewY(-1.5deg); }
+    75% { transform: perspective(140px) rotateY(-12deg) rotateX(3deg) skewY(1.5deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wavy-flag-sheen,
+    .wavy-flag-cloth {
+      animation: none;
+    }
   }
 
   /* Sheen sweep across glass surfaces on hover */
@@ -495,7 +561,8 @@
     background: #0a1930;
     border-color: rgba(255, 255, 255, 0.2);
     color: #fff;
-    font-family: var(--font-mono), monospace;
+    font-family: var(--font-body), sans-serif;
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
   }
 }

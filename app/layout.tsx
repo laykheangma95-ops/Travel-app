@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Manrope, Marcellus, JetBrains_Mono, Noto_Serif_Khmer } from 'next/font/google';
+import { Manrope, Marcellus, Noto_Serif_Khmer } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
@@ -12,31 +12,31 @@ import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
 
-// Domer brand type: Marcellus (display/wordmark), Manrope (UI/body),
-// Noto Serif Khmer (Khmer script), JetBrains Mono (flight data).
+// Domner brand type — kept to three families: Marcellus (display/wordmark),
+// Manrope (UI/body, also flight & order data with tabular numerals — see
+// .font-mono in globals.css), Noto Serif Khmer (Khmer script).
 const display = Marcellus({ subsets: ['latin'], weight: '400', variable: '--font-display' });
 const body = Manrope({ subsets: ['latin'], variable: '--font-body' });
-const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
 const khmer = Noto_Serif_Khmer({ subsets: ['khmer'], weight: ['400', '600', '700'], variable: '--font-khmer' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://domnerapp.com'),
   title: {
-    default: 'Domer — Travel Confidently. Stay Connected.',
-    template: '%s · Domer',
+    default: 'Domner — Travel Confidently. Stay Connected.',
+    template: '%s · Domner',
   },
   description:
     "Cambodia's first Khmer-language travel super app. eSIM for 150+ countries, real-time flight alerts, and step-by-step airport guidance — all in Khmer.",
   openGraph: {
-    title: 'Domer — Travel Confidently. Stay Connected.',
+    title: 'Domner — Travel Confidently. Stay Connected.',
     description:
       'eSIM for 150+ countries. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
     type: 'website',
-    siteName: 'Domer',
+    siteName: 'Domner',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Domer — Travel Confidently. Stay Connected.',
+    title: 'Domner — Travel Confidently. Stay Connected.',
   },
   manifest: '/manifest.webmanifest',
   icons: {
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Domer',
+    title: 'Domner',
   },
 };
 
@@ -56,7 +56,7 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${khmer.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
         <LanguageProvider>
           <DomerSplash />

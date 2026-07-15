@@ -3,6 +3,7 @@ import { Map, Calendar, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 
 // Demo trips — served from trip_plans in Supabase once connected.
 const trips = [
@@ -58,8 +59,8 @@ export default function MyTripsPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           {trips.map((trip) => (
             <Card key={trip.id} hover className="overflow-hidden">
-              <div className="flex h-28 items-center justify-center bg-gradient-to-br from-secondary to-primary text-6xl">
-                <span role="img" aria-label={`${trip.destination} flag`}>{trip.flag}</span>
+              <div className="flex h-28 items-center justify-center bg-gradient-to-br from-secondary to-primary">
+                <WavyFlag flag={trip.flag} label={`${trip.destination} flag`} size={72} />
               </div>
               <div className="p-5">
                 <div className="flex items-start justify-between">
