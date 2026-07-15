@@ -1,5 +1,9 @@
+'use client';
+
 // Domer "Wayfinder Star" mark — 8-point compass rose with a gilded gem at the
 // pivot. Color recipes per surface follow the brand handoff exactly.
+
+import { useLang } from '@/lib/i18n';
 
 type Surface = 'navy' | 'light' | 'gold' | 'mono-dark' | 'mono-light';
 
@@ -45,18 +49,22 @@ interface DomerLogoProps {
   className?: string;
 }
 
-// Full lockup: mark + "Domer" wordmark (Marcellus, tracking .05em) with the
-// optional "TRAVEL" kicker (caps, tracking .36em, Angkor Gold).
+// Full lockup: mark + wordmark, which swaps with the language switcher —
+// "Domner" (Marcellus) + "TRAVEL" kicker in English, "ដំណើរ" (Khmer serif) +
+// "DOMNER" kicker in Khmer — so the logo visibly responds to the language
+// toggle instead of staying pinned to English.
 export function DomerLogo({ surface = 'light', size = 30, kicker = true, className }: DomerLogoProps) {
+  const { lang, t } = useLang();
   const wordColor = surface === 'navy' ? 'text-sandstone' : 'text-primary';
+  const wordFont = lang === 'km' ? 'font-khmer' : 'font-display';
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
       <DomerMark surface={surface} size={size} />
-      <span className="leading-none">
-        <span className={`block font-display text-xl tracking-[0.05em] ${wordColor}`}>Domer</span>
+      <span key={lang} className="leading-none animate-fade-up">
+        <span className={`block ${wordFont} text-xl tracking-[0.05em] ${wordColor}`}>{t('brand.word')}</span>
         {kicker && (
           <span className="mt-0.5 block text-[8px] font-semibold uppercase tracking-[0.36em] text-accent">
-            Travel
+            {t('brand.kicker')}
           </span>
         )}
       </span>

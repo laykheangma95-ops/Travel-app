@@ -3,6 +3,7 @@ import { Plane, Smartphone, Map, PlusCircle, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 
 // Demo dashboard data — replaced by Supabase queries once the project is
 // connected (see saved_flights, esim_orders, trip_plans tables).
@@ -94,9 +95,7 @@ export default function DashboardPage() {
             <Card key={e.country} className="p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl" role="img" aria-label={`${e.country} flag`}>
-                    {e.flag}
-                  </span>
+                  <WavyFlag flag={e.flag} label={`${e.country} flag`} size={44} />
                   <div>
                     <p className="font-semibold text-ink">
                       {e.country} — {e.plan}

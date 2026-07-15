@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 
 // Demo orders — served from esim_orders in Supabase once connected.
 const esims = [
@@ -57,9 +58,7 @@ export default function MyEsimsPage() {
             <Card key={e.orderNumber} className="p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
-                  <span className="text-4xl" role="img" aria-label={`${e.country} flag`}>
-                    {e.flag}
-                  </span>
+                  <WavyFlag flag={e.flag} label={`${e.country} flag`} size={52} />
                   <div>
                     <h2 className="font-display font-bold text-ink">
                       {e.country} — {e.plan}

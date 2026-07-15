@@ -7,6 +7,9 @@ export type Lang = 'en' | 'km';
 // UI dictionary. English is the source of truth; Khmer mirrors every key.
 const dicts = {
   en: {
+    // Brand
+    'brand.word': 'Domner',
+    'brand.kicker': 'TRAVEL',
     // Navbar
     'nav.esim': 'eSIM',
     'nav.buyEsim': 'Buy eSIM',
@@ -89,6 +92,9 @@ const dicts = {
     'footer.prices': 'All prices in USD',
   },
   km: {
+    // Brand
+    'brand.word': 'ដំណើរ',
+    'brand.kicker': 'DOMNER',
     // Navbar
     'nav.esim': 'eSIM',
     'nav.buyEsim': 'ទិញ eSIM',

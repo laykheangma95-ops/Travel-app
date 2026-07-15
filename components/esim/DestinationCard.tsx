@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { Destination } from '@/types';
 import { Badge } from '@/components/ui/Badge';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useLang } from '@/lib/i18n';
 
 export function DestinationCard({ destination }: { destination: Destination }) {
@@ -13,13 +14,12 @@ export function DestinationCard({ destination }: { destination: Destination }) {
       href={`/esim/${destination.slug}`}
       className="group relative flex h-full flex-col rounded-card border border-line/60 bg-white p-6 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
     >
-      <span
-        className="inline-block origin-bottom-left text-5xl transition-transform duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3"
-        role="img"
-        aria-label={`${destination.name} flag`}
-      >
-        {destination.flag}
-      </span>
+      <WavyFlag
+        flag={destination.flag}
+        label={`${destination.name} flag`}
+        size={60}
+        className="origin-bottom-left transition-transform duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3"
+      />
       <h3 className="mt-4 font-display text-lg font-bold text-ink">{destination.name}</h3>
       <p className="font-khmer text-sm text-ink-secondary">ចូលទស្សនា{destination.nameKm}</p>
       <div className="mt-4 flex items-center justify-between">

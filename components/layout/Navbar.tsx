@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, Menu, ShoppingCart, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { DomerLogo } from '@/components/brand/DomerMark';
+import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -131,10 +132,15 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-            className="rounded-btn px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3"
+            className="flex items-center gap-2 rounded-btn px-2.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3"
             aria-label={lang === 'en' ? 'ប្តូរទៅភាសាខ្មែរ' : 'Switch to English'}
           >
-            {lang === 'en' ? '🇬🇧 EN' : '🇰🇭 KM'}
+            <WavyFlag
+              flag={lang === 'en' ? '🇬🇧' : '🇰🇭'}
+              label={lang === 'en' ? 'English' : 'ភាសាខ្មែរ'}
+              size={26}
+            />
+            {lang === 'en' ? 'EN' : 'KM'}
           </button>
 
           <Link
