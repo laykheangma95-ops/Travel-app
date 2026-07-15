@@ -4,6 +4,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
+import { LiquidTouchController } from '@/components/pwa/LiquidTouchController';
 import { DomerSplash } from '@/components/brand/DomerLoader';
 import { TripCopilot } from '@/components/copilot/TripCopilot';
 import { LanguageProvider } from '@/lib/i18n';
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <DomerSplash />
           <ServiceWorkerRegister />
+          <LiquidTouchController />
           <Suspense fallback={null}>
             <ReferralTracker />
           </Suspense>

@@ -117,7 +117,8 @@ export function TripCopilot() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close Domer Copilot' : 'Open Domer Copilot'}
-        className="liquid-glass-accent liquid-sheen fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        data-liquid=""
+        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105"
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
       </button>
