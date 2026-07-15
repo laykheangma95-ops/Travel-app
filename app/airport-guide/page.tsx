@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Search, AlertTriangle, MessageSquare, PlaneTakeoff, PlaneLanding } from 'lucide-react';
+import { Search, AlertTriangle, MessageSquare, PlaneTakeoff, PlaneLanding, Map, ExternalLink } from 'lucide-react';
 import { airportGuides } from '@/data/airportGuides';
 import { cn } from '@/lib/utils';
 import type { AirportGuide } from '@/types';
@@ -114,9 +114,28 @@ function AirportGuideContent() {
             </button>
           </div>
 
-          <h2 className="mb-8 text-center font-display text-xl font-bold uppercase tracking-wide text-ink">
+          <h2 className="mb-6 text-center font-display text-xl font-bold uppercase tracking-wide text-ink">
             {mode === 'departure' ? 'Departing from' : 'Arriving at'} {selected.city} ({selected.code})
           </h2>
+
+          {/* Digital map — links to the airport's official / interactive terminal map */}
+          {selected.digitalMapUrl && (
+            <div className="mb-8 flex justify-center">
+              <a
+                href={selected.digitalMapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110"
+                aria-label={`Open the digital terminal map for ${selected.name}`}
+              >
+                <Map size={16} /> Digital Map
+                <span className="hidden items-center gap-1 text-xs font-normal text-white/80 sm:inline-flex">
+                  · {selected.digitalMapLabel ?? 'Interactive terminal map'}
+                  <ExternalLink size={12} />
+                </span>
+              </a>
+            </div>
+          )}
 
           {/* Steps */}
           <ol className="relative space-y-4 border-l-2 border-line pl-8">

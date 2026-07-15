@@ -7,6 +7,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Phnom Penh',
     country: 'Cambodia',
     flag: '🇰🇭',
+    digitalMapUrl: 'https://www.airportinformation.com/PNH/map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -67,6 +69,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Siem Reap',
     country: 'Cambodia',
     flag: '🇰🇭',
+    digitalMapUrl: 'https://www.airportinformation.com/SAI/map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -117,6 +121,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Bangkok',
     country: 'Thailand',
     flag: '🇹🇭',
+    digitalMapUrl: 'https://suvarnabhumi.airportthai.co.th/airport-map',
+    digitalMapLabel: 'Official interactive map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -163,6 +169,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Bangkok',
     country: 'Thailand',
     flag: '🇹🇭',
+    digitalMapUrl: 'https://donmueang.airportthai.co.th/airport-map',
+    digitalMapLabel: 'Official interactive map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -199,6 +207,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Ho Chi Minh City',
     country: 'Vietnam',
     flag: '🇻🇳',
+    digitalMapUrl: 'https://www.ifly.com/airports/ho-chi-minh-airport/terminal-map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -235,6 +245,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Hanoi',
     country: 'Vietnam',
     flag: '🇻🇳',
+    digitalMapUrl: 'https://www.ifly.com/airports/hanoi-noi-bai-airport/terminal-map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -264,6 +276,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Singapore',
     country: 'Singapore',
     flag: '🇸🇬',
+    digitalMapUrl: 'https://www.changiairport.com/en/at-changi/map.html',
+    digitalMapLabel: 'Official interactive map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -300,6 +314,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Beijing',
     country: 'China',
     flag: '🇨🇳',
+    digitalMapUrl: 'https://www.ifly.com/airports/beijing-capital-international-airport/terminal-map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -333,6 +349,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Shanghai',
     country: 'China',
     flag: '🇨🇳',
+    digitalMapUrl: 'https://www.ifly.com/airports/shanghai-pudong-international-airport/terminal-map',
+    digitalMapLabel: 'Interactive terminal map',
     departureSteps: [
       {
         title: 'Check-in',
@@ -358,6 +376,8 @@ export const airportGuides: AirportGuide[] = [
     city: 'Tokyo',
     country: 'Japan',
     flag: '🇯🇵',
+    digitalMapUrl: 'https://www.narita-airport.jp/en/map/',
+    digitalMapLabel: 'Official interactive map',
     departureSteps: [
       {
         title: 'Check-in',
