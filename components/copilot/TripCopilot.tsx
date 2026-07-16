@@ -43,7 +43,6 @@ export function TripCopilot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [demo, setDemo] = useState(false);
   const [flightSummary, setFlightSummary] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -90,8 +89,7 @@ export function TripCopilot() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: next, context: { flightNumber, flightSummary } }),
       });
-      const data = (await res.json()) as { reply?: string; demo?: boolean; error?: string };
-      setDemo(Boolean(data.demo));
+      const data = (await res.json()) as { reply?: string; error?: string };
       setMessages([
         ...next,
         { role: 'assistant', content: data.reply ?? data.error ?? 'Sorry, something went wrong.' },
@@ -176,12 +174,6 @@ export function TripCopilot() {
               </div>
             )}
           </div>
-
-          {demo && (
-            <p className="border-t border-white/10 px-4 py-1.5 text-center text-[10px] text-white/40">
-              Demo mode — connect OPENROUTER_API_KEY for live AI answers
-            </p>
-          )}
 
           <form
             onSubmit={(e) => {

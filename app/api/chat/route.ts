@@ -7,14 +7,14 @@
 //   block of business knowledge that auto-syncs eSIM prices/countries from the
 //   data files, so answers stay correct without editing this route.
 //
-// WHICH AI PROVIDER IT USES:
-//   OPENROUTER_API_KEY set → OpenRouter (openrouter.ai), which routes to Claude.
-//   No key                 → friendly "demo mode" canned answer, so the chatbot
-//                            always works while you're building.
+// HOW IT ANSWERS:
+//   It calls Claude through OpenRouter (openrouter.ai) using the brain as the
+//   system prompt. There is NO demo/canned mode — if the AI can't be reached the
+//   endpoint returns a clear error so the problem is visible, never hidden.
 //
-// SETUP ON VERCEL:
+// SETUP ON VERCEL (required for the chatbot to answer):
 //   Project → Settings → Environment Variables → add OPENROUTER_API_KEY
-//   (sk-or-v1-...) → Redeploy. That's it.
+//   (sk-or-v1-...) for the Production environment → Redeploy.
 //
 // TRY IT (with the dev server running):
 //   curl -s -X POST http://localhost:3000/api/chat \
@@ -49,20 +49,8 @@ interface ChatContext {
   flightSummary?: string | null;
 }
 
-// A canned reply used when no API key is configured (demo mode) OR when the AI
-// call fails for any reason — so the chatbot always answers something helpful.
-function demoReply(turns: ChatTurn[], context?: ChatContext): string {
-  const lastMessage = turns[turns.length - 1]?.content ?? '';
-  const wroteInKhmer = /[ក-៿]/.test(lastMessage); // any Khmer character?
-  const flightNote = context?.flightSummary ? ` (${context.flightSummary})` : '';
-
-  if (wroteInKhmer) {
-    return `សួស្តី! ខ្ញុំជាជំនួយការ Domner។ ដើម្បីទទួលបានចម្លើយ AI ពិតប្រាកដ សូមបញ្ចូល API key។${flightNote} ជាទូទៅ៖ ដំឡើង eSIM មុនពេលហោះហើរ ហើយបើកវានៅពេលចុះចតដល់គោលដៅ។`;
-  }
-  return `Hi! I'm the Domner assistant. Add an OPENROUTER_API_KEY to unlock live AI answers.${flightNote} In the meantime: install your eSIM before you fly, and switch it on only after you land at your destination.`;
-}
-
 // Ask Claude through OpenRouter (OpenAI-compatible chat/completions endpoint).
+// Throws on any failure so the caller can surface a clear error.
 async function askOpenRouter(
   apiKey: string,
   system: string,
@@ -95,7 +83,9 @@ async function askOpenRouter(
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
   };
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  const reply = data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!reply) throw new Error('OpenRouter returned an empty reply.');
+  return reply;
 }
 
 export async function POST(request: Request) {
@@ -113,10 +103,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please send at least one message.' }, { status: 400 });
   }
 
-  // ── Step 2: If there's no API key, answer in demo mode ───────────────────
+  // ── Step 2: The AI key must be configured — no demo fallback ─────────────
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) {
-    return NextResponse.json({ reply: demoReply(turns, body?.context), demo: true });
+    console.error('[chat] OPENROUTER_API_KEY is not set on this deployment.');
+    return NextResponse.json(
+      { error: 'The assistant is not configured yet: OPENROUTER_API_KEY is missing on the server.' },
+      { status: 503 },
+    );
   }
 
   // If the traveller is viewing a flight, hand that live context to the AI. We
@@ -129,14 +123,12 @@ export async function POST(request: Request) {
   // ── Step 3: Ask Claude (via OpenRouter) for a real answer ────────────────
   try {
     const reply = await askOpenRouter(openRouterKey, system, turns);
-
-    // ── Step 4: Send the reply back ──────────────────────────────────────────
-    return NextResponse.json({ reply: reply || demoReply(turns, body?.context), demo: false });
+    return NextResponse.json({ reply });
   } catch (error) {
-    // If anything goes wrong (bad key, no credits, network blip), we log it for
-    // ourselves and still return a helpful demo answer instead of an error —
-    // so the traveller is never left staring at a broken chatbot.
-    console.error('[chat] AI call failed, serving demo reply:', error instanceof Error ? error.message : error);
-    return NextResponse.json({ reply: demoReply(turns, body?.context), demo: true });
+    // Surface the real reason (bad key, no credits, wrong model, network blip)
+    // instead of hiding it — so it can actually be diagnosed and fixed.
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[chat] AI call failed:', message);
+    return NextResponse.json({ error: `AI request failed — ${message}` }, { status: 502 });
   }
 }
