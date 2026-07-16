@@ -1,6 +1,6 @@
 # 🤖 Domner AI Chatbot — Beginner's Guide
 
-A plain-English guide to the AI chatbot "brain" and the beginner chatbot API.
+A plain-English guide to the AI chatbot "brain" and the chatbot API.
 No AI/machine-learning background needed.
 
 ---
@@ -10,8 +10,8 @@ No AI/machine-learning background needed.
 | File | What it is |
 | --- | --- |
 | `lib/domnerBrain.ts` | **The brain.** A big, organised block of text that teaches Claude everything about the Domner business — products, eSIM setup, prices, policies, tone, and rules. |
-| `app/api/chat/route.ts` | **The beginner chatbot API.** A small, heavily-commented endpoint (`POST /api/chat`) that uses the brain to answer questions. Read it to learn how a chatbot works. |
-| `app/api/copilot/route.ts` | The existing **production** chatbot (already wired into the floating "✦" Copilot button in the app). More advanced: it adds a free FAQ layer and live flight context. |
+| `app/api/chat/route.ts` | **The chatbot API.** A small, heavily-commented endpoint (`POST /api/chat`) that uses the brain to answer questions. It powers the floating "✦" Trip Copilot in the app and picks up live flight context when you're viewing a flight. |
+| `components/copilot/TripCopilot.tsx` | **The chat UI** — the floating "✦" button and chat window, wired to `POST /api/chat`. |
 
 ---
 
@@ -120,19 +120,18 @@ const MODEL = 'claude-haiku-4-5';   // fast + cheap (default)
 
 ---
 
-## Making the production Copilot use this brain (optional)
+## Live flight context (automatic)
 
-The production Copilot (`app/api/copilot/route.ts`) currently uses its own
-knowledge text in `lib/copilotKnowledge.ts`. If you'd like it to use this richer,
-auto-syncing brain instead, import `DOMNER_SYSTEM_PROMPT` from `lib/domnerBrain.ts`
-and use it as the `system` value there. The free FAQ layer can stay as-is.
+When the traveller is on a flight-detail page, the chat UI
+(`components/copilot/TripCopilot.tsx`) sends a short `context.flightSummary`
+along with the messages. `/api/chat` hands that to Claude so answers can
+reference the current flight — while the brain's guardrails still stop the AI
+from inventing gate numbers or delay times that weren't provided.
 
 ---
 
 ## Where to go next
 
-- Add more FAQ entries to the free layer in `lib/copilotKnowledge.ts` (those are
-  answered instantly with zero AI cost).
 - Add new facts to the brain as the business grows (new products, new policies).
 - Keep the **guardrails** section strong — never letting the AI invent flight or
   price details is what keeps travellers trusting Domner.

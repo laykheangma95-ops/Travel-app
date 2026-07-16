@@ -54,17 +54,17 @@ substitute already built into the codebase.
   data + mock scheduled data. Only subscribe once flight tracking is a proven driver of eSIM sales and
   you've decided real gate/delay data is worth paying for. When you do, add a monthly call cap.
 
-### 3b. Anthropic Claude — Trip Copilot — **KEEP but downgrade the model + cap spend**
-- **Why it's risky:** it's metered per token and currently wired to **`claude-opus-4-8`** — the most
-  expensive model. Every chat costs money, and there's no per-day budget.
+### 3b. Anthropic Claude — Trip Copilot — **KEEP but cap spend**
+- **Why it's risky:** it's metered per token. Every chat costs money, and there's no per-day budget.
 - **The good news:** with no `ANTHROPIC_API_KEY` it falls back to a canned bilingual reply, so the
-  feature never breaks — it just isn't "smart."
+  feature never breaks — it just isn't "smart." It's already wired to **`claude-haiku-4-5`**, a
+  fraction of the cost of Opus.
 - **Founder call — pick one:**
   1. **Cheapest:** leave the key empty → $0, canned answers only.
-  2. **Recommended:** keep AI on but switch the model in `app/api/copilot/route.ts` from
-     `claude-opus-4-8` to **`claude-haiku-4-5`** (a fraction of the cost), and set a hard monthly
-     spend limit in the Anthropic console. Great UX for cents, not dollars.
-  3. Keep Opus only once Copilot demonstrably converts users to paying customers.
+  2. **Recommended:** keep AI on (already on the cheap Haiku model in `app/api/chat/route.ts`) and
+     set a hard monthly spend limit in the Anthropic console. Great UX for cents, not dollars.
+  3. Bump the model in `app/api/chat/route.ts` to `claude-opus-4-8` only once Copilot demonstrably
+     converts users to paying customers.
 
 ### 3c. Domain — **PAY IT, it's ~$1/month**
 - You cannot run a real brand on a random URL. ~$12–15/year is the one genuinely unavoidable cost.

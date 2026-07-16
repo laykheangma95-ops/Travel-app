@@ -13,9 +13,9 @@
 //   on their first day. The better the manual, the better the answers.
 //
 // HOW IT'S USED:
-//   `app/api/chat/route.ts` (the beginner chatbot API) and
-//   `app/api/copilot/route.ts` (the production Copilot) both import
-//   DOMNER_SYSTEM_PROMPT from here and pass it to Claude as the `system` field.
+//   `app/api/chat/route.ts` (the chatbot behind the floating "✦" Trip Copilot)
+//   imports DOMNER_SYSTEM_PROMPT from here and passes it to Claude as the
+//   `system` field.
 //
 // HOW TO EDIT:
 //   Just edit the plain-English text in the sections below. No AI knowledge
