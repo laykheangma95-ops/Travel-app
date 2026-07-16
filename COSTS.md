@@ -33,7 +33,7 @@ substitute already built into the codebase.
 | 6 | **Resend** (order confirmation emails) | `RESEND_API_KEY` | Free tier 3,000 emails/mo (100/day) → $20/mo | **$0** | 🟢 |
 | 7 | **Live flight tracking** (ADS-B: adsb.lol, airplanes.live, adsb.fi + planespotters photos) | *none — no key needed* | Open / crowdsourced, free | **$0** | 🟢 |
 | 8 | **AeroDataBox** (scheduled flight status: gate, delay, times) | `RAPIDAPI_KEY`, `AEROBOX_HOST` | RapidAPI: small free quota → paid tiers ($ monthly) | **$0 now, real risk later** | 🔴 |
-| 9 | **Anthropic / Claude** (Domer Trip Copilot AI chat) | `ANTHROPIC_API_KEY` | Pay-per-token usage | **$0 now, scales with use** | 🔴 |
+| 9 | **AI chat — Claude via OpenRouter** (Domner Trip Copilot) | `OPENROUTER_API_KEY` (or `ANTHROPIC_API_KEY`) | Pay-per-token usage | **$0 now, scales with use** | 🔴 |
 | 10 | **Domain** (`domnerapp.com`) | `NEXT_PUBLIC_APP_URL` | ~$12–15 / **year** | **~$1/mo** | 🔴 (tiny, unavoidable) |
 | 11 | **Hosting** (Next.js — e.g. Vercel) | *deployment, not in env* | Free hobby tier → $20/mo Pro | **$0** on hobby | 🟢 → 🔴 if upgraded |
 
@@ -54,17 +54,19 @@ substitute already built into the codebase.
   data + mock scheduled data. Only subscribe once flight tracking is a proven driver of eSIM sales and
   you've decided real gate/delay data is worth paying for. When you do, add a monthly call cap.
 
-### 3b. Anthropic Claude — Trip Copilot — **KEEP but downgrade the model + cap spend**
-- **Why it's risky:** it's metered per token and currently wired to **`claude-opus-4-8`** — the most
-  expensive model. Every chat costs money, and there's no per-day budget.
-- **The good news:** with no `ANTHROPIC_API_KEY` it falls back to a canned bilingual reply, so the
-  feature never breaks — it just isn't "smart."
+### 3b. AI chat (Claude via OpenRouter) — Trip Copilot — **KEEP but cap spend**
+- **Why it's risky:** it's metered per token. Every chat costs money, and there's no per-day budget.
+- **The good news:** with no key set it falls back to a canned bilingual reply, so the feature never
+  breaks — it just isn't "smart." It's already wired to **Claude Haiku**, a fraction of the cost of
+  Opus, and the chatbot accepts either an `OPENROUTER_API_KEY` (checked first) or an
+  `ANTHROPIC_API_KEY`.
 - **Founder call — pick one:**
   1. **Cheapest:** leave the key empty → $0, canned answers only.
-  2. **Recommended:** keep AI on but switch the model in `app/api/copilot/route.ts` from
-     `claude-opus-4-8` to **`claude-haiku-4-5`** (a fraction of the cost), and set a hard monthly
-     spend limit in the Anthropic console. Great UX for cents, not dollars.
-  3. Keep Opus only once Copilot demonstrably converts users to paying customers.
+  2. **Recommended:** keep AI on (already on the cheap Haiku model in `app/api/chat/route.ts`) and
+     set a spend limit in the OpenRouter dashboard (or Anthropic console). Great UX for cents, not
+     dollars.
+  3. Bump the model in `app/api/chat/route.ts` to an Opus-tier model only once Copilot demonstrably
+     converts users to paying customers.
 
 ### 3c. Domain — **PAY IT, it's ~$1/month**
 - You cannot run a real brand on a random URL. ~$12–15/year is the one genuinely unavoidable cost.
@@ -120,7 +122,7 @@ NEXT_PUBLIC_FIREBASE_CONFIG=...
 
 # --- LEAVE EMPTY until profitable ---
 # RAPIDAPI_KEY=              # AeroDataBox — free ADS-B + mock covers us
-# ANTHROPIC_API_KEY=         # Copilot — canned replies, or switch model to haiku first
+# OPENROUTER_API_KEY=        # Copilot — leave empty for canned replies, set for live AI (Haiku)
 ```
 
 **Result: ~$1/month (domain only) to run the whole app in production.** Every "expensive" feature is

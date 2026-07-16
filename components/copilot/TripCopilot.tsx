@@ -1,8 +1,8 @@
 'use client';
 
 // AI Trip Copilot — a Khmer-first chat assistant floating over every page.
-// Powered by Claude via /api/copilot. Picks up the current flight (if the
-// traveler is on a flight detail page) so answers can reference it.
+// Powered by Claude via /api/chat (the Domner "brain"). Picks up the current
+// flight (if the traveler is on a flight detail page) so answers can reference it.
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
@@ -85,7 +85,7 @@ export function TripCopilot() {
     setInput('');
     setLoading(true);
     try {
-      const res = await fetch('/api/copilot', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: next, context: { flightNumber, flightSummary } }),
@@ -179,7 +179,7 @@ export function TripCopilot() {
 
           {demo && (
             <p className="border-t border-white/10 px-4 py-1.5 text-center text-[10px] text-white/40">
-              Demo mode — connect ANTHROPIC_API_KEY for live AI answers
+              Demo mode — connect OPENROUTER_API_KEY for live AI answers
             </p>
           )}
 

@@ -26,8 +26,8 @@ Experience Domner **on a real phone** — mobile browser + installed to the home
   - [ ] Supabase (auth + DB) — free tier
   - [ ] Stripe + ABA PayWay — no fixed fee, per-transaction
   - [ ] Resend, Telegram, Firebase — free tiers
-  - [ ] `ANTHROPIC_API_KEY` for the AI Copilot (Haiku) — **turn this ON at launch**; set a
-        monthly spend cap in the Anthropic console first
+  - [ ] `OPENROUTER_API_KEY` for the AI Copilot (Claude Haiku via OpenRouter) — **turn this
+        ON at launch**; set a spend limit in the OpenRouter dashboard first
   - [ ] Leave `RAPIDAPI_KEY` **empty** — free ADS-B tracking covers launch (defer to Pro)
 - [ ] **Run the Supabase schema** — `supabase/schema.sql` in the SQL editor.
 - [ ] **Set `ADMIN_EMAIL`** so `/admin` is gated to you.

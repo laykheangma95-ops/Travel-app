@@ -1,6 +1,6 @@
 # 🤖 Domner AI Chatbot — Beginner's Guide
 
-A plain-English guide to the AI chatbot "brain" and the beginner chatbot API.
+A plain-English guide to the AI chatbot "brain" and the chatbot API.
 No AI/machine-learning background needed.
 
 ---
@@ -10,8 +10,8 @@ No AI/machine-learning background needed.
 | File | What it is |
 | --- | --- |
 | `lib/domnerBrain.ts` | **The brain.** A big, organised block of text that teaches Claude everything about the Domner business — products, eSIM setup, prices, policies, tone, and rules. |
-| `app/api/chat/route.ts` | **The beginner chatbot API.** A small, heavily-commented endpoint (`POST /api/chat`) that uses the brain to answer questions. Read it to learn how a chatbot works. |
-| `app/api/copilot/route.ts` | The existing **production** chatbot (already wired into the floating "✦" Copilot button in the app). More advanced: it adds a free FAQ layer and live flight context. |
+| `app/api/chat/route.ts` | **The chatbot API.** A small, heavily-commented endpoint (`POST /api/chat`) that uses the brain to answer questions. It powers the floating "✦" Trip Copilot in the app and picks up live flight context when you're viewing a flight. |
+| `components/copilot/TripCopilot.tsx` | **The chat UI** — the floating "✦" button and chat window, wired to `POST /api/chat`. |
 
 ---
 
@@ -88,51 +88,56 @@ The `messages` array is the whole conversation. Add past turns so the AI has con
 ## Turning on real AI answers
 
 Without a key, the chatbot runs in **demo mode** — it returns a friendly canned
-reply and sets `"demo": true`. To get real AI answers:
+reply and sets `"demo": true`. To get real AI answers, get a key from
+**openrouter.ai** (`sk-or-v1-...`) and set it as `OPENROUTER_API_KEY`. One key
+routes to Claude and many other models; add credits and a spend limit in the
+OpenRouter dashboard.
 
-1. Get an API key from **console.anthropic.com** → API Keys, and add some credits.
-   ⚠️ Set a **monthly spend cap** first.
-2. Add it to your environment:
-   - **Local:** put `ANTHROPIC_API_KEY=sk-ant-...` in `.env.local`
-   - **Live (Vercel):** Project → Settings → Environment Variables → add
-     `ANTHROPIC_API_KEY`, then redeploy.
+Add it to your environment:
+
+- **Local:** put `OPENROUTER_API_KEY=sk-or-v1-...` in `.env.local`
+- **Live (Vercel):** Project → Settings → Environment Variables → add
+  `OPENROUTER_API_KEY`, then redeploy.
 
 That's the only setup. With the key present, `/api/chat` returns real answers and
 `"demo": false`.
 
 > **Security:** never put the key in the code or commit it to GitHub — it always
-> lives in environment variables.
+> lives in environment variables. If a key ever leaks (pasted in a chat, a
+> screenshot, a commit), revoke it in the provider dashboard and make a new one.
 
 ---
 
 ## Cost & model choice
 
-The chatbot uses **`claude-haiku-4-5`** — Anthropic's fastest and cheapest model,
-which fits a high-volume support chatbot (and matches Domner's cost strategy in
+The chatbot uses **Claude Haiku** — Anthropic's fastest and cheapest model, which
+fits a high-volume support chatbot (and matches Domner's cost strategy in
 `STRATEGY.md`).
 
-Want smarter answers? Open `app/api/chat/route.ts` and change one line:
+Want smarter answers? Open `app/api/chat/route.ts` and change the model lines:
 
 ```ts
-const MODEL = 'claude-haiku-4-5';   // fast + cheap (default)
-// const MODEL = 'claude-opus-4-8';  // higher quality, costs more per message
+const OPENROUTER_MODEL = 'anthropic/claude-haiku-4.5'; // fast + cheap (default)
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';            // same model, direct-API spelling
 ```
+
+Browse other model names at openrouter.ai/models — anything there works with the
+same `OPENROUTER_API_KEY`.
 
 ---
 
-## Making the production Copilot use this brain (optional)
+## Live flight context (automatic)
 
-The production Copilot (`app/api/copilot/route.ts`) currently uses its own
-knowledge text in `lib/copilotKnowledge.ts`. If you'd like it to use this richer,
-auto-syncing brain instead, import `DOMNER_SYSTEM_PROMPT` from `lib/domnerBrain.ts`
-and use it as the `system` value there. The free FAQ layer can stay as-is.
+When the traveller is on a flight-detail page, the chat UI
+(`components/copilot/TripCopilot.tsx`) sends a short `context.flightSummary`
+along with the messages. `/api/chat` hands that to Claude so answers can
+reference the current flight — while the brain's guardrails still stop the AI
+from inventing gate numbers or delay times that weren't provided.
 
 ---
 
 ## Where to go next
 
-- Add more FAQ entries to the free layer in `lib/copilotKnowledge.ts` (those are
-  answered instantly with zero AI cost).
 - Add new facts to the brain as the business grows (new products, new policies).
 - Keep the **guardrails** section strong — never letting the AI invent flight or
   price details is what keeps travellers trusting Domner.
