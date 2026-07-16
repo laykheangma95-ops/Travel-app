@@ -31,6 +31,10 @@ export interface Destination {
   currency: string;
   usdRate: number;
   popular: boolean;
+  /** HD landscape marketing photo (iconic landmark) shown on the destination card. */
+  image?: string;
+  /** Short marketing tagline naming the iconic scene in the photo. */
+  tagline?: string;
 }
 
 export interface EsimPlan {
