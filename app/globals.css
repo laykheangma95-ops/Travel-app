@@ -188,6 +188,52 @@
       0 10px 32px rgba(198, 151, 73, 0.38);
   }
 
+  /* ── Blue Liquid Glass — glossy product surface for light pages ────────────
+     Reads on a white background through a cool blue tint, a bright specular
+     crown baked into the fill, and inner depth — so each card looks like a
+     tangible piece of blue glass hardware. Pair with .liquid-sheen for the
+     hover glint and .rounded-card for the product shape. */
+  .liquid-glass-blue {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background:
+      radial-gradient(135% 80% at 28% -12%, rgba(255, 255, 255, 0.92), transparent 55%),
+      linear-gradient(
+        158deg,
+        rgba(255, 255, 255, 0.9) 0%,
+        rgba(223, 238, 255, 0.72) 42%,
+        rgba(186, 216, 254, 0.62) 100%
+      );
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    border: 1px solid rgba(147, 197, 253, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -18px 34px rgba(37, 99, 235, 0.08),
+      0 10px 28px rgba(30, 64, 175, 0.14);
+    transition:
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.45s ease,
+      box-shadow 0.45s ease;
+  }
+
+  .liquid-glass-blue:hover {
+    transform: translateY(-6px);
+    border-color: rgba(96, 165, 250, 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -18px 34px rgba(37, 99, 235, 0.13),
+      0 22px 48px rgba(30, 64, 175, 0.22);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .liquid-glass-blue,
+    .liquid-glass-blue:hover {
+      transform: none;
+    }
+  }
+
   /* ── Wavy premium flag medallion ───────────────────────────────────────────
      Dark navy-to-black glass badge with a gold-foil rim (Singapore Airlines–
      style dark/gold premium look) and a rippling, cloth-like wave on the
@@ -792,6 +838,17 @@
 
 .cam-float {
   animation: camFloat 8s ease-in-out infinite;
+}
+
+/* The inbound plane on the orbital bridge — same gilded glow as the hero jet. */
+.cam-bridge-jet {
+  filter: drop-shadow(0 4px 12px rgba(230, 203, 139, 0.7));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cam-bridge-jet {
+    display: none;
+  }
 }
 
 @keyframes camFloat {

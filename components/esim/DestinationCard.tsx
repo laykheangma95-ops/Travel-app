@@ -10,14 +10,44 @@ import { useLang } from '@/lib/i18n';
 interface DestinationCardProps {
   destination: Destination;
   /**
-   * `light` (default) — white card for light pages such as /esim.
-   * `glass`           — frosted glass card for the dark Temple-Night home canvas.
+   * `light`   (default) — plain white card.
+   * `glass`             — frosted glass card for the dark Temple-Night home canvas.
+   * `product`           — blue Liquid Glass product tile on a white page (/esim).
    */
-  variant?: 'light' | 'glass';
+  variant?: 'light' | 'glass' | 'product';
 }
 
 export function DestinationCard({ destination, variant = 'light' }: DestinationCardProps) {
   const { t } = useLang();
+
+  if (variant === 'product') {
+    return (
+      <Link
+        href={`/esim/${destination.slug}`}
+        className="liquid-glass-blue liquid-sheen group flex h-full flex-col rounded-card p-6"
+      >
+        <WavyFlag
+          flag={destination.flag}
+          label={`${destination.name} flag`}
+          size={60}
+          className="origin-bottom-left transition-transform duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3"
+        />
+        <h3 className="mt-4 font-display text-lg font-bold text-ink">{destination.name}</h3>
+        <p className="font-khmer text-sm text-ink-secondary">ចូលទស្សនា{destination.nameKm}</p>
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm font-bold text-secondary">
+            {t('dest.from')} ${destination.fromPriceUsd.toFixed(2)}
+          </p>
+          <Badge tone={destination.networkQuality === 'Excellent' ? 'success' : 'info'}>
+            {destination.networkQuality}
+          </Badge>
+        </div>
+        <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-secondary opacity-0 transition-all duration-300 group-hover:gap-2.5 group-hover:opacity-100">
+          {t('dest.viewPlans')} <ArrowRight size={14} aria-hidden="true" />
+        </span>
+      </Link>
+    );
+  }
 
   if (variant === 'glass') {
     return (

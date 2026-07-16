@@ -77,6 +77,12 @@ const DESTINATIONS: Destination[] = [
   },
 ];
 
+// A single paper-plane glyph, reused from the hero so the flight that departs
+// the globe and the one that arrives over Cambodia are unmistakably the same
+// aircraft — the thread that stitches the two scenes into one journey.
+const JET_PATH =
+  'M21.5 15.5 13.5 11V4.75a1.5 1.5 0 0 0-3 0V11l-8 4.5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13.5 19v-4l8 2.5v-2Z';
+
 const N = DESTINATIONS.length;
 const STEP = 360 / N; // degrees between adjacent medallions on the ring
 const AUTO_SPEED = 0.12; // degrees per frame when idle-spinning
@@ -190,7 +196,7 @@ export function CambodiaShowcase() {
   const current = DESTINATIONS[active];
 
   return (
-    <section className="relative overflow-hidden py-20 sm:py-28">
+    <section className="relative overflow-hidden pb-20 pt-4 sm:pb-28 sm:pt-6">
       {/* Ambient starfield + gold aura — drawn on the shared home canvas so the
           showcase melts into the sections above and below it. */}
       <div className="stars" aria-hidden="true" />
@@ -199,7 +205,50 @@ export function CambodiaShowcase() {
         aria-hidden="true"
       />
 
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+      {/* ── Orbital flight bridge ──────────────────────────────────────────────
+          Dashed orbits fan down from the hero globe (just above this section)
+          and a paper plane descends along them into Cambodia — carrying the eye
+          seamlessly from "the world" into "its destinations" as one scene. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 flex justify-center" aria-hidden="true">
+        <svg
+          viewBox="0 0 1000 360"
+          className="h-auto w-[1160px] max-w-none overflow-visible opacity-90"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Orbital trails leaving the globe overhead */}
+          <path d="M 70 40 Q 500 -60 930 40" stroke="rgba(230,203,139,0.24)" strokeWidth="1.2" className="arc-line" />
+          <path
+            d="M 150 90 Q 500 -30 850 90"
+            stroke="rgba(230,203,139,0.16)"
+            strokeWidth="1.1"
+            className="arc-line"
+            style={{ animationDelay: '-1.3s' }}
+          />
+          {/* The descending flight path from the globe down to the ring */}
+          <path
+            id="camBridgePath"
+            d="M 300 20 Q 470 150 500 300"
+            stroke="rgba(230,203,139,0.34)"
+            strokeWidth="1.2"
+            strokeDasharray="4 9"
+          />
+          {[[70, 40], [930, 40], [500, 300]].map(([cx, cy]) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill="#E6CB8B" className="arc-node" />
+          ))}
+          {/* The plane — the same glyph as the hero jet, now inbound to Cambodia */}
+          <g className="cam-bridge-jet">
+            <g transform="rotate(90) scale(1.5) translate(-12 -12)">
+              <path d={JET_PATH} fill="#F7EAC0" />
+            </g>
+            <animateMotion dur="10s" repeatCount="indefinite" rotate="auto">
+              <mpath href="#camBridgePath" />
+            </animateMotion>
+          </g>
+        </svg>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
         {/* Heading */}
         <div className="text-center">
           <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white">

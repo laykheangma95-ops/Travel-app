@@ -210,6 +210,12 @@ export function HomeContent() {
       <div className="home-canvas relative overflow-hidden">
         {/* Persistent night sky threaded through the whole page */}
         <div className="stars pointer-events-none absolute inset-0" aria-hidden="true" />
+        {/* Shared horizon glow at the seam — dissolves the line between the hero
+            globe and the showcase so they read as one continuous sky. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-72 bg-[radial-gradient(72%_100%_at_50%_0%,rgba(198,151,73,0.20)_0%,rgba(198,151,73,0.06)_42%,transparent_74%)]"
+          aria-hidden="true"
+        />
         {/* Gold auras that recur down the canvas as the warm connective accent */}
         <div className="home-aura left-1/2 top-[8%] h-[600px] w-[600px] -translate-x-1/2" aria-hidden="true" />
         <div className="home-aura -left-40 top-[46%] h-[520px] w-[520px]" aria-hidden="true" />
