@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope, Marcellus, Noto_Serif_Khmer } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
+import { BottomNav } from '@/components/layout/BottomNav';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
@@ -66,9 +67,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ReferralTracker />
           </Suspense>
           <Navbar />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1 pb-[76px] md:pb-0">{children}</main>
           <Footer />
           <TripCopilot />
+          <BottomNav />
         </LanguageProvider>
       </body>
     </html>

@@ -47,6 +47,13 @@ export function TripCopilot() {
   const [flightSummary, setFlightSummary] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Let the mobile bottom-tab bar (and anything else) open the Copilot.
+  useEffect(() => {
+    const openHandler = () => setOpen(true);
+    window.addEventListener('domner:open-copilot', openHandler);
+    return () => window.removeEventListener('domner:open-copilot', openHandler);
+  }, []);
+
   const flightMatch = pathname?.match(/\/flights\/([^/?]+)/);
   const flightNumber = flightMatch ? decodeURIComponent(flightMatch[1]) : null;
 
@@ -117,7 +124,7 @@ export function TripCopilot() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close Domer Copilot' : 'Open Domer Copilot'}
         data-liquid=""
-        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105"
+        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] hidden h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105 md:flex"
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
       </button>
@@ -130,10 +137,18 @@ export function TripCopilot() {
         >
           <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3.5">
             <DomerMark surface="gold" size={24} />
-            <div>
+            <div className="flex-1">
               <p className="font-display text-sm font-bold text-white">Domer Copilot</p>
               <p className="font-khmer text-[11px] text-white/50">ជំនួយការធ្វើដំណើររបស់អ្នក</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+              className="grid h-8 w-8 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X size={18} />
+            </button>
           </div>
 
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
