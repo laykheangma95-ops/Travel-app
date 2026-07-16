@@ -72,7 +72,7 @@ export function HomeContent() {
         ref={heroRef}
         onMouseMove={onHeroPointer}
         onMouseLeave={resetHeroPointer}
-        className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)]"
+        className="relative flex min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)] pb-10"
       >
         {/* Starfield */}
         <div className="stars" aria-hidden="true" />
@@ -84,90 +84,7 @@ export function HomeContent() {
           aria-hidden="true"
         />
 
-        {/* Living globe scene — one SVG coordinate system so the sphere,
-            surface, arcs, and orbiting plane stay perfectly centered */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center" aria-hidden="true">
-          <div className="hero-scene w-[920px] shrink-0 sm:w-[1200px]">
-            <svg viewBox="0 0 1000 400" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="heroSphere" cx="0.42" cy="0.14" r="0.9">
-                  <stop offset="0" stopColor="#23406A" />
-                  <stop offset="0.4" stopColor="#14263F" />
-                  <stop offset="0.75" stopColor="#0E1B30" />
-                  <stop offset="1" stopColor="#091220" />
-                </radialGradient>
-                <linearGradient id="heroRim" x1="0" y1="140" x2="0" y2="400" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="#E6CB8B" stopOpacity="0.55" />
-                  <stop offset="0.35" stopColor="#C69749" stopOpacity="0.12" />
-                  <stop offset="1" stopColor="#C69749" stopOpacity="0" />
-                </linearGradient>
-                <pattern id="heroDotGrid" width="26" height="22" patternUnits="userSpaceOnUse">
-                  <circle cx="4" cy="5" r="1.4" fill="rgba(230,203,139,0.22)" />
-                  <circle cx="17" cy="16" r="1.1" fill="rgba(230,203,139,0.14)" />
-                </pattern>
-                <clipPath id="heroGlobeClip">
-                  <circle cx="500" cy="760" r="620" />
-                </clipPath>
-              </defs>
-
-              {/* Sphere */}
-              <circle className="hero-sphere" cx="500" cy="760" r="620" fill="url(#heroSphere)" />
-              {/* Gilded rim light on the crown */}
-              <circle cx="500" cy="760" r="619" stroke="url(#heroRim)" strokeWidth="1.6" />
-
-              {/* Rotating dotted surface + latitude lines + city lights */}
-              <g clipPath="url(#heroGlobeClip)">
-                <g className="hero-dots-drift">
-                  <rect x="-80" y="130" width="2200" height="290" fill="url(#heroDotGrid)" />
-                </g>
-                <path d="M 190 215 Q 500 152 810 215" stroke="rgba(230,203,139,0.16)" strokeWidth="1" />
-                <path d="M 95 305 Q 500 218 905 305" stroke="rgba(230,203,139,0.13)" strokeWidth="1" />
-                <path d="M 30 400 Q 500 295 970 400" stroke="rgba(230,203,139,0.10)" strokeWidth="1" />
-                {[
-                  [352, 230, 0], [548, 195, 0.6], [700, 250, 1.1], [255, 300, 0.3], [820, 330, 0.9], [470, 320, 1.5],
-                ].map(([cx, cy, delay]) => (
-                  <circle
-                    key={`${cx}-${cy}`}
-                    cx={cx}
-                    cy={cy}
-                    r="2.6"
-                    fill="#E6CB8B"
-                    className="hero-twinkle arc-node"
-                    style={{ animationDelay: `${delay}s` }}
-                  />
-                ))}
-              </g>
-
-              {/* Network arcs hugging the crown */}
-              <path d="M 150 330 Q 340 170 545 265" stroke="rgba(230,203,139,0.6)" strokeWidth="1.4" className="arc-line" />
-              <path d="M 300 365 Q 545 130 845 320" stroke="rgba(230,203,139,0.42)" strokeWidth="1.3" className="arc-line" style={{ animationDelay: '-1.4s' }} />
-              {[[150, 330], [545, 265], [845, 320]].map(([cx, cy]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.2" fill="#E6CB8B" className="arc-node" />
-              ))}
-
-              {/* Orbit + contrail */}
-              <path
-                id="heroOrbit"
-                d="M -60 335 C 250 68 750 68 1060 335"
-                stroke="rgba(230,203,139,0.5)"
-                strokeWidth="1.6"
-                className="arc-line"
-              />
-
-              {/* The flight — follows the orbit, nose always along the path */}
-              <g className="hero-jet">
-                <g transform="rotate(90) scale(1.8) translate(-12 -12)">
-                  <path d={JET_PATH} fill="#F7EAC0" />
-                </g>
-                <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#heroOrbit" />
-                </animateMotion>
-              </g>
-            </svg>
-          </div>
-        </div>
-
-        <div className="hero-copy relative mx-auto max-w-5xl px-4 pb-72 pt-24 text-center sm:px-6 sm:pb-80">
+        <div className="hero-copy relative z-10 mx-auto max-w-5xl px-4 pt-28 text-center sm:px-6 sm:pt-32">
           <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
             {t('hero.badge')}
           </span>
@@ -191,12 +108,178 @@ export function HomeContent() {
               {t('hero.ctaFlight')}
             </Button>
           </div>
-          <div className="mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-white/60 animate-fade-up [animation-delay:400ms]">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-white/60 animate-fade-up [animation-delay:400ms]">
             <span>{t('hero.stat1')}</span>
             <span className="hidden text-white/25 sm:inline">·</span>
             <span>{t('hero.stat2')}</span>
             <span className="hidden text-white/25 sm:inline">·</span>
             <span>{t('hero.stat3')}</span>
+          </div>
+        </div>
+
+        {/* ── Full living globe — a realistic sphere wrapped in golden eSIM
+            wires that link city to city. It descends toward the Cambodia
+            showcase below, so both scenes share one world. ── */}
+        <div className="hero-scene relative z-[1] mt-4 w-[340px] shrink-0 sm:mt-6 sm:w-[460px] lg:w-[520px]" aria-hidden="true">
+          <div className="animate-float-y [animation-duration:9s]">
+            <svg viewBox="0 0 800 800" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                {/* Sun-lit ocean sphere: light falls from the upper left */}
+                <radialGradient id="gSphere" cx="0.36" cy="0.26" r="1">
+                  <stop offset="0" stopColor="#3E6699" />
+                  <stop offset="0.3" stopColor="#27476F" />
+                  <stop offset="0.6" stopColor="#16294A" />
+                  <stop offset="0.85" stopColor="#0D1B33" />
+                  <stop offset="1" stopColor="#081222" />
+                </radialGradient>
+                {/* Thin blue atmosphere warming to gold at the limb */}
+                <radialGradient id="gAtmo" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0.6" stopColor="rgba(126,178,255,0)" />
+                  <stop offset="0.78" stopColor="rgba(126,178,255,0.12)" />
+                  <stop offset="0.9" stopColor="rgba(230,203,139,0.18)" />
+                  <stop offset="1" stopColor="rgba(230,203,139,0)" />
+                </radialGradient>
+                {/* Day → night terminator falling to the lower right */}
+                <radialGradient id="gShade" cx="0.32" cy="0.22" r="0.95">
+                  <stop offset="0.5" stopColor="rgba(0,0,0,0)" />
+                  <stop offset="1" stopColor="rgba(3,8,18,0.6)" />
+                </radialGradient>
+                {/* Soft specular sun glint */}
+                <radialGradient id="gSpec" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stopColor="rgba(255,255,255,0.16)" />
+                  <stop offset="1" stopColor="rgba(255,255,255,0)" />
+                </radialGradient>
+                <linearGradient id="gRim" x1="400" y1="80" x2="400" y2="720" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#E6CB8B" stopOpacity="0.6" />
+                  <stop offset="0.4" stopColor="#C69749" stopOpacity="0.1" />
+                  <stop offset="1" stopColor="#C69749" stopOpacity="0" />
+                </linearGradient>
+                <pattern id="gDots" width="18" height="16" patternUnits="userSpaceOnUse">
+                  <circle cx="3" cy="4" r="1.1" fill="rgba(230,203,139,0.20)" />
+                  <circle cx="12" cy="11" r="0.9" fill="rgba(147,197,253,0.18)" />
+                </pattern>
+                <clipPath id="gClip">
+                  <circle cx="400" cy="400" r="318" />
+                </clipPath>
+              </defs>
+
+              {/* Atmosphere halo */}
+              <circle cx="400" cy="400" r="396" fill="url(#gAtmo)" />
+
+              {/* Far side of the flight orbit — passes behind the sphere */}
+              <g transform="rotate(-14 400 400)">
+                <path d="M 5 400 A 395 140 0 0 1 795 400" stroke="rgba(230,203,139,0.16)" strokeWidth="1.2" strokeDasharray="4 9" fill="none" />
+              </g>
+
+              {/* The sphere */}
+              <circle className="hero-sphere" cx="400" cy="400" r="320" fill="url(#gSphere)" />
+
+              {/* Rotating dotted surface at two depths — the earth turning */}
+              <g clipPath="url(#gClip)">
+                <g className="globe-drift-slow" opacity="0.45">
+                  <rect x="-760" y="90" width="2280" height="620" fill="url(#gDots)" />
+                </g>
+                <g className="globe-drift">
+                  <rect x="-760" y="90" width="2280" height="620" fill="url(#gDots)" />
+                </g>
+              </g>
+
+              {/* Wireframe graticule with spherical perspective */}
+              <g stroke="rgba(147,197,253,0.13)" strokeWidth="1" fill="none">
+                <line x1="400" y1="80" x2="400" y2="720" />
+                <ellipse cx="400" cy="400" rx="120" ry="320" />
+                <ellipse cx="400" cy="400" rx="225" ry="320" />
+                <ellipse cx="400" cy="400" rx="298" ry="320" />
+                <ellipse cx="400" cy="123" rx="160" ry="36" />
+                <ellipse cx="400" cy="240" rx="277" ry="58" />
+                <ellipse cx="400" cy="400" rx="320" ry="66" />
+                <ellipse cx="400" cy="560" rx="277" ry="58" />
+                <ellipse cx="400" cy="677" rx="160" ry="36" />
+              </g>
+
+              {/* Light: terminator shading, sun glint, gilded rim */}
+              <circle cx="400" cy="400" r="320" fill="url(#gShade)" />
+              <ellipse cx="292" cy="240" rx="180" ry="115" fill="url(#gSpec)" />
+              <circle cx="400" cy="400" r="319" stroke="url(#gRim)" strokeWidth="1.6" />
+
+              {/* Golden wires — live eSIM routes linking city to city */}
+              <g stroke="rgba(240,216,150,0.95)" strokeWidth="2.1">
+                <path className="globe-wire" d="M520 470 Q640 380 610 300" />
+                <path className="globe-wire" d="M520 470 Q515 545 470 560" style={{ animationDelay: '-0.7s' }} />
+                <path className="globe-wire" d="M470 560 Q382 565 300 430" style={{ animationDelay: '-1.4s' }} />
+                <path className="globe-wire" d="M300 430 Q225 330 255 255" style={{ animationDelay: '-2.1s' }} />
+                <path className="globe-wire" d="M255 255 Q145 270 150 350" style={{ animationDelay: '-0.4s' }} />
+                <path className="globe-wire" d="M610 300 Q700 450 585 585" style={{ animationDelay: '-1.8s' }} />
+                <path className="globe-wire" d="M150 350 Q135 425 170 480" style={{ animationDelay: '-1.1s' }} />
+                <path className="globe-wire" d="M300 200 Q235 315 300 430" style={{ animationDelay: '-2.6s' }} />
+                {/* The long haul — over the pole */}
+                <path className="globe-wire" d="M150 350 Q400 -260 610 300" stroke="rgba(230,203,139,0.6)" style={{ animationDelay: '-3s' }} />
+              </g>
+
+              {/* Data packets riding the wires */}
+              <circle r="3" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="4s" repeatCount="indefinite" path="M520 470 Q640 380 610 300" />
+              </circle>
+              <circle r="3" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="6.5s" repeatCount="indefinite" path="M150 350 Q400 -260 610 300" />
+              </circle>
+              <circle r="2.6" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="5s" repeatCount="indefinite" path="M470 560 Q382 565 300 430" />
+              </circle>
+              <circle r="2.6" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="5.6s" repeatCount="indefinite" path="M300 430 Q225 330 255 255" />
+              </circle>
+
+              {/* City nodes — hubs ping like a live network map */}
+              {([
+                [520, 470, 0, true], // Phnom Penh — home hub
+                [610, 300, 0.5, false],
+                [470, 560, 1, false],
+                [300, 430, 1.5, true],
+                [255, 255, 0.8, false],
+                [150, 350, 1.9, true],
+                [585, 585, 0.3, false],
+                [170, 480, 1.2, false],
+                [300, 200, 2.2, false],
+              ] as [number, number, number, boolean][]).map(([cx, cy, delay, hub]) => (
+                <g key={`${cx}-${cy}`}>
+                  {hub && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r="9"
+                      stroke="rgba(230,203,139,0.5)"
+                      strokeWidth="1"
+                      fill="none"
+                      className="globe-ping"
+                      style={{ animationDelay: `${delay}s` }}
+                    />
+                  )}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="3.2"
+                    fill="#E6CB8B"
+                    className="globe-node hero-twinkle"
+                    style={{ animationDelay: `${delay}s` }}
+                  />
+                </g>
+              ))}
+
+              {/* Near side of the orbit + the flight */}
+              <g transform="rotate(-14 400 400)">
+                <path d="M 795 400 A 395 140 0 0 1 5 400" stroke="rgba(230,203,139,0.38)" strokeWidth="1.4" strokeDasharray="4 9" fill="none" />
+                <path id="gOrbit" d="M 5 400 A 395 140 0 0 1 795 400 A 395 140 0 0 1 5 400" fill="none" />
+                <g className="hero-jet">
+                  <g transform="rotate(90) scale(1.7) translate(-12 -12)">
+                    <path d={JET_PATH} fill="#F7EAC0" />
+                  </g>
+                  <animateMotion dur="16s" repeatCount="indefinite" rotate="auto">
+                    <mpath href="#gOrbit" />
+                  </animateMotion>
+                </g>
+              </g>
+            </svg>
           </div>
         </div>
       </section>
