@@ -488,13 +488,116 @@
   .fiber-line {
     fill: none;
     stroke-linecap: round;
-    filter: drop-shadow(0 0 3px rgba(230, 203, 139, 0.55));
+    filter: drop-shadow(0 0 3px rgba(214, 178, 110, 0.55));
     animation: fiberPulse 5s ease-in-out infinite;
   }
 
   @keyframes fiberPulse {
     0%, 100% { opacity: 0.5; }
     50% { opacity: 1; }
+  }
+
+  /* ── Cinematic Earth ────────────────────────────────────────────────────────
+     A real NASA Blue Marble texture on a turning sphere. The 2:1 equirect map
+     is duplicated inside a 400%-wide belt and translated for a seamless spin;
+     shading, terminator and atmospheric scattering are painted as layers so
+     the planet reads photographic instead of flat. */
+  .earth-sphere {
+    border-radius: 9999px;
+    overflow: hidden;
+    isolation: isolate;
+    /* limb darkening + night side + airglow + atmosphere bloom */
+    box-shadow:
+      inset 0 0 90px 24px rgba(5, 12, 26, 0.9),
+      inset -50px -70px 180px rgba(3, 8, 18, 0.9),
+      inset 34px 44px 130px rgba(140, 200, 255, 0.16),
+      0 0 90px 18px rgba(80, 160, 235, 0.26),
+      0 0 220px 70px rgba(55, 125, 205, 0.16);
+  }
+
+  .earth-belt {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 400%;
+    display: flex;
+    animation: earthSpin 140s linear infinite;
+    will-change: transform;
+  }
+
+  .earth-belt > i {
+    display: block;
+    width: 50%;
+    height: 100%;
+    background-image: url('/textures/earth-blue-marble.jpg');
+    background-size: 100% 100%;
+  }
+
+  @keyframes earthSpin {
+    to { transform: translateX(-50%); }
+  }
+
+  /* Sun + terminator: specular daylight upper-left, night falling lower-right.
+     The extra top gradient dims the bright arctic crown so the hero copy
+     floating above it stays perfectly readable. */
+  .earth-sphere::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(4, 10, 22, 0.62) 0%, rgba(4, 10, 22, 0.28) 14%, transparent 30%),
+      radial-gradient(115% 115% at 34% 26%, rgba(255, 255, 255, 0.13) 0%, transparent 26%),
+      radial-gradient(140% 140% at 34% 26%, transparent 40%, rgba(5, 12, 24, 0.5) 68%, rgba(2, 6, 14, 0.9) 98%);
+  }
+
+  /* Thin atmospheric-scattering ring hugging the limb */
+  .earth-atmo {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      transparent 66%,
+      rgba(110, 190, 250, 0.14) 74%,
+      rgba(150, 220, 255, 0.30) 79.5%,
+      rgba(150, 220, 255, 0.10) 84%,
+      transparent 92%
+    );
+  }
+
+  /* Golden sunrise rim light on the crown */
+  .earth-sunrise {
+    background: radial-gradient(
+      42% 42% at 50% 12%,
+      rgba(222, 184, 118, 0.30) 0%,
+      rgba(222, 184, 118, 0.08) 48%,
+      transparent 72%
+    );
+  }
+
+  /* Volumetric haze that melts the planet's base into the scene below */
+  .earth-fog {
+    background: radial-gradient(
+      62% 62% at 50% 74%,
+      rgba(10, 24, 44, 0.62) 0%,
+      rgba(10, 24, 44, 0.30) 55%,
+      transparent 80%
+    );
+  }
+
+  /* Luxury flight: a warm light segment travelling the route beneath the jet.
+     pathLength=1000 on the SVG path normalises the dash space. */
+  .route-trail {
+    fill: none;
+    stroke-linecap: round;
+    stroke-dasharray: 70 930;
+    filter: drop-shadow(0 0 4px rgba(230, 200, 150, 0.8));
+    animation: routeTrail 12s linear infinite;
+  }
+
+  @keyframes routeTrail {
+    to { stroke-dashoffset: -1000; }
   }
 
   /* Radar ping that expands from hub cities */
@@ -514,7 +617,9 @@
     .globe-drift-slow,
     .globe-wire,
     .globe-ping,
-    .fiber-line {
+    .fiber-line,
+    .earth-belt,
+    .route-trail {
       animation: none;
     }
   }
@@ -693,18 +798,21 @@
 .home-canvas {
   position: relative;
   isolation: isolate;
-  /* The first stops continue the hero gradient's decay (#2A4A7A → #14263F)
-     so the section seam has no visible brightness step. */
+  /* One continuous deep-space gradient beneath the whole homepage — the hero
+     lives on this same canvas, so there is no section boundary anywhere for
+     the Earth to be cut by. */
   background:
     linear-gradient(
       180deg,
-      #172b47 0%,
-      #14263f 4%,
-      #0e1b30 10%,
-      #14263f 26%,
-      #1c3355 46%,
-      #172c4c 62%,
-      #14263f 80%,
+      #071426 0%,
+      #0b1d38 6%,
+      #10284a 12%,
+      #14263f 20%,
+      #0e1b30 30%,
+      #14263f 45%,
+      #1c3355 60%,
+      #172c4c 70%,
+      #14263f 82%,
       #0b1526 100%
     );
 }

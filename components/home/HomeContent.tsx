@@ -67,215 +67,195 @@ export function HomeContent() {
 
   return (
     <>
-      {/* ── Hero — living globe with an orbiting flight ── */}
-      <section
-        ref={heroRef}
-        onMouseMove={onHeroPointer}
-        onMouseLeave={resetHeroPointer}
-        className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)]"
-      >
-        {/* Starfield */}
-        <div className="stars" aria-hidden="true" />
-        <div className="stars-far" aria-hidden="true" />
-
-        {/* Sunrise glow behind the globe */}
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] animate-globe-glow bg-[radial-gradient(60%_55%_at_50%_100%,rgba(198,151,73,0.22)_0%,rgba(35,64,106,0.20)_45%,transparent_75%)]"
-          aria-hidden="true"
-        />
-
-        <div className="hero-copy relative z-10 mx-auto max-w-5xl px-4 pb-64 pt-24 text-center sm:px-6 sm:pb-80">
-          <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
-            {t('hero.badge')}
-          </span>
-          <h1 className="mt-8 font-display text-5xl font-semibold leading-[1.08] tracking-[-0.03em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
-            {t('hero.t1')}
-            <span className="bg-gradient-to-r from-gold-bright via-gold-light to-accent bg-clip-text text-transparent">
-              {' '}
-              {t('hero.t2')}
-            </span>
-            <br />
-            {t('hero.t3')}
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-white/65 sm:text-xl animate-fade-up [animation-delay:200ms]">
-            {t('hero.sub')}
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row animate-fade-up [animation-delay:300ms]">
-            <Button href="/esim" variant="liquid-accent" size="lg">
-              {t('hero.ctaEsim')}
-            </Button>
-            <Button href="/flights" variant="liquid" size="lg">
-              {t('hero.ctaFlight')}
-            </Button>
-          </div>
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-3 animate-fade-up [animation-delay:400ms]">
-            {[t('hero.stat1'), t('hero.stat2'), t('hero.stat3')].map((stat) => (
-              <span
-                key={stat}
-                className="liquid-glass rounded-full px-5 py-2.5 text-xs font-semibold tracking-wide text-white/80"
-              >
-                {stat}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Upper hemisphere ─────────────────────────────────────────────
-            The crown of a photoreal planet rising from the fold: deep-navy
-            sphere, cyan atmosphere rim, drifting city-light surface,
-            volumetric beams, and golden fiber-optic routes arcing city to
-            city. Its lower half lives at the top of the Cambodia showcase —
-            the two sections complete one shared globe across the seam, so
-            both halves are pinned (no parallax) to stay perfectly aligned. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center" aria-hidden="true">
-          <div className="w-[900px] shrink-0 sm:w-[1150px]">
-            <svg viewBox="0 0 1000 400" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="hemiTop" x1="500" y1="40" x2="500" y2="400" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="#35608F" />
-                  <stop offset="0.45" stopColor="#1B3252" />
-                  <stop offset="1" stopColor="#0C1830" />
-                </linearGradient>
-                <radialGradient id="hemiAtmo" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0.78" stopColor="rgba(110,195,245,0)" />
-                  <stop offset="0.86" stopColor="rgba(110,195,245,0.22)" />
-                  <stop offset="0.93" stopColor="rgba(160,225,255,0.10)" />
-                  <stop offset="1" stopColor="rgba(160,225,255,0)" />
-                </radialGradient>
-                <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="rgba(190,228,255,0)" />
-                  <stop offset="1" stopColor="rgba(190,228,255,0.55)" />
-                </linearGradient>
-                <pattern id="hemiDots" width="18" height="16" patternUnits="userSpaceOnUse">
-                  <circle cx="3" cy="4" r="1" fill="rgba(150,200,245,0.20)" />
-                  <circle cx="12" cy="11" r="0.9" fill="rgba(230,203,139,0.12)" />
-                </pattern>
-                <clipPath id="hemiClip">
-                  <circle cx="500" cy="400" r="358" />
-                </clipPath>
-                <filter id="soft3" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3" />
-                </filter>
-                <filter id="soft8" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="8" />
-                </filter>
-              </defs>
-
-              {/* Atmosphere halo */}
-              <circle cx="500" cy="400" r="430" fill="url(#hemiAtmo)" />
-
-              {/* The planet */}
-              <circle cx="500" cy="400" r="360" fill="url(#hemiTop)" />
-
-              {/* Cyan rim light — sharp line over a soft volumetric glow */}
-              <circle cx="500" cy="400" r="360" stroke="rgba(120,200,250,0.5)" strokeWidth="7" filter="url(#soft8)" />
-              <circle cx="500" cy="400" r="360" stroke="rgba(150,215,255,0.55)" strokeWidth="1.5" />
-
-              {/* Drifting city-light surface + faint latitudes */}
-              <g clipPath="url(#hemiClip)">
-                <g className="globe-drift">
-                  <rect x="-760" y="30" width="2280" height="380" fill="url(#hemiDots)" />
-                </g>
-                <path d="M 175 250 Q 500 175 825 250" stroke="rgba(150,200,245,0.14)" strokeWidth="1" />
-                <path d="M 92 330 Q 500 240 908 330" stroke="rgba(150,200,245,0.11)" strokeWidth="1" />
-              </g>
-
-              {/* Volumetric light beams rising from the brightest cities */}
-              {([[290, 300], [500, 215], [705, 285]] as [number, number][]).map(([bx, by]) => (
-                <rect
-                  key={`beam-${bx}`}
-                  x={bx - 2.5}
-                  y={by - 160}
-                  width="5"
-                  height="160"
-                  fill="url(#beamGrad)"
-                  filter="url(#soft3)"
-                  opacity="0.8"
-                />
-              ))}
-
-              {/* City clusters */}
-              {([
-                [240, 330, 0], [330, 252, 0.5], [430, 205, 1], [560, 195, 0.3], [680, 240, 0.8],
-                [790, 312, 1.3], [290, 300, 1.7], [500, 215, 0.6], [705, 285, 1.1],
-              ] as [number, number, number][]).map(([cx, cy, d]) => (
-                <g key={`city-${cx}-${cy}`}>
-                  <circle cx={cx} cy={cy} r="6" fill="rgba(160,220,255,0.22)" />
-                  <circle cx={cx} cy={cy} r="2.4" fill="#EAF6FF" className="hero-twinkle" style={{ animationDelay: `${d}s` }} />
-                </g>
-              ))}
-
-              {/* Golden fiber-optic routes — gold lives only on the network */}
-              <g stroke="rgba(238,208,142,0.8)" strokeWidth="1.3">
-                <path className="fiber-line" d="M240 330 Q380 60 560 195" />
-                <path className="fiber-line" d="M330 252 Q505 20 680 240" style={{ animationDelay: '-1s' }} />
-                <path className="fiber-line" d="M430 205 Q640 60 790 312" style={{ animationDelay: '-2s' }} />
-                <path className="fiber-line" d="M240 330 Q515 -60 790 312" strokeWidth="1" style={{ animationDelay: '-3s' }} />
-                <path className="fiber-line" d="M330 252 Q430 110 560 195" strokeWidth="1" style={{ animationDelay: '-1.6s' }} />
-                <path className="fiber-line" d="M560 195 Q700 120 860 260" strokeWidth="1" style={{ animationDelay: '-2.4s' }} />
-                <path className="fiber-line" d="M430 205 Q300 90 130 220" strokeWidth="1" style={{ animationDelay: '-0.6s' }} />
-                <path className="globe-wire" d="M290 300 Q505 90 705 285" strokeWidth="1.2" />
-                {/* Routes that dive past the horizon — picked up by the lower
-                    hemisphere at the top of the showcase */}
-                <path className="fiber-line" d="M143 398 Q190 330 270 300" strokeWidth="1.1" style={{ animationDelay: '-2.8s' }} />
-                <path className="fiber-line" d="M857 398 Q810 335 730 292" strokeWidth="1.1" style={{ animationDelay: '-1.2s' }} />
-              </g>
-
-              {/* Data packets riding the fibers */}
-              <circle r="2.6" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="4.5s" repeatCount="indefinite" path="M240 330 Q380 60 560 195" />
-              </circle>
-              <circle r="2.6" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="6s" repeatCount="indefinite" path="M330 252 Q505 20 680 240" />
-              </circle>
-              <circle r="2.4" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="7.5s" repeatCount="indefinite" path="M240 330 Q515 -60 790 312" />
-              </circle>
-
-              {/* Golden nodes + hub pings */}
-              {([
-                [240, 330], [330, 252], [430, 205], [560, 195], [680, 240], [790, 312],
-                [143, 396], [857, 396],
-              ] as [number, number][]).map(([nx, ny]) => (
-                <circle key={`node-${nx}-${ny}`} cx={nx} cy={ny} r="2.6" fill="#E6CB8B" className="globe-node" />
-              ))}
-              <circle cx="240" cy="330" r="9" stroke="rgba(230,203,139,0.5)" strokeWidth="1" fill="none" className="globe-ping" />
-              <circle cx="560" cy="195" r="9" stroke="rgba(230,203,139,0.5)" strokeWidth="1" fill="none" className="globe-ping" style={{ animationDelay: '1.4s' }} />
-
-              {/* The flight, tracing the longest route */}
-              <g className="hero-jet">
-                <g transform="rotate(90) scale(1.5) translate(-12 -12)">
-                  <path d={JET_PATH} fill="#F7EAC0" />
-                </g>
-                <animateMotion dur="15s" repeatCount="indefinite" rotate="auto" path="M240 330 Q515 -60 790 312" />
-              </g>
-
-              {/* Light fog hugging the horizon */}
-              <ellipse cx="500" cy="398" rx="560" ry="70" fill="rgba(190,225,255,0.05)" filter="url(#soft8)" />
-            </svg>
-          </div>
-        </div>
-      </section>
-
       {/* ══════════════════════════════════════════════════════════════════════
-          One continuous "Temple Night → Golden Dawn" canvas.
-          Every section below is transparent and floats on this single cinematic
-          backdrop, so the page reads as one concept from the showcase straight
-          through to the final call to action — no dark/light patchwork.
+          One continuous immersive scene. The hero lives INSIDE the shared
+          canvas — there is no section background change anywhere, so the
+          Earth below is never cut by an edge: it simply extends past the fold
+          and the showcase emerges from the same environment beneath it.
           ══════════════════════════════════════════════════════════════════════ */}
       <div className="home-canvas relative overflow-hidden">
-        {/* Persistent night sky threaded through the whole page */}
+        {/* Deep-space sky shared by every section */}
         <div className="stars pointer-events-none absolute inset-0" aria-hidden="true" />
-        {/* Shared horizon glow at the seam — dissolves the line between the hero
-            globe and the showcase so they read as one continuous sky. */}
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-72 bg-[radial-gradient(72%_100%_at_50%_0%,rgba(198,151,73,0.20)_0%,rgba(198,151,73,0.06)_42%,transparent_74%)]"
-          aria-hidden="true"
-        />
+        <div className="stars-far pointer-events-none absolute inset-0" aria-hidden="true" />
         {/* Gold auras that recur down the canvas as the warm connective accent */}
-        <div className="home-aura left-1/2 top-[8%] h-[600px] w-[600px] -translate-x-1/2" aria-hidden="true" />
         <div className="home-aura -left-40 top-[46%] h-[520px] w-[520px]" aria-hidden="true" />
         <div className="home-aura -right-40 top-[74%] h-[560px] w-[560px]" aria-hidden="true" />
+
+        {/* ── Hero — cinematic Earth with a living golden route network ── */}
+        <section
+          ref={heroRef}
+          onMouseMove={onHeroPointer}
+          onMouseLeave={resetHeroPointer}
+          className="relative flex min-h-[110vh] items-start justify-center"
+        >
+          <div className="hero-copy relative z-10 mx-auto max-w-5xl px-4 pt-28 text-center sm:px-6 sm:pt-32">
+            <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
+              {t('hero.badge')}
+            </span>
+            <h1 className="mt-8 font-display text-5xl font-normal leading-[1.08] tracking-[-0.02em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
+              {t('hero.t1')}
+              <span className="bg-gradient-to-r from-gold-bright via-gold-light to-accent bg-clip-text text-transparent">
+                {' '}
+                {t('hero.t2')}
+              </span>
+              <br />
+              {t('hero.t3')}
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-white/65 sm:text-xl animate-fade-up [animation-delay:200ms]">
+              {t('hero.sub')}
+            </p>
+            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row animate-fade-up [animation-delay:300ms]">
+              <Button href="/esim" variant="liquid-accent" size="lg">
+                {t('hero.ctaEsim')}
+              </Button>
+              <Button href="/flights" variant="liquid" size="lg">
+                {t('hero.ctaFlight')}
+              </Button>
+            </div>
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-3 animate-fade-up [animation-delay:400ms]">
+              {[t('hero.stat1'), t('hero.stat2'), t('hero.stat3')].map((stat) => (
+                <span
+                  key={stat}
+                  className="liquid-glass rounded-full px-5 py-2.5 text-xs font-semibold tracking-wide text-white/80"
+                >
+                  {stat}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* ── The Earth — one uncut planet bridging hero and showcase.
+              Anchored to the hero's base and translated 44% below the fold, it
+              overlaps the next section as a single object: no edge, no seam —
+              only atmosphere, haze and depth. ── */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center" aria-hidden="true">
+            <div className="hero-scene relative aspect-square w-[680px] shrink-0 translate-y-[50%] sm:w-[920px] lg:w-[1120px]">
+              {/* Far routes — wrapping the planet, disappearing behind it */}
+              <svg viewBox="0 0 1000 1000" fill="none" className="absolute inset-0 h-full w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+                <g stroke="rgba(214,178,110,0.30)" strokeWidth="1">
+                  {[
+                    'M992 413 Q500 -400 8 413',
+                    'M30 671 Q500 1450 970 671',
+                    'M883 179 Q500 -520 117 179',
+                    'M117 821 Q500 1330 883 821',
+                    'M413 8 Q-280 500 413 992',
+                    'M587 8 Q1280 500 587 992',
+                    'M750 67 Q1250 850 250 933',
+                    'M250 67 Q-250 850 750 933',
+                  ].map((d, i) => (
+                    <path key={d} className="fiber-line" d={d} style={{ animationDelay: `${-i * 0.9}s` }} />
+                  ))}
+                </g>
+              </svg>
+
+              {/* Atmospheric scattering + golden sunrise rim */}
+              <div className="earth-atmo absolute -inset-[5%] rounded-full" />
+              <div className="earth-sunrise absolute -inset-[8%] rounded-full" />
+
+              {/* The planet — real NASA Blue Marble texture, slowly turning */}
+              <div className="earth-sphere absolute inset-0">
+                <div className="earth-belt">
+                  <i />
+                  <i />
+                </div>
+              </div>
+
+              {/* Near routes — fiber-optic golden trajectories at varying
+                  heights, with travelling light, glowing endpoints and the
+                  flight riding the longest one */}
+              <svg viewBox="0 0 1000 1000" fill="none" className="absolute inset-0 h-full w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+                <g stroke="rgba(216,181,114,0.8)">
+                  {([
+                    ['M67 250 Q500 -175 933 250', 1.5, 0.9],
+                    ['M17 371 Q334 -120 854 146', 1.1, 0.6],
+                    ['M8 587 Q33 33 587 8', 1, 0.5],
+                    ['M67 750 Q500 1200 933 750', 1.2, 0.55],
+                    ['M146 146 Q-5 890 750 933', 0.9, 0.4],
+                    ['M750 67 Q1130 272 970 671', 1, 0.5],
+                    ['M250 67 Q731 -139 970 329', 1.1, 0.6],
+                    ['M413 8 Q210 -2 117 179', 0.9, 0.5],
+                    ['M953 289 Q879 48 629 17', 1, 0.6],
+                    ['M30 671 Q83 918 329 970', 0.9, 0.45],
+                    ['M671 970 Q898 935 953 711', 0.9, 0.45],
+                    ['M8 413 Q500 1150 992 587', 1.1, 0.5],
+                    ['M787 90 Q500 -260 213 90', 1.2, 0.7],
+                    ['M544 2 Q90 10 2 456', 1, 0.55],
+                  ] as [string, number, number][]).map(([d, w, o], i) => (
+                    <path
+                      key={d}
+                      className="fiber-line"
+                      d={d}
+                      strokeWidth={w}
+                      opacity={o}
+                      style={{ animationDelay: `${-i * 0.7}s` }}
+                    />
+                  ))}
+                </g>
+
+                {/* Light travelling the flagship route, just behind the jet */}
+                <path
+                  className="route-trail"
+                  d="M67 250 Q500 -175 933 250"
+                  pathLength={1000}
+                  stroke="rgba(240,218,168,0.9)"
+                  strokeWidth="2.4"
+                  style={{ animationDelay: '0.35s' }}
+                />
+
+                {/* Data packets riding other routes */}
+                {([
+                  ['M8 587 Q33 33 587 8', 9],
+                  ['M67 750 Q500 1200 933 750', 11],
+                  ['M250 67 Q731 -139 970 329', 8],
+                  ['M8 413 Q500 1150 992 587', 12],
+                  ['M787 90 Q500 -260 213 90', 6.5],
+                ] as [string, number][]).map(([d, dur]) => (
+                  <circle key={`pk-${d}`} r="2.4" fill="#F0DAA8" className="globe-node">
+                    <animateMotion dur={`${dur}s`} repeatCount="indefinite" path={d} />
+                  </circle>
+                ))}
+
+                {/* Glowing route endpoints */}
+                {([
+                  [67, 250], [933, 250], [250, 67], [970, 329], [953, 289],
+                  [629, 17], [787, 90], [213, 90], [8, 413], [992, 587],
+                ] as [number, number][]).map(([nx, ny]) => (
+                  <circle key={`ep-${nx}-${ny}`} cx={nx} cy={ny} r="2.8" fill="#E8D3A2" className="globe-node" />
+                ))}
+
+                {/* City lights on the day side, gently pulsing */}
+                {([
+                  [620, 320, 0], [430, 260, 0.6], [300, 420, 1.2], [700, 480, 0.3],
+                  [540, 610, 0.9], [380, 700, 1.5], [660, 760, 0.4], [250, 610, 1.1],
+                  [760, 300, 0.7], [480, 420, 1.8], [590, 180, 0.2], [330, 300, 1.4],
+                ] as [number, number, number][]).map(([cx, cy, dl], i) => (
+                  <circle
+                    key={`ct-${cx}-${cy}`}
+                    cx={cx}
+                    cy={cy}
+                    r="2.2"
+                    fill={i % 3 === 0 ? 'rgba(190,225,255,0.9)' : '#E8D3A2'}
+                    className="globe-node hero-twinkle"
+                    style={{ animationDelay: `${dl}s` }}
+                  />
+                ))}
+                <circle cx="620" cy="320" r="9" stroke="rgba(214,178,110,0.5)" strokeWidth="1" fill="none" className="globe-ping" />
+                <circle cx="330" cy="300" r="9" stroke="rgba(214,178,110,0.5)" strokeWidth="1" fill="none" className="globe-ping" style={{ animationDelay: '1.6s' }} />
+
+                {/* The flight — luxury cruise along the flagship route */}
+                <g className="hero-jet">
+                  <g transform="rotate(90) scale(1.6) translate(-12 -12)">
+                    <path d={JET_PATH} fill="#F7EAC0" />
+                  </g>
+                  <animateMotion dur="12s" repeatCount="indefinite" rotate="auto" path="M67 250 Q500 -175 933 250" />
+                </g>
+              </svg>
+
+              {/* Volumetric haze melting the planet's base into the next scene */}
+              <div className="earth-fog absolute -inset-x-[12%] bottom-[-6%] h-[55%]" />
+            </div>
+          </div>
+        </section>
 
         {/* ── Cambodia 3D Liquid-Glass destination showcase ── */}
         <CambodiaShowcase />

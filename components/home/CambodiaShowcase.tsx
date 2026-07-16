@@ -190,7 +190,7 @@ export function CambodiaShowcase() {
   const current = DESTINATIONS[active];
 
   return (
-    <section className="relative overflow-hidden pb-20 pt-52 sm:pb-28 sm:pt-64">
+    <section className="relative pb-20 pt-64 sm:pb-28 sm:pt-80 lg:pt-96">
       {/* Ambient starfield + gold aura — drawn on the shared home canvas so the
           showcase melts into the sections above and below it. */}
       <div className="stars" aria-hidden="true" />
@@ -199,75 +199,14 @@ export function CambodiaShowcase() {
         aria-hidden="true"
       />
 
-      {/* ── Lower hemisphere ───────────────────────────────────────────────
-          The other half of the hero's planet. The hero holds the upper
-          hemisphere; this completes the sphere across the section seam, so
-          the two pages literally share one globe — wrapped by the same
-          golden fiber routes that dove past the horizon above. It dissolves
-          into the night as the destination ring takes over. */}
+      {/* ── Atmospheric haze ─────────────────────────────────────────────────
+          The hero's Earth extends uncut into this section; this soft radial
+          haze adds depth between the planet's base and the destination ring,
+          so the showcase emerges from the same environment — no boundary. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-0 flex justify-center [mask-image:linear-gradient(180deg,black_25%,transparent_95%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[480px] bg-[radial-gradient(70%_70%_at_50%_28%,rgba(9,22,42,0.55)_0%,rgba(9,22,42,0.26)_55%,transparent_82%)]"
         aria-hidden="true"
-      >
-        <div className="w-[900px] shrink-0 sm:w-[1150px]">
-          <svg viewBox="0 0 1000 360" fill="none" className="h-auto w-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="hemiBot" x1="500" y1="0" x2="500" y2="360" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stopColor="#0C1830" />
-                <stop offset="0.6" stopColor="#0A1426" />
-                <stop offset="1" stopColor="#070E1C" />
-              </linearGradient>
-              <pattern id="hemiDotsB" width="18" height="16" patternUnits="userSpaceOnUse">
-                <circle cx="3" cy="4" r="1" fill="rgba(150,200,245,0.12)" />
-                <circle cx="12" cy="11" r="0.9" fill="rgba(230,203,139,0.08)" />
-              </pattern>
-              <clipPath id="hemiClipB">
-                <circle cx="500" cy="0" r="358" />
-              </clipPath>
-              <filter id="softB8" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="8" />
-              </filter>
-            </defs>
-
-            {/* The night side of the planet */}
-            <circle cx="500" cy="0" r="360" fill="url(#hemiBot)" />
-            <circle cx="500" cy="0" r="360" stroke="rgba(110,190,245,0.22)" strokeWidth="6" filter="url(#softB8)" />
-            <circle cx="500" cy="0" r="360" stroke="rgba(120,200,250,0.30)" strokeWidth="1.5" />
-
-            {/* Dim drifting surface */}
-            <g clipPath="url(#hemiClipB)">
-              <g className="globe-drift-slow">
-                <rect x="-760" y="-10" width="2280" height="380" fill="url(#hemiDotsB)" />
-              </g>
-              <path d="M 130 90 Q 500 190 870 90" stroke="rgba(150,200,245,0.10)" strokeWidth="1" />
-            </g>
-
-            {/* Golden fibers wrapping the underside — continuing the hero's
-                routes through the seam at the same x positions */}
-            <g stroke="rgba(238,208,142,0.7)" strokeWidth="1.1">
-              <path className="fiber-line" d="M143 2 Q210 120 400 170" />
-              <path className="fiber-line" d="M857 2 Q790 125 600 175" style={{ animationDelay: '-1.4s' }} />
-              <path className="fiber-line" d="M143 2 Q500 300 857 2" strokeWidth="0.9" style={{ animationDelay: '-2.2s' }} />
-              <path className="globe-wire" d="M400 170 Q500 205 600 175" strokeWidth="1.1" />
-            </g>
-            <circle r="2.4" fill="#F7EAC0" className="globe-node">
-              <animateMotion dur="7s" repeatCount="indefinite" path="M143 2 Q500 300 857 2" />
-            </circle>
-
-            {/* Nodes + sleeping cities on the night side */}
-            {([
-              [143, 4], [857, 4], [400, 170], [600, 175],
-            ] as [number, number][]).map(([nx, ny]) => (
-              <circle key={`bnode-${nx}-${ny}`} cx={nx} cy={ny} r="2.4" fill="#E6CB8B" className="globe-node" />
-            ))}
-            {([
-              [300, 120, 0.4], [700, 115, 1.2], [500, 150, 0.8],
-            ] as [number, number, number][]).map(([cx, cy, d]) => (
-              <circle key={`bcity-${cx}-${cy}`} cx={cx} cy={cy} r="2" fill="rgba(200,235,255,0.75)" className="hero-twinkle" style={{ animationDelay: `${d}s` }} />
-            ))}
-          </svg>
-        </div>
-      </div>
+      />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
         {/* Heading */}
