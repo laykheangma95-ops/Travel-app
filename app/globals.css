@@ -568,6 +568,130 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Unified "Temple Night → Golden Dawn" home canvas
+   One continuous cinematic backdrop beneath the whole homepage so every
+   section — showcase, features, how-it-works, destinations, testimonials, CTA —
+   reads as a single concept instead of a dark/light patchwork. Sections sit
+   transparent on this canvas; content floats on frosted glass surfaces.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.home-canvas {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(
+      180deg,
+      #14263f 0%,
+      #0e1b30 9%,
+      #14263f 26%,
+      #1c3355 46%,
+      #172c4c 62%,
+      #14263f 80%,
+      #0b1526 100%
+    );
+}
+
+/* A soft gold aura that breathes behind a section — the recurring warm accent
+   that threads the whole page together. Drop one into any section wrapper. */
+.home-aura {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(198, 151, 73, 0.22) 0%,
+    rgba(198, 151, 73, 0.07) 44%,
+    transparent 72%
+  );
+  animation: camAura 9s ease-in-out infinite;
+}
+
+/* Hairline that separates stacked sections without a hard color seam. */
+.home-hairline {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, rgba(230, 203, 139, 0.28), transparent);
+}
+
+/* Frosted glass content card used across the dark home sections. */
+.glass-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.028) 55%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(230, 203, 139, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 20px 44px rgba(2, 8, 23, 0.4);
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.45s ease,
+    box-shadow 0.45s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(230, 203, 139, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 30px 64px rgba(2, 8, 23, 0.55),
+    0 0 0 1px rgba(198, 151, 73, 0.2);
+}
+
+/* Gold top hairline that ignites on hover. */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  z-index: 1;
+  background: linear-gradient(90deg, transparent, rgba(230, 203, 139, 0.75), transparent);
+  opacity: 0.35;
+  transition: opacity 0.45s ease;
+}
+
+.glass-card:hover::before {
+  opacity: 1;
+}
+
+/* Numbered step token used in "How it works" on the dark canvas. */
+.step-token {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: radial-gradient(120% 120% at 30% 18%, #23406a 0%, #14263f 55%, #0e1b30 100%);
+  border: 1px solid rgba(230, 203, 139, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 22px rgba(2, 8, 23, 0.5),
+    0 0 0 6px rgba(20, 38, 63, 0.6);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
+}
+
+.step-token:hover {
+  transform: translateY(-4px) scale(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px rgba(2, 8, 23, 0.6),
+    0 0 0 6px rgba(198, 151, 73, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-aura {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Cambodia 3D Liquid-Glass destination showcase (components/home/CambodiaShowcase)
    A ring of gold-rimmed glass "profile" medallions that rotate in real 3D to
    promote Cambodian travel destinations. Transforms per-item are set inline;

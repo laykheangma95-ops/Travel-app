@@ -201,138 +201,172 @@ export function HomeContent() {
         </div>
       </section>
 
-      {/* ── Cambodia 3D Liquid-Glass destination showcase ── */}
-      <CambodiaShowcase />
+      {/* ══════════════════════════════════════════════════════════════════════
+          One continuous "Temple Night → Golden Dawn" canvas.
+          Every section below is transparent and floats on this single cinematic
+          backdrop, so the page reads as one concept from the showcase straight
+          through to the final call to action — no dark/light patchwork.
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="home-canvas relative overflow-hidden">
+        {/* Persistent night sky threaded through the whole page */}
+        <div className="stars pointer-events-none absolute inset-0" aria-hidden="true" />
+        {/* Gold auras that recur down the canvas as the warm connective accent */}
+        <div className="home-aura left-1/2 top-[8%] h-[600px] w-[600px] -translate-x-1/2" aria-hidden="true" />
+        <div className="home-aura -left-40 top-[46%] h-[520px] w-[520px]" aria-hidden="true" />
+        <div className="home-aura -right-40 top-[74%] h-[560px] w-[560px]" aria-hidden="true" />
 
-      {/* ── Feature showcase ── */}
-      <section className="section-pad bg-surface-2">
+        {/* ── Cambodia 3D Liquid-Glass destination showcase ── */}
+        <CambodiaShowcase />
+
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading
-              eyebrow={t('features.eyebrow')}
-              title={t('features.title')}
-              description={t('features.desc')}
-            />
-          </Reveal>
-          <div className="grid gap-6 md:grid-cols-3">
-            {features.map((f, i) => (
-              <Reveal key={f.nameKey} delay={i * 110}>
-                <div className="group h-full rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
-                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-[#F5EEDC] transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
-                    <f.icon size={32} className="text-accent" aria-hidden="true" />
-                  </div>
-                  <h3 className="font-display text-lg font-bold tracking-tight text-ink">{t(f.nameKey)}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{t(f.descKey)}</p>
-                  <Link
-                    href={f.href}
-                    className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-secondary transition-all duration-200 hover:gap-2.5 hover:text-accent"
-                  >
-                    {t('features.learnMore')} <ArrowRight size={14} />
-                  </Link>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <hr className="home-hairline" aria-hidden="true" />
         </div>
-      </section>
 
-      {/* ── How it works ── */}
-      <section id="how-it-works" className="section-pad bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading eyebrow={t('how.eyebrow')} title={t('how.title')} />
-          </Reveal>
-          <div className="relative grid gap-10 md:grid-cols-4">
-            {/* Connecting line on desktop */}
-            <div
-              className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-px bg-line md:block"
-              aria-hidden="true"
-            />
-            {stepKeys.map((key, i) => (
-              <Reveal key={key} delay={i * 130}>
-                <div className="relative flex flex-col items-center text-center">
-                  <div className="z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-secondary font-display text-lg font-bold text-white shadow-card transition-transform duration-300 ease-smooth hover:scale-110">
-                    {i + 1}
-                  </div>
-                  <p className="mt-4 max-w-[200px] font-medium text-ink">{t(key)}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Popular destinations ── */}
-      <section className="section-pad bg-surface-2">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading eyebrow={t('dest.eyebrow')} title={t('dest.title')} description={t('dest.desc')} />
-          </Reveal>
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-            {popularDestinations.map((dest, i) => (
-              <Reveal key={dest.slug} delay={(i % 4) * 80}>
-                <DestinationCard destination={dest} />
-              </Reveal>
-            ))}
-          </div>
-          <Reveal className="mt-12 text-center">
-            <Button href="/esim" variant="outline">
-              {t('dest.viewAll')} <ArrowRight size={16} />
-            </Button>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Testimonials ── */}
-      <section className="section-pad bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading eyebrow={t('testi.eyebrow')} title={t('testi.title')} />
-          </Reveal>
-          <div className="grid gap-6 md:grid-cols-3">
-            {testimonials.map((tm, i) => (
-              <Reveal key={tm.name} delay={i * 110}>
-                <figure className="h-full rounded-card border border-line/60 bg-surface-2 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:bg-white hover:shadow-card-hover">
-                  <div className="flex gap-1" aria-label="5 out of 5 stars">
-                    {Array.from({ length: 5 }).map((_, s) => (
-                      <Star key={s} size={16} className="fill-warning text-warning" aria-hidden="true" />
-                    ))}
-                  </div>
-                  <blockquote className="mt-4 text-sm leading-relaxed text-ink-secondary">
-                    “{tm.quote}”
-                  </blockquote>
-                  <figcaption className="mt-6 flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-white">
-                      {tm.initials}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{tm.name}</p>
-                      <p className="text-xs text-ink-muted">{tm.trip}</p>
+        {/* ── Feature showcase ── */}
+        <section className="section-pad relative">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <Reveal>
+              <SectionHeading
+                dark
+                eyebrow={t('features.eyebrow')}
+                title={t('features.title')}
+                description={t('features.desc')}
+              />
+            </Reveal>
+            <div className="grid gap-6 md:grid-cols-3">
+              {features.map((f, i) => (
+                <Reveal key={f.nameKey} delay={i * 110}>
+                  <div className="glass-card group h-full p-8">
+                    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card border border-gold-light/25 bg-gradient-to-br from-gold-light/20 to-accent/10 transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:border-gold-light/50">
+                      <f.icon size={30} className="text-gold-light" aria-hidden="true" />
                     </div>
-                  </figcaption>
-                </figure>
-              </Reveal>
-            ))}
+                    <h3 className="font-display text-lg font-bold tracking-tight text-white">{t(f.nameKey)}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-white/60">{t(f.descKey)}</p>
+                    <Link
+                      href={f.href}
+                      className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-gold-light transition-all duration-200 hover:gap-2.5 hover:text-gold-bright"
+                    >
+                      {t('features.learnMore')} <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Bottom CTA ── */}
-      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)] py-20">
-        <div className="stars" aria-hidden="true" />
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">{t('cta.title')}</h2>
-          <p className="mt-4 text-white/70">{t('cta.sub')}</p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button href="/esim" variant="liquid-accent" size="lg">
-              {t('hero.ctaEsim')}
-            </Button>
-            <Button href="/checklist" variant="liquid" size="lg">
-              {t('cta.checklist')}
-            </Button>
+        {/* ── How it works ── */}
+        <section id="how-it-works" className="section-pad relative">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <Reveal>
+              <SectionHeading dark eyebrow={t('how.eyebrow')} title={t('how.title')} />
+            </Reveal>
+            <div className="relative grid gap-10 md:grid-cols-4">
+              {/* Animated flight path connecting the four steps on desktop */}
+              <svg
+                className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-3 w-3/4 md:block"
+                viewBox="0 0 100 6"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <line x1="0" y1="3" x2="100" y2="3" stroke="rgba(230,203,139,0.22)" strokeWidth="0.6" />
+                <line
+                  x1="0"
+                  y1="3"
+                  x2="100"
+                  y2="3"
+                  stroke="rgba(230,203,139,0.85)"
+                  strokeWidth="0.7"
+                  className="arc-line"
+                />
+              </svg>
+              {stepKeys.map((key, i) => (
+                <Reveal key={key} delay={i * 130}>
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="step-token z-10 h-14 w-14 font-display text-lg font-bold text-gold-bright">
+                      {i + 1}
+                    </div>
+                    <p className="mt-5 max-w-[200px] font-medium text-white/80">{t(key)}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* ── Popular destinations ── */}
+        <section className="section-pad relative">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <Reveal>
+              <SectionHeading dark eyebrow={t('dest.eyebrow')} title={t('dest.title')} description={t('dest.desc')} />
+            </Reveal>
+            <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+              {popularDestinations.map((dest, i) => (
+                <Reveal key={dest.slug} delay={(i % 4) * 80}>
+                  <DestinationCard destination={dest} variant="glass" />
+                </Reveal>
+              ))}
+            </div>
+            <Reveal className="mt-12 text-center">
+              <Button href="/esim" variant="liquid">
+                {t('dest.viewAll')} <ArrowRight size={16} />
+              </Button>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ── Testimonials ── */}
+        <section className="section-pad relative">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <Reveal>
+              <SectionHeading dark eyebrow={t('testi.eyebrow')} title={t('testi.title')} />
+            </Reveal>
+            <div className="grid gap-6 md:grid-cols-3">
+              {testimonials.map((tm, i) => (
+                <Reveal key={tm.name} delay={i * 110}>
+                  <figure className="glass-card liquid-sheen h-full p-8">
+                    <div className="flex gap-1" aria-label="5 out of 5 stars">
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <Star key={s} size={16} className="fill-gold-light text-gold-light" aria-hidden="true" />
+                      ))}
+                    </div>
+                    <blockquote className="mt-4 text-sm leading-relaxed text-white/75">
+                      “{tm.quote}”
+                    </blockquote>
+                    <figcaption className="mt-6 flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gold-light/30 bg-gradient-to-br from-secondary-high to-primary-deep text-sm font-bold text-gold-light">
+                        {tm.initials}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{tm.name}</p>
+                        <p className="text-xs text-white/45">{tm.trip}</p>
+                      </div>
+                    </figcaption>
+                  </figure>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Bottom CTA — the horizon the whole journey has been descending toward ── */}
+        <section className="relative py-24">
+          <Reveal className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+            <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
+              {t('cta.title')}
+            </h2>
+            <p className="mt-4 text-white/70">{t('cta.sub')}</p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button href="/esim" variant="liquid-accent" size="lg">
+                {t('hero.ctaEsim')}
+              </Button>
+              <Button href="/checklist" variant="liquid" size="lg">
+                {t('cta.checklist')}
+              </Button>
+            </div>
+          </Reveal>
+        </section>
+      </div>
     </>
   );
 }
