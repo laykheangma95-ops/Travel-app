@@ -7,12 +7,10 @@
 //   block of business knowledge that auto-syncs eSIM prices/countries from the
 //   data files, so answers stay correct without editing this route.
 //
-// WHICH AI PROVIDER IT USES (checked in this order):
-//   1. OPENROUTER_API_KEY set  → OpenRouter (openrouter.ai), which routes to
-//      Claude. One key, works with many models, simple billing.
-//   2. ANTHROPIC_API_KEY set   → Anthropic directly (console.anthropic.com).
-//   3. Neither                 → friendly "demo mode" canned answer, so the
-//      chatbot always works while you're building.
+// WHICH AI PROVIDER IT USES:
+//   OPENROUTER_API_KEY set → OpenRouter (openrouter.ai), which routes to Claude.
+//   No key                 → friendly "demo mode" canned answer, so the chatbot
+//                            always works while you're building.
 //
 // SETUP ON VERCEL:
 //   Project → Settings → Environment Variables → add OPENROUTER_API_KEY
@@ -25,19 +23,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { DOMNER_SYSTEM_PROMPT } from '@/lib/domnerBrain';
 
-// Run on Vercel's Node runtime (the Anthropic SDK needs it), and disable caching
-// so every message gets a fresh answer.
+// Run on Vercel's Node runtime, and disable caching so every message gets a
+// fresh answer.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// The models to use. Haiku is Anthropic's fastest + cheapest model, which suits
-// a high-volume support chatbot (this matches Domner's cost strategy). Note the
-// two spellings: OpenRouter writes versions with a dot, Anthropic with a dash.
+// The model to use. Haiku is Anthropic's fastest + cheapest model, which suits a
+// high-volume support chatbot (this matches Domner's cost strategy). Browse
+// other names at openrouter.ai/models — they all work with the same key.
 const OPENROUTER_MODEL = 'anthropic/claude-haiku-4.5';
-const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
 // One "turn" in the conversation: who spoke ('user' = the traveller,
 // 'assistant' = the AI) and what they said.
@@ -102,29 +98,6 @@ async function askOpenRouter(
   return data.choices?.[0]?.message?.content?.trim() ?? '';
 }
 
-// Ask Claude through Anthropic directly (kept as a fallback provider).
-async function askAnthropic(
-  apiKey: string,
-  system: string,
-  turns: ChatTurn[],
-): Promise<string> {
-  const claude = new Anthropic({ apiKey });
-  const message = await claude.messages.create({
-    model: ANTHROPIC_MODEL,
-    max_tokens: 1024,
-    system,
-    messages: turns.map((t) => ({ role: t.role, content: t.content })),
-  });
-
-  // Claude's answer comes back as a list of "content blocks". For a plain
-  // chat reply we just want the text blocks, joined together.
-  return message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim();
-}
-
 export async function POST(request: Request) {
   // ── Step 1: Read and validate the incoming conversation ──────────────────
   // We defend against bad input so the endpoint never crashes.
@@ -140,10 +113,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please send at least one message.' }, { status: 400 });
   }
 
-  // ── Step 2: If there's no API key at all, answer in demo mode ────────────
+  // ── Step 2: If there's no API key, answer in demo mode ───────────────────
   const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!openRouterKey && !anthropicKey) {
+  if (!openRouterKey) {
     return NextResponse.json({ reply: demoReply(turns, body?.context), demo: true });
   }
 
@@ -154,11 +126,9 @@ export async function POST(request: Request) {
     : '';
   const system = DOMNER_SYSTEM_PROMPT + contextNote; // <-- the "brain"
 
-  // ── Step 3: Ask Claude for a real answer ─────────────────────────────────
+  // ── Step 3: Ask Claude (via OpenRouter) for a real answer ────────────────
   try {
-    const reply = openRouterKey
-      ? await askOpenRouter(openRouterKey, system, turns)
-      : await askAnthropic(anthropicKey!, system, turns);
+    const reply = await askOpenRouter(openRouterKey, system, turns);
 
     // ── Step 4: Send the reply back ──────────────────────────────────────────
     return NextResponse.json({ reply: reply || demoReply(turns, body?.context), demo: false });

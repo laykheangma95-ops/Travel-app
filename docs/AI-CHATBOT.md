@@ -88,13 +88,10 @@ The `messages` array is the whole conversation. Add past turns so the AI has con
 ## Turning on real AI answers
 
 Without a key, the chatbot runs in **demo mode** — it returns a friendly canned
-reply and sets `"demo": true`. The chatbot supports two providers — set **one**:
-
-- **OpenRouter (used first):** a key from **openrouter.ai** (`sk-or-v1-...`) as
-  `OPENROUTER_API_KEY`. One key routes to Claude and many other models; add
-  credits and a spend limit in the OpenRouter dashboard.
-- **Anthropic (fallback):** a key from **console.anthropic.com** (`sk-ant-...`)
-  as `ANTHROPIC_API_KEY`. ⚠️ Set a monthly spend cap first.
+reply and sets `"demo": true`. To get real AI answers, get a key from
+**openrouter.ai** (`sk-or-v1-...`) and set it as `OPENROUTER_API_KEY`. One key
+routes to Claude and many other models; add credits and a spend limit in the
+OpenRouter dashboard.
 
 Add it to your environment:
 
