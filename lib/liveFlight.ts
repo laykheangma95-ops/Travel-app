@@ -103,11 +103,20 @@ function candidateCallsigns(flightNumber: string): string[] {
   return Array.from(new Set(candidates));
 }
 
+// Several of the free ADS-B endpoints (notably airplanes.live) reject requests
+// that arrive without a proper User-Agent — they answer 403 or an empty body,
+// which would make the tracker look permanently "on standby". So we always
+// identify ourselves with a descriptive User-Agent.
+const UPSTREAM_HEADERS = {
+  Accept: 'application/json',
+  'User-Agent': 'Domner-FlightTracker/1.0 (+https://domnerapp.com)',
+};
+
 async function fetchJson<T>(url: string, timeoutMs = 5000): Promise<T | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(timeoutMs),
-      headers: { Accept: 'application/json' },
+      headers: UPSTREAM_HEADERS,
       next: { revalidate: 15 },
     });
     if (!res.ok) return null;
