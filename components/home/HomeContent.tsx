@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Reveal } from '@/components/ui/Reveal';
 import { DestinationCard } from '@/components/esim/DestinationCard';
+import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { popularDestinations } from '@/data/destinations';
 import { useLang, type DictKey } from '@/lib/i18n';
 
@@ -199,6 +200,9 @@ export function HomeContent() {
           </div>
         </div>
       </section>
+
+      {/* ── Cambodia 3D Liquid-Glass destination showcase ── */}
+      <CambodiaShowcase />
 
       {/* ── Feature showcase ── */}
       <section className="section-pad bg-surface-2">

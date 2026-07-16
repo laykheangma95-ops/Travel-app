@@ -566,3 +566,139 @@
     font-size: 11px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Cambodia 3D Liquid-Glass destination showcase (components/home/CambodiaShowcase)
+   A ring of gold-rimmed glass "profile" medallions that rotate in real 3D to
+   promote Cambodian travel destinations. Transforms per-item are set inline;
+   these classes carry the premium glass finish, depth, and idle motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cam-stage {
+  perspective: 1600px;
+  perspective-origin: 50% 42%;
+  touch-action: pan-y; /* let the page scroll vertically; we own horizontal drag */
+}
+
+.cam-ring {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Each medallion sits on the ring; back-facing ones vanish for a clean arc. */
+.cam-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  cursor: pointer;
+}
+
+/* The circular "profile picture": gold-foil rim + glass depth + specular top. */
+.cam-medallion {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  isolation: isolate;
+  /* Hide the medallion when it swings to the back of the ring, so far-side
+     items don't show through as mirrored text — keeps a clean front arc. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 1px solid rgba(230, 203, 139, 0.55);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -16px 34px rgba(0, 0, 0, 0.55),
+    0 22px 48px rgba(2, 8, 23, 0.5),
+    0 0 0 1px rgba(198, 151, 73, 0.22);
+}
+
+.cam-medallion::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: radial-gradient(125% 85% at 30% 10%, rgba(255, 255, 255, 0.55), transparent 55%);
+  pointer-events: none;
+}
+
+/* Rotating conic light on the rim of the active medallion. */
+.cam-medallion::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: 0;
+  border-radius: 9999px;
+  padding: 2px;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(247, 234, 192, 0.9) 60deg, transparent 140deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.cam-item[data-active='true'] .cam-medallion::after {
+  opacity: 1;
+  animation: camRimSpin 5s linear infinite;
+}
+
+.cam-emoji {
+  position: relative;
+  z-index: 2;
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+}
+
+.cam-caption {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* Soft gold aura that breathes behind the whole ring. */
+.cam-aura {
+  animation: camAura 7s ease-in-out infinite;
+}
+
+.cam-float {
+  animation: camFloat 8s ease-in-out infinite;
+}
+
+@keyframes camFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes camAura {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
+
+@keyframes camRimSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Cross-fade for the active destination caption below the ring. */
+.cam-info-enter {
+  animation: camInfoIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes camInfoIn {
+  from { opacity: 0; transform: translateY(10px); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cam-float,
+  .cam-aura,
+  .cam-info-enter,
+  .cam-item[data-active='true'] .cam-medallion::after {
+    animation: none;
+  }
+}
