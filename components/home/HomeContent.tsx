@@ -72,7 +72,7 @@ export function HomeContent() {
         ref={heroRef}
         onMouseMove={onHeroPointer}
         onMouseLeave={resetHeroPointer}
-        className="relative flex min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)] pb-10"
+        className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_38%,#1C3355_66%,#2A4A7A_84%,#14263F_100%)]"
       >
         {/* Starfield */}
         <div className="stars" aria-hidden="true" />
@@ -84,11 +84,11 @@ export function HomeContent() {
           aria-hidden="true"
         />
 
-        <div className="hero-copy relative z-10 mx-auto max-w-5xl px-4 pt-28 text-center sm:px-6 sm:pt-32">
+        <div className="hero-copy relative z-10 mx-auto max-w-5xl px-4 pb-64 pt-24 text-center sm:px-6 sm:pb-80">
           <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
             {t('hero.badge')}
           </span>
-          <h1 className="mt-8 font-display text-5xl font-extrabold leading-[1.1] tracking-[-0.03em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
+          <h1 className="mt-8 font-display text-5xl font-semibold leading-[1.08] tracking-[-0.03em] text-white sm:text-7xl lg:text-8xl animate-fade-up [animation-delay:100ms]">
             {t('hero.t1')}
             <span className="bg-gradient-to-r from-gold-bright via-gold-light to-accent bg-clip-text text-transparent">
               {' '}
@@ -97,7 +97,7 @@ export function HomeContent() {
             <br />
             {t('hero.t3')}
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl animate-fade-up [animation-delay:200ms]">
+          <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-white/65 sm:text-xl animate-fade-up [animation-delay:200ms]">
             {t('hero.sub')}
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row animate-fade-up [animation-delay:300ms]">
@@ -108,177 +108,150 @@ export function HomeContent() {
               {t('hero.ctaFlight')}
             </Button>
           </div>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-white/60 animate-fade-up [animation-delay:400ms]">
-            <span>{t('hero.stat1')}</span>
-            <span className="hidden text-white/25 sm:inline">·</span>
-            <span>{t('hero.stat2')}</span>
-            <span className="hidden text-white/25 sm:inline">·</span>
-            <span>{t('hero.stat3')}</span>
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-3 animate-fade-up [animation-delay:400ms]">
+            {[t('hero.stat1'), t('hero.stat2'), t('hero.stat3')].map((stat) => (
+              <span
+                key={stat}
+                className="liquid-glass rounded-full px-5 py-2.5 text-xs font-semibold tracking-wide text-white/80"
+              >
+                {stat}
+              </span>
+            ))}
           </div>
         </div>
 
-        {/* ── Full living globe — a realistic sphere wrapped in golden eSIM
-            wires that link city to city. It descends toward the Cambodia
-            showcase below, so both scenes share one world. ── */}
-        <div className="hero-scene relative z-[1] mt-4 w-[340px] shrink-0 sm:mt-6 sm:w-[460px] lg:w-[520px]" aria-hidden="true">
-          <div className="animate-float-y [animation-duration:9s]">
-            <svg viewBox="0 0 800 800" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+        {/* ── Upper hemisphere ─────────────────────────────────────────────
+            The crown of a photoreal planet rising from the fold: deep-navy
+            sphere, cyan atmosphere rim, drifting city-light surface,
+            volumetric beams, and golden fiber-optic routes arcing city to
+            city. Its lower half lives at the top of the Cambodia showcase —
+            the two sections complete one shared globe across the seam, so
+            both halves are pinned (no parallax) to stay perfectly aligned. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center" aria-hidden="true">
+          <div className="w-[900px] shrink-0 sm:w-[1150px]">
+            <svg viewBox="0 0 1000 400" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                {/* Sun-lit ocean sphere: light falls from the upper left */}
-                <radialGradient id="gSphere" cx="0.36" cy="0.26" r="1">
-                  <stop offset="0" stopColor="#3E6699" />
-                  <stop offset="0.3" stopColor="#27476F" />
-                  <stop offset="0.6" stopColor="#16294A" />
-                  <stop offset="0.85" stopColor="#0D1B33" />
-                  <stop offset="1" stopColor="#081222" />
-                </radialGradient>
-                {/* Thin blue atmosphere warming to gold at the limb */}
-                <radialGradient id="gAtmo" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0.6" stopColor="rgba(126,178,255,0)" />
-                  <stop offset="0.78" stopColor="rgba(126,178,255,0.12)" />
-                  <stop offset="0.9" stopColor="rgba(230,203,139,0.18)" />
-                  <stop offset="1" stopColor="rgba(230,203,139,0)" />
-                </radialGradient>
-                {/* Day → night terminator falling to the lower right */}
-                <radialGradient id="gShade" cx="0.32" cy="0.22" r="0.95">
-                  <stop offset="0.5" stopColor="rgba(0,0,0,0)" />
-                  <stop offset="1" stopColor="rgba(3,8,18,0.6)" />
-                </radialGradient>
-                {/* Soft specular sun glint */}
-                <radialGradient id="gSpec" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0" stopColor="rgba(255,255,255,0.16)" />
-                  <stop offset="1" stopColor="rgba(255,255,255,0)" />
-                </radialGradient>
-                <linearGradient id="gRim" x1="400" y1="80" x2="400" y2="720" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="#E6CB8B" stopOpacity="0.6" />
-                  <stop offset="0.4" stopColor="#C69749" stopOpacity="0.1" />
-                  <stop offset="1" stopColor="#C69749" stopOpacity="0" />
+                <linearGradient id="hemiTop" x1="500" y1="40" x2="500" y2="400" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#35608F" />
+                  <stop offset="0.45" stopColor="#1B3252" />
+                  <stop offset="1" stopColor="#0C1830" />
                 </linearGradient>
-                <pattern id="gDots" width="18" height="16" patternUnits="userSpaceOnUse">
-                  <circle cx="3" cy="4" r="1.1" fill="rgba(230,203,139,0.20)" />
-                  <circle cx="12" cy="11" r="0.9" fill="rgba(147,197,253,0.18)" />
+                <radialGradient id="hemiAtmo" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0.78" stopColor="rgba(110,195,245,0)" />
+                  <stop offset="0.86" stopColor="rgba(110,195,245,0.22)" />
+                  <stop offset="0.93" stopColor="rgba(160,225,255,0.10)" />
+                  <stop offset="1" stopColor="rgba(160,225,255,0)" />
+                </radialGradient>
+                <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="rgba(190,228,255,0)" />
+                  <stop offset="1" stopColor="rgba(190,228,255,0.55)" />
+                </linearGradient>
+                <pattern id="hemiDots" width="18" height="16" patternUnits="userSpaceOnUse">
+                  <circle cx="3" cy="4" r="1" fill="rgba(150,200,245,0.20)" />
+                  <circle cx="12" cy="11" r="0.9" fill="rgba(230,203,139,0.12)" />
                 </pattern>
-                <clipPath id="gClip">
-                  <circle cx="400" cy="400" r="318" />
+                <clipPath id="hemiClip">
+                  <circle cx="500" cy="400" r="358" />
                 </clipPath>
+                <filter id="soft3" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" />
+                </filter>
+                <filter id="soft8" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="8" />
+                </filter>
               </defs>
 
               {/* Atmosphere halo */}
-              <circle cx="400" cy="400" r="396" fill="url(#gAtmo)" />
+              <circle cx="500" cy="400" r="430" fill="url(#hemiAtmo)" />
 
-              {/* Far side of the flight orbit — passes behind the sphere */}
-              <g transform="rotate(-14 400 400)">
-                <path d="M 5 400 A 395 140 0 0 1 795 400" stroke="rgba(230,203,139,0.16)" strokeWidth="1.2" strokeDasharray="4 9" fill="none" />
-              </g>
+              {/* The planet */}
+              <circle cx="500" cy="400" r="360" fill="url(#hemiTop)" />
 
-              {/* The sphere */}
-              <circle className="hero-sphere" cx="400" cy="400" r="320" fill="url(#gSphere)" />
+              {/* Cyan rim light — sharp line over a soft volumetric glow */}
+              <circle cx="500" cy="400" r="360" stroke="rgba(120,200,250,0.5)" strokeWidth="7" filter="url(#soft8)" />
+              <circle cx="500" cy="400" r="360" stroke="rgba(150,215,255,0.55)" strokeWidth="1.5" />
 
-              {/* Rotating dotted surface at two depths — the earth turning */}
-              <g clipPath="url(#gClip)">
-                <g className="globe-drift-slow" opacity="0.45">
-                  <rect x="-760" y="90" width="2280" height="620" fill="url(#gDots)" />
-                </g>
+              {/* Drifting city-light surface + faint latitudes */}
+              <g clipPath="url(#hemiClip)">
                 <g className="globe-drift">
-                  <rect x="-760" y="90" width="2280" height="620" fill="url(#gDots)" />
+                  <rect x="-760" y="30" width="2280" height="380" fill="url(#hemiDots)" />
                 </g>
+                <path d="M 175 250 Q 500 175 825 250" stroke="rgba(150,200,245,0.14)" strokeWidth="1" />
+                <path d="M 92 330 Q 500 240 908 330" stroke="rgba(150,200,245,0.11)" strokeWidth="1" />
               </g>
 
-              {/* Wireframe graticule with spherical perspective */}
-              <g stroke="rgba(147,197,253,0.13)" strokeWidth="1" fill="none">
-                <line x1="400" y1="80" x2="400" y2="720" />
-                <ellipse cx="400" cy="400" rx="120" ry="320" />
-                <ellipse cx="400" cy="400" rx="225" ry="320" />
-                <ellipse cx="400" cy="400" rx="298" ry="320" />
-                <ellipse cx="400" cy="123" rx="160" ry="36" />
-                <ellipse cx="400" cy="240" rx="277" ry="58" />
-                <ellipse cx="400" cy="400" rx="320" ry="66" />
-                <ellipse cx="400" cy="560" rx="277" ry="58" />
-                <ellipse cx="400" cy="677" rx="160" ry="36" />
-              </g>
+              {/* Volumetric light beams rising from the brightest cities */}
+              {([[290, 300], [500, 215], [705, 285]] as [number, number][]).map(([bx, by]) => (
+                <rect
+                  key={`beam-${bx}`}
+                  x={bx - 2.5}
+                  y={by - 160}
+                  width="5"
+                  height="160"
+                  fill="url(#beamGrad)"
+                  filter="url(#soft3)"
+                  opacity="0.8"
+                />
+              ))}
 
-              {/* Light: terminator shading, sun glint, gilded rim */}
-              <circle cx="400" cy="400" r="320" fill="url(#gShade)" />
-              <ellipse cx="292" cy="240" rx="180" ry="115" fill="url(#gSpec)" />
-              <circle cx="400" cy="400" r="319" stroke="url(#gRim)" strokeWidth="1.6" />
-
-              {/* Golden wires — live eSIM routes linking city to city */}
-              <g stroke="rgba(240,216,150,0.95)" strokeWidth="2.1">
-                <path className="globe-wire" d="M520 470 Q640 380 610 300" />
-                <path className="globe-wire" d="M520 470 Q515 545 470 560" style={{ animationDelay: '-0.7s' }} />
-                <path className="globe-wire" d="M470 560 Q382 565 300 430" style={{ animationDelay: '-1.4s' }} />
-                <path className="globe-wire" d="M300 430 Q225 330 255 255" style={{ animationDelay: '-2.1s' }} />
-                <path className="globe-wire" d="M255 255 Q145 270 150 350" style={{ animationDelay: '-0.4s' }} />
-                <path className="globe-wire" d="M610 300 Q700 450 585 585" style={{ animationDelay: '-1.8s' }} />
-                <path className="globe-wire" d="M150 350 Q135 425 170 480" style={{ animationDelay: '-1.1s' }} />
-                <path className="globe-wire" d="M300 200 Q235 315 300 430" style={{ animationDelay: '-2.6s' }} />
-                {/* The long haul — over the pole */}
-                <path className="globe-wire" d="M150 350 Q400 -260 610 300" stroke="rgba(230,203,139,0.6)" style={{ animationDelay: '-3s' }} />
-              </g>
-
-              {/* Data packets riding the wires */}
-              <circle r="3" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="4s" repeatCount="indefinite" path="M520 470 Q640 380 610 300" />
-              </circle>
-              <circle r="3" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="6.5s" repeatCount="indefinite" path="M150 350 Q400 -260 610 300" />
-              </circle>
-              <circle r="2.6" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="5s" repeatCount="indefinite" path="M470 560 Q382 565 300 430" />
-              </circle>
-              <circle r="2.6" fill="#F7EAC0" className="globe-node">
-                <animateMotion dur="5.6s" repeatCount="indefinite" path="M300 430 Q225 330 255 255" />
-              </circle>
-
-              {/* City nodes — hubs ping like a live network map */}
+              {/* City clusters */}
               {([
-                [520, 470, 0, true], // Phnom Penh — home hub
-                [610, 300, 0.5, false],
-                [470, 560, 1, false],
-                [300, 430, 1.5, true],
-                [255, 255, 0.8, false],
-                [150, 350, 1.9, true],
-                [585, 585, 0.3, false],
-                [170, 480, 1.2, false],
-                [300, 200, 2.2, false],
-              ] as [number, number, number, boolean][]).map(([cx, cy, delay, hub]) => (
-                <g key={`${cx}-${cy}`}>
-                  {hub && (
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r="9"
-                      stroke="rgba(230,203,139,0.5)"
-                      strokeWidth="1"
-                      fill="none"
-                      className="globe-ping"
-                      style={{ animationDelay: `${delay}s` }}
-                    />
-                  )}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r="3.2"
-                    fill="#E6CB8B"
-                    className="globe-node hero-twinkle"
-                    style={{ animationDelay: `${delay}s` }}
-                  />
+                [240, 330, 0], [330, 252, 0.5], [430, 205, 1], [560, 195, 0.3], [680, 240, 0.8],
+                [790, 312, 1.3], [290, 300, 1.7], [500, 215, 0.6], [705, 285, 1.1],
+              ] as [number, number, number][]).map(([cx, cy, d]) => (
+                <g key={`city-${cx}-${cy}`}>
+                  <circle cx={cx} cy={cy} r="6" fill="rgba(160,220,255,0.22)" />
+                  <circle cx={cx} cy={cy} r="2.4" fill="#EAF6FF" className="hero-twinkle" style={{ animationDelay: `${d}s` }} />
                 </g>
               ))}
 
-              {/* Near side of the orbit + the flight */}
-              <g transform="rotate(-14 400 400)">
-                <path d="M 795 400 A 395 140 0 0 1 5 400" stroke="rgba(230,203,139,0.38)" strokeWidth="1.4" strokeDasharray="4 9" fill="none" />
-                <path id="gOrbit" d="M 5 400 A 395 140 0 0 1 795 400 A 395 140 0 0 1 5 400" fill="none" />
-                <g className="hero-jet">
-                  <g transform="rotate(90) scale(1.7) translate(-12 -12)">
-                    <path d={JET_PATH} fill="#F7EAC0" />
-                  </g>
-                  <animateMotion dur="16s" repeatCount="indefinite" rotate="auto">
-                    <mpath href="#gOrbit" />
-                  </animateMotion>
-                </g>
+              {/* Golden fiber-optic routes — gold lives only on the network */}
+              <g stroke="rgba(238,208,142,0.8)" strokeWidth="1.3">
+                <path className="fiber-line" d="M240 330 Q380 60 560 195" />
+                <path className="fiber-line" d="M330 252 Q505 20 680 240" style={{ animationDelay: '-1s' }} />
+                <path className="fiber-line" d="M430 205 Q640 60 790 312" style={{ animationDelay: '-2s' }} />
+                <path className="fiber-line" d="M240 330 Q515 -60 790 312" strokeWidth="1" style={{ animationDelay: '-3s' }} />
+                <path className="fiber-line" d="M330 252 Q430 110 560 195" strokeWidth="1" style={{ animationDelay: '-1.6s' }} />
+                <path className="fiber-line" d="M560 195 Q700 120 860 260" strokeWidth="1" style={{ animationDelay: '-2.4s' }} />
+                <path className="fiber-line" d="M430 205 Q300 90 130 220" strokeWidth="1" style={{ animationDelay: '-0.6s' }} />
+                <path className="globe-wire" d="M290 300 Q505 90 705 285" strokeWidth="1.2" />
+                {/* Routes that dive past the horizon — picked up by the lower
+                    hemisphere at the top of the showcase */}
+                <path className="fiber-line" d="M143 398 Q190 330 270 300" strokeWidth="1.1" style={{ animationDelay: '-2.8s' }} />
+                <path className="fiber-line" d="M857 398 Q810 335 730 292" strokeWidth="1.1" style={{ animationDelay: '-1.2s' }} />
               </g>
+
+              {/* Data packets riding the fibers */}
+              <circle r="2.6" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="4.5s" repeatCount="indefinite" path="M240 330 Q380 60 560 195" />
+              </circle>
+              <circle r="2.6" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="6s" repeatCount="indefinite" path="M330 252 Q505 20 680 240" />
+              </circle>
+              <circle r="2.4" fill="#F7EAC0" className="globe-node">
+                <animateMotion dur="7.5s" repeatCount="indefinite" path="M240 330 Q515 -60 790 312" />
+              </circle>
+
+              {/* Golden nodes + hub pings */}
+              {([
+                [240, 330], [330, 252], [430, 205], [560, 195], [680, 240], [790, 312],
+                [143, 396], [857, 396],
+              ] as [number, number][]).map(([nx, ny]) => (
+                <circle key={`node-${nx}-${ny}`} cx={nx} cy={ny} r="2.6" fill="#E6CB8B" className="globe-node" />
+              ))}
+              <circle cx="240" cy="330" r="9" stroke="rgba(230,203,139,0.5)" strokeWidth="1" fill="none" className="globe-ping" />
+              <circle cx="560" cy="195" r="9" stroke="rgba(230,203,139,0.5)" strokeWidth="1" fill="none" className="globe-ping" style={{ animationDelay: '1.4s' }} />
+
+              {/* The flight, tracing the longest route */}
+              <g className="hero-jet">
+                <g transform="rotate(90) scale(1.5) translate(-12 -12)">
+                  <path d={JET_PATH} fill="#F7EAC0" />
+                </g>
+                <animateMotion dur="15s" repeatCount="indefinite" rotate="auto" path="M240 330 Q515 -60 790 312" />
+              </g>
+
+              {/* Light fog hugging the horizon */}
+              <ellipse cx="500" cy="398" rx="560" ry="70" fill="rgba(190,225,255,0.05)" filter="url(#soft8)" />
             </svg>
           </div>
         </div>

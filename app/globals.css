@@ -483,6 +483,20 @@
     filter: drop-shadow(0 0 6px rgba(230, 203, 139, 0.9));
   }
 
+  /* Solid golden fiber-optic route: a hairline of warm light that slowly
+     breathes, like live traffic on a cable */
+  .fiber-line {
+    fill: none;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 3px rgba(230, 203, 139, 0.55));
+    animation: fiberPulse 5s ease-in-out infinite;
+  }
+
+  @keyframes fiberPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
   /* Radar ping that expands from hub cities */
   .globe-ping {
     transform-box: fill-box;
@@ -499,7 +513,8 @@
     .globe-drift,
     .globe-drift-slow,
     .globe-wire,
-    .globe-ping {
+    .globe-ping,
+    .fiber-line {
       animation: none;
     }
   }
@@ -678,11 +693,14 @@
 .home-canvas {
   position: relative;
   isolation: isolate;
+  /* The first stops continue the hero gradient's decay (#2A4A7A → #14263F)
+     so the section seam has no visible brightness step. */
   background:
     linear-gradient(
       180deg,
-      #14263f 0%,
-      #0e1b30 9%,
+      #172b47 0%,
+      #14263f 4%,
+      #0e1b30 10%,
       #14263f 26%,
       #1c3355 46%,
       #172c4c 62%,
