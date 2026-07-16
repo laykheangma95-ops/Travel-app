@@ -1,8 +1,9 @@
 'use client';
 
 // AI Trip Copilot — a Khmer-first chat assistant floating over every page.
-// Powered by Claude via /api/chat (the Domner "brain"). Picks up the current
-// flight (if the traveler is on a flight detail page) so answers can reference it.
+// Powered by Domner's own in-app engine via /api/chat (lib/domnerEngine.ts) —
+// no external AI provider, no API key, no credits. Picks up the current flight
+// (if the traveler is on a flight detail page) so answers can reference it.
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
