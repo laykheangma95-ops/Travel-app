@@ -44,6 +44,29 @@ const testimonials = [
 
 const JET_PATH = 'M21.5 15.5 13.5 11V4.75a1.5 1.5 0 0 0-3 0V11l-8 4.5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13.5 19v-4l8 2.5v-2Z';
 
+// A curated set of premium flight paths that all depart from one luminous hub.
+// A single, intentional airline signature — not a busy world map. The arcs fan
+// out so they never overlap, brightest at the centre and fading toward the
+// edges to create depth and negative space. `pulse` marks the few routes that
+// carry a travelling light.
+const HERO_HUB = { x: 500, y: 298 };
+const FLIGHT_ROUTES: { d: string; o: number; pulse?: number }[] = [
+  { d: 'M 500 298 Q 236 246 110 300', o: 0.24 },
+  { d: 'M 500 298 Q 272 188 165 240', o: 0.3 },
+  { d: 'M 500 298 Q 327 146 245 198', o: 0.42, pulse: 0 },
+  { d: 'M 500 298 Q 395 120 345 172', o: 0.52 },
+  { d: 'M 500 298 Q 463 108 445 160', o: 0.6, pulse: -1.6 },
+  { d: 'M 500 298 Q 541 110 560 162', o: 0.6 },
+  { d: 'M 500 298 Q 616 128 670 180', o: 0.5, pulse: -0.8 },
+  { d: 'M 500 298 Q 684 158 770 210', o: 0.4 },
+  { d: 'M 500 298 Q 738 200 850 252', o: 0.3, pulse: -2.4 },
+  { d: 'M 500 298 Q 769 246 895 305', o: 0.24 },
+];
+const FLIGHT_NODES: [number, number, number][] = [
+  [110, 300, 0], [165, 240, 0.5], [245, 198, 1.1], [345, 172, 0.3], [445, 160, 1.4],
+  [560, 162, 0.8], [670, 180, 0.2], [770, 210, 1.6], [850, 252, 0.9], [895, 305, 1.3],
+];
+
 export function HomeContent() {
   const { t } = useLang();
   const heroRef = useRef<HTMLElement>(null);
@@ -101,10 +124,11 @@ export function HomeContent() {
                   <stop offset="0.35" stopColor="#C69749" stopOpacity="0.12" />
                   <stop offset="1" stopColor="#C69749" stopOpacity="0" />
                 </linearGradient>
-                <pattern id="heroDotGrid" width="26" height="22" patternUnits="userSpaceOnUse">
-                  <circle cx="4" cy="5" r="1.4" fill="rgba(230,203,139,0.22)" />
-                  <circle cx="17" cy="16" r="1.1" fill="rgba(230,203,139,0.14)" />
-                </pattern>
+                <radialGradient id="heroHubGlow" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stopColor="#FBEFC6" stopOpacity="0.9" />
+                  <stop offset="0.5" stopColor="#E6CB8B" stopOpacity="0.32" />
+                  <stop offset="1" stopColor="#E6CB8B" stopOpacity="0" />
+                </radialGradient>
                 <clipPath id="heroGlobeClip">
                   <circle cx="500" cy="760" r="620" />
                 </clipPath>
@@ -115,42 +139,44 @@ export function HomeContent() {
               {/* Gilded rim light on the crown */}
               <circle cx="500" cy="760" r="619" stroke="url(#heroRim)" strokeWidth="1.6" />
 
-              {/* Rotating dotted surface + latitude lines + city lights */}
+              {/* Two whisper-faint latitude lines give the sphere its form
+                  without ever reading as a map */}
               <g clipPath="url(#heroGlobeClip)">
-                <g className="hero-dots-drift">
-                  <rect x="-80" y="130" width="2200" height="290" fill="url(#heroDotGrid)" />
-                </g>
-                <path d="M 190 215 Q 500 152 810 215" stroke="rgba(230,203,139,0.16)" strokeWidth="1" />
-                <path d="M 95 305 Q 500 218 905 305" stroke="rgba(230,203,139,0.13)" strokeWidth="1" />
-                <path d="M 30 400 Q 500 295 970 400" stroke="rgba(230,203,139,0.10)" strokeWidth="1" />
-                {[
-                  [352, 230, 0], [548, 195, 0.6], [700, 250, 1.1], [255, 300, 0.3], [820, 330, 0.9], [470, 320, 1.5],
-                ].map(([cx, cy, delay]) => (
+                <path d="M 95 305 Q 500 230 905 305" stroke="rgba(230,203,139,0.08)" strokeWidth="1" fill="none" />
+                <path d="M 30 400 Q 500 305 970 400" stroke="rgba(230,203,139,0.06)" strokeWidth="1" fill="none" />
+              </g>
+
+              {/* Curated premium flight paths — every route departs from one
+                  luminous hub, so each line feels intentional */}
+              <g className="hero-network">
+                {FLIGHT_ROUTES.map((r) => (
+                  <path key={r.d} d={r.d} className="flight-path" stroke="#E6CB8B" strokeWidth="1.2" strokeOpacity={r.o} />
+                ))}
+                {FLIGHT_ROUTES.filter((r) => r.pulse !== undefined).map((r) => (
+                  <path key={`pulse-${r.d}`} d={r.d} className="flight-pulse" style={{ animationDelay: `${r.pulse}s` }} />
+                ))}
+                {FLIGHT_NODES.map(([cx, cy, delay]) => (
                   <circle
                     key={`${cx}-${cy}`}
                     cx={cx}
                     cy={cy}
                     r="2.6"
                     fill="#E6CB8B"
-                    className="hero-twinkle arc-node"
+                    className="arc-node hero-twinkle"
                     style={{ animationDelay: `${delay}s` }}
                   />
                 ))}
+                {/* The luminous home hub every path fans out from */}
+                <circle cx={HERO_HUB.x} cy={HERO_HUB.y} r="26" fill="url(#heroHubGlow)" className="hero-hub-glow" />
+                <circle cx={HERO_HUB.x} cy={HERO_HUB.y} r="4.5" fill="#FBEFC6" className="arc-node" />
               </g>
-
-              {/* Network arcs hugging the crown */}
-              <path d="M 150 330 Q 340 170 545 265" stroke="rgba(230,203,139,0.6)" strokeWidth="1.4" className="arc-line" />
-              <path d="M 300 365 Q 545 130 845 320" stroke="rgba(230,203,139,0.42)" strokeWidth="1.3" className="arc-line" style={{ animationDelay: '-1.4s' }} />
-              {[[150, 330], [545, 265], [845, 320]].map(([cx, cy]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.2" fill="#E6CB8B" className="arc-node" />
-              ))}
 
               {/* Orbit + contrail */}
               <path
                 id="heroOrbit"
                 d="M -60 335 C 250 68 750 68 1060 335"
-                stroke="rgba(230,203,139,0.5)"
-                strokeWidth="1.6"
+                stroke="rgba(230,203,139,0.24)"
+                strokeWidth="1.3"
                 className="arc-line"
               />
 

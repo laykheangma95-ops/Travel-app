@@ -118,6 +118,18 @@
   to { transform: translateX(-26px); }
 }
 
+/* A single luminous point travels along a premium flight path */
+@keyframes flightTravel {
+  from { stroke-dashoffset: 1434; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* The home hub breathes softly, like a living object */
+@keyframes heroHubPulse {
+  0%, 100% { opacity: 0.7; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
 @layer components {
   /* Premium glassmorphism panel used on dark hero sections */
   .glass-panel {
@@ -376,6 +388,30 @@
     filter: drop-shadow(0 0 6px rgba(230, 203, 139, 0.9));
   }
 
+  /* ── Curated premium flight paths (Apple-Vision-Pro, not Google-Earth) ──── */
+  .flight-path {
+    fill: none;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 4px rgba(230, 203, 139, 0.45));
+  }
+
+  /* A short travelling light glides along a few chosen routes */
+  .flight-pulse {
+    fill: none;
+    stroke: #fbefc6;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-dasharray: 34 1400;
+    filter: drop-shadow(0 0 6px rgba(251, 239, 198, 0.9));
+    animation: flightTravel 4.6s linear infinite;
+  }
+
+  .hero-hub-glow {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: heroHubPulse 4s ease-in-out infinite;
+  }
+
   /* ── Living globe hero scene ────────────────────────────────────────────── */
   /* Pointer parallax: the section sets --par-x/--par-y (-0.5..0.5); the scene
      drifts with the cursor, the copy drifts gently against it. */
@@ -495,7 +531,9 @@
     .domer-glow,
     .domer-sheen-path,
     .domer-label span,
-    .hero-dots-drift {
+    .hero-dots-drift,
+    .flight-pulse,
+    .hero-hub-glow {
       animation: none;
     }
 
