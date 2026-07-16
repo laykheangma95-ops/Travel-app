@@ -179,7 +179,7 @@ export function TripCopilot() {
 
           {demo && (
             <p className="border-t border-white/10 px-4 py-1.5 text-center text-[10px] text-white/40">
-              Demo mode — connect ANTHROPIC_API_KEY for live AI answers
+              Demo mode — connect OPENROUTER_API_KEY for live AI answers
             </p>
           )}
 

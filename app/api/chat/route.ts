@@ -7,14 +7,16 @@
 //   block of business knowledge that auto-syncs eSIM prices/countries from the
 //   data files, so answers stay correct without editing this route.
 //
-// THE WHOLE IDEA IN 4 STEPS:
-//   1. Read the conversation the user sent (a list of messages).
-//   2. Load the Domner "brain" (lib/domnerBrain.ts) — what the AI knows.
-//   3. Ask Claude for a reply, giving it the brain + the conversation.
-//   4. Send the reply back as JSON.
+// WHICH AI PROVIDER IT USES (checked in this order):
+//   1. OPENROUTER_API_KEY set  → OpenRouter (openrouter.ai), which routes to
+//      Claude. One key, works with many models, simple billing.
+//   2. ANTHROPIC_API_KEY set   → Anthropic directly (console.anthropic.com).
+//   3. Neither                 → friendly "demo mode" canned answer, so the
+//      chatbot always works while you're building.
 //
-// If there's no ANTHROPIC_API_KEY set, we skip step 3 and return a friendly
-// "demo mode" answer, so the endpoint always works while you're building.
+// SETUP ON VERCEL:
+//   Project → Settings → Environment Variables → add OPENROUTER_API_KEY
+//   (sk-or-v1-...) → Redeploy. That's it.
 //
 // TRY IT (with the dev server running):
 //   curl -s -X POST http://localhost:3000/api/chat \
@@ -31,11 +33,11 @@ import { DOMNER_SYSTEM_PROMPT } from '@/lib/domnerBrain';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// The AI model to use. Haiku is Anthropic's fastest + cheapest model, which
-// suits a high-volume support chatbot (this matches Domner's cost strategy).
-// To get higher-quality answers, change this to 'claude-opus-4-8' — it costs
-// more per message but reasons better. That's the only line you need to change.
-const MODEL = 'claude-haiku-4-5';
+// The models to use. Haiku is Anthropic's fastest + cheapest model, which suits
+// a high-volume support chatbot (this matches Domner's cost strategy). Note the
+// two spellings: OpenRouter writes versions with a dot, Anthropic with a dash.
+const OPENROUTER_MODEL = 'anthropic/claude-haiku-4.5';
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
 // One "turn" in the conversation: who spoke ('user' = the traveller,
 // 'assistant' = the AI) and what they said.
@@ -59,9 +61,68 @@ function demoReply(turns: ChatTurn[], context?: ChatContext): string {
   const flightNote = context?.flightSummary ? ` (${context.flightSummary})` : '';
 
   if (wroteInKhmer) {
-    return `សួស្តី! ខ្ញុំជាជំនួយការ Domner។ ដើម្បីទទួលបានចម្លើយ AI ពិតប្រាកដ សូមបញ្ចូល ANTHROPIC_API_KEY។${flightNote} ជាទូទៅ៖ ដំឡើង eSIM មុនពេលហោះហើរ ហើយបើកវានៅពេលចុះចតដល់គោលដៅ។`;
+    return `សួស្តី! ខ្ញុំជាជំនួយការ Domner។ ដើម្បីទទួលបានចម្លើយ AI ពិតប្រាកដ សូមបញ្ចូល API key។${flightNote} ជាទូទៅ៖ ដំឡើង eSIM មុនពេលហោះហើរ ហើយបើកវានៅពេលចុះចតដល់គោលដៅ។`;
   }
-  return `Hi! I'm the Domner assistant. Add an ANTHROPIC_API_KEY to unlock live AI answers.${flightNote} In the meantime: install your eSIM before you fly, and switch it on only after you land at your destination.`;
+  return `Hi! I'm the Domner assistant. Add an OPENROUTER_API_KEY to unlock live AI answers.${flightNote} In the meantime: install your eSIM before you fly, and switch it on only after you land at your destination.`;
+}
+
+// Ask Claude through OpenRouter (OpenAI-compatible chat/completions endpoint).
+async function askOpenRouter(
+  apiKey: string,
+  system: string,
+  turns: ChatTurn[],
+): Promise<string> {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      // Optional OpenRouter attribution headers — show up in their dashboard.
+      'HTTP-Referer': 'https://domnerapp.com',
+      'X-Title': 'Domner Trip Copilot',
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      max_tokens: 1024, // a chat reply is short; this caps the length
+      messages: [
+        { role: 'system', content: system },
+        ...turns.map((t) => ({ role: t.role, content: t.content })),
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`OpenRouter ${res.status}: ${detail.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return data.choices?.[0]?.message?.content?.trim() ?? '';
+}
+
+// Ask Claude through Anthropic directly (kept as a fallback provider).
+async function askAnthropic(
+  apiKey: string,
+  system: string,
+  turns: ChatTurn[],
+): Promise<string> {
+  const claude = new Anthropic({ apiKey });
+  const message = await claude.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 1024,
+    system,
+    messages: turns.map((t) => ({ role: t.role, content: t.content })),
+  });
+
+  // Claude's answer comes back as a list of "content blocks". For a plain
+  // chat reply we just want the text blocks, joined together.
+  return message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim();
 }
 
 export async function POST(request: Request) {
@@ -79,9 +140,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please send at least one message.' }, { status: 400 });
   }
 
-  // ── Step 2: If there's no API key, answer in demo mode ───────────────────
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  // ── Step 2: If there's no API key at all, answer in demo mode ────────────
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!openRouterKey && !anthropicKey) {
     return NextResponse.json({ reply: demoReply(turns, body?.context), demo: true });
   }
 
@@ -90,25 +152,13 @@ export async function POST(request: Request) {
   const contextNote = body?.context?.flightSummary
     ? `\n\nCurrent flight context (trust this, don't invent beyond it): ${body.context.flightSummary}`
     : '';
+  const system = DOMNER_SYSTEM_PROMPT + contextNote; // <-- the "brain"
 
   // ── Step 3: Ask Claude for a real answer ─────────────────────────────────
   try {
-    const claude = new Anthropic({ apiKey });
-
-    const message = await claude.messages.create({
-      model: MODEL,
-      max_tokens: 1024, // a chat reply is short; this caps the length
-      system: DOMNER_SYSTEM_PROMPT + contextNote, // <-- the "brain" teaches Claude about Domner
-      messages: turns.map((t) => ({ role: t.role, content: t.content })),
-    });
-
-    // Claude's answer comes back as a list of "content blocks". For a plain
-    // chat reply we just want the text blocks, joined together.
-    const reply = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n')
-      .trim();
+    const reply = openRouterKey
+      ? await askOpenRouter(openRouterKey, system, turns)
+      : await askAnthropic(anthropicKey!, system, turns);
 
     // ── Step 4: Send the reply back ──────────────────────────────────────────
     return NextResponse.json({ reply: reply || demoReply(turns, body?.context), demo: false });

@@ -88,35 +88,44 @@ The `messages` array is the whole conversation. Add past turns so the AI has con
 ## Turning on real AI answers
 
 Without a key, the chatbot runs in **demo mode** — it returns a friendly canned
-reply and sets `"demo": true`. To get real AI answers:
+reply and sets `"demo": true`. The chatbot supports two providers — set **one**:
 
-1. Get an API key from **console.anthropic.com** → API Keys, and add some credits.
-   ⚠️ Set a **monthly spend cap** first.
-2. Add it to your environment:
-   - **Local:** put `ANTHROPIC_API_KEY=sk-ant-...` in `.env.local`
-   - **Live (Vercel):** Project → Settings → Environment Variables → add
-     `ANTHROPIC_API_KEY`, then redeploy.
+- **OpenRouter (used first):** a key from **openrouter.ai** (`sk-or-v1-...`) as
+  `OPENROUTER_API_KEY`. One key routes to Claude and many other models; add
+  credits and a spend limit in the OpenRouter dashboard.
+- **Anthropic (fallback):** a key from **console.anthropic.com** (`sk-ant-...`)
+  as `ANTHROPIC_API_KEY`. ⚠️ Set a monthly spend cap first.
+
+Add it to your environment:
+
+- **Local:** put `OPENROUTER_API_KEY=sk-or-v1-...` in `.env.local`
+- **Live (Vercel):** Project → Settings → Environment Variables → add
+  `OPENROUTER_API_KEY`, then redeploy.
 
 That's the only setup. With the key present, `/api/chat` returns real answers and
 `"demo": false`.
 
 > **Security:** never put the key in the code or commit it to GitHub — it always
-> lives in environment variables.
+> lives in environment variables. If a key ever leaks (pasted in a chat, a
+> screenshot, a commit), revoke it in the provider dashboard and make a new one.
 
 ---
 
 ## Cost & model choice
 
-The chatbot uses **`claude-haiku-4-5`** — Anthropic's fastest and cheapest model,
-which fits a high-volume support chatbot (and matches Domner's cost strategy in
+The chatbot uses **Claude Haiku** — Anthropic's fastest and cheapest model, which
+fits a high-volume support chatbot (and matches Domner's cost strategy in
 `STRATEGY.md`).
 
-Want smarter answers? Open `app/api/chat/route.ts` and change one line:
+Want smarter answers? Open `app/api/chat/route.ts` and change the model lines:
 
 ```ts
-const MODEL = 'claude-haiku-4-5';   // fast + cheap (default)
-// const MODEL = 'claude-opus-4-8';  // higher quality, costs more per message
+const OPENROUTER_MODEL = 'anthropic/claude-haiku-4.5'; // fast + cheap (default)
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';            // same model, direct-API spelling
 ```
+
+Browse other model names at openrouter.ai/models — anything there works with the
+same `OPENROUTER_API_KEY`.
 
 ---
 
