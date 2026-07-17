@@ -190,9 +190,11 @@ export function CambodiaShowcase() {
   const current = DESTINATIONS[active];
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#1C3355_100%)] py-20 sm:py-28">
-      {/* Ambient starfield + gold aura, matching the hero */}
-      <div className="stars" aria-hidden="true" />
+    // Transparent background: this section sits over the shared globe layer
+    // (see .dgh-stage / GlobeHero), so the planet's lower hemisphere shows
+    // through with the carousel floating on top.
+    <section className="relative z-[1] overflow-hidden py-20 sm:py-28">
+      {/* Gold aura behind the carousel (the globe layer provides the starfield) */}
       <div
         className="cam-aura pointer-events-none absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(198,151,73,0.28)_0%,rgba(198,151,73,0.08)_40%,transparent_70%)]"
         aria-hidden="true"

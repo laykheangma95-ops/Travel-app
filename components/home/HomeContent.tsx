@@ -48,11 +48,13 @@ export function HomeContent() {
 
   return (
     <>
-      {/* ── Hero — cinematic 3D particle globe (Three.js + GSAP) ── */}
-      <GlobeHero />
-
-      {/* ── Cambodia 3D Liquid-Glass destination showcase ── */}
-      <CambodiaShowcase />
+      {/* ── Hero + Cambodia showcase share ONE full 3D globe. The .dgh-stage
+          wrapper (styled inside GlobeHero) lets a single sphere span both
+          sections so they read as one continuous page. ── */}
+      <div className="dgh-stage">
+        <GlobeHero />
+        <CambodiaShowcase />
+      </div>
 
       {/* ── Feature showcase ── */}
       <section className="section-pad bg-surface-2">

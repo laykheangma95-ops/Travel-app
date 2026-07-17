@@ -241,7 +241,14 @@ export function GlobeHero() {
   useEffect(() => {
     const section = sectionRef.current;
     const canvas = canvasRef.current;
-    if (!section || !canvas) return;
+    if (!section || !canvas || !canvasWrapRef.current) return;
+    // Assert non-null so the type is preserved inside the async init() closure
+    // below (same reason `section!` is used throughout).
+    const wrap = canvasWrapRef.current!;
+    // The globe layer is an absolute child of .dgh-stage, the wrapper that
+    // holds both the hero and the Cambodia showcase. Sizing + pointer maths use
+    // the stage box so the sphere spans both sections.
+    const stage = wrap.parentElement ?? section;
 
     let disposed = false;
     let disposeScene: (() => void) | null = null;
@@ -509,24 +516,36 @@ export function GlobeHero() {
       starGroup.add(new THREE.Points(starGeo, starMat));
       scene.add(starGroup);
 
-      /* ── Layout: globe rises from the bottom, horizon-style ── */
+      /* ── Layout: one full sphere centred on the hero/showcase seam ──
+         The canvas spans the whole stage (hero + showcase). We place the
+         sphere's centre at the seam between the two sections, so the top
+         hemisphere lives in the hero and the bottom hemisphere sits behind the
+         Cambodia carousel — reading as a single planet across both.
+         FULL_FACTOR sets the sphere diameter as a fraction of viewport width;
+         it is tuned ~30% smaller than the old horizon globe. */
+      const FULL_FACTOR = 0.44;
       let globeScale = 1;
       const layout = () => {
-        const w = section!.clientWidth;
-        const h = section!.clientHeight;
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight; // full stage height (hero + showcase)
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         const dist = camera.position.z;
         const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
         const halfW = halfH * camera.aspect;
-        // Wider than the viewport for a planet-horizon curve; crown of the
-        // globe sits ~42% up the viewport so only the top is visible.
-        globeScale = Math.max(1.05, halfW * 1.12);
-        const crownY = halfH * (2 * 0.42 - 1);
+        // Radius as a fraction of the viewport half-width, capped so a tall
+        // stage never lets the sphere overflow its vertical room.
+        globeScale = Math.min(halfH * 0.92, halfW * FULL_FACTOR);
+        // Screen fraction of the seam (bottom of the hero within the stage).
+        const heroH = section!.offsetHeight || h * 0.5;
+        const fSeam = Math.min(0.985, (heroH - globeScale * 0.02) / h);
+        // World-Y that projects to that screen fraction on the z=0 plane.
         tiltGroup.scale.setScalar(globeScale);
-        tiltGroup.position.y = crownY - globeScale;
-        const pxScale = (h * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+        tiltGroup.position.y = halfH * (1 - 2 * fSeam);
+        const pxScale =
+          (h * renderer.getPixelRatio()) /
+          (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
         dotsMat.uniforms.uScale.value = pxScale;
         dotsMat.uniforms.uGlobeScale.value = globeScale;
         hubMat.uniforms.uScale.value = pxScale;
@@ -534,7 +553,7 @@ export function GlobeHero() {
       };
       layout();
       const ro = new ResizeObserver(layout);
-      ro.observe(section!);
+      ro.observe(stage);
 
       /* ── Interaction state ── */
       const parallax = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -546,7 +565,7 @@ export function GlobeHero() {
       const BASE_SPIN = (Math.PI * 2) / 90; // one revolution / 90s
 
       const onMouseMove = (e: MouseEvent) => {
-        const rect = section!.getBoundingClientRect();
+        const rect = wrap.getBoundingClientRect();
         parallax.tx = (e.clientX - rect.left) / rect.width - 0.5;
         parallax.ty = (e.clientY - rect.top) / rect.height - 0.5;
         mousePx.x = e.clientX - rect.left;
@@ -571,20 +590,21 @@ export function GlobeHero() {
       const onPointerDown = (e: PointerEvent) => {
         if (isMobile || e.pointerType === 'touch') return; // no drag on mobile
         const target = e.target as HTMLElement;
-        if (target.closest('a, button')) return;
+        // Don't hijack links/buttons or the Cambodia carousel's own drag/controls.
+        if (target.closest('a, button, input, [role="tablist"], .cam-stage')) return;
         dragging = true;
         lastDragX = e.clientX;
-        section!.classList.add('dgh-dragging');
+        stage.classList.add('dgh-dragging');
       };
       const onPointerUp = () => {
         dragging = false;
-        section!.classList.remove('dgh-dragging');
+        stage.classList.remove('dgh-dragging');
       };
 
       if (!reducedMotion) {
-        section!.addEventListener('mousemove', onMouseMove, { passive: true });
-        section!.addEventListener('mouseleave', onMouseLeave);
-        section!.addEventListener('pointerdown', onPointerDown);
+        stage.addEventListener('mousemove', onMouseMove, { passive: true });
+        stage.addEventListener('mouseleave', onMouseLeave);
+        stage.addEventListener('pointerdown', onPointerDown);
         window.addEventListener('pointerup', onPointerUp);
       }
 
@@ -610,8 +630,8 @@ export function GlobeHero() {
       const camDir = new THREE.Vector3();
       const updateHover = () => {
         if (isMobile || !label) return;
-        const w = section!.clientWidth;
-        const h = section!.clientHeight;
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight;
         let best = -1;
         let bestD = 44; // px hit radius
         let bestX = 0;
@@ -712,7 +732,7 @@ export function GlobeHero() {
         },
         { threshold: 0 },
       );
-      viewIO.observe(section!);
+      viewIO.observe(stage);
       const onVisibility = () => {
         pageVisible = !document.hidden;
         setRunning();
@@ -759,12 +779,13 @@ export function GlobeHero() {
           onComplete: () => section!.classList.remove('dgh-anim'),
         });
 
-        // Scroll: globe grows slightly and dims as the next section arrives.
+        // Scroll: the hero copy lifts and fades as you move toward the
+        // showcase. The globe itself is NOT dimmed — it scrolls with the page
+        // as one continuous planet into the section below.
         const scrub = gsap.timeline({
           scrollTrigger: { trigger: section!, start: 'top top', end: 'bottom top', scrub: 0.6 },
         });
         scrub
-          .to(canvasWrapRef.current, { scale: 1.13, opacity: 0.32, ease: 'none' }, 0)
           .to(copyRef.current, { y: -70, opacity: 0, ease: 'none' }, 0)
           .to(chipsRef.current, { y: -30, opacity: 0, ease: 'none' }, 0);
 
@@ -781,9 +802,9 @@ export function GlobeHero() {
         ro.disconnect();
         viewIO.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
-        section!.removeEventListener('mousemove', onMouseMove);
-        section!.removeEventListener('mouseleave', onMouseLeave);
-        section!.removeEventListener('pointerdown', onPointerDown);
+        stage.removeEventListener('mousemove', onMouseMove);
+        stage.removeEventListener('mouseleave', onMouseLeave);
+        stage.removeEventListener('pointerdown', onPointerDown);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('deviceorientation', onOrientation);
         killGsap?.();
@@ -812,16 +833,17 @@ export function GlobeHero() {
   };
 
   return (
-    <section ref={sectionRef} className="dgh-hero dgh-anim" aria-label={t('hero.badge')}>
-      {/* Warm sunrise glow behind the planet horizon */}
-      <div className="dgh-sunrise" aria-hidden="true" />
-
-      {/* WebGL globe + stars (lazy-initialised) */}
-      <div ref={canvasWrapRef} className="dgh-canvas-wrap" aria-hidden="true">
+    <>
+      {/* Shared globe canvas. It is positioned absolutely against .dgh-stage
+          (see HomeContent), which wraps BOTH this hero and the Cambodia
+          showcase below — so a single full sphere reads as one planet spanning
+          the two sections. Lazy-initialised when scrolled near. */}
+      <div ref={canvasWrapRef} className="dgh-globe-layer" aria-hidden="true">
         <canvas ref={canvasRef} className="dgh-canvas" />
         <div ref={labelRef} className="dgh-hublabel" />
       </div>
 
+      <section ref={sectionRef} className="dgh-hero dgh-anim" aria-label={t('hero.badge')}>
       {/* Drifting volumetric mist layers */}
       <div className="dgh-clouds" aria-hidden="true">
         <div className="dgh-cloud dgh-cloud-a" />
@@ -864,10 +886,11 @@ export function GlobeHero() {
         <span className="dgh-chip dgh-reveal">{t('hero.stat3')}</span>
       </div>
 
-      {/* All styles scoped under .dgh-hero — no global leakage. Injected via
-          innerHTML so SSR text escaping can't cause a hydration mismatch. */}
+      {/* All styles scoped under the dgh- prefix — no global leakage. Injected
+          via innerHTML so SSR text escaping can't cause a hydration mismatch. */}
       <style dangerouslySetInnerHTML={{ __html: CSS_TEXT }} />
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -878,8 +901,31 @@ const GRAIN_URI =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E\")";
 
 const CSS_TEXT = `
+/* .dgh-stage wraps the hero AND the Cambodia showcase (see HomeContent). It
+   owns the continuous deep-space gradient and hosts the shared globe layer, so
+   one planet spans both sections as a single "page". */
+.dgh-stage {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(52% 26% at 50% 41%, rgba(230, 176, 90, 0.12) 0%, transparent 62%),
+    radial-gradient(120% 48% at 50% 39%, rgba(30, 64, 122, 0.55) 0%, transparent 60%),
+    linear-gradient(180deg, #050b2e 0%, #08163a 28%, #0a1a4a 44%, #0b1c40 62%, #0e1b30 100%);
+}
+.dgh-stage.dgh-dragging { cursor: grabbing; }
+
+/* Shared globe canvas layer — spans the full stage, sits behind section content. */
+.dgh-globe-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
 .dgh-hero {
   position: relative;
+  z-index: 1;
   isolation: isolate;
   overflow: hidden;
   min-height: 100vh;
@@ -889,33 +935,11 @@ const CSS_TEXT = `
   align-items: center;
   justify-content: flex-start;
   color: #fff;
-  background: linear-gradient(180deg, #050b2e 0%, #071438 55%, #0a1a4a 100%);
+  background: transparent;
 }
-.dgh-hero.dgh-dragging { cursor: grabbing; }
 
 /* ── Scene layers ── */
-.dgh-sunrise {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 52%;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(58% 52% at 50% 100%,
-    rgba(230, 176, 90, 0.30) 0%,
-    rgba(120, 140, 220, 0.14) 42%,
-    rgba(10, 26, 74, 0) 74%);
-  animation: dgh-sunrise-breathe 9s ease-in-out infinite alternate;
-}
-.dgh-canvas-wrap {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  transform-origin: 50% 78%;
-  will-change: transform, opacity;
-  pointer-events: none;
-}
-/* Fade-in lives on the inner canvas so GSAP can scrub the wrap's opacity
-   without fighting a CSS transition. */
+/* Fade-in lives on the inner canvas so it eases in once WebGL is ready. */
 .dgh-canvas {
   position: absolute;
   inset: 0;
@@ -1062,17 +1086,29 @@ const CSS_TEXT = `
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
   will-change: transform;
 }
-/* Primary CTA: Angkor-Gold fill (brand metallic recipe) with a glowing
-   gradient border (padding-box / border-box trick). */
+/* Primary CTA: luxury Apple-style blue frosted glass — a translucent deep-blue
+   pane with backdrop blur, an inner sheen, and a glowing cyan gradient border. */
 .dgh-cta {
-  color: #2a1d04;
+  color: #eaf3ff;
   border: 1.5px solid transparent;
   background:
-    linear-gradient(160deg, #e6cb8b 0%, #c69749 46%, #8a6820 100%) padding-box,
-    linear-gradient(120deg, #f7eac0, #57c8ff, #f7eac0) border-box;
-  box-shadow: 0 0 26px rgba(198, 151, 73, 0.4), 0 6px 24px rgba(5, 11, 46, 0.5);
+    linear-gradient(160deg, rgba(58, 116, 210, 0.55) 0%, rgba(26, 62, 130, 0.62) 55%, rgba(14, 34, 84, 0.7) 100%) padding-box,
+    linear-gradient(120deg, rgba(143, 216, 255, 0.95), rgba(87, 200, 255, 0.6), rgba(120, 170, 255, 0.9)) border-box;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
+    0 0 28px rgba(87, 200, 255, 0.32),
+    0 8px 26px rgba(5, 11, 46, 0.5);
 }
-.dgh-cta:hover { box-shadow: 0 0 40px rgba(198, 151, 73, 0.6), 0 8px 28px rgba(5, 11, 46, 0.55); }
+.dgh-cta:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
+    0 0 44px rgba(87, 200, 255, 0.5),
+    0 10px 30px rgba(5, 11, 46, 0.55);
+}
 .dgh-cta-ghost {
   color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.07);
@@ -1127,10 +1163,6 @@ const CSS_TEXT = `
   from { transform: translateY(0); }
   to { transform: translateY(-9px); }
 }
-@keyframes dgh-sunrise-breathe {
-  from { opacity: 0.85; }
-  to { opacity: 1; }
-}
 @keyframes dgh-drift-a {
   from { transform: translate3d(-4%, 1%, 0) scale(1); }
   to { transform: translate3d(6%, -3%, 0) scale(1.12); }
@@ -1150,7 +1182,7 @@ const CSS_TEXT = `
 /* ── Reduced motion: static frame, everything visible, no animation ── */
 @media (prefers-reduced-motion: reduce) {
   .dgh-anim .dgh-reveal { opacity: 1; transform: none; filter: none; }
-  .dgh-sunrise, .dgh-cloud, .dgh-grain, .dgh-chip { animation: none; }
+  .dgh-cloud, .dgh-grain, .dgh-chip { animation: none; }
   .dgh-clouds { transition: none; }
   .dgh-cta, .dgh-cta-ghost { transition: none; }
 }
