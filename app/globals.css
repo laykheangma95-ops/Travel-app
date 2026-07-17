@@ -831,6 +831,18 @@
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
+/* Bespoke destination scene sits under the label, above the gradient sky. */
+.cam-art {
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Bottom-anchored scrim keeps the medallion label readable over any scene. */
+.cam-scrim {
+  z-index: 1;
+  background: linear-gradient(to top, rgba(6, 11, 22, 0.72) 0%, rgba(6, 11, 22, 0.35) 45%, transparent 100%);
+}
+
 .cam-caption {
   position: relative;
   z-index: 2;
