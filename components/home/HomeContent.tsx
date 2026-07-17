@@ -57,27 +57,26 @@ export function HomeContent() {
       </div>
 
       {/* ── Feature showcase ── */}
-      <section className="section-pad bg-surface-2">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading
-              eyebrow={t('features.eyebrow')}
-              title={t('features.title')}
-              description={t('features.desc')}
-            />
+      <section className="section-pad relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)]">
+        <div className="stars" aria-hidden="true" />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
+          <Reveal className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">{t('features.eyebrow')}</p>
+            <h2 className="mt-4 font-display text-4xl font-bold text-white sm:text-5xl">{t('features.title')}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-white/70">{t('features.desc')}</p>
           </Reveal>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
             {features.map((f, i) => (
               <Reveal key={f.nameKey} delay={i * 110}>
-                <div className="group h-full rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
-                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-[#F5EEDC] transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
+                <div className="group h-full rounded-card border border-accent/20 bg-[radial-gradient(circle_at_30%_20%,#24406A_0%,#152A47_100%)] p-8 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-all duration-300 ease-smooth hover:-translate-y-1 hover:border-accent/40">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card border border-accent/40 bg-[#152A47] transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3">
                     <f.icon size={32} className="text-accent" aria-hidden="true" />
                   </div>
-                  <h3 className="font-display text-lg font-bold tracking-tight text-ink">{t(f.nameKey)}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{t(f.descKey)}</p>
+                  <h3 className="font-display text-lg font-bold tracking-tight text-white">{t(f.nameKey)}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-white/70">{t(f.descKey)}</p>
                   <Link
                     href={f.href}
-                    className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-secondary transition-all duration-200 hover:gap-2.5 hover:text-accent"
+                    className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-accent transition-all duration-200 hover:gap-2.5"
                   >
                     {t('features.learnMore')} <ArrowRight size={14} />
                   </Link>
