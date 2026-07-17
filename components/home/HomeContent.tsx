@@ -114,12 +114,15 @@ export function HomeContent() {
       </section>
 
       {/* ── Popular destinations ── */}
-      <section className="section-pad bg-surface-2">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading eyebrow={t('dest.eyebrow')} title={t('dest.title')} description={t('dest.desc')} />
+      <section className="section-pad relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)]">
+        <div className="stars" aria-hidden="true" />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
+          <Reveal className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">{t('dest.eyebrow')}</p>
+            <h2 className="mt-4 font-display text-4xl font-bold text-white sm:text-5xl">{t('dest.title')}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-white/70">{t('dest.desc')}</p>
           </Reveal>
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+          <div className="mt-14 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
             {popularDestinations.map((dest, i) => (
               <Reveal key={dest.slug} delay={(i % 4) * 80}>
                 <DestinationCard destination={dest} />
@@ -127,7 +130,7 @@ export function HomeContent() {
             ))}
           </div>
           <Reveal className="mt-12 text-center">
-            <Button href="/esim" variant="outline">
+            <Button href="/esim" variant="liquid">
               {t('dest.viewAll')} <ArrowRight size={16} />
             </Button>
           </Reveal>
