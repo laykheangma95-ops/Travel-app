@@ -568,137 +568,177 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Cambodia 3D Liquid-Glass destination showcase (components/home/CambodiaShowcase)
-   A ring of gold-rimmed glass "profile" medallions that rotate in real 3D to
-   promote Cambodian travel destinations. Transforms per-item are set inline;
-   these classes carry the premium glass finish, depth, and idle motion.
+   Cambodia portrait 3D slideshow (components/home/CambodiaShowcase)
+   A "Chamonix-style" fan of tall portrait cards floating in real 3D
+   perspective. Per-card transforms (translateX / scale / rotateY) are set
+   inline from the active index; these classes carry the glass finish, the
+   gold gradient CTA, the Ken Burns photo zoom, and the entrance motion.
    ═══════════════════════════════════════════════════════════════════════════ */
-.cam-stage {
+.slide-stage {
   perspective: 1600px;
-  perspective-origin: 50% 42%;
-  touch-action: pan-y; /* let the page scroll vertically; we own horizontal drag */
-}
-
-.cam-ring {
-  position: absolute;
-  inset: 0;
+  perspective-origin: 50% 44%;
   transform-style: preserve-3d;
-  will-change: transform;
+  touch-action: pan-y; /* page scrolls vertically; we own the horizontal drag */
+  outline: none;
+  cursor: grab;
+}
+.slide-stage:active {
+  cursor: grabbing;
 }
 
-/* Each medallion sits on the ring; back-facing ones vanish for a clean arc. */
-.cam-item {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  cursor: pointer;
-}
-
-/* The circular "profile picture": gold-foil rim + glass depth + specular top. */
-.cam-medallion {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 9999px;
+/* A single portrait card: rounded, gold-rimmed glass with layered depth. */
+.slide-card {
+  border-radius: 22px;
   overflow: hidden;
   isolation: isolate;
-  /* Hide the medallion when it swings to the back of the ring, so far-side
-     items don't show through as mirrored text — keeps a clean front arc. */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  border: 1px solid rgba(230, 203, 139, 0.55);
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  background: #0b1626;
+  border: 1px solid rgba(230, 203, 139, 0.35);
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -16px 34px rgba(0, 0, 0, 0.55),
-    0 22px 48px rgba(2, 8, 23, 0.5),
-    0 0 0 1px rgba(198, 151, 73, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 30px 60px rgba(2, 8, 23, 0.55),
+    0 0 0 1px rgba(198, 151, 73, 0.14);
+}
+.slide-card[data-active='true'] {
+  border-color: rgba(230, 203, 139, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 40px 80px rgba(2, 8, 23, 0.6),
+    0 0 0 1px rgba(230, 203, 139, 0.3),
+    0 0 60px rgba(198, 151, 73, 0.22);
 }
 
-.cam-medallion::before {
-  content: '';
+/* Hero "photo" — the top ~60% of the card. */
+.slide-photo {
+  position: absolute;
+  inset: 0 0 40% 0;
+  overflow: hidden;
+  background-size: cover;
+  transform: scale(1);
+}
+.slide-card[data-active='true'] .slide-photo {
+  animation: slideKenBurns 12s ease-in-out infinite alternate;
+}
+.slide-photo-emoji {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  font-size: 82px;
+  line-height: 1;
+  opacity: 0.9;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.45));
+}
+.slide-photo-scrim {
   position: absolute;
   inset: 0;
-  z-index: 3;
-  background: radial-gradient(125% 85% at 30% 10%, rgba(255, 255, 255, 0.55), transparent 55%);
-  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(8, 14, 26, 0.55) 78%, #0b1626 100%);
 }
 
-/* Rotating conic light on the rim of the active medallion. */
-.cam-medallion::after {
-  content: '';
+/* Glassmorphism location badge, top-left of the photo. */
+.slide-badge {
   position: absolute;
-  inset: -2px;
-  z-index: 0;
-  border-radius: 9999px;
-  padding: 2px;
-  background: conic-gradient(from 0deg, transparent 0deg, rgba(247, 234, 192, 0.9) 60deg, transparent 140deg, transparent 360deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-.cam-item[data-active='true'] .cam-medallion::after {
-  opacity: 1;
-  animation: camRimSpin 5s linear infinite;
-}
-
-.cam-emoji {
-  position: relative;
+  top: 14px;
+  left: 14px;
   z-index: 2;
-  line-height: 1;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.cam-caption {
-  position: relative;
+/* Title block, overlaid where the photo meets the info panel. */
+.slide-titleblock {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: calc(40% - 4px);
   z-index: 2;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
-/* Soft gold aura that breathes behind the whole ring. */
-.cam-aura {
-  animation: camAura 7s ease-in-out infinite;
+/* Info panel — the bottom ~40% of the card. */
+.slide-info {
+  position: absolute;
+  inset: 60% 0 0 0;
+  padding: 22px 20px 20px;
+  background: linear-gradient(180deg, #0b1626 0%, #0e1c30 100%);
+  display: flex;
+  flex-direction: column;
 }
 
-.cam-float {
-  animation: camFloat 8s ease-in-out infinite;
+/* Gold-gradient pill CTA. */
+.slide-cta {
+  align-self: flex-start;
+  padding: 9px 22px;
+  border-radius: 9999px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3a2a08;
+  background: linear-gradient(135deg, #F7EAC0 0%, #E6CB8B 45%, #C69749 100%);
+  box-shadow: 0 6px 18px rgba(198, 151, 73, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.slide-cta:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 24px rgba(212, 175, 55, 0.6);
+}
+.slide-cta:active {
+  transform: scale(0.97);
 }
 
-@keyframes camFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+/* Soft gold aura that breathes behind the fan. */
+.slide-aura {
+  animation: slideAura 7s ease-in-out infinite;
 }
 
-@keyframes camAura {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.06); }
+/* Drifting atmospheric fog. */
+.slide-fog {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 40% at 20% 30%, rgba(255, 255, 255, 0.05), transparent 60%),
+    radial-gradient(50% 40% at 80% 60%, rgba(255, 255, 255, 0.04), transparent 60%);
+  animation: slideFog 24s ease-in-out infinite alternate;
 }
 
-@keyframes camRimSpin {
-  to { transform: rotate(360deg); }
+.slide-title-glow {
+  text-shadow: 0 4px 24px rgba(212, 175, 55, 0.35);
 }
 
-/* Cross-fade for the active destination caption below the ring. */
-.cam-info-enter {
-  animation: camInfoIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+.slide-progress {
+  transition: width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 12px rgba(230, 203, 139, 0.5);
 }
 
-@keyframes camInfoIn {
-  from { opacity: 0; transform: translateY(10px); filter: blur(6px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+@keyframes slideKenBurns {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+@keyframes slideAura {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.06); }
+}
+@keyframes slideFog {
+  from { transform: translateX(-2%); }
+  to { transform: translateX(2%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cam-float,
-  .cam-aura,
-  .cam-info-enter,
-  .cam-item[data-active='true'] .cam-medallion::after {
+  .slide-card[data-active='true'] .slide-photo,
+  .slide-aura,
+  .slide-fog {
     animation: none;
   }
 }
