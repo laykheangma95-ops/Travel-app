@@ -117,7 +117,10 @@ export function TripCopilot() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close Domer Copilot' : 'Open Domer Copilot'}
         data-liquid=""
-        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105"
+        // [backdrop-filter:none]: the blur is invisible on this opaque gold FAB
+        // but rendered a square halo behind the circle (Chromium backdrop-filter
+        // + border-radius clipping bug), so we disable it here.
+        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105 [backdrop-filter:none] [-webkit-backdrop-filter:none]"
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
       </button>
@@ -194,7 +197,7 @@ export function TripCopilot() {
               type="submit"
               disabled={loading || !input.trim()}
               aria-label="Send"
-              className="liquid-glass-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40"
+              className="liquid-glass-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40 [backdrop-filter:none] [-webkit-backdrop-filter:none]"
             >
               <Send size={16} />
             </button>

@@ -1062,16 +1062,17 @@ const CSS_TEXT = `
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
   will-change: transform;
 }
-/* Primary CTA: glowing gradient border (padding-box / border-box trick). */
+/* Primary CTA: Angkor-Gold fill (brand metallic recipe) with a glowing
+   gradient border (padding-box / border-box trick). */
 .dgh-cta {
-  color: #10203e;
+  color: #2a1d04;
   border: 1.5px solid transparent;
   background:
-    linear-gradient(180deg, #f7e7bb, #e6cb8b) padding-box,
-    linear-gradient(120deg, #ffe9b0, #57c8ff, #ffe9b0) border-box;
-  box-shadow: 0 0 26px rgba(230, 203, 139, 0.35), 0 6px 24px rgba(5, 11, 46, 0.5);
+    linear-gradient(160deg, #e6cb8b 0%, #c69749 46%, #8a6820 100%) padding-box,
+    linear-gradient(120deg, #f7eac0, #57c8ff, #f7eac0) border-box;
+  box-shadow: 0 0 26px rgba(198, 151, 73, 0.4), 0 6px 24px rgba(5, 11, 46, 0.5);
 }
-.dgh-cta:hover { box-shadow: 0 0 40px rgba(230, 203, 139, 0.55), 0 8px 28px rgba(5, 11, 46, 0.55); }
+.dgh-cta:hover { box-shadow: 0 0 40px rgba(198, 151, 73, 0.6), 0 8px 28px rgba(5, 11, 46, 0.55); }
 .dgh-cta-ghost {
   color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.07);
