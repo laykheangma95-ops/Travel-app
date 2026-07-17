@@ -8,6 +8,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { GlobeHero } from '@/components/home/GlobeHero';
+import { JourneyCompanion } from '@/components/home/JourneyCompanion';
 import { popularDestinations } from '@/data/destinations';
 import { useLang, type DictKey } from '@/lib/i18n';
 
@@ -63,7 +64,11 @@ export function HomeContent() {
         <div className="night-stars" aria-hidden="true" />
 
         {/* ── Feature showcase ── */}
-        <section className="relative section-pad">
+        <section
+          className="relative section-pad"
+          data-journey-section
+          data-journey-label={t('features.eyebrow')}
+        >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <Reveal>
               <SectionHeading
@@ -96,7 +101,12 @@ export function HomeContent() {
         </section>
 
         {/* ── How it works — constellation path ── */}
-        <section id="how-it-works" className="relative section-pad">
+        <section
+          id="how-it-works"
+          className="relative section-pad"
+          data-journey-section
+          data-journey-label={t('how.eyebrow')}
+        >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <Reveal>
               <SectionHeading eyebrow={t('how.eyebrow')} title={t('how.title')} dark />
@@ -126,7 +136,11 @@ export function HomeContent() {
         </section>
 
         {/* ── Popular destinations ── */}
-        <section className="relative section-pad">
+        <section
+          className="relative section-pad"
+          data-journey-section
+          data-journey-label={t('dest.eyebrow')}
+        >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <Reveal>
               <SectionHeading eyebrow={t('dest.eyebrow')} title={t('dest.title')} description={t('dest.desc')} dark />
@@ -147,7 +161,11 @@ export function HomeContent() {
         </section>
 
         {/* ── Testimonials — boarding passes ── */}
-        <section className="relative section-pad">
+        <section
+          className="relative section-pad"
+          data-journey-section
+          data-journey-label={t('testi.eyebrow')}
+        >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <Reveal>
               <SectionHeading eyebrow={t('testi.eyebrow')} title={t('testi.title')} dark />
@@ -201,6 +219,9 @@ export function HomeContent() {
           </div>
         </section>
       </div>
+
+      {/* Persistent mini-globe that rides the night sky (scroll companion). */}
+      <JourneyCompanion />
     </>
   );
 }

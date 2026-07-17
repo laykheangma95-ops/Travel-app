@@ -878,3 +878,165 @@
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Journey companion (components/home/JourneyCompanion)
+   A persistent gold-rimmed mini-globe, docked bottom-left, that rides the night
+   sky as the reader scrolls: a progress ring tracks position through the page, a
+   gold comet orbits, and a label names the current section. Bottom-LEFT on
+   purpose — the Trip Copilot FAB owns the bottom-right corner.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.jc {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.jc.jc-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.jc-label {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #f7eac0;
+  background: rgba(14, 27, 48, 0.72);
+  border: 1px solid rgba(230, 203, 139, 0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.4);
+}
+
+.jc-orb-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.jc-orb-wrap:focus-visible {
+  outline: 2px solid #8fd8ff;
+  outline-offset: 3px;
+}
+
+/* Progress ring (SVG rotated -90deg so it fills from the top). */
+.jc-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.jc-ring-track {
+  fill: none;
+  stroke: rgba(230, 203, 139, 0.16);
+  stroke-width: 3;
+}
+.jc-ring-prog {
+  fill: none;
+  stroke: url(#jcGold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(230, 203, 139, 0.5));
+  transition: stroke-dashoffset 0.15s linear;
+}
+
+/* The little planet. */
+.jc-orb {
+  position: absolute;
+  inset: 7px;
+  border-radius: 9999px;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 32% 24%, #24406b 0%, #14263f 46%, #0b162e 74%, #060d1c 100%);
+  border: 1px solid rgba(230, 203, 139, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.55),
+    0 8px 22px rgba(2, 8, 23, 0.5);
+}
+.jc-orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: radial-gradient(120% 80% at 30% 12%, rgba(255, 255, 255, 0.42), transparent 55%);
+  pointer-events: none;
+}
+/* Rotating gold sheen suggests the planet turning. */
+.jc-sheen {
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(230, 203, 139, 0.35) 70deg, transparent 150deg, transparent 360deg);
+  animation: jc-spin 6s linear infinite;
+}
+.jc-orb-wrap:hover .jc-orb {
+  border-color: rgba(247, 234, 192, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.55),
+    0 0 22px rgba(198, 151, 73, 0.4),
+    0 8px 22px rgba(2, 8, 23, 0.5);
+}
+
+/* Gold comet orbiting the planet. */
+.jc-orbit {
+  position: absolute;
+  inset: 1px;
+  border-radius: 9999px;
+  animation: jc-spin 7s linear infinite;
+  pointer-events: none;
+}
+.jc-comet {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 9999px;
+  background: #f7eac0;
+  box-shadow: 0 0 8px 1px rgba(230, 203, 139, 0.9);
+}
+
+@keyframes jc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .jc-label { display: none; }
+  .jc-orb-wrap { width: 54px; height: 54px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jc,
+  .jc.jc-visible {
+    transition: opacity 0.3s ease;
+    transform: none;
+  }
+  .jc-sheen,
+  .jc-orbit {
+    animation: none;
+  }
+}
