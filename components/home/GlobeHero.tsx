@@ -1053,7 +1053,7 @@ const CSS_TEXT = `
   text-wrap: balance;
 }
 .dgh-title-accent {
-  background: linear-gradient(92deg, #f5dfa8 0%, #e6cb8b 45%, #8fd8ff 115%);
+  background: linear-gradient(180deg, #f6e4b4 0%, #e3c584 48%, #cba659 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1077,48 +1077,53 @@ const CSS_TEXT = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3.25rem;
-  padding: 0 2rem;
-  border-radius: 999px;
-  font-size: 1rem;
+  min-height: 3.5rem;
+  padding: 0 2.5rem;
+  border-radius: 1.05rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease, background 0.28s ease;
   will-change: transform;
 }
-/* Primary CTA: luxury Apple-style blue frosted glass — a translucent deep-blue
-   pane with backdrop blur, an inner sheen, and a glowing cyan gradient border. */
+/* Primary CTA: luxury solid gold pane — a warm brushed-gold gradient with a
+   bright top sheen, soft inner base shadow, and a golden outer glow. */
 .dgh-cta {
-  color: #eaf3ff;
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(160deg, rgba(58, 116, 210, 0.55) 0%, rgba(26, 62, 130, 0.62) 55%, rgba(14, 34, 84, 0.7) 100%) padding-box,
-    linear-gradient(120deg, rgba(143, 216, 255, 0.95), rgba(87, 200, 255, 0.6), rgba(120, 170, 255, 0.9)) border-box;
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: #14263f;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, #e8cf94 0%, #cfa860 50%, #b78f47 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
-    0 0 28px rgba(87, 200, 255, 0.32),
-    0 8px 26px rgba(5, 11, 46, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -9px 20px rgba(120, 88, 30, 0.35),
+    0 8px 26px rgba(150, 110, 40, 0.35),
+    0 0 30px rgba(216, 178, 110, 0.25);
 }
 .dgh-cta:hover {
+  background: linear-gradient(180deg, #f0daa3 0%, #d9b46c 50%, #c19a54 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
-    0 0 44px rgba(87, 200, 255, 0.5),
-    0 10px 30px rgba(5, 11, 46, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -9px 20px rgba(120, 88, 30, 0.35),
+    0 10px 32px rgba(150, 110, 40, 0.45),
+    0 0 46px rgba(230, 190, 120, 0.45);
 }
+/* Secondary CTA: deep-navy frosted glass rounded pane with a soft sheen. */
 .dgh-cta-ghost {
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  color: #eaf3ff;
+  background: linear-gradient(180deg, rgba(46, 78, 140, 0.55) 0%, rgba(24, 46, 92, 0.6) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 8px 24px rgba(5, 11, 46, 0.45);
 }
 .dgh-cta-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 24px rgba(143, 216, 255, 0.22);
+  background: linear-gradient(180deg, rgba(58, 96, 168, 0.62) 0%, rgba(30, 56, 110, 0.68) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 26px rgba(120, 170, 255, 0.28),
+    0 10px 28px rgba(5, 11, 46, 0.5);
 }
 
 /* ── Frosted feature chips ── */
@@ -1189,6 +1194,8 @@ const CSS_TEXT = `
 
 @media (max-width: 640px) {
   .dgh-copy { padding-top: 5.5rem; }
+  .dgh-ctas { flex-direction: column; width: 100%; }
+  .dgh-cta, .dgh-cta-ghost { width: 100%; max-width: 22rem; }
   .dgh-chips { gap: 0.5rem; }
   .dgh-chip { padding: 0.55rem 1rem; font-size: 0.78rem; }
 }
