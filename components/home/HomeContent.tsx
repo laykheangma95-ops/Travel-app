@@ -89,24 +89,24 @@ export function HomeContent() {
       </section>
 
       {/* ── How it works ── */}
-      <section id="how-it-works" className="section-pad bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading eyebrow={t('how.eyebrow')} title={t('how.title')} />
+      <section
+        id="how-it-works"
+        className="section-pad relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)]"
+      >
+        <div className="stars" aria-hidden="true" />
+        <div className="relative mx-auto max-w-3xl px-4 sm:px-6">
+          <Reveal className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">{t('how.eyebrow')}</p>
+            <h2 className="mt-4 font-display text-4xl font-bold text-white sm:text-5xl">{t('how.title')}</h2>
           </Reveal>
-          <div className="relative grid gap-10 md:grid-cols-4">
-            {/* Connecting line on desktop */}
-            <div
-              className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-px bg-line md:block"
-              aria-hidden="true"
-            />
+          <div className="mt-16 flex flex-col items-center gap-14">
             {stepKeys.map((key, i) => (
               <Reveal key={key} delay={i * 130}>
-                <div className="relative flex flex-col items-center text-center">
-                  <div className="z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-secondary font-display text-lg font-bold text-white shadow-card transition-transform duration-300 ease-smooth hover:scale-110">
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-accent/50 bg-[radial-gradient(circle_at_30%_25%,#24406A_0%,#152A47_100%)] font-display text-2xl font-medium text-[#EBD9A8] shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 ease-smooth hover:scale-110">
                     {i + 1}
                   </div>
-                  <p className="mt-4 max-w-[200px] font-medium text-ink">{t(key)}</p>
+                  <p className="mt-5 max-w-[260px] text-lg text-white/85">{t(key)}</p>
                 </div>
               </Reveal>
             ))}
