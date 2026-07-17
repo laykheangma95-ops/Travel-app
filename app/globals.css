@@ -568,6 +568,182 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Night-sky page system (see .claude/skills/ui-ux)
+   The whole post-hero homepage is one continuous nocturnal surface so the
+   cinematic energy of the globe hero never drops into flat light cards.
+   These classes carry the deep-space ground, night glass cards, gold-rimmed
+   icon tiles, the constellation "how it works" path, and boarding-pass
+   testimonials. Tokens only — no new hardcoded palette.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Continuous deep-space ground for the mid-page. Mirrors .dgh-stage so the
+   sections below the hero read as the same planet's night sky, plus a faint
+   drifting starfield and a soft gold horizon glow. */
+.night-canvas {
+  position: relative;
+  isolation: isolate;
+  color: #fff;
+  background:
+    radial-gradient(60% 40% at 50% 0%, rgba(198, 151, 73, 0.10) 0%, transparent 60%),
+    radial-gradient(90% 60% at 50% 120%, rgba(35, 64, 106, 0.35) 0%, transparent 60%),
+    linear-gradient(180deg, #0e1b30 0%, #0b1c40 26%, #0e1b30 55%, #0b162e 100%);
+}
+
+/* Soft starfield the whole night page shares (decorative, aria-hidden). */
+.night-stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 18%, rgba(255, 255, 255, 0.85), transparent 60%),
+    radial-gradient(1px 1px at 48% 32%, rgba(191, 219, 254, 0.8), transparent 60%),
+    radial-gradient(1.3px 1.3px at 78% 14%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 28% 66%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(1px 1px at 88% 72%, rgba(230, 203, 139, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 62% 84%, rgba(255, 255, 255, 0.5), transparent 60%);
+  background-size: 600px 600px;
+  animation: twinkle 6s ease-in-out infinite;
+}
+
+/* Night content card: translucent navy glass with a hairline light border and
+   a soft inner top highlight. The go-to surface on any dark section. */
+.night-card {
+  position: relative;
+  border-radius: 18px;
+  background:
+    linear-gradient(165deg, rgba(36, 64, 107, 0.42) 0%, rgba(20, 38, 63, 0.55) 55%, rgba(11, 22, 46, 0.62) 100%);
+  border: 1px solid rgba(230, 203, 139, 0.14);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 18px 48px rgba(2, 8, 23, 0.45);
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.night-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(230, 203, 139, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 26px 64px rgba(2, 8, 23, 0.6),
+    0 0 0 1px rgba(198, 151, 73, 0.18);
+}
+
+/* Gold-rimmed icon tile — the one gold focal point inside a night card. */
+.night-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: radial-gradient(120% 120% at 30% 12%, rgba(230, 203, 139, 0.22), rgba(20, 38, 63, 0.5) 70%);
+  border: 1px solid rgba(230, 203, 139, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 244, 0.35),
+    0 6px 18px rgba(2, 8, 23, 0.4);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
+}
+
+.group:hover .night-icon {
+  transform: scale(1.08) rotate(-3deg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 244, 0.5),
+    0 0 26px rgba(198, 151, 73, 0.35);
+}
+
+/* ── Constellation "how it works" path ─────────────────────────────────────
+   Glowing gold star-nodes connected by a dashed gold arc that draws itself,
+   replacing the flat gray connector line. */
+.constellation-line {
+  fill: none;
+  stroke: rgba(230, 203, 139, 0.5);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 9;
+  filter: drop-shadow(0 0 4px rgba(230, 203, 139, 0.5));
+  animation: dash-flow 5s linear infinite;
+}
+
+.constellation-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #f7eac0;
+  background: radial-gradient(circle at 32% 24%, #24406b 0%, #14263f 55%, #0b162e 100%);
+  border: 1px solid rgba(230, 203, 139, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 22px rgba(198, 151, 73, 0.32),
+    0 8px 20px rgba(2, 8, 23, 0.5);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+}
+
+.constellation-node:hover {
+  transform: scale(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 34px rgba(247, 234, 192, 0.55),
+    0 10px 24px rgba(2, 8, 23, 0.55);
+}
+
+/* ── Boarding-pass testimonial ─────────────────────────────────────────────
+   A night-glass ticket with a perforated seam and a gold stub rail, so social
+   proof reads as a travel document rather than a generic quote card. */
+.boarding-pass {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, rgba(28, 51, 85, 0.55) 0%, rgba(14, 27, 48, 0.62) 100%);
+  border: 1px solid rgba(230, 203, 139, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 44px rgba(2, 8, 23, 0.45);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.boarding-pass:hover {
+  transform: translateY(-6px);
+  border-color: rgba(230, 203, 139, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 26px 60px rgba(2, 8, 23, 0.6);
+}
+
+/* Perforated seam: a dashed rule with a punched notch at each end. */
+.boarding-pass-seam {
+  position: relative;
+  border-top: 1.5px dashed rgba(230, 203, 139, 0.3);
+}
+
+.boarding-pass-seam::before,
+.boarding-pass-seam::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #0e1b30;
+  transform: translateY(-50%);
+}
+
+.boarding-pass-seam::before { left: -9px; }
+.boarding-pass-seam::after { right: -9px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .night-stars,
+  .constellation-line {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Cambodia 3D Liquid-Glass destination showcase (components/home/CambodiaShowcase)
    A ring of gold-rimmed glass "profile" medallions that rotate in real 3D to
    promote Cambodian travel destinations. Transforms per-item are set inline;
@@ -699,6 +875,168 @@
   .cam-aura,
   .cam-info-enter,
   .cam-item[data-active='true'] .cam-medallion::after {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Journey companion (components/home/JourneyCompanion)
+   A persistent gold-rimmed mini-globe, docked bottom-left, that rides the night
+   sky as the reader scrolls: a progress ring tracks position through the page, a
+   gold comet orbits, and a label names the current section. Bottom-LEFT on
+   purpose — the Trip Copilot FAB owns the bottom-right corner.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.jc {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.jc.jc-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.jc-label {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #f7eac0;
+  background: rgba(14, 27, 48, 0.72);
+  border: 1px solid rgba(230, 203, 139, 0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.4);
+}
+
+.jc-orb-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.jc-orb-wrap:focus-visible {
+  outline: 2px solid #8fd8ff;
+  outline-offset: 3px;
+}
+
+/* Progress ring (SVG rotated -90deg so it fills from the top). */
+.jc-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.jc-ring-track {
+  fill: none;
+  stroke: rgba(230, 203, 139, 0.16);
+  stroke-width: 3;
+}
+.jc-ring-prog {
+  fill: none;
+  stroke: url(#jcGold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(230, 203, 139, 0.5));
+  transition: stroke-dashoffset 0.15s linear;
+}
+
+/* The little planet. */
+.jc-orb {
+  position: absolute;
+  inset: 7px;
+  border-radius: 9999px;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 32% 24%, #24406b 0%, #14263f 46%, #0b162e 74%, #060d1c 100%);
+  border: 1px solid rgba(230, 203, 139, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.55),
+    0 8px 22px rgba(2, 8, 23, 0.5);
+}
+.jc-orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: radial-gradient(120% 80% at 30% 12%, rgba(255, 255, 255, 0.42), transparent 55%);
+  pointer-events: none;
+}
+/* Rotating gold sheen suggests the planet turning. */
+.jc-sheen {
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(230, 203, 139, 0.35) 70deg, transparent 150deg, transparent 360deg);
+  animation: jc-spin 6s linear infinite;
+}
+.jc-orb-wrap:hover .jc-orb {
+  border-color: rgba(247, 234, 192, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.55),
+    0 0 22px rgba(198, 151, 73, 0.4),
+    0 8px 22px rgba(2, 8, 23, 0.5);
+}
+
+/* Gold comet orbiting the planet. */
+.jc-orbit {
+  position: absolute;
+  inset: 1px;
+  border-radius: 9999px;
+  animation: jc-spin 7s linear infinite;
+  pointer-events: none;
+}
+.jc-comet {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 9999px;
+  background: #f7eac0;
+  box-shadow: 0 0 8px 1px rgba(230, 203, 139, 0.9);
+}
+
+@keyframes jc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .jc-label { display: none; }
+  .jc-orb-wrap { width: 54px; height: 54px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jc,
+  .jc.jc-visible {
+    transition: opacity 0.3s ease;
+    transform: none;
+  }
+  .jc-sheen,
+  .jc-orbit {
     animation: none;
   }
 }
