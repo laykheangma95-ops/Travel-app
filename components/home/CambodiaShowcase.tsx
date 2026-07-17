@@ -222,7 +222,7 @@ export function CambodiaShowcase() {
   const resumeAuto = () => { if (!reducedRef.current && !dragRef.current.active && snapRef.current === null) autoRef.current = true; };
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#1C3355_100%)] py-20 sm:py-28">
+    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#1C3355_100%)] pb-20 pt-5 sm:pb-28 sm:pt-8">
       {/* Ambient starfield + gold aura, matching the hero */}
       <div className="stars" aria-hidden="true" />
       <div

@@ -84,90 +84,7 @@ export function HomeContent() {
           aria-hidden="true"
         />
 
-        {/* Living globe scene — one SVG coordinate system so the sphere,
-            surface, arcs, and orbiting plane stay perfectly centered */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center" aria-hidden="true">
-          <div className="hero-scene w-[920px] shrink-0 sm:w-[1200px]">
-            <svg viewBox="0 0 1000 400" fill="none" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="heroSphere" cx="0.42" cy="0.14" r="0.9">
-                  <stop offset="0" stopColor="#23406A" />
-                  <stop offset="0.4" stopColor="#14263F" />
-                  <stop offset="0.75" stopColor="#0E1B30" />
-                  <stop offset="1" stopColor="#091220" />
-                </radialGradient>
-                <linearGradient id="heroRim" x1="0" y1="140" x2="0" y2="400" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="#E6CB8B" stopOpacity="0.55" />
-                  <stop offset="0.35" stopColor="#C69749" stopOpacity="0.12" />
-                  <stop offset="1" stopColor="#C69749" stopOpacity="0" />
-                </linearGradient>
-                <pattern id="heroDotGrid" width="26" height="22" patternUnits="userSpaceOnUse">
-                  <circle cx="4" cy="5" r="1.4" fill="rgba(230,203,139,0.22)" />
-                  <circle cx="17" cy="16" r="1.1" fill="rgba(230,203,139,0.14)" />
-                </pattern>
-                <clipPath id="heroGlobeClip">
-                  <circle cx="500" cy="760" r="620" />
-                </clipPath>
-              </defs>
-
-              {/* Sphere */}
-              <circle className="hero-sphere" cx="500" cy="760" r="620" fill="url(#heroSphere)" />
-              {/* Gilded rim light on the crown */}
-              <circle cx="500" cy="760" r="619" stroke="url(#heroRim)" strokeWidth="1.6" />
-
-              {/* Rotating dotted surface + latitude lines + city lights */}
-              <g clipPath="url(#heroGlobeClip)">
-                <g className="hero-dots-drift">
-                  <rect x="-80" y="130" width="2200" height="290" fill="url(#heroDotGrid)" />
-                </g>
-                <path d="M 190 215 Q 500 152 810 215" stroke="rgba(230,203,139,0.16)" strokeWidth="1" />
-                <path d="M 95 305 Q 500 218 905 305" stroke="rgba(230,203,139,0.13)" strokeWidth="1" />
-                <path d="M 30 400 Q 500 295 970 400" stroke="rgba(230,203,139,0.10)" strokeWidth="1" />
-                {[
-                  [352, 230, 0], [548, 195, 0.6], [700, 250, 1.1], [255, 300, 0.3], [820, 330, 0.9], [470, 320, 1.5],
-                ].map(([cx, cy, delay]) => (
-                  <circle
-                    key={`${cx}-${cy}`}
-                    cx={cx}
-                    cy={cy}
-                    r="2.6"
-                    fill="#E6CB8B"
-                    className="hero-twinkle arc-node"
-                    style={{ animationDelay: `${delay}s` }}
-                  />
-                ))}
-              </g>
-
-              {/* Network arcs hugging the crown */}
-              <path d="M 150 330 Q 340 170 545 265" stroke="rgba(230,203,139,0.6)" strokeWidth="1.4" className="arc-line" />
-              <path d="M 300 365 Q 545 130 845 320" stroke="rgba(230,203,139,0.42)" strokeWidth="1.3" className="arc-line" style={{ animationDelay: '-1.4s' }} />
-              {[[150, 330], [545, 265], [845, 320]].map(([cx, cy]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.2" fill="#E6CB8B" className="arc-node" />
-              ))}
-
-              {/* Orbit + contrail */}
-              <path
-                id="heroOrbit"
-                d="M -60 335 C 250 68 750 68 1060 335"
-                stroke="rgba(230,203,139,0.5)"
-                strokeWidth="1.6"
-                className="arc-line"
-              />
-
-              {/* The flight — follows the orbit, nose always along the path */}
-              <g className="hero-jet">
-                <g transform="rotate(90) scale(1.8) translate(-12 -12)">
-                  <path d={JET_PATH} fill="#F7EAC0" />
-                </g>
-                <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#heroOrbit" />
-                </animateMotion>
-              </g>
-            </svg>
-          </div>
-        </div>
-
-        <div className="hero-copy relative mx-auto max-w-5xl px-4 pb-72 pt-24 text-center sm:px-6 sm:pb-80">
+        <div className="hero-copy relative mx-auto max-w-5xl px-4 pb-24 pt-24 text-center sm:px-6 sm:pb-28">
           <span className="liquid-glass liquid-sheen inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide text-white animate-fade-up">
             {t('hero.badge')}
           </span>
@@ -198,6 +115,99 @@ export function HomeContent() {
             <span className="hidden text-white/25 sm:inline">·</span>
             <span>{t('hero.stat3')}</span>
           </div>
+        </div>
+      </section>
+
+      {/* ── The living globe — standing full between the Hero and the Circle
+          Showcase, with the gold arcs and orbiting flight from the hero ── */}
+      <section
+        className="relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#0E1B30_100%)] pb-0 pt-4 sm:pt-6"
+        aria-hidden="true"
+      >
+        <div className="stars" aria-hidden="true" />
+        <div className="relative mx-auto w-[min(78vw,460px)]">
+          {/* Atmosphere glow ring */}
+          <div className="absolute inset-[4%] rounded-full shadow-[0_0_70px_rgba(127,200,218,0.35),0_0_28px_rgba(198,151,73,0.22)] ring-1 ring-[#7FC8DA]/30" />
+          <svg viewBox="0 0 500 500" fill="none" className="relative h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="globeSphere" cx="0.42" cy="0.2" r="0.9">
+                <stop offset="0" stopColor="#23406A" />
+                <stop offset="0.4" stopColor="#14263F" />
+                <stop offset="0.75" stopColor="#0E1B30" />
+                <stop offset="1" stopColor="#091220" />
+              </radialGradient>
+              <linearGradient id="globeRim" x1="0" y1="20" x2="0" y2="480" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stopColor="#E6CB8B" stopOpacity="0.55" />
+                <stop offset="0.45" stopColor="#C69749" stopOpacity="0.12" />
+                <stop offset="1" stopColor="#C69749" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="globeNight" x1="0" y1="250" x2="0" y2="480" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stopColor="#091220" stopOpacity="0" />
+                <stop offset="1" stopColor="#091220" stopOpacity="0.85" />
+              </linearGradient>
+              <pattern id="globeDotGrid" width="26" height="22" patternUnits="userSpaceOnUse">
+                <circle cx="4" cy="5" r="1.4" fill="rgba(230,203,139,0.22)" />
+                <circle cx="17" cy="16" r="1.1" fill="rgba(230,203,139,0.14)" />
+              </pattern>
+              <clipPath id="globeClip">
+                <circle cx="250" cy="250" r="230" />
+              </clipPath>
+            </defs>
+
+            {/* Sphere */}
+            <circle cx="250" cy="250" r="230" fill="url(#globeSphere)" />
+            {/* Gilded rim light on the crown */}
+            <circle cx="250" cy="250" r="229" stroke="url(#globeRim)" strokeWidth="1.6" />
+
+            {/* Rotating dotted surface + latitude lines + city lights */}
+            <g clipPath="url(#globeClip)">
+              <g className="hero-dots-drift">
+                <rect x="-80" y="40" width="2200" height="420" fill="url(#globeDotGrid)" />
+              </g>
+              <path d="M 60 140 Q 250 80 440 140" stroke="rgba(230,203,139,0.16)" strokeWidth="1" />
+              <path d="M 25 250 Q 250 170 475 250" stroke="rgba(230,203,139,0.13)" strokeWidth="1" />
+              <path d="M 45 360 Q 250 270 455 360" stroke="rgba(230,203,139,0.10)" strokeWidth="1" />
+              {[
+                [175, 130, 0], [300, 105, 0.6], [385, 175, 1.1], [120, 210, 0.3], [410, 280, 0.9], [240, 235, 1.5], [160, 320, 0.7],
+              ].map(([cx, cy, delay]) => (
+                <circle
+                  key={`${cx}-${cy}`}
+                  cx={cx}
+                  cy={cy}
+                  r="2.6"
+                  fill="#E6CB8B"
+                  className="hero-twinkle arc-node"
+                  style={{ animationDelay: `${delay}s` }}
+                />
+              ))}
+              {/* Night side — the lower half falls into shadow */}
+              <circle cx="250" cy="250" r="230" fill="url(#globeNight)" />
+            </g>
+
+            {/* Network arcs hugging the crown */}
+            <path d="M 75 200 Q 180 60 330 125" stroke="rgba(230,203,139,0.6)" strokeWidth="1.4" className="arc-line" />
+            <path d="M 120 300 Q 250 30 430 235" stroke="rgba(230,203,139,0.42)" strokeWidth="1.3" className="arc-line" style={{ animationDelay: '-1.4s' }} />
+            {[[75, 200], [330, 125], [430, 235]].map(([cx, cy]) => (
+              <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.2" fill="#E6CB8B" className="arc-node" />
+            ))}
+
+            {/* Orbit + the flight — nose always along the path */}
+            <path
+              id="globeOrbit"
+              d="M -40 250 C 100 -30 400 -30 540 250"
+              stroke="rgba(230,203,139,0.5)"
+              strokeWidth="1.6"
+              className="arc-line"
+            />
+            <g className="hero-jet">
+              <g transform="rotate(90) scale(1.8) translate(-12 -12)">
+                <path d={JET_PATH} fill="#F7EAC0" />
+              </g>
+              <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
+                <mpath href="#globeOrbit" />
+              </animateMotion>
+            </g>
+          </svg>
         </div>
       </section>
 
