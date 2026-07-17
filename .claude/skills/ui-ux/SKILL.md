@@ -162,16 +162,72 @@ Three.js + GSAP + (optional) Lenis is heavy. Protect the mobile experience:
 
 ---
 
-## 9. Award-readiness checklist (run before calling any UI change done)
+## 9. Award-craft — how to *win* (beyond the checklist)
+
+The §10 checklist is the **don't-lose list** — pass it and the site is polished,
+consistent, accessible. That earns a *professional* score, not a trophy. Awards
+are won on the **40% Design + 20% Creativity**, and those come from the eight
+moves below. A change can pass every checkbox and still be forgettable; measure
+ambitious work against this section too.
+
+**The one rule that outranks the rest: the concept must survive the whole funnel.**
+The most common failure of a beautiful site is a showpiece homepage bolted to a
+generic SaaS funnel. Juries click through — `/esim`, `/checkout`, `/flights`,
+`/dashboard` are all judged. If the night-sky ends at the fold of page one, the
+submission is a homepage, not a product. Carry `.night-canvas` / `.night-card`
+and the gold budget into every screen a visitor can reach.
+
+1. **Concept continuity.** Every route wears the night sky (or an intentional,
+   documented light utility variant). No screen may read as a different product.
+2. **Route transitions.** Navigation should feel like *one continuous surface*,
+   never a hard cut. Use `framer-motion` (already a dep) or the View Transitions
+   API; prefer shared-element morphs (a globe/medallion/boarding-pass that carries
+   between routes). Gate behind `prefers-reduced-motion`; never trap focus or
+   break the back button.
+3. **Art direction over placeholders.** Emoji and gradient blobs read as
+   *unfinished* to a jury. Ship real photography, commissioned illustration, or
+   bespoke SVG. A placeholder is never "done" for a hero or a destination card.
+4. **A scroll-narrative spine, not set-pieces.** The globe should *tell the story*
+   as you scroll (world → zoom to Cambodia, live-flight arcs drawing the journey,
+   sections docking to its rotation), not sit as an isolated showpiece. One spine,
+   3–4 signature beats hung off it.
+5. **Cinematic real data.** The winning move for a travel app is making live data
+   feel physical: real aircraft arcing the globe, a boarding-pass that behaves
+   like paper. Fuse existing data (live-flight API, `.ticket-notch` seam) into a
+   hero moment instead of a table.
+6. **Loader → hero handoff.** The splash must *choreograph the reveal*, not just
+   hold then cut. The Wayfinder star should fly up and *become* the globe; stagger
+   the first paint in. A spinner that fades to a cold hero is a wasted first
+   impression.
+7. **Signature micro-interactions, sitewide.** Magnetic CTAs, a considered custom
+   cursor on desktop, field-level focus choreography, optional tasteful sound —
+   present everywhere, not only on the hero. Consistency of *feel* is the tell.
+8. **First-impression surfaces.** A dynamic OG/share image and a crafted favicon
+   are the jury's (and every visitor's) first frame — design them, don't default
+   them. Smooth-scroll inertia (Lenis) is the approved upgrade for premium weight.
+
+**Award-craft gate:** before shipping a flagship change, at least the first three
+(continuity, transitions, art direction) must hold. A feature that only looks
+award-level on `/` is not done.
+
+---
+
+## 10. Award-readiness checklist (run before calling any UI change done)
 
 - [ ] Does it reinforce the **one concept** (night-sky journey), or add noise?
+- [ ] **Concept survives the funnel** — this screen matches the home bar, not
+      generic SaaS (see §9); night-sky carried in or an intentional light variant.
 - [ ] **Dark-first** unless it's a dense utility screen — no energy drop mid-page.
 - [ ] Tokens only — **no new hardcoded hexes**; gold budget respected.
 - [ ] Type has real scale contrast; gold eyebrow opens the section.
 - [ ] Motion uses the shared easings; **reduced-motion fallback present**.
+- [ ] Navigation into/out of the screen isn't a hard cut (transition or documented
+      exception); back button + focus still behave.
+- [ ] No emoji/gradient placeholders standing in for real art on a hero surface.
 - [ ] Glass stays within the 3-tier ladder; one accent CTA per viewport.
 - [ ] 44px targets, visible focus, keyboard + screen-reader paths work.
-- [ ] Contrast checked (esp. gold on dark).
+- [ ] Contrast checked (esp. gold on dark **and white-on-gold** — never `text-white`
+      on an accent-gold fill; use `primary-deep` ink on gold).
 - [ ] Heavy visuals lazy-load, pause off-screen, and are mobile-capped.
 - [ ] Looks intentional at 360px, 768px, 1440px — no horizontal scroll.
 

@@ -14,10 +14,12 @@ type Variant =
 type Size = 'sm' | 'md' | 'lg';
 
 const variantClasses: Record<Variant, string> = {
+  // Gold accent fill takes dark ink, never white — white-on-gold fails AA
+  // (see .claude/skills/ui-ux §7 + §10 contrast gate).
   primary:
-    'liquid-glass-accent liquid-sheen liquid-touch text-white hover:brightness-110 focus-visible:ring-accent',
+    'liquid-glass-accent liquid-sheen liquid-touch text-primary-deep hover:brightness-110 focus-visible:ring-accent',
   secondary:
-    'bg-secondary text-white hover:bg-[#162c4a] focus-visible:ring-secondary shadow-sm',
+    'bg-secondary text-white hover:bg-secondary-high focus-visible:ring-secondary shadow-sm',
   outline:
     'border border-line bg-white text-ink hover:border-secondary hover:text-secondary focus-visible:ring-secondary',
   'outline-light':
@@ -27,13 +29,13 @@ const variantClasses: Record<Variant, string> = {
   liquid:
     'liquid-glass liquid-sheen liquid-touch text-white hover:brightness-110 focus-visible:ring-white',
   'liquid-accent':
-    'liquid-glass-accent liquid-sheen liquid-touch text-white hover:brightness-110 focus-visible:ring-accent',
+    'liquid-glass-accent liquid-sheen liquid-touch text-primary-deep hover:brightness-110 focus-visible:ring-accent',
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'px-3.5 py-2 text-sm',
-  md: 'px-5 py-2.5 text-sm',
-  lg: 'px-7 py-3.5 text-base',
+  sm: 'px-3.5 py-2 text-sm min-h-[2.25rem]',
+  md: 'px-5 py-2.5 text-sm min-h-[2.75rem]', // 44px touch target (skill §6)
+  lg: 'px-7 py-3.5 text-base min-h-[3.25rem]',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
