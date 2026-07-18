@@ -308,6 +308,8 @@ export function GlobeHero() {
         dragging = true;
         lastDragX = e.clientX;
         stage.classList.add('dgh-dragging');
+        // First real drag — the hint chip has done its job, fade it out.
+        section!.classList.add('dgh-interacted');
       };
       const onPointerUp = () => {
         dragging = false;
@@ -564,6 +566,24 @@ export function GlobeHero() {
             {t('hero.ctaFlight')}
           </Link>
         </div>
+        {/* Interaction affordance: the globe is draggable but nothing said so.
+            A quiet glass pill with a sliding gold dot invites the first spin;
+            it fades once the visitor actually drags (dgh-interacted). Desktop
+            only — drag is disabled on touch. Decorative, so aria-hidden. */}
+        {/* The reveal class sits on a wrapper: GSAP leaves inline opacity on
+            .dgh-reveal elements, which would override the fade-on-drag rule
+            if it lived on the pill itself. */}
+        <div className="dgh-reveal">
+          <div className="dgh-hint" aria-hidden="true">
+            <span className="dgh-hint-track">
+              <i className="dgh-hint-dot" />
+            </span>
+            <span>
+              Drag to spin the globe
+              <span className="dgh-hint-km font-khmer"> · អូសបង្វិលផែនដី</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Frosted feature chips floating above the horizon */}
@@ -600,6 +620,14 @@ const CSS_TEXT = `
     linear-gradient(180deg, #050b2e 0%, #08163a 28%, #0a1a4a 44%, #0b1c40 62%, #0e1b30 100%);
 }
 .dgh-stage.dgh-dragging { cursor: grabbing; }
+
+/* Drag affordance: on fine pointers the hero reads as grabbable. Links and
+   buttons keep their own cursors; the Cambodia showcase (excluded from the
+   globe drag) is outside .dgh-hero so it is not affected. */
+@media (pointer: fine) {
+  .dgh-hero { cursor: grab; }
+  .dgh-stage.dgh-dragging .dgh-hero { cursor: grabbing; }
+}
 
 /* Shared globe canvas layer — spans the full stage, sits behind section content. */
 .dgh-globe-layer {
@@ -808,6 +836,74 @@ const CSS_TEXT = `
   box-shadow: 0 0 24px rgba(143, 216, 255, 0.22);
 }
 
+/* ── Drag hint: quiet glass pill + sliding gold dot ── */
+.dgh-hint {
+  margin-top: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.dgh-hint-km {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.42);
+}
+/* Chevron rails + a gold dot gliding between them = "drag me" in miniature. */
+.dgh-hint-track {
+  position: relative;
+  width: 38px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.dgh-hint-track::before,
+.dgh-hint-track::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-54%);
+  font-size: 0.85rem;
+  line-height: 1;
+  color: rgba(230, 203, 139, 0.75);
+}
+.dgh-hint-track::before { content: '‹'; left: 0; }
+.dgh-hint-track::after { content: '›'; right: 0; }
+.dgh-hint-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: #e6cb8b;
+  box-shadow: 0 0 8px rgba(230, 203, 139, 0.85);
+  animation: dgh-hint-slide 1.7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+@keyframes dgh-hint-slide {
+  from { transform: translateX(-9px); }
+  to { transform: translateX(9px); }
+}
+/* Job done: fade out after the first real drag. */
+.dgh-interacted .dgh-hint {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+/* Drag is desktop-only, so the invitation is too. */
+@media (pointer: coarse) {
+  .dgh-hint { display: none; }
+}
+
 /* ── Frosted feature chips ── */
 .dgh-chips {
   position: relative;
@@ -869,7 +965,8 @@ const CSS_TEXT = `
 /* ── Reduced motion: static frame, everything visible, no animation ── */
 @media (prefers-reduced-motion: reduce) {
   .dgh-anim .dgh-reveal { opacity: 1; transform: none; filter: none; }
-  .dgh-cloud, .dgh-grain, .dgh-chip { animation: none; }
+  .dgh-cloud, .dgh-grain, .dgh-chip, .dgh-hint-dot { animation: none; }
+  .dgh-hint { transition: none; }
   .dgh-clouds { transition: none; }
   .dgh-cta, .dgh-cta-ghost { transition: none; }
 }
