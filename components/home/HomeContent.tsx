@@ -8,6 +8,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { GlobeHero } from '@/components/home/GlobeHero';
+import { TripBoard } from '@/components/home/TripBoard';
 import { popularDestinations } from '@/data/destinations';
 import { useLang, type DictKey } from '@/lib/i18n';
 
@@ -55,6 +56,9 @@ export function HomeContent() {
         <GlobeHero />
         <CambodiaShowcase />
       </div>
+
+      {/* ── Trip board (signature asymmetric bento) ── */}
+      <TripBoard />
 
       {/* ── Feature showcase ── */}
       <section className="section-pad bg-surface-2">
