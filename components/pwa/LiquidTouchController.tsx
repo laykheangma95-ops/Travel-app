@@ -42,14 +42,43 @@ export function LiquidTouchController() {
       current = null;
     };
 
+    // Liquid ripple: on press, a gold bloom expands from the touch point and
+    // settles — the glass surface reacts like liquid. The span is appended at
+    // z-index:-1 (behind the label, above the tint) and self-removes when its
+    // animation ends. Buttons already provide `position: relative; overflow:
+    // hidden` via the liquid-glass recipe, so the ripple clips to their shape.
+    const ripple = (event: PointerEvent) => {
+      const target = event.target;
+      const el =
+        target instanceof Element
+          ? (target.closest('[data-liquid]') as HTMLElement | null)
+          : null;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 2.1;
+      const span = document.createElement('span');
+      span.className = 'liquid-ripple-ink';
+      span.style.width = `${size}px`;
+      span.style.height = `${size}px`;
+      span.style.left = `${event.clientX - rect.left}px`;
+      span.style.top = `${event.clientY - rect.top}px`;
+      span.addEventListener('animationend', () => span.remove(), { once: true });
+      el.appendChild(span);
+    };
+
+    const onDown = (event: PointerEvent) => {
+      track(event);
+      ripple(event);
+    };
+
     window.addEventListener('pointermove', track, { passive: true });
-    window.addEventListener('pointerdown', track, { passive: true });
+    window.addEventListener('pointerdown', onDown, { passive: true });
     window.addEventListener('pointerup', release, { passive: true });
     window.addEventListener('pointercancel', release, { passive: true });
 
     return () => {
       window.removeEventListener('pointermove', track);
-      window.removeEventListener('pointerdown', track);
+      window.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointerup', release);
       window.removeEventListener('pointercancel', release);
     };
