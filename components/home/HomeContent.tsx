@@ -9,6 +9,7 @@ import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { GlobeHero } from '@/components/home/GlobeHero';
 import { TripBoard } from '@/components/home/TripBoard';
+import { JourneyNarrative } from '@/components/home/JourneyNarrative';
 import { popularDestinations } from '@/data/destinations';
 import { useLang, type DictKey } from '@/lib/i18n';
 
@@ -17,8 +18,6 @@ const features: { icon: typeof Smartphone; nameKey: DictKey; descKey: DictKey; h
   { icon: BellRing, nameKey: 'feature2.name', descKey: 'feature2.desc', href: '/flights' },
   { icon: MapPinned, nameKey: 'feature3.name', descKey: 'feature3.desc', href: '/airport-guide' },
 ];
-
-const stepKeys: DictKey[] = ['how.step1', 'how.step2', 'how.step3', 'how.step4'];
 
 const testimonials = [
   {
@@ -94,31 +93,8 @@ export function HomeContent() {
         </div>
       </section>
 
-      {/* ── How it works (Temple Night) ── */}
-      <section id="how-it-works" className="relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#0E1B30_100%)] section-pad">
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
-          <Reveal>
-            <SectionHeading dark eyebrow={t('how.eyebrow')} title={t('how.title')} />
-          </Reveal>
-          <div className="relative grid gap-10 md:grid-cols-4">
-            {/* Connecting line on desktop */}
-            <div
-              className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-px bg-white/15 md:block"
-              aria-hidden="true"
-            />
-            {stepKeys.map((key, i) => (
-              <Reveal key={key} delay={i * 130}>
-                <div className="relative flex flex-col items-center text-center">
-                  <div className="z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary-deep bg-[linear-gradient(160deg,#F7EAC0,#C69749)] font-display text-lg font-bold text-primary-deep shadow-[0_6px_20px_rgba(198,151,73,0.4)] transition-transform duration-300 ease-smooth hover:scale-110">
-                    {i + 1}
-                  </div>
-                  <p className="mt-4 max-w-[200px] font-medium text-white/80">{t(key)}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── How it works — scroll-pinned journey narrative ── */}
+      <JourneyNarrative />
 
       {/* ── Popular destinations (deliberate daylight beat) ── */}
       <section className="section-pad bg-[linear-gradient(180deg,#F6F1E7_0%,#FFFFFF_100%)]">
