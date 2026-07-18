@@ -14,6 +14,10 @@
  *    the scroll-linked lift/fade of the hero copy.
  *  - Custom shaders: dot flicker + limb fade, fresnel atmosphere rim,
  *    travelling arc pulses, rising hub beams, twinkling starfield.
+ *  - Live flights: /api/flights/sky (keyless ADS-B) supplies real aircraft
+ *    around the beamed hub cities, drawn as pulsing markers with ground-track
+ *    streaks, dead-reckoned at true speed between refreshes and hoverable for
+ *    callsign + altitude. The layer fails soft to an empty sky.
  *
  * Scroll spine: the canvas lives in a sticky viewport-sized wrapper inside
  * .dgh-stage. Scroll position is sampled every frame against a keyframe track:
@@ -207,6 +211,66 @@ const HUB_FRAG = /* glsl */ `
     float a = (core + halo) * vAlpha;
     if (a < 0.02) discard;
     gl_FragColor = vec4(mix(uColor, uHoverColor, vHover), a);
+  }
+`;
+
+const PLANE_VERT = /* glsl */ `
+  attribute float aPhase;
+  uniform float uTime;
+  uniform float uScale;
+  uniform float uGlobeScale;
+  uniform float uBoost;
+  varying float vAlpha;
+  void main() {
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec3 n = normalize(normalMatrix * normalize(position));
+    float facing = smoothstep(0.02, 0.35, n.z);
+    float pulse = 0.78 + 0.22 * sin(uTime * 2.4 + aPhase);
+    vAlpha = facing * pulse * (0.75 + 0.25 * uBoost);
+    float size = 0.017 * (1.0 + 0.45 * uBoost);
+    gl_PointSize = size * uGlobeScale * uScale / -mv.z;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const PLANE_FRAG = /* glsl */ `
+  precision mediump float;
+  uniform vec3 uColor;
+  varying float vAlpha;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    float core = smoothstep(0.18, 0.04, d);
+    float halo = smoothstep(0.5, 0.08, d) * 0.45;
+    float a = (core + halo) * vAlpha;
+    if (a < 0.02) discard;
+    gl_FragColor = vec4(mix(uColor, vec3(1.0), core * 0.6), a);
+  }
+`;
+
+// Streak behind each aircraft along its ground track: bright at the head
+// (aT = 1), fading to nothing at the tail (aT = 0).
+const TRAIL_VERT = /* glsl */ `
+  attribute float aT;
+  varying float vT;
+  varying float vFace;
+  void main() {
+    vec3 n = normalize(normalMatrix * normalize(position));
+    vFace = smoothstep(0.02, 0.3, n.z);
+    vT = aT;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const TRAIL_FRAG = /* glsl */ `
+  precision mediump float;
+  uniform vec3 uColor;
+  uniform float uBoost;
+  varying float vT;
+  varying float vFace;
+  void main() {
+    float a = vT * vT * vFace * (0.30 + 0.35 * uBoost);
+    if (a < 0.015) discard;
+    gl_FragColor = vec4(uColor, a);
   }
 `;
 
@@ -500,6 +564,154 @@ export function GlobeHero() {
         beamMats.push(mat);
       }
 
+      /* ── Live aircraft layer (keyless ADS-B via /api/flights/sky) ──
+         Real positions around the beamed hub cities, drawn as glowing cyan
+         markers with a short streak along each aircraft's ground track.
+         Between refreshes the markers dead-reckon forward at their true
+         ground speed — honest, if nearly imperceptible at planetary scale;
+         the streaks and pulse carry the motion. Fails soft: if the endpoint
+         is unreachable the layer simply stays empty. */
+      const MAX_PLANES = 160;
+      const SKY_ALT = 1.008; // markers ride just above the surface
+      const TRAIL_LEN = 0.05; // streak length, radians of arc
+      const skyPos = new Float32Array(MAX_PLANES * 3); // unit-sphere positions
+      const skyDir = new Float32Array(MAX_PLANES * 3); // tangent flight direction
+      const skyOmega = new Float32Array(MAX_PLANES); // angular speed, rad/s
+      const skyMeta: { callsign: string; altFt: number | null }[] = [];
+      let skyCount = 0;
+
+      const planeHead = new Float32Array(MAX_PLANES * 3);
+      const planePhase = new Float32Array(MAX_PLANES);
+      for (let i = 0; i < MAX_PLANES; i++) planePhase[i] = Math.random() * Math.PI * 2;
+      const planeGeo = track(new THREE.BufferGeometry());
+      planeGeo.setAttribute('position', new THREE.BufferAttribute(planeHead, 3));
+      planeGeo.setAttribute('aPhase', new THREE.BufferAttribute(planePhase, 1));
+      planeGeo.setDrawRange(0, 0);
+      const planeMat = track(
+        new THREE.ShaderMaterial({
+          vertexShader: PLANE_VERT,
+          fragmentShader: PLANE_FRAG,
+          uniforms: {
+            uTime: { value: 0 },
+            uScale: { value: 1 },
+            uGlobeScale: { value: 1 },
+            uBoost: { value: 0 },
+            uColor: { value: new THREE.Color('#bfe9ff') },
+          },
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      spinGroup.add(new THREE.Points(planeGeo, planeMat));
+
+      const trailPos = new Float32Array(MAX_PLANES * 6); // head + tail vertex
+      const trailT = new Float32Array(MAX_PLANES * 2);
+      for (let i = 0; i < MAX_PLANES; i++) trailT[i * 2] = 1; // heads bright
+      const trailGeo = track(new THREE.BufferGeometry());
+      trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+      trailGeo.setAttribute('aT', new THREE.BufferAttribute(trailT, 1));
+      trailGeo.setDrawRange(0, 0);
+      const trailMat = track(
+        new THREE.ShaderMaterial({
+          vertexShader: TRAIL_VERT,
+          fragmentShader: TRAIL_FRAG,
+          uniforms: {
+            uBoost: { value: 0 },
+            uColor: { value: new THREE.Color('#8fd8ff') },
+          },
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      spinGroup.add(new THREE.LineSegments(trailGeo, trailMat));
+
+      const updateSky = (dt: number) => {
+        if (!skyCount) return;
+        for (let i = 0; i < skyCount; i++) {
+          const j = i * 3;
+          const w = skyOmega[i] * dt;
+          let x = skyPos[j] + skyDir[j] * w;
+          let y = skyPos[j + 1] + skyDir[j + 1] * w;
+          let z = skyPos[j + 2] + skyDir[j + 2] * w;
+          const inv = 1 / Math.hypot(x, y, z);
+          x *= inv;
+          y *= inv;
+          z *= inv;
+          skyPos[j] = x;
+          skyPos[j + 1] = y;
+          skyPos[j + 2] = z;
+          planeHead[j] = x * SKY_ALT;
+          planeHead[j + 1] = y * SKY_ALT;
+          planeHead[j + 2] = z * SKY_ALT;
+          // Tail: step backwards along the track, back onto the shell.
+          let tx = x - skyDir[j] * TRAIL_LEN;
+          let ty = y - skyDir[j + 1] * TRAIL_LEN;
+          let tz = z - skyDir[j + 2] * TRAIL_LEN;
+          const tInv = SKY_ALT / Math.hypot(tx, ty, tz);
+          const k = i * 6;
+          trailPos[k] = planeHead[j];
+          trailPos[k + 1] = planeHead[j + 1];
+          trailPos[k + 2] = planeHead[j + 2];
+          trailPos[k + 3] = tx * tInv;
+          trailPos[k + 4] = ty * tInv;
+          trailPos[k + 5] = tz * tInv;
+        }
+        planeGeo.getAttribute('position').needsUpdate = true;
+        trailGeo.getAttribute('position').needsUpdate = true;
+      };
+
+      type SkyPlaneWire = {
+        callsign?: string;
+        lat?: number;
+        lon?: number;
+        heading?: number | null;
+        speedKt?: number | null;
+        altFt?: number | null;
+      };
+      const loadSky = async () => {
+        try {
+          const res = await fetch('/api/flights/sky');
+          if (!res.ok || disposed) return;
+          const data = (await res.json()) as { planes?: SkyPlaneWire[]; count?: number };
+          const list = (data.planes ?? []).slice(0, MAX_PLANES);
+          skyMeta.length = 0;
+          let n = 0;
+          for (const p of list) {
+            if (typeof p.lat !== 'number' || typeof p.lon !== 'number') continue;
+            const j = n * 3;
+            const [x, y, z] = latLonToXYZ(p.lat, p.lon);
+            skyPos[j] = x;
+            skyPos[j + 1] = y;
+            skyPos[j + 2] = z;
+            // Tangent basis at the fix (axes match latLonToXYZ) → ground-track
+            // direction from the broadcast heading.
+            const la = (p.lat * Math.PI) / 180;
+            const lo = (p.lon * Math.PI) / 180;
+            const hasTrack = typeof p.heading === 'number';
+            const h = (((p.heading ?? 0) as number) * Math.PI) / 180;
+            const cosH = Math.cos(h);
+            const sinH = Math.sin(h);
+            skyDir[j] = hasTrack ? cosH * (-Math.sin(la) * Math.cos(lo)) + sinH * -Math.sin(lo) : 0;
+            skyDir[j + 1] = hasTrack ? cosH * Math.cos(la) : 0;
+            skyDir[j + 2] = hasTrack ? cosH * (Math.sin(la) * Math.sin(lo)) + sinH * -Math.cos(lo) : 0;
+            skyOmega[n] = ((p.speedKt ?? 0) * 1.852) / 3600 / 6371; // rad/s over Earth radius
+            skyMeta.push({ callsign: p.callsign ?? '', altFt: p.altFt ?? null });
+            n++;
+          }
+          skyCount = n;
+          planeGeo.setDrawRange(0, n);
+          trailGeo.setDrawRange(0, n * 2);
+          updateSky(0);
+          // Tell the narrative chapters how busy the sky is (live badge).
+          window.dispatchEvent(new CustomEvent('dgh-sky', { detail: { count: data.count ?? n } }));
+          if (reducedMotion) renderStatic();
+        } catch {
+          /* offline or blocked — the sky layer simply stays empty */
+        }
+      };
+
       /* ── Starfield (twinkling, slow parallax layer) ── */
       const starCount = isMobile ? 450 : 900;
       const starPos = new Float32Array(starCount * 3);
@@ -633,6 +845,7 @@ export function GlobeHero() {
           (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
         dotsMat.uniforms.uScale.value = pxScale;
         hubMat.uniforms.uScale.value = pxScale;
+        planeMat.uniforms.uScale.value = pxScale;
         buildKeys();
         if (reducedMotion) renderStatic();
       };
@@ -678,6 +891,7 @@ export function GlobeHero() {
         tiltGroup.rotation.x = parallax.y * 0.05 + s.tiltX;
         dotsMat.uniforms.uGlobeScale.value = sc;
         hubMat.uniforms.uGlobeScale.value = sc;
+        planeMat.uniforms.uGlobeScale.value = sc;
         spinGroup.rotation.y = freeSpin + shortAngle(s.focusR - freeSpin) * s.focusW;
         if (glowWarm && glowHaze) {
           const cx = s.x * vwPx;
@@ -780,6 +994,7 @@ export function GlobeHero() {
       const label = labelRef.current;
       const worldV = new THREE.Vector3();
       const camDir = new THREE.Vector3();
+      const toCamV = new THREE.Vector3();
       const updateHover = () => {
         if (isMobile || !label) return;
         const w = wrap.clientWidth;
@@ -812,7 +1027,38 @@ export function GlobeHero() {
           label.style.transform = `translate(${bestX}px, ${bestY}px) translate(-50%, -170%)`;
           label.classList.add('dgh-hublabel-on');
         } else {
-          label.classList.remove('dgh-hublabel-on');
+          // No hub under the cursor — try the live aircraft markers.
+          let pBest = -1;
+          let pD = 32;
+          let pX = 0;
+          let pY = 0;
+          for (let i = 0; i < skyCount; i++) {
+            worldV.set(planeHead[i * 3], planeHead[i * 3 + 1], planeHead[i * 3 + 2]);
+            spinGroup.localToWorld(worldV);
+            toCamV.copy(worldV).sub(tiltGroup.position).normalize();
+            if (toCamV.dot(camDir) > -0.02) continue;
+            worldV.project(camera);
+            const sx = (worldV.x * 0.5 + 0.5) * w;
+            const sy = (-worldV.y * 0.5 + 0.5) * h;
+            const d = Math.hypot(sx - mousePx.x, sy - mousePx.y);
+            if (d < pD) {
+              pD = d;
+              pBest = i;
+              pX = sx;
+              pY = sy;
+            }
+          }
+          if (pBest >= 0) {
+            const m = skyMeta[pBest];
+            label.textContent =
+              m.altFt != null
+                ? `${m.callsign} · ${Math.round(m.altFt).toLocaleString()} ft`
+                : m.callsign;
+            label.style.transform = `translate(${pX}px, ${pY}px) translate(-50%, -170%)`;
+            label.classList.add('dgh-hublabel-on');
+          } else {
+            label.classList.remove('dgh-hublabel-on');
+          }
         }
         // Lerp hover pulse per hub.
         let dirty = false;
@@ -864,6 +1110,12 @@ export function GlobeHero() {
         starMat.uniforms.uTime.value = time;
         for (const m of beamMats) m.uniforms.uTime.value = time;
         updateArcs(dt);
+        // Live aircraft: pulse with time, glow harder in the flight chapter.
+        const skyBoost = Math.min(1, Math.max(0, spine.arc - 1));
+        planeMat.uniforms.uTime.value = time;
+        planeMat.uniforms.uBoost.value = skyBoost;
+        trailMat.uniforms.uBoost.value = skyBoost;
+        updateSky(dt);
         updateHover();
 
         renderer.render(scene, camera);
@@ -915,6 +1167,16 @@ export function GlobeHero() {
 
       canvasWrapRef.current?.classList.add('dgh-canvas-on');
 
+      // Live sky: fetch once now, then refresh while the globe is on screen.
+      // (The endpoint is server-cached, so every visitor shares one upstream
+      // snapshot per interval.)
+      loadSky();
+      const skyTimer = reducedMotion
+        ? null
+        : window.setInterval(() => {
+            if (inView && !document.hidden) loadSky();
+          }, 45000);
+
       /* ── GSAP: entrance reveal + scroll scrub ── */
       async function initGsap() {
         const [{ gsap }, { ScrollTrigger }] = await Promise.all([
@@ -956,6 +1218,7 @@ export function GlobeHero() {
       /* ── Teardown ── */
       disposeScene = () => {
         cancelAnimationFrame(raf);
+        if (skyTimer !== null) clearInterval(skyTimer);
         ro.disconnect();
         viewIO.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);

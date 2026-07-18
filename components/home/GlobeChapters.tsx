@@ -29,6 +29,8 @@ interface Chapter {
   no: string;
   href: string;
   side: 'left' | 'right' | 'center';
+  /** show the live aircraft counter (fed by GlobeHero's sky layer) */
+  live?: boolean;
   globe: { x: number; y: number; scale: number; lat: number; lon: number; arc: number };
   eyebrow: string;
   eyebrowKm: string;
@@ -62,6 +64,7 @@ const CHAPTERS: Chapter[] = [
     no: '02',
     href: '/flights',
     side: 'right',
+    live: true,
     // Globe crosses to the left; the Pacific route lanes light up hard.
     globe: { x: 0.3, y: 0.5, scale: 0.56, lat: 24, lon: 145, arc: 2.1 },
     eyebrow: 'In the air',
@@ -99,6 +102,18 @@ export function GlobeChapters() {
   const km = lang === 'km';
   const wrapRef = useRef<HTMLElement>(null);
   const [active, setActive] = useState(0);
+  const [skyCount, setSkyCount] = useState<number | null>(null);
+
+  // GlobeHero broadcasts how many live aircraft its ADS-B sky layer is
+  // drawing; chapter 02 shows the number as proof the sky is real.
+  useEffect(() => {
+    const onSky = (e: Event) => {
+      const count = (e as CustomEvent<{ count?: number }>).detail?.count;
+      if (typeof count === 'number' && count > 0) setSkyCount(count);
+    };
+    window.addEventListener('dgh-sky', onSky);
+    return () => window.removeEventListener('dgh-sky', onSky);
+  }, []);
 
   // Light up the rail number of whichever chapter crosses mid-viewport.
   useEffect(() => {
@@ -150,6 +165,14 @@ export function GlobeChapters() {
             </p>
             <h3 className="dgc-title font-display">{km ? c.titleKm : c.title}</h3>
             <p className="dgc-body">{km ? c.bodyKm : c.body}</p>
+            {c.live && skyCount !== null && (
+              <p className="dgc-live">
+                <span className="dgc-live-dot" aria-hidden="true" />
+                {km
+                  ? `យន្តហោះ ${skyCount} គ្រឿង កំពុងហោះហើរលើអាស៊ីឥឡូវនេះ`
+                  : `${skyCount} aircraft over Asia right now`}
+              </p>
+            )}
             <Link href={c.href} className="dgc-cta liquid-glass liquid-sheen">
               {km ? c.ctaKm : c.cta}
               <ArrowRight size={15} aria-hidden="true" />
@@ -252,6 +275,35 @@ const CSS_TEXT = `
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.68);
 }
+/* Live aircraft counter — proof the sky on the globe is real data. */
+.dgc-live {
+  margin-top: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9fe4ff;
+}
+.dgc-center .dgc-live { justify-content: center; }
+.dgc-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #9fe4ff;
+  box-shadow: 0 0 10px rgba(159, 228, 255, 0.9);
+  animation: dgc-live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes dgc-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dgc-live-dot { animation: none; }
+}
+
 .dgc-cta {
   margin-top: 1.75rem;
   display: inline-flex;

@@ -77,7 +77,7 @@ const IATA_TO_ICAO: Record<string, string> = {
   AI: 'AIC', // Air India
 };
 
-interface AdsbAircraft {
+export interface AdsbAircraft {
   hex?: string;
   flight?: string;
   r?: string; // registration
@@ -112,7 +112,7 @@ const UPSTREAM_HEADERS = {
   'User-Agent': 'Domner-FlightTracker/1.0 (+https://domnerapp.com)',
 };
 
-async function fetchJson<T>(url: string, timeoutMs = 5000): Promise<T | null> {
+export async function fetchJson<T>(url: string, timeoutMs = 5000): Promise<T | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(timeoutMs),
