@@ -1186,6 +1186,22 @@ export function GlobeHero() {
         if (disposed) return;
         gsap.registerPlugin(ScrollTrigger);
 
+        // First-load splash still up? Hold the entrance until its handoff
+        // begins, so the copy rises exactly as the veil lifts (the planet is
+        // already alive underneath). Safety timeout in case the splash never
+        // announces.
+        if ((window as unknown as { __domerSplashPending?: boolean }).__domerSplashPending) {
+          await new Promise<void>((resolve) => {
+            const done = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+            const timer = window.setTimeout(done, 5000);
+            window.addEventListener('domer-splash-handoff', done, { once: true });
+          });
+          if (disposed) return;
+        }
+
         const reveals = section!.querySelectorAll('.dgh-reveal');
         const intro = gsap.to(reveals, {
           opacity: 1,

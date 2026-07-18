@@ -4,7 +4,7 @@
 // Gold metallic Wayfinder Star spinning in 3D (slow→fast easing), stardust ring,
 // pulsing glow, "Preparing your journey" label. Keyframes live in globals.css.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WAYFINDER_PATH } from './DomerMark';
 
 const DUST = [
@@ -84,24 +84,94 @@ export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { 
   );
 }
 
-// Full-screen splash: shown once per session on first load, fades out after
+// Full-screen splash: shown once per session on first load, dismissed after
 // the page has hydrated (min 900ms so the animation reads, max 4s safety).
+//
+// Dismissal is a loader → hero handoff rather than a hard cut: the navy veil
+// lifts to reveal the already-living page while the Wayfinder Star flies into
+// the navbar mark (.domer-nav-mark) and cross-fades into it. The splash
+// broadcasts the moment the veil starts lifting (window 'domer-splash-handoff'
+// + the __domerSplashPending flag), so the home hero can hold its entrance
+// reveal and rise exactly as the page is unveiled. Reduced motion — or a page
+// without the navbar mark — falls back to the simple cross-fade.
+
+const SPLASH_KEY = 'domer-splash-shown';
+
+// Read the session flag once per page load, at module scope. The effect below
+// must NOT re-read it: under React StrictMode the effect runs twice, and an
+// in-effect check would see the flag set by its own first run, early-return,
+// and leave the splash stuck with no dismiss timers armed.
+const shownBeforeLoad =
+  typeof window !== 'undefined' &&
+  (() => {
+    try {
+      return sessionStorage.getItem(SPLASH_KEY) === '1';
+    } catch {
+      return true; // storage unavailable — never risk a stuck splash
+    }
+  })();
+
+if (typeof window !== 'undefined' && !shownBeforeLoad) {
+  (window as unknown as { __domerSplashPending?: boolean }).__domerSplashPending = true;
+}
+
 export function DomerSplash() {
   const [visible, setVisible] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(false); // simple cross-fade path
+  const [handoff, setHandoff] = useState(false); // star-flight path
+  const rootRef = useRef<HTMLDivElement>(null);
+  const flightRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem('domer-splash-shown')) return;
-    sessionStorage.setItem('domer-splash-shown', '1');
+    if (shownBeforeLoad) return;
+    try {
+      sessionStorage.setItem(SPLASH_KEY, '1');
+    } catch {
+      /* ignore */
+    }
     setVisible(true);
 
+    // Unblock anyone waiting on the splash (the hero's entrance reveal).
+    const announce = () => {
+      (window as unknown as { __domerSplashPending?: boolean }).__domerSplashPending = false;
+      window.dispatchEvent(new Event('domer-splash-handoff'));
+    };
+
     const start = Date.now();
+    let dismissed = false;
     let dismissTimer: ReturnType<typeof setTimeout>;
+    let unmountTimer: ReturnType<typeof setTimeout>;
     const dismiss = () => {
       const wait = Math.max(0, 900 - (Date.now() - start));
       dismissTimer = setTimeout(() => {
-        setHidden(true);
-        setTimeout(() => setVisible(false), 550);
+        if (dismissed) return;
+        dismissed = true;
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const flight = flightRef.current;
+        const star = rootRef.current?.querySelector<HTMLElement>('.domer-star');
+        const mark = document.querySelector<SVGSVGElement>('.domer-nav-mark');
+        if (reduced || !flight || !star || !mark) {
+          announce();
+          setHidden(true);
+          unmountTimer = setTimeout(() => setVisible(false), 550);
+          return;
+        }
+        // Fly the star's centre onto the navbar mark's centre, scaling to its
+        // size. The star spins in 3D, so its projected rect width oscillates —
+        // offsetWidth gives the stable layout size for the scale.
+        const s = star.getBoundingClientRect();
+        const t = mark.getBoundingClientRect();
+        const f = flight.getBoundingClientRect();
+        const sx = s.left + s.width / 2;
+        const sy = s.top + s.height / 2;
+        flight.style.transformOrigin = `${sx - f.left}px ${sy - f.top}px`;
+        flight.style.transform =
+          `translate(${t.left + t.width / 2 - sx}px, ${t.top + t.height / 2 - sy}px) ` +
+          `scale(${t.width / (star.offsetWidth || s.width)})`;
+        flight.style.opacity = '0';
+        setHandoff(true);
+        announce();
+        unmountTimer = setTimeout(() => setVisible(false), 1150);
       }, wait);
     };
 
@@ -113,14 +183,22 @@ export function DomerSplash() {
       window.removeEventListener('load', dismiss);
       clearTimeout(safety);
       clearTimeout(dismissTimer);
+      clearTimeout(unmountTimer);
     };
   }, []);
 
   if (!visible) return null;
 
   return (
-    <div className={`domer-splash ${hidden ? 'is-hidden' : ''}`} aria-hidden={hidden}>
-      <DomerLoader />
+    <div
+      ref={rootRef}
+      className={`domer-splash ${hidden ? 'is-hidden' : ''} ${handoff ? 'is-handoff' : ''}`}
+      aria-hidden={hidden || handoff}
+    >
+      <div className="domer-splash-veil" aria-hidden="true" />
+      <div ref={flightRef} className="domer-splash-flight">
+        <DomerLoader />
+      </div>
     </div>
   );
 }

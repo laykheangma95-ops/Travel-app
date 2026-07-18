@@ -80,7 +80,8 @@ export function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
         <Link href="/" aria-label="Domer home">
-          <DomerLogo surface="light" />
+          {/* domer-nav-mark: landing target for the splash star handoff */}
+          <DomerLogo surface="light" markClassName="domer-nav-mark" />
         </Link>
 
         {/* Desktop nav */}

@@ -47,19 +47,21 @@ interface DomerLogoProps {
   size?: number;
   kicker?: boolean;
   className?: string;
+  /** class applied to the mark svg itself (e.g. as a handoff target) */
+  markClassName?: string;
 }
 
 // Full lockup: mark + wordmark, which swaps with the language switcher —
 // "Domner" (Marcellus) + "TRAVEL" kicker in English, "ដំណើរ" (Khmer serif) +
 // "DOMNER" kicker in Khmer — so the logo visibly responds to the language
 // toggle instead of staying pinned to English.
-export function DomerLogo({ surface = 'light', size = 30, kicker = true, className }: DomerLogoProps) {
+export function DomerLogo({ surface = 'light', size = 30, kicker = true, className, markClassName }: DomerLogoProps) {
   const { lang, t } = useLang();
   const wordColor = surface === 'navy' ? 'text-sandstone' : 'text-primary';
   const wordFont = lang === 'km' ? 'font-khmer' : 'font-display';
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
-      <DomerMark surface={surface} size={size} />
+      <DomerMark surface={surface} size={size} className={markClassName} />
       <span key={lang} className="leading-none animate-fade-up">
         <span className={`block ${wordFont} text-xl tracking-[0.05em] ${wordColor}`}>{t('brand.word')}</span>
         {kicker && (
