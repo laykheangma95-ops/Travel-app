@@ -25,78 +25,85 @@ export default function EsimStorePage() {
   }, [query, filter]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-      <div className="mb-10 max-w-2xl">
-        <h1 className="font-display text-3xl font-bold text-ink sm:text-4xl">eSIM Store</h1>
-        <p className="mt-3 text-ink-secondary">
-          Instant data for 150+ countries. Buy now, scan the QR, and connect the moment you land.
-        </p>
-      </div>
-
-      {/* Search */}
-      <form
-        className="mb-6 flex max-w-xl gap-2"
-        onSubmit={(e) => e.preventDefault()}
-        role="search"
-        aria-label="Search destinations"
-      >
-        <div className="relative flex-1">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search destination..."
-            aria-label="Search destination"
-            className="w-full rounded-btn border border-line bg-white py-3 pl-11 pr-4 text-sm transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
-          />
+    // One continuous night sky — the funnel keeps the home's cinematic surface
+    // rather than dropping into flat light SaaS (see .claude/skills/ui-ux §9).
+    <div className="night-canvas min-h-screen">
+      <div className="night-stars" aria-hidden="true" />
+      <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div className="mb-10 max-w-2xl">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Global data</p>
+          <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">eSIM Store</h1>
+          <p className="mt-3 text-white/70">
+            Instant data for 150+ countries. Buy now, scan the QR, and connect the moment you land.
+          </p>
         </div>
-        <button
-          type="submit"
-          className="rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:brightness-110"
-          aria-label="Search"
+
+        {/* Search */}
+        <form
+          className="mb-6 flex max-w-xl gap-2"
+          onSubmit={(e) => e.preventDefault()}
+          role="search"
+          aria-label="Search destinations"
         >
-          <Search size={18} />
-        </button>
-      </form>
-
-      {/* Filter tabs */}
-      <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label="Filter by region">
-        {FILTERS.map((f) => (
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search destination..."
+              aria-label="Search destination"
+              className="w-full rounded-btn border border-gold-light/20 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/40 backdrop-blur-md transition-all focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25"
+            />
+          </div>
           <button
-            key={f}
-            type="button"
-            role="tab"
-            aria-selected={filter === f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-smooth',
-              filter === f
-                ? 'bg-secondary text-white shadow-sm'
-                : 'bg-white text-ink-secondary border border-line hover:border-secondary hover:text-secondary'
-            )}
+            type="submit"
+            className="liquid-glass-accent liquid-press rounded-btn px-5 py-3 text-sm font-semibold text-primary-deep transition-all hover:brightness-110"
+            aria-label="Search"
           >
-            {f}
+            <Search size={18} />
           </button>
-        ))}
-      </div>
+        </form>
 
-      {/* Grid */}
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((dest) => (
-            <DestinationCard key={dest.slug} destination={dest} />
+        {/* Filter tabs */}
+        <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label="Filter by region">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={filter === f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-smooth',
+                filter === f
+                  ? 'border border-gold-light/50 bg-gold-light/15 text-gold-light shadow-sm'
+                  : 'border border-white/10 bg-white/5 text-white/70 hover:border-gold-light/40 hover:text-white'
+              )}
+            >
+              {f}
+            </button>
           ))}
         </div>
-      ) : (
-        <EmptyState
-          icon={Globe}
-          title="No destinations found"
-          description={`We couldn't find "${query}". Try another country name or clear your filters.`}
-          ctaLabel="Clear search"
-          ctaHref="/esim"
-        />
-      )}
+
+        {/* Grid */}
+        {filtered.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
+            {filtered.map((dest) => (
+              <DestinationCard key={dest.slug} destination={dest} dark />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Globe}
+            title="No destinations found"
+            description={`We couldn't find "${query}". Try another country name or clear your filters.`}
+            ctaLabel="Clear search"
+            ctaHref="/esim"
+            dark
+          />
+        )}
+      </div>
     </div>
   );
 }
