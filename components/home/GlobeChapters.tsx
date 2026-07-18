@@ -31,7 +31,7 @@ interface Chapter {
   side: 'left' | 'right' | 'center';
   /** show the live aircraft counter (fed by GlobeHero's sky layer) */
   live?: boolean;
-  globe: { x: number; y: number; scale: number; lat: number; lon: number; arc: number };
+  globe: { x: number; y: number; scale: number; lat: number; lon: number; arc: number; sky: number };
   eyebrow: string;
   eyebrowKm: string;
   title: string;
@@ -48,7 +48,7 @@ const CHAPTERS: Chapter[] = [
     href: '/esim',
     side: 'left',
     // Globe glides right and shrinks; South-East Asia faces the camera.
-    globe: { x: 0.7, y: 0.5, scale: 0.62, lat: 8, lon: 103, arc: 1.15 },
+    globe: { x: 0.7, y: 0.5, scale: 0.62, lat: 8, lon: 103, arc: 1.15, sky: 0 },
     eyebrow: 'Before you fly',
     eyebrowKm: 'មុនពេលហោះហើរ',
     title: 'One eSIM. Two hundred horizons.',
@@ -66,7 +66,7 @@ const CHAPTERS: Chapter[] = [
     side: 'right',
     live: true,
     // Globe crosses to the left; the Pacific route lanes light up hard.
-    globe: { x: 0.3, y: 0.5, scale: 0.56, lat: 24, lon: 145, arc: 2.1 },
+    globe: { x: 0.3, y: 0.5, scale: 0.56, lat: 24, lon: 145, arc: 2.1, sky: 1 },
     eyebrow: 'In the air',
     eyebrowKm: 'ពេលកំពុងហោះហើរ',
     title: 'Every flight, followed live.',
@@ -83,7 +83,7 @@ const CHAPTERS: Chapter[] = [
     href: '/airport-guide',
     side: 'center',
     // Finale: the planet returns to centre and zooms in on Cambodia.
-    globe: { x: 0.5, y: 0.62, scale: 0.95, lat: 11.56, lon: 104.92, arc: 1.3 },
+    globe: { x: 0.5, y: 0.62, scale: 0.95, lat: 11.56, lon: 104.92, arc: 1.3, sky: 0 },
     eyebrow: 'Touchdown',
     eyebrowKm: 'ពេលចុះដល់',
     title: 'Land in Cambodia, ready.',
@@ -156,6 +156,7 @@ export function GlobeChapters() {
           data-lat={c.globe.lat}
           data-lon={c.globe.lon}
           data-arc={c.globe.arc}
+          data-sky={c.globe.sky}
           className={`dgc-chapter dgc-${c.side}`}
         >
           <Reveal className="dgc-card">

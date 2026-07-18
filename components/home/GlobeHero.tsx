@@ -214,22 +214,43 @@ const HUB_FRAG = /* glsl */ `
   }
 `;
 
+// Aircraft glyph: a small sharp dart rotated to the aircraft's real ground
+// track (projected to screen space in the vertex stage). Visibility is gated
+// by uSky, the scroll spine's per-chapter aircraft weight — the layer exists
+// only where it is the story. Hovered plane brightens and grows slightly.
 const PLANE_VERT = /* glsl */ `
   attribute float aPhase;
+  attribute float aIdx;
+  attribute vec3 aDir;
   uniform float uTime;
   uniform float uScale;
   uniform float uGlobeScale;
-  uniform float uBoost;
+  uniform float uSky;
+  uniform float uAspect;
+  uniform float uHover;
+  uniform float uHoverAmt;
   varying float vAlpha;
+  varying float vAngle;
+  varying float vHasDir;
+  varying float vHover;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec4 c1 = projectionMatrix * mv;
+    // Screen-space direction of the ground track -> glyph rotation.
+    vec4 c2 = projectionMatrix * (modelViewMatrix * vec4(position + aDir * 0.03, 1.0));
+    vec2 d = c2.xy / max(c2.w, 0.0001) - c1.xy / max(c1.w, 0.0001);
+    d.x *= uAspect;
+    vAngle = atan(d.y, d.x);
+    vHasDir = step(0.0001, dot(aDir, aDir));
     vec3 n = normalize(normalMatrix * normalize(position));
     float facing = smoothstep(0.02, 0.35, n.z);
-    float pulse = 0.78 + 0.22 * sin(uTime * 2.4 + aPhase);
-    vAlpha = facing * pulse * (0.75 + 0.25 * uBoost);
-    float size = 0.017 * (1.0 + 0.45 * uBoost);
+    float pulse = 0.85 + 0.15 * sin(uTime * 2.2 + aPhase);
+    float hov = (abs(aIdx - uHover) < 0.5) ? uHoverAmt : 0.0;
+    vHover = hov;
+    vAlpha = facing * pulse * uSky * (0.62 + 0.38 * hov);
+    float size = 0.021 * (1.0 + 0.3 * hov) * (0.6 + 0.4 * uSky);
     gl_PointSize = size * uGlobeScale * uScale / -mv.z;
-    gl_Position = projectionMatrix * mv;
+    gl_Position = c1;
   }
 `;
 
@@ -237,13 +258,28 @@ const PLANE_FRAG = /* glsl */ `
   precision mediump float;
   uniform vec3 uColor;
   varying float vAlpha;
+  varying float vAngle;
+  varying float vHasDir;
+  varying float vHover;
   void main() {
-    float d = length(gl_PointCoord - 0.5);
-    float core = smoothstep(0.18, 0.04, d);
-    float halo = smoothstep(0.5, 0.08, d) * 0.45;
-    float a = (core + halo) * vAlpha;
+    vec2 p = vec2(gl_PointCoord.x - 0.5, 0.5 - gl_PointCoord.y);
+    float cs = cos(vAngle);
+    float sn = sin(vAngle);
+    vec2 q = vec2(cs * p.x + sn * p.y, -sn * p.x + cs * p.y);
+    // Dart pointing +x: swept wing edge, tail, nose, tail notch.
+    float wing = (0.35 - q.x) * 0.36;
+    float dart =
+      smoothstep(0.035, -0.035, abs(q.y) - wing) *
+      smoothstep(-0.035, 0.035, q.x + 0.26) *
+      smoothstep(0.035, -0.035, q.x - 0.35) *
+      smoothstep(-0.035, 0.035, abs(q.y) - (-0.10 - q.x) * 0.5);
+    // No broadcast track -> neutral dot instead of a mis-pointed dart.
+    float disc = smoothstep(0.30, 0.10, length(p));
+    float glyph = mix(disc, dart, vHasDir);
+    float halo = smoothstep(0.5, 0.16, length(p)) * (0.10 + 0.25 * vHover);
+    float a = (glyph + halo) * vAlpha;
     if (a < 0.02) discard;
-    gl_FragColor = vec4(mix(uColor, vec3(1.0), core * 0.6), a);
+    gl_FragColor = vec4(mix(uColor, vec3(1.0), glyph * 0.55), a);
   }
 `;
 
@@ -264,11 +300,11 @@ const TRAIL_VERT = /* glsl */ `
 const TRAIL_FRAG = /* glsl */ `
   precision mediump float;
   uniform vec3 uColor;
-  uniform float uBoost;
+  uniform float uSky;
   varying float vT;
   varying float vFace;
   void main() {
-    float a = vT * vT * vFace * (0.30 + 0.35 * uBoost);
+    float a = vT * vT * vFace * 0.28 * uSky;
     if (a < 0.015) discard;
     gl_FragColor = vec4(uColor, a);
   }
@@ -565,15 +601,17 @@ export function GlobeHero() {
       }
 
       /* ── Live aircraft layer (keyless ADS-B via /api/flights/sky) ──
-         Real positions around the beamed hub cities, drawn as glowing cyan
-         markers with a short streak along each aircraft's ground track.
-         Between refreshes the markers dead-reckon forward at their true
-         ground speed — honest, if nearly imperceptible at planetary scale;
-         the streaks and pulse carry the motion. Fails soft: if the endpoint
-         is unreachable the layer simply stays empty. */
+         Real positions around the beamed hub cities, drawn as small sharp
+         darts oriented to each aircraft's ground track, with a hairline
+         streak behind. The layer is scoped by the scroll spine's sky weight:
+         invisible through the hero and showcase, fading in only for the
+         flight-tracking chapter where the data is the story. Between
+         refreshes the markers dead-reckon forward at their true ground
+         speed — honest, if nearly imperceptible at planetary scale. Fails
+         soft: if the endpoint is unreachable the layer simply stays empty. */
       const MAX_PLANES = 160;
       const SKY_ALT = 1.008; // markers ride just above the surface
-      const TRAIL_LEN = 0.05; // streak length, radians of arc
+      const TRAIL_LEN = 0.035; // streak length, radians of arc
       const skyPos = new Float32Array(MAX_PLANES * 3); // unit-sphere positions
       const skyDir = new Float32Array(MAX_PLANES * 3); // tangent flight direction
       const skyOmega = new Float32Array(MAX_PLANES); // angular speed, rad/s
@@ -582,11 +620,16 @@ export function GlobeHero() {
 
       const planeHead = new Float32Array(MAX_PLANES * 3);
       const planePhase = new Float32Array(MAX_PLANES);
-      for (let i = 0; i < MAX_PLANES; i++) planePhase[i] = Math.random() * Math.PI * 2;
+      const planeIdx = new Float32Array(MAX_PLANES);
+      for (let i = 0; i < MAX_PLANES; i++) {
+        planePhase[i] = Math.random() * Math.PI * 2;
+        planeIdx[i] = i;
+      }
       const planeGeo = track(new THREE.BufferGeometry());
       planeGeo.setAttribute('position', new THREE.BufferAttribute(planeHead, 3));
       planeGeo.setAttribute('aPhase', new THREE.BufferAttribute(planePhase, 1));
-      planeGeo.setDrawRange(0, 0);
+      planeGeo.setAttribute('aIdx', new THREE.BufferAttribute(planeIdx, 1));
+      planeGeo.setAttribute('aDir', new THREE.BufferAttribute(skyDir, 3));
       const planeMat = track(
         new THREE.ShaderMaterial({
           vertexShader: PLANE_VERT,
@@ -595,7 +638,10 @@ export function GlobeHero() {
             uTime: { value: 0 },
             uScale: { value: 1 },
             uGlobeScale: { value: 1 },
-            uBoost: { value: 0 },
+            uSky: { value: 0 },
+            uAspect: { value: 1 },
+            uHover: { value: -1 },
+            uHoverAmt: { value: 0 },
             uColor: { value: new THREE.Color('#bfe9ff') },
           },
           transparent: true,
@@ -603,7 +649,10 @@ export function GlobeHero() {
           blending: THREE.AdditiveBlending,
         }),
       );
+      planeGeo.setDrawRange(0, 0);
       spinGroup.add(new THREE.Points(planeGeo, planeMat));
+      let hoveredPlane = -1;
+      let planeHoverAmt = 0;
 
       const trailPos = new Float32Array(MAX_PLANES * 6); // head + tail vertex
       const trailT = new Float32Array(MAX_PLANES * 2);
@@ -617,7 +666,7 @@ export function GlobeHero() {
           vertexShader: TRAIL_VERT,
           fragmentShader: TRAIL_FRAG,
           uniforms: {
-            uBoost: { value: 0 },
+            uSky: { value: 0 },
             uColor: { value: new THREE.Color('#8fd8ff') },
           },
           transparent: true,
@@ -703,6 +752,7 @@ export function GlobeHero() {
           skyCount = n;
           planeGeo.setDrawRange(0, n);
           trailGeo.setDrawRange(0, n * 2);
+          planeGeo.getAttribute('aDir').needsUpdate = true;
           updateSky(0);
           // Tell the narrative chapters how busy the sky is (live badge).
           window.dispatchEvent(new CustomEvent('dgh-sky', { detail: { count: data.count ?? n } }));
@@ -755,8 +805,11 @@ export function GlobeHero() {
              tracking while those sections scroll past).
            - One key per [data-dgc] chapter element then glides the planet to
              that chapter's declared position / scale / focus lat-lon.
-         FULL_FACTOR sets the sphere diameter as a fraction of viewport width. */
+         FULL_FACTOR sets the sphere diameter as a fraction of viewport width;
+         compact (phone) viewports use a much larger factor so the planet
+         reads as a proper hero instead of a distant marble. */
       const FULL_FACTOR = 0.44;
+      const FULL_FACTOR_COMPACT = 0.85;
       const DEG = Math.PI / 180;
       let globeScale = 1;
       let halfHWorld = 1;
@@ -771,6 +824,7 @@ export function GlobeHero() {
         y: number; // globe centre, fraction of wrap height
         scale: number; // multiplier on the base globe scale
         arc: number; // arc-activity boost (1 = normal)
+        sky: number; // live-aircraft visibility (0 = hidden, 1 = full)
         focusW: number; // 0 = free spin, 1 = locked to focusR
         focusR: number; // spin angle that puts the chapter's lon front-centre
         tiltX: number; // extra x-tilt to raise the chapter's lat
@@ -784,7 +838,7 @@ export function GlobeHero() {
         const seamY = section!.getBoundingClientRect().bottom - stageRect.top;
         // Seam-locked centre-y (fraction of wrap height) at stage offset st.
         const yAt = (st: number) => (seamY - st) / h;
-        const base = { x: 0.5, scale: 1, arc: 1, focusW: 0, focusR: 0, tiltX: 0 };
+        const base = { x: 0.5, scale: 1, arc: 1, sky: 0, focusW: 0, focusR: 0, tiltX: 0 };
         // Reduced motion: seam-lock only — the planet scrolls with the page
         // like a printed element and never glides on its own.
         const els = reducedMotion
@@ -799,9 +853,9 @@ export function GlobeHero() {
         const firstTop = els[0].getBoundingClientRect().top - stageRect.top;
         const stHold = Math.max(1, firstTop - h);
         keys.push({ st: stHold, y: yAt(stHold), ...base });
-        // Compact viewports: the width-scaled globe is tiny, so per-chapter
-        // sizes would vanish behind the copy card. Centre it and blow it up
-        // instead — the card's glass backdrop floats on the planet.
+        // Compact viewports: the planet is already enlarged at the base size
+        // (see layout), so chapters keep it centred at full scale and let the
+        // copy card's glass backdrop float on it.
         const compact = (wrap.clientWidth || 0) < 768;
         for (const el of els) {
           const r = el.getBoundingClientRect();
@@ -812,8 +866,9 @@ export function GlobeHero() {
             st: r.top - stageRect.top + r.height / 2 - h / 2,
             x: compact ? 0.5 : parseFloat(d.x ?? '0.5'),
             y: parseFloat(d.y ?? '0.5'),
-            scale: compact ? 1.85 : parseFloat(d.scale ?? '0.6'),
+            scale: compact ? 1 : parseFloat(d.scale ?? '0.6'),
             arc: parseFloat(d.arc ?? '1'),
+            sky: Math.min(1, Math.max(0, parseFloat(d.sky ?? '0'))),
             focusW: 1,
             // rotation.y that brings `lon` to face the camera (see latLonToXYZ).
             focusR: -Math.PI / 2 - lon * DEG,
@@ -838,7 +893,8 @@ export function GlobeHero() {
         halfWWorld = halfHWorld * camera.aspect;
         // Radius as a fraction of the viewport half-width, capped so a short
         // wrap never lets the sphere overflow its vertical room.
-        globeScale = Math.min(halfHWorld * 0.92, halfWWorld * FULL_FACTOR);
+        const factor = w < 768 ? FULL_FACTOR_COMPACT : FULL_FACTOR;
+        globeScale = Math.min(halfHWorld * 0.92, halfWWorld * factor);
         radiusPx = (globeScale / halfHWorld) * (h / 2);
         const pxScale =
           (h * renderer.getPixelRatio()) /
@@ -846,6 +902,7 @@ export function GlobeHero() {
         dotsMat.uniforms.uScale.value = pxScale;
         hubMat.uniforms.uScale.value = pxScale;
         planeMat.uniforms.uScale.value = pxScale;
+        planeMat.uniforms.uAspect.value = w / h;
         buildKeys();
         if (reducedMotion) renderStatic();
       };
@@ -853,7 +910,7 @@ export function GlobeHero() {
       const shortAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
       // Current interpolated spine state (also read by updateArcs / spin).
-      const spine = { x: 0.5, y: 1, scale: 1, arc: 1, focusW: 0, focusR: 0, tiltX: 0 };
+      const spine = { x: 0.5, y: 1, scale: 1, arc: 1, sky: 0, focusW: 0, focusR: 0, tiltX: 0 };
 
       const sampleSpine = (st: number) => {
         let a = keys[0];
@@ -871,6 +928,7 @@ export function GlobeHero() {
         spine.y = a.y + (b.y - a.y) * u;
         spine.scale = a.scale + (b.scale - a.scale) * u;
         spine.arc = a.arc + (b.arc - a.arc) * u;
+        spine.sky = a.sky + (b.sky - a.sky) * u;
         spine.focusW = a.focusW + (b.focusW - a.focusW) * u;
         spine.focusR = a.focusR + shortAngle(b.focusR - a.focusR) * u;
         spine.tiltX = a.tiltX + (b.tiltX - a.tiltX) * u;
@@ -1023,16 +1081,18 @@ export function GlobeHero() {
         }
         hoveredHub = best;
         if (best >= 0) {
+          hoveredPlane = -1;
           label.textContent = HUBS[best].name;
           label.style.transform = `translate(${bestX}px, ${bestY}px) translate(-50%, -170%)`;
           label.classList.add('dgh-hublabel-on');
         } else {
-          // No hub under the cursor — try the live aircraft markers.
+          // No hub under the cursor — try the live aircraft markers (only
+          // while the sky layer is actually visible).
           let pBest = -1;
           let pD = 32;
           let pX = 0;
           let pY = 0;
-          for (let i = 0; i < skyCount; i++) {
+          for (let i = 0; spine.sky > 0.3 && i < skyCount; i++) {
             worldV.set(planeHead[i * 3], planeHead[i * 3 + 1], planeHead[i * 3 + 2]);
             spinGroup.localToWorld(worldV);
             toCamV.copy(worldV).sub(tiltGroup.position).normalize();
@@ -1048,6 +1108,7 @@ export function GlobeHero() {
               pY = sy;
             }
           }
+          hoveredPlane = pBest;
           if (pBest >= 0) {
             const m = skyMeta[pBest];
             label.textContent =
@@ -1110,12 +1171,15 @@ export function GlobeHero() {
         starMat.uniforms.uTime.value = time;
         for (const m of beamMats) m.uniforms.uTime.value = time;
         updateArcs(dt);
-        // Live aircraft: pulse with time, glow harder in the flight chapter.
-        const skyBoost = Math.min(1, Math.max(0, spine.arc - 1));
+        // Live aircraft: visible only where the spine says the sky is the
+        // story (the flight-tracking chapter); frozen and skipped elsewhere.
         planeMat.uniforms.uTime.value = time;
-        planeMat.uniforms.uBoost.value = skyBoost;
-        trailMat.uniforms.uBoost.value = skyBoost;
-        updateSky(dt);
+        planeMat.uniforms.uSky.value = spine.sky;
+        trailMat.uniforms.uSky.value = spine.sky;
+        planeHoverAmt += ((hoveredPlane >= 0 ? 1 : 0) - planeHoverAmt) * Math.min(1, dt * 8);
+        planeMat.uniforms.uHover.value = hoveredPlane;
+        planeMat.uniforms.uHoverAmt.value = planeHoverAmt;
+        if (spine.sky > 0.02) updateSky(dt);
         updateHover();
 
         renderer.render(scene, camera);
