@@ -156,11 +156,15 @@ function RouteTile({ dest, lang, reduce }: { dest: Dest; lang: 'en' | 'km'; redu
   const cy = 210;
   const r = 150;
   const rad = (dest.angle * Math.PI) / 180;
-  const fx = cx + Math.cos(rad) * r;
-  const fy = cy - Math.sin(rad) * r;
+  // Round to 2dp so the server- and client-rendered path strings are byte-for-
+  // byte identical — full float precision differs across JS engines and trips
+  // React's hydration mismatch warning.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const fx = round2(cx + Math.cos(rad) * r);
+  const fy = round2(cy - Math.sin(rad) * r);
   // Control point lifted above the chord for a satellite-like arc.
-  const mx = (cx + fx) / 2;
-  const my = (cy + fy) / 2 - 90;
+  const mx = round2((cx + fx) / 2);
+  const my = round2((cy + fy) / 2 - 90);
   const path = `M ${cx} ${cy} Q ${mx} ${my} ${fx} ${fy}`;
 
   return (
