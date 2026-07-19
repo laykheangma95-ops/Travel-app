@@ -20,4 +20,6 @@ Quick list:
 7. Home — Bottom CTA (night-sky band) · `components/home/HomeContent.tsx`
 8. Brand tokens (colors/fonts) · `tailwind.config.ts` + `app/globals.css`
 
-Saved as git tag: **`v1.0-home`**  (`git show v1.0-home` to see the exact state)
+Save point: commit **`e239732`** (`git show e239732` to see the exact locked state).
+This commit is the permanent recovery point — see
+[`docs/design-lock/README.md`](./docs/design-lock/README.md#save-points-git-commit-shas).
