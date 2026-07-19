@@ -148,7 +148,7 @@ export default function EmergencyPhrasesPage() {
           Tap <Volume2 size={14} className="inline text-accent" aria-hidden="true" /> to play the phrase out
           loud for a local person, or copy it and show your phone.
         </p>
-        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-medium text-success">
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3.5 py-1.5 text-xs font-medium text-success">
           <WifiOff size={13} aria-hidden="true" /> Phrases available without internet
         </p>
       </div>
@@ -170,7 +170,7 @@ export default function EmergencyPhrasesPage() {
               'rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-200',
               langCode === l.code
                 ? 'bg-secondary text-white shadow-sm'
-                : 'border border-line bg-white text-ink-secondary hover:border-secondary'
+                : 'border border-line bg-surface-1 text-ink-secondary hover:border-secondary'
             )}
           >
             {l.flag} {l.name}
@@ -179,7 +179,7 @@ export default function EmergencyPhrasesPage() {
       </div>
 
       {ttsUnavailable && (
-        <p className="mb-8 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-ink">
+        <p className="mb-8 flex items-center gap-2 rounded-card border border-amber-200 bg-warning/10 p-4 text-sm text-ink">
           <VolumeX size={16} className="shrink-0 text-warning" aria-hidden="true" />
           Voice playback needs an internet connection or a device voice for this language. The copy
           button still works — show the phrase on your screen instead.
@@ -211,8 +211,8 @@ export default function EmergencyPhrasesPage() {
                         speaking
                           ? 'border-accent bg-[#F5EEDC]/70 shadow-card'
                           : copied
-                            ? 'border-success bg-emerald-50'
-                            : 'border-line/60 bg-white shadow-card hover:-translate-y-0.5 hover:border-secondary hover:shadow-card-hover'
+                            ? 'border-success bg-success/10'
+                            : 'border-line/60 bg-surface-1 shadow-card hover:-translate-y-0.5 hover:border-secondary hover:shadow-card-hover'
                       )}
                     >
                       <div className="min-w-0">
@@ -241,7 +241,7 @@ export default function EmergencyPhrasesPage() {
                             'flex h-11 w-11 items-center justify-center rounded-btn transition-all duration-200 active:scale-95',
                             copied
                               ? 'bg-success text-white'
-                              : 'border border-line bg-white text-ink-secondary hover:border-secondary hover:text-secondary'
+                              : 'border border-line bg-surface-1 text-ink-secondary hover:border-secondary hover:text-secondary'
                           )}
                         >
                           {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}

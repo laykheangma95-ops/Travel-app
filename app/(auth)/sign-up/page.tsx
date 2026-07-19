@@ -61,7 +61,7 @@ export default function SignUpPage() {
     return (
       <AuthCard title="Check your email" subtitle="One more step to activate your account">
         <div className="flex flex-col items-center py-6 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
             <MailCheck size={26} className="text-success" />
           </span>
           <p className="mt-4 text-sm text-ink-secondary">
@@ -139,7 +139,7 @@ export default function SignUpPage() {
             </option>
           ))}
         </Select>
-        {error && <p className="rounded-btn bg-red-50 p-3 text-sm text-danger">{error}</p>}
+        {error && <p className="rounded-btn bg-danger/10 p-3 text-sm text-danger">{error}</p>}
         <button
           type="submit"
           disabled={loading}

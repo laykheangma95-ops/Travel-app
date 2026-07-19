@@ -29,21 +29,21 @@ export default function DashboardPage() {
       <div className="grid grid-cols-3 gap-3">
         <Link
           href="/flights"
-          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
+          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-surface-1 p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <Plane size={22} className="text-accent" aria-hidden="true" />
           <span className="text-xs font-semibold text-ink sm:text-sm">Track Flight</span>
         </Link>
         <Link
           href="/esim"
-          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
+          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-surface-1 p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <Smartphone size={22} className="text-accent" aria-hidden="true" />
           <span className="text-xs font-semibold text-ink sm:text-sm">Buy eSIM</span>
         </Link>
         <Link
           href="/checklist"
-          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
+          className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-surface-1 p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <PlusCircle size={22} className="text-accent" aria-hidden="true" />
           <span className="text-xs font-semibold text-ink sm:text-sm">New Trip</span>
@@ -64,7 +64,7 @@ export default function DashboardPage() {
           {upcomingFlights.map((f) => (
             <Card key={f.number} className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <span className="flex h-11 w-11 items-center justify-center rounded-card bg-blue-50">
+                <span className="flex h-11 w-11 items-center justify-center rounded-card bg-blue-500/10">
                   <Plane size={20} className="text-secondary" aria-hidden="true" />
                 </span>
                 <div>

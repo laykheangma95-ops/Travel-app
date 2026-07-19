@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   'inline-flex items-center gap-2 rounded-btn px-4 py-2.5 text-sm font-medium transition-all duration-200',
                   active
                     ? 'bg-secondary text-white shadow-sm'
-                    : 'border border-line bg-white text-ink-secondary hover:border-secondary hover:text-secondary'
+                    : 'border border-line bg-surface-1 text-ink-secondary hover:border-secondary hover:text-secondary'
                 )}
                 aria-current={active ? 'page' : undefined}
               >

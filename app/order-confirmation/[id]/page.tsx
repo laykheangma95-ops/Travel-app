@@ -63,7 +63,7 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="mt-12 rounded-card border border-line/60 bg-white p-8 text-left shadow-card"
+        className="mt-12 rounded-card border border-line/60 bg-surface-1 p-8 text-left shadow-card"
       >
         <h2 className="mb-6 font-display text-lg font-bold text-ink">What happens next</h2>
         <ol className="relative space-y-8 border-l-2 border-line pl-8">

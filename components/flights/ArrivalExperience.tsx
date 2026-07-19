@@ -66,7 +66,7 @@ export function ArrivalExperience({ flight }: { flight: FlightStatus }) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="overflow-hidden rounded-card border border-line/60 bg-white shadow-card-hover"
+      className="overflow-hidden rounded-card border border-line/60 bg-surface-1 shadow-card-hover"
     >
       <div className="bg-gradient-to-br from-secondary to-primary px-8 py-10 text-center text-white">
         <motion.p

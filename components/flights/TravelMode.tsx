@@ -65,7 +65,7 @@ export function TravelMode({ flight, onClose }: { flight: FlightStatus; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_55%,#1C3355_100%)]"
+      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-[linear-gradient(180deg,#080D18_0%,#0C1424_48%,#0E1B30_100%)]"
       role="dialog"
       aria-modal="true"
       aria-label={`Travel mode for flight ${flight.flightNumber}`}

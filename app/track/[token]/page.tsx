@@ -39,7 +39,7 @@ export default function PublicTrackPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#23406A_100%)] pb-28">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#080D18_0%,#0C1424_48%,#0E1B30_100%)] pb-28">
       <div className="stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="mb-8 text-center">

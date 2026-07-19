@@ -26,16 +26,18 @@ const config: Config = {
         success: '#10B981',
         warning: '#F59E0B',
         danger: '#EF4444',
+        // Apple dark-night surfaces — deep near-black navy, cards lifted a touch
+        // above the page so they read as floating glass on the night canvas.
         surface: {
-          1: '#FFFFFF',
-          2: '#F8FAFC',
-          3: '#F1F5F9',
+          1: '#111C30', // card / elevated surface
+          2: '#0A1120', // page background
+          3: '#182741', // raised / hover surface
         },
-        line: '#E2E8F0',
+        line: '#26344C',
         ink: {
-          DEFAULT: '#0F172A',
-          secondary: '#475569',
-          muted: '#94A3B8',
+          DEFAULT: '#F1F5F9', // primary text on night surfaces
+          secondary: '#AEBAD0',
+          muted: '#7C8AA6',
         },
       },
       fontFamily: {
@@ -52,8 +54,9 @@ const config: Config = {
         btn: '12px',
       },
       boxShadow: {
-        card: '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px rgba(0,0,0,0.10), 0 16px 40px rgba(0,0,0,0.08)',
+        // Deeper shadows so cards lift off the dark-night canvas
+        card: '0 1px 2px rgba(0,0,0,0.4), 0 10px 30px rgba(0,0,0,0.35)',
+        'card-hover': '0 4px 12px rgba(0,0,0,0.5), 0 18px 46px rgba(0,0,0,0.45)',
       },
       transitionTimingFunction: {
         smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',

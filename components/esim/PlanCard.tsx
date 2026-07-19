@@ -34,7 +34,7 @@ export function PlanCard({ plan, destination }: PlanCardProps) {
   return (
     <div
       className={cn(
-        'relative flex flex-col rounded-card border bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover',
+        'relative flex flex-col rounded-card border bg-surface-1 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover',
         plan.popular ? 'border-2 border-accent lg:scale-[1.04] lg:hover:scale-[1.05]' : 'border-line/60'
       )}
     >

@@ -80,7 +80,7 @@ export default function SignInPage() {
             </Link>
           </div>
         </div>
-        {error && <p className="rounded-btn bg-red-50 p-3 text-sm text-danger">{error}</p>}
+        {error && <p className="rounded-btn bg-danger/10 p-3 text-sm text-danger">{error}</p>}
         <button
           type="submit"
           disabled={loading}

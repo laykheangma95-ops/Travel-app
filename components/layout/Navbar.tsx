@@ -73,8 +73,8 @@ export function Navbar() {
       className={cn(
         'sticky top-0 z-40 transition-all duration-300 ease-smooth backdrop-blur-xl',
         scrolled
-          ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
-          : 'border-b border-transparent bg-white/60'
+          ? 'border-b border-white/10 bg-[#0A1120]/80 shadow-[0_1px_2px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.35)]'
+          : 'border-b border-transparent bg-[#0A1120]/50'
       )}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
@@ -102,7 +102,7 @@ export function Navbar() {
                   <ChevronDown size={14} />
                 </button>
                 {openDropdown === group.labelKey && (
-                  <div className="absolute left-0 top-full w-56 rounded-card border border-line bg-white p-2 shadow-card-hover animate-fade-up">
+                  <div className="absolute left-0 top-full w-56 rounded-card border border-line bg-surface-1 p-2 shadow-card-hover animate-fade-up">
                     {group.items.map((item) => (
                       <Link
                         key={item.labelKey}
@@ -183,7 +183,7 @@ export function Navbar() {
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="border-t border-line bg-white lg:hidden animate-fade-up">
+        <div className="border-t border-line bg-surface-1 lg:hidden animate-fade-up">
           <div className="space-y-1 px-4 py-4">
             {navGroups.map((group) => (
               <div key={group.labelKey}>

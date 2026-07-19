@@ -37,7 +37,7 @@ export default function CountryPlansPage({ params }: PageProps) {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#0E1B30_0%,#14263F_55%,#1C3355_100%)] py-16">
+      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#080D18_0%,#0C1424_52%,#0E1B30_100%)] py-16">
         <div className="stars-far" aria-hidden="true" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
@@ -78,7 +78,7 @@ export default function CountryPlansPage({ params }: PageProps) {
         </div>
 
         {customs && (
-          <div className="mt-8 rounded-card border border-amber-200 bg-amber-50 p-6">
+          <div className="mt-8 rounded-card border border-amber-200 bg-warning/10 p-6">
             <div className="flex items-start gap-3">
               <Badge tone="warning">Entry info</Badge>
             </div>

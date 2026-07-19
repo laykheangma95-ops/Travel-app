@@ -49,7 +49,7 @@ export default function FlightTrackerPage() {
   };
 
   return (
-    <div className="relative min-h-[80vh] overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#23406A_100%)]">
+    <div className="relative min-h-[80vh] overflow-hidden bg-[linear-gradient(180deg,#080D18_0%,#0C1424_48%,#0E1B30_100%)]">
       <div className="stars" aria-hidden="true" />
       <div className="stars-far" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-20 sm:px-6">

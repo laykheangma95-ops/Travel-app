@@ -12,7 +12,7 @@ export function DestinationCard({ destination }: { destination: Destination }) {
   return (
     <Link
       href={`/esim/${destination.slug}`}
-      className="group relative flex h-full flex-col rounded-card border border-line/60 bg-white p-6 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
+      className="group relative flex h-full flex-col rounded-card border border-line/60 bg-surface-1 p-6 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
     >
       <WavyFlag
         flag={destination.flag}

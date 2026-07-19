@@ -69,7 +69,7 @@ export default function AffiliatePage() {
             <Card className="p-7">
               {submitted ? (
                 <div className="flex flex-col items-center py-8 text-center animate-fade-up">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
                     <Check size={26} className="text-success" />
                   </span>
                   <p className="mt-4 font-semibold text-ink">Application received!</p>

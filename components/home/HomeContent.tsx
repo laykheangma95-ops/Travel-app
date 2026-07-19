@@ -69,7 +69,7 @@ export function HomeContent() {
           <div className="grid gap-6 md:grid-cols-3">
             {features.map((f, i) => (
               <Reveal key={f.nameKey} delay={i * 110}>
-                <div className="group h-full rounded-card border border-line/60 bg-white p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
+                <div className="group h-full rounded-card border border-line/60 bg-surface-1 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:shadow-card-hover">
                   <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-card bg-[#F5EEDC] transition-all duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-accent/15">
                     <f.icon size={32} className="text-accent" aria-hidden="true" />
                   </div>
@@ -89,7 +89,7 @@ export function HomeContent() {
       </section>
 
       {/* ── How it works ── */}
-      <section id="how-it-works" className="section-pad bg-white">
+      <section id="how-it-works" className="section-pad bg-surface-1">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal>
             <SectionHeading eyebrow={t('how.eyebrow')} title={t('how.title')} />
@@ -136,7 +136,7 @@ export function HomeContent() {
       </section>
 
       {/* ── Testimonials ── */}
-      <section className="section-pad bg-white">
+      <section className="section-pad bg-surface-1">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal>
             <SectionHeading eyebrow={t('testi.eyebrow')} title={t('testi.title')} />
@@ -144,7 +144,7 @@ export function HomeContent() {
           <div className="grid gap-6 md:grid-cols-3">
             {testimonials.map((tm, i) => (
               <Reveal key={tm.name} delay={i * 110}>
-                <figure className="h-full rounded-card border border-line/60 bg-surface-2 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:bg-white hover:shadow-card-hover">
+                <figure className="h-full rounded-card border border-line/60 bg-surface-2 p-8 shadow-card transition-all duration-300 ease-smooth hover:-translate-y-1 hover:bg-surface-1 hover:shadow-card-hover">
                   <div className="flex gap-1" aria-label="5 out of 5 stars">
                     {Array.from({ length: 5 }).map((_, s) => (
                       <Star key={s} size={16} className="fill-warning text-warning" aria-hidden="true" />
@@ -170,7 +170,7 @@ export function HomeContent() {
       </section>
 
       {/* ── Bottom CTA ── */}
-      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#14263F_0%,#1C3355_60%,#14263F_100%)] py-20">
+      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0A1120_0%,#0E1B30_55%,#0A1120_100%)] py-20">
         <div className="stars" aria-hidden="true" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">{t('cta.title')}</h2>

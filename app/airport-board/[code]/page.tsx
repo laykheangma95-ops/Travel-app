@@ -80,7 +80,7 @@ export default function AirportBoardPage() {
   const isDemo = flights?.some((f) => f.demo);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#1C3355_100%)]">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#080D18_0%,#0C1424_48%,#0E1B30_100%)]">
       <div className="stars" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">

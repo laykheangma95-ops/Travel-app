@@ -19,7 +19,7 @@ const variantClasses: Record<Variant, string> = {
   secondary:
     'bg-secondary text-white hover:bg-[#162c4a] focus-visible:ring-secondary shadow-sm',
   outline:
-    'border border-line bg-white text-ink hover:border-secondary hover:text-secondary focus-visible:ring-secondary',
+    'border border-line bg-surface-1 text-ink hover:border-secondary hover:text-secondary focus-visible:ring-secondary',
   'outline-light':
     'liquid-glass liquid-sheen liquid-touch text-white hover:brightness-110 focus-visible:ring-white',
   ghost: 'bg-transparent text-ink-secondary hover:bg-surface-3 focus-visible:ring-secondary',

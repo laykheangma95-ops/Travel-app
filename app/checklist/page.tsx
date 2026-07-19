@@ -155,7 +155,7 @@ export default function ChecklistPage() {
       </div>
 
       {step === 1 && (
-        <div className="rounded-card border border-line/60 bg-white p-8 shadow-card animate-fade-up">
+        <div className="rounded-card border border-line/60 bg-surface-1 p-8 shadow-card animate-fade-up">
           <h2 className="mb-6 font-display text-xl font-bold text-ink">Step 1 — Travel details</h2>
           <div className="space-y-5">
             <Select
@@ -214,7 +214,7 @@ export default function ChecklistPage() {
       )}
 
       {step === 2 && (
-        <div className="rounded-card border border-line/60 bg-white p-8 shadow-card animate-fade-up">
+        <div className="rounded-card border border-line/60 bg-surface-1 p-8 shadow-card animate-fade-up">
           <h2 className="mb-6 font-display text-xl font-bold text-ink">Step 2 — Your profile</h2>
           <div className="space-y-6">
             <div>
@@ -262,7 +262,7 @@ export default function ChecklistPage() {
       {step === 3 && (
         <div className="space-y-6 animate-fade-up">
           {/* Progress */}
-          <div className="sticky top-20 z-20 rounded-card border border-line/60 bg-white/95 p-5 shadow-card backdrop-blur">
+          <div className="sticky top-20 z-20 rounded-card border border-line/60 bg-surface-1/95 p-5 shadow-card backdrop-blur">
             <ProgressBar
               value={pct}
               tone={pct === 100 ? 'success' : 'accent'}
@@ -275,7 +275,7 @@ export default function ChecklistPage() {
             if (catItems.length === 0) return null;
             const meta = categoryMeta[cat];
             return (
-              <section key={cat} className="rounded-card border border-line/60 bg-white p-6 shadow-card">
+              <section key={cat} className="rounded-card border border-line/60 bg-surface-1 p-6 shadow-card">
                 <h2 className={cn('mb-4 font-display text-sm font-bold uppercase tracking-wide', meta.tone)}>
                   {meta.title}
                 </h2>

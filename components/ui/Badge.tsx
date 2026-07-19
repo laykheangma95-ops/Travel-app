@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'accent' | 'neutral';
 
 const toneClasses: Record<Tone, string> = {
-  success: 'bg-emerald-50 text-success border-emerald-200',
-  warning: 'bg-amber-50 text-warning border-amber-200',
-  danger: 'bg-red-50 text-danger border-red-200',
-  info: 'bg-blue-50 text-blue-600 border-blue-200',
-  accent: 'bg-[#F5EEDC] text-accent border-[#E2CFA0]',
+  success: 'bg-success/10 text-success border-success/30',
+  warning: 'bg-warning/10 text-warning border-warning/30',
+  danger: 'bg-danger/10 text-danger border-danger/30',
+  info: 'bg-blue-500/15 text-blue-300 border-blue-400/30',
+  accent: 'bg-accent/15 text-gold-light border-accent/30',
   neutral: 'bg-surface-3 text-ink-secondary border-line',
 };
 

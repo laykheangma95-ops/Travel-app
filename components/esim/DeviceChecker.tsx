@@ -33,7 +33,7 @@ export function DeviceChecker() {
   };
 
   return (
-    <div className="rounded-card border border-line/60 bg-white p-8 shadow-card">
+    <div className="rounded-card border border-line/60 bg-surface-1 p-8 shadow-card">
       <h3 className="font-display text-lg font-bold text-ink">Is my phone eSIM compatible?</h3>
       <p className="mt-1.5 text-sm text-ink-secondary">
         Type your phone model and we&apos;ll check for you.
@@ -65,17 +65,17 @@ export function DeviceChecker() {
       </form>
 
       {result === 'supported' && (
-        <p className="mt-4 flex items-center gap-2 rounded-btn bg-emerald-50 p-3.5 text-sm font-medium text-success animate-fade-up">
+        <p className="mt-4 flex items-center gap-2 rounded-btn bg-success/10 p-3.5 text-sm font-medium text-success animate-fade-up">
           <CheckCircle2 size={18} /> Great news — your phone supports eSIM!
         </p>
       )}
       {result === 'unsupported' && (
-        <p className="mt-4 flex items-center gap-2 rounded-btn bg-red-50 p-3.5 text-sm font-medium text-danger animate-fade-up">
+        <p className="mt-4 flex items-center gap-2 rounded-btn bg-danger/10 p-3.5 text-sm font-medium text-danger animate-fade-up">
           <XCircle size={18} /> Sorry, this model doesn&apos;t support eSIM. You&apos;ll need a physical SIM.
         </p>
       )}
       {result === 'unknown' && (
-        <p className="mt-4 flex items-center gap-2 rounded-btn bg-amber-50 p-3.5 text-sm font-medium text-warning animate-fade-up">
+        <p className="mt-4 flex items-center gap-2 rounded-btn bg-warning/10 p-3.5 text-sm font-medium text-warning animate-fade-up">
           <HelpCircle size={18} /> We&apos;re not sure about this model — message our Khmer support on Telegram and we&apos;ll check.
         </p>
       )}

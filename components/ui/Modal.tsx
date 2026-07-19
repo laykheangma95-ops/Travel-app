@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         className="absolute inset-0 bg-primary/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md rounded-card bg-white p-6 shadow-card-hover animate-fade-up">
+      <div className="relative w-full max-w-md rounded-card bg-surface-1 p-6 shadow-card-hover animate-fade-up">
         <div className="mb-4 flex items-center justify-between">
           {title && <h3 className="font-display text-lg font-bold text-ink">{title}</h3>}
           <button

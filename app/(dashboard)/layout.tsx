@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile bottom tabs */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 backdrop-blur-lg lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface-1/95 backdrop-blur-lg lg:hidden"
         aria-label="Dashboard navigation"
       >
         {navItems.slice(0, 5).map((item) => {

@@ -32,5 +32,5 @@ export function AccordionItem({ title, defaultOpen = false, children }: Accordio
 }
 
 export function Accordion({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('rounded-card border border-line bg-white px-5', className)}>{children}</div>;
+  return <div className={cn('rounded-card border border-line bg-surface-1 px-5', className)}>{children}</div>;
 }

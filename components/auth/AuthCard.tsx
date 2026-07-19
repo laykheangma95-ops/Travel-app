@@ -20,7 +20,7 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
           <h1 className="mt-6 font-display text-2xl font-bold text-ink">{title}</h1>
           <p className="mt-2 text-sm text-ink-secondary">{subtitle}</p>
         </div>
-        <div className="rounded-card border border-line/60 bg-white p-8 shadow-card">{children}</div>
+        <div className="rounded-card border border-line/60 bg-surface-1 p-8 shadow-card">{children}</div>
         {footer && <div className="mt-6 text-center text-sm text-ink-secondary">{footer}</div>}
       </div>
     </div>
@@ -32,7 +32,7 @@ export function OAuthButtons() {
     <div className="space-y-3">
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-3 rounded-btn border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-all duration-200 hover:border-ink-muted hover:bg-surface-2"
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-line bg-surface-1 px-5 py-2.5 text-sm font-semibold text-ink transition-all duration-200 hover:border-ink-muted hover:bg-surface-2"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />

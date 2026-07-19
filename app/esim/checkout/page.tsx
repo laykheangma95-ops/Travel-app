@@ -97,7 +97,7 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-8 lg:grid-cols-5">
         {/* Customer form */}
         <div className="space-y-5 lg:col-span-3">
-          <div className="rounded-card border border-line/60 bg-white p-7 shadow-card">
+          <div className="rounded-card border border-line/60 bg-surface-1 p-7 shadow-card">
             <h2 className="mb-5 font-display text-lg font-bold text-ink">Your details</h2>
             <div className="space-y-4">
               <Input
@@ -148,7 +148,7 @@ export default function CheckoutPage() {
         {/* Payment */}
         <div className="lg:col-span-2">
           <div className="sticky top-24 space-y-5">
-            <div className="rounded-card border border-line/60 bg-white p-6 shadow-card">
+            <div className="rounded-card border border-line/60 bg-surface-1 p-6 shadow-card">
               <h2 className="font-display text-lg font-bold text-ink">Order summary</h2>
               <ul className="mt-4 space-y-2 border-b border-line pb-4 text-sm text-ink-secondary">
                 {cart.items.map((i) => (
@@ -168,7 +168,7 @@ export default function CheckoutPage() {
               <p className="text-right text-xs text-ink-muted">≈ {formatKhr(total)} KHR</p>
             </div>
 
-            <div className="rounded-card border border-line/60 bg-white p-6 shadow-card">
+            <div className="rounded-card border border-line/60 bg-surface-1 p-6 shadow-card">
               <h2 className="mb-4 font-display text-lg font-bold text-ink">Payment method</h2>
 
               <div className="space-y-3">
@@ -210,7 +210,7 @@ export default function CheckoutPage() {
               </div>
 
               {payError && (
-                <p className="mt-4 rounded-btn bg-red-50 p-3 text-sm text-danger">{payError}</p>
+                <p className="mt-4 rounded-btn bg-danger/10 p-3 text-sm text-danger">{payError}</p>
               )}
 
               <button

@@ -48,7 +48,7 @@ export default function CartPage() {
             {cart.items.map((item) => (
               <div
                 key={item.planId}
-                className="flex items-center gap-4 rounded-card border border-line/60 bg-white p-5 shadow-card"
+                className="flex items-center gap-4 rounded-card border border-line/60 bg-surface-1 p-5 shadow-card"
               >
                 <WavyFlag flag={item.flag} label={`${item.countryName} flag`} size={52} />
                 <div className="flex-1">
@@ -67,7 +67,7 @@ export default function CartPage() {
                   type="button"
                   onClick={() => cart.removeItem(item.planId)}
                   aria-label={`Remove ${item.countryName} ${item.planName} from cart`}
-                  className="rounded-btn p-2 text-ink-muted transition-colors hover:bg-red-50 hover:text-danger"
+                  className="rounded-btn p-2 text-ink-muted transition-colors hover:bg-danger/10 hover:text-danger"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -77,7 +77,7 @@ export default function CartPage() {
 
           {/* Summary */}
           <div className="lg:col-span-2">
-            <div className="sticky top-24 rounded-card border border-line/60 bg-white p-6 shadow-card">
+            <div className="sticky top-24 rounded-card border border-line/60 bg-surface-1 p-6 shadow-card">
               <h2 className="font-display text-lg font-bold text-ink">Order Summary</h2>
 
               <div className="mt-5 space-y-3 border-b border-line pb-5 text-sm">

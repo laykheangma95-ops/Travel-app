@@ -51,7 +51,7 @@ function AirportGuideContent() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search airports (e.g. PNH, Bangkok)…"
           aria-label="Search airports"
-          className="w-full rounded-btn border border-line bg-white py-3 pl-11 pr-4 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+          className="w-full rounded-btn border border-line bg-surface-1 py-3 pl-11 pr-4 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
         />
       </div>
 
@@ -68,7 +68,7 @@ function AirportGuideContent() {
               'rounded-card border-2 p-4 text-left transition-all duration-200 ease-smooth hover:-translate-y-0.5',
               selected?.code === airport.code
                 ? 'border-accent bg-[#F5EEDC]/70 shadow-card'
-                : 'border-line bg-white hover:border-ink-muted'
+                : 'border-line bg-surface-1 hover:border-ink-muted'
             )}
             aria-pressed={selected?.code === airport.code}
           >
@@ -92,7 +92,7 @@ function AirportGuideContent() {
               }}
               className={cn(
                 'inline-flex items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold transition-all duration-200',
-                mode === 'departure' ? 'bg-secondary text-white shadow-sm' : 'bg-white border border-line text-ink-secondary'
+                mode === 'departure' ? 'bg-secondary text-white shadow-sm' : 'bg-surface-1 border border-line text-ink-secondary'
               )}
               aria-pressed={mode === 'departure'}
             >
@@ -106,7 +106,7 @@ function AirportGuideContent() {
               }}
               className={cn(
                 'inline-flex items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold transition-all duration-200',
-                mode === 'arrival' ? 'bg-secondary text-white shadow-sm' : 'bg-white border border-line text-ink-secondary'
+                mode === 'arrival' ? 'bg-secondary text-white shadow-sm' : 'bg-surface-1 border border-line text-ink-secondary'
               )}
               aria-pressed={mode === 'arrival'}
             >
@@ -153,7 +153,7 @@ function AirportGuideContent() {
                         ? 'border-success bg-success text-white'
                         : isActive
                           ? 'border-accent bg-accent text-white'
-                          : 'border-line bg-white text-ink-muted'
+                          : 'border-line bg-surface-1 text-ink-muted'
                     )}
                     aria-label={`Step ${i + 1}: ${step.title}`}
                   >
@@ -164,7 +164,7 @@ function AirportGuideContent() {
                     onClick={() => setActiveStep(i)}
                     className={cn(
                       'w-full rounded-card border p-5 text-left transition-all duration-200 ease-smooth',
-                      isActive ? 'border-accent bg-white shadow-card' : 'border-line/60 bg-surface-2 hover:bg-white'
+                      isActive ? 'border-accent bg-surface-1 shadow-card' : 'border-line/60 bg-surface-2 hover:bg-surface-1'
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -181,7 +181,7 @@ function AirportGuideContent() {
                       <div className="mt-3 space-y-4 animate-fade-up">
                         <p className="text-sm leading-relaxed text-ink-secondary">{step.description}</p>
                         {step.phrases && step.phrases.length > 0 && (
-                          <div className="rounded-btn bg-blue-50 p-4">
+                          <div className="rounded-btn bg-blue-500/10 p-4">
                             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary">
                               <MessageSquare size={13} /> Useful phrases
                             </p>
@@ -193,7 +193,7 @@ function AirportGuideContent() {
                           </div>
                         )}
                         {step.watchOut && (
-                          <div className="rounded-btn bg-amber-50 p-4">
+                          <div className="rounded-btn bg-warning/10 p-4">
                             <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-warning">
                               <AlertTriangle size={13} /> Watch out for
                             </p>

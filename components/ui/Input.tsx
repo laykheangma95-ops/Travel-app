@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type T
 import { cn } from '@/lib/utils';
 
 const baseFieldClasses =
-  'w-full rounded-btn border border-line bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted transition-all duration-200 ease-smooth focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:bg-surface-3';
+  'w-full rounded-btn border border-line bg-surface-1 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted transition-all duration-200 ease-smooth focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:bg-surface-3';
 
 interface FieldWrapperProps {
   label?: string;
