@@ -32,17 +32,29 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Base night colour so there is never a light flash before paint. */
+    background-color: var(--night-0);
   }
 
   body {
     @apply font-body text-ink;
-    /* Apple dark-night canvas: a soft aurora glow at the crown fading into a
-       deep near-black navy. Fixed so it stays put while content scrolls. */
+    position: relative;
+    background-color: var(--night-0);
+  }
+
+  /* Apple dark-night canvas: a soft aurora glow at the crown fading into deep
+     near-black navy. Rendered on a fixed pseudo-element (not
+     `background-attachment: fixed`, which repaints every frame and stalls the
+     WebGL hero on scroll). It composites once and stays put behind content. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background:
       radial-gradient(120% 80% at 50% -10%, #14243F 0%, transparent 58%),
       linear-gradient(180deg, var(--night-1) 0%, var(--night-0) 100%);
-    background-attachment: fixed;
-    background-color: var(--night-1);
   }
 
   /* Khmer mode: prefer the Khmer face everywhere so script renders correctly */
