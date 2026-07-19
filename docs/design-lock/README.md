@@ -1,0 +1,85 @@
+# 🔒 Design Lock — Domer
+
+This folder is the **single source of truth** for the designs that are FINISHED
+and must not change by accident.
+
+The live design we are protecting:
+**https://travel-8dta13o2c-laykheangma95-ops-projects.vercel.app/**
+
+> **The promise (1 → 10):** every design listed here is a promise to the user.
+> When you add something new, you ADD it. You do not remove, revert, or restyle
+> anything on the locked list unless the user asks for that exact thing.
+
+---
+
+## Why this folder exists
+
+The problem we are solving: *"I add one new design, and suddenly other finished
+designs go back to an old version."* That is called a **regression**. This folder
++ git tags make it stop:
+
+1. **Git tags** = permanent save points. Nothing is ever truly lost.
+2. **This registry** = the written list of what is locked (the 1 → 10 promise).
+3. **The per-page maps** (e.g. [`home.md`](./home.md)) = tell you the EXACT file
+   and line for each piece, so you can change *only* the background — or *only*
+   a font, a color, a word, a picture — without touching anything else.
+
+---
+
+## The rules (read before editing any locked design)
+
+1. **Always start from the newest code.** Before adding anything, pull the latest
+   `main`/current branch. Building on an old copy is what drags old designs back.
+2. **One feature = one folder.** A change to the eSIM should only touch
+   `components/esim`. If an edit starts changing 5 unrelated folders — STOP.
+3. **Change only the layer you were asked to.** The per-page map splits every
+   section into **Background · Text (words) · Font · Color · Picture**. If the
+   user says "change the hero background," you touch the background line ONLY.
+4. **Never delete a locked section to add a new one.** New goes next to old.
+5. **If a request would change something on the locked list that the user did
+   NOT mention — stop and ask first.**
+
+---
+
+## 🔒 Locked design registry (the 1 → 10 list)
+
+| # | Design | Where it lives | Locked at tag | Detail map |
+|---|--------|----------------|---------------|------------|
+| 1 | Home — **Hero** (3D particle globe, title, CTAs) | `components/home/GlobeHero.tsx` | `v1.0-home` | [home.md → Hero](./home.md#1-hero) |
+| 2 | Home — **Cambodia Showcase** (spinning medallion ring) | `components/home/CambodiaShowcase.tsx` | `v1.0-home` | [home.md → Showcase](./home.md#2-cambodia-showcase) |
+| 3 | Home — **Feature cards** (eSIM / Flights / Guide) | `components/home/HomeContent.tsx` | `v1.0-home` | [home.md → Features](./home.md#3-feature-cards) |
+| 4 | Home — **How it works** (4 steps) | `components/home/HomeContent.tsx` | `v1.0-home` | [home.md → How it works](./home.md#4-how-it-works) |
+| 5 | Home — **Popular destinations** grid | `components/home/HomeContent.tsx` | `v1.0-home` | [home.md → Destinations](./home.md#5-popular-destinations) |
+| 6 | Home — **Testimonials** | `components/home/HomeContent.tsx` | `v1.0-home` | [home.md → Testimonials](./home.md#6-testimonials) |
+| 7 | Home — **Bottom CTA** (night-sky band) | `components/home/HomeContent.tsx` | `v1.0-home` | [home.md → Bottom CTA](./home.md#7-bottom-cta) |
+| 8 | **Brand tokens** (colors, fonts, radius, shadow) | `tailwind.config.ts` + `app/globals.css` | `v1.0-home` | [home.md → Brand tokens](./home.md#brand-tokens-global) |
+
+> Add a new row every time a design becomes "final." Never remove a row —
+> if a design is retired, mark it `~~struck through~~` with the date instead.
+
+---
+
+## How the git tags work (your save points)
+
+Each locked version is frozen as a git tag. To see or restore one:
+
+```bash
+git tag                       # list every save point
+git show v1.0-home            # see exactly what was locked
+git checkout v1.0-home -- components/home/GlobeHero.tsx   # restore ONE file
+```
+
+Restoring a tag never deletes your new work — it only brings back the old file
+you name. When a new design becomes final, we cut the next tag (`v1.1-...`) and
+add its row to the table above.
+
+---
+
+## How to ask for a safe change
+
+Say it in this shape and the change stays surgical:
+
+> "On the **home hero**, change **only the background** to X. Keep everything
+> else exactly the same."
+
+The map in [`home.md`](./home.md) turns that into one exact line to edit.
