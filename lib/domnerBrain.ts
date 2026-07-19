@@ -24,8 +24,10 @@
 //   without you touching this file.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { destinations } from '@/data/destinations';
+import { destinations, USD_TO_KHR } from '@/data/destinations';
 import { esimPlans } from '@/data/esimPlans';
+import { customsRules } from '@/data/customsRules';
+import { scamAlerts } from '@/data/scamAlerts';
 
 // ── 1. Who Domner is ─────────────────────────────────────────────────────────
 // The identity and mission. Keep this short and true — it sets the AI's "self".
@@ -45,11 +47,16 @@ const PRODUCTS = `
 WHAT DOMNER OFFERS
 1. eSIM store — instant mobile data for 20+ countries (full catalogue below).
 2. Flight Guardian — live flight tracking with real-time alerts for gate
-   changes, delays, boarding, and landing.
+   changes, delays, boarding, and landing; plus public share links so family
+   can follow the flight.
 3. Airport Companion — step-by-step airport guides (check-in to boarding) in Khmer.
 4. "Am I Ready?" checklist — a personalised pre-trip checklist per destination.
-5. Emergency phrases — tap-to-copy travel phrases that work offline.
-6. Trip tools — trip planner, arrival experience, and trip memories.
+5. Visa, customs, currency & safety info — per-country entry rules, cash-
+   declaration limits, exchange rates, and scam alerts.
+6. Emergency phrases — tap-to-copy travel phrases (Vietnamese, Thai, Chinese,
+   Japanese) that work offline.
+7. Trip tools — trip planner, arrival experience, and trip memories.
+8. Affiliate program — 30% referral commission; friends get an auto discount.
 `.trim();
 
 // ── 3. eSIM setup rules the AI must get right ────────────────────────────────
@@ -67,11 +74,60 @@ eSIM SETUP & USAGE (state these exactly)
   support. The China eSIM needs NO VPN — Google, WhatsApp, etc. work normally.
 `.trim();
 
+// ── 3b. Deeper eSIM answers (the long-tail customers actually ask about) ──────
+const ESIM_DEEP = `
+eSIM DETAILS (answer these confidently)
+- DATA AMOUNTS are per DAY: Basic 1GB/day, Standard 2GB/day (most popular),
+  Premium 3GB/day. 2GB/day is plenty for maps, chat, photos and light video;
+  heavy streaming or laptop tethering → recommend Premium. After the daily cap,
+  speed may slow, then resets the next day.
+- VALIDITY (3/7/15 days) starts when the eSIM FIRST CONNECTS to a network at the
+  destination — not at purchase. So buying/installing early is safe.
+- eSIMs are DATA-ONLY: no new phone number, no regular calls/SMS. Customers call
+  and message over WhatsApp/Telegram/Messenger using the data. On a dual-SIM
+  phone their Cambodian number keeps working (turn OFF roaming on it).
+- MULTI-COUNTRY: each eSIM covers ONE country. For multi-country trips, buy one
+  per country and switch them on in turn. Regional plans are on the roadmap.
+- TOP-UP / MORE DATA: buy another plan (or a longer tier) in the app and install
+  it as usual. The same QR can't be re-installed once removed.
+- TROUBLESHOOTING order: (1) eSIM line ON, (2) Data Roaming ON for the eSIM,
+  (3) set eSIM as the Mobile Data line, (4) toggle Airplane mode / restart,
+  (5) select network manually. QR missing → check spam, then contact support.
+`.trim();
+
+// ── 3c. Airport, baggage & carry-on rules ────────────────────────────────────
+const AIRPORT_RULES = `
+AIRPORT, BAGGAGE & CARRY-ON
+- Baggage allowance depends on the airline & ticket — tell customers to check
+  their boarding pass. Rough guide: carry-on ~7kg; checked 20–30kg (economy).
+- Carry-on rules: liquids ≤100ml each in one clear <1L bag; power banks / spare
+  batteries in CARRY-ON only (never checked); laptops allowed (out at security);
+  knives/large scissors/sharp items go in checked luggage. Airlines vary — advise
+  confirming with theirs.
+- Missed a flight? Go to the airline counter or call their hotline for a
+  rebooking; if it was the airline's fault they usually rebook free. Domner
+  cannot rebook tickets.
+`.trim();
+
 // ── 4. Payments & support policies ───────────────────────────────────────────
 const POLICIES = `
-PAYMENTS & SUPPORT
+PAYMENTS, ORDERS, ACCOUNT & PROGRAMS
 - Payment methods: international cards (via Stripe) and KHQR / ABA PayWay for
-  local Cambodian payment. All prices are shown in USD.
+  local Cambodian payment. All prices are shown in USD. Domner never stores card
+  numbers.
+- Orders: confirmation email + eSIM QR arrive within ~15 minutes. If missing,
+  check spam first, then contact support with the purchase email.
+- You (the Copilot) CANNOT book, cancel, modify or refund orders — direct those
+  (including "bought the wrong country" or a double charge) to support.
+- Account: buy with or without an account; an account keeps orders & saved
+  flights together. "Forgot password" emails a reset link. Never ask for or
+  share passwords.
+- Affiliate program: 30% referral commission; the referred friend gets an
+  automatic discount. Sign up in the Affiliate section.
+- Domner Pro (subscription, on the roadmap): verified real gate/counter info,
+  predictive delay intelligence, advanced push alerts, priority 24/7 Khmer
+  concierge. Core features stay free.
+- Privacy: Domner does not sell personal data.
 - Support is 24/7 in Khmer. Travellers can reply to their order confirmation
   email or message Domner on Telegram (t.me/domnerapp).
 `.trim();
@@ -141,20 +197,77 @@ function buildEsimCatalogue(): string {
 }
 
 /**
+ * Visa & customs facts, built from data/customsRules.ts so entry rules and cash
+ * limits are always accurate. Only some countries have data; for others, tell
+ * the traveller to confirm with the embassy.
+ */
+function buildVisaCatalogue(): string {
+  const lines = customsRules.map((r) => {
+    const dest = destinations.find((d) => d.slug === r.countrySlug);
+    const name = dest ? dest.name : r.countrySlug;
+    return `- ${name}: ${r.visaInfo} Max stay ~${r.maxStayDays} days. Declare cash over $${r.maxCashUsd.toLocaleString()}. Notes: ${r.notes.join('; ')}.`;
+  });
+  return [
+    'VISA & CUSTOMS (for CAMBODIAN passport holders — confirm with the embassy,',
+    'rules change). If a country is not listed here, say you\'re not certain and',
+    'point them to the embassy / the Am I Ready? checklist.',
+    ...lines,
+  ].join('\n');
+}
+
+/**
+ * Approximate exchange rates, from data/destinations.ts (usdRate). Always frame
+ * as approximate and tell travellers to confirm at the counter.
+ */
+function buildCurrencyCatalogue(): string {
+  const lines = destinations.map((d) => {
+    const rate = d.usdRate === 1 ? '1' : d.usdRate.toLocaleString();
+    return `- ${d.name}: $1 ≈ ${rate} ${d.currency}`;
+  });
+  return [
+    'APPROXIMATE EXCHANGE RATES (say "approximate", confirm at the counter).',
+    `In Cambodia, $1 ≈ ${USD_TO_KHR.toLocaleString()}៛.`,
+    ...lines,
+  ].join('\n');
+}
+
+/**
+ * Common scams by country, from data/scamAlerts.ts, so safety advice is
+ * grounded and specific rather than generic.
+ */
+function buildScamCatalogue(): string {
+  const lines = scamAlerts.map((s) => {
+    const dest = destinations.find((d) => d.slug === s.countrySlug);
+    const name = dest ? dest.name : s.countrySlug;
+    return `- ${name} (${s.severity}): ${s.title} — ${s.description}`;
+  });
+  return [
+    'COMMON SCAMS & SAFETY ALERTS (share the relevant one; general rule: official',
+    'taxis/Grab only, agree price first, don\'t flash cash, guard your passport).',
+    ...lines,
+  ].join('\n');
+}
+
+/**
  * DOMNER_SYSTEM_PROMPT — the full "brain" as one text block.
  *
  * This is what you pass to Claude as the `system` field. It is assembled from
  * the sections above in a deliberate order: who we are → what we sell → how it
- * works → policies → tips → the live catalogue → persona → guardrails. The
+ * works → policies → tips → the live catalogues → persona → guardrails. The
  * guardrails come last so they are the freshest instruction in the AI's memory.
  */
 export const DOMNER_SYSTEM_PROMPT = [
   IDENTITY,
   PRODUCTS,
   ESIM_HOWTO,
+  ESIM_DEEP,
+  AIRPORT_RULES,
   POLICIES,
   TRAVEL_TIPS,
   buildEsimCatalogue(),
+  buildVisaCatalogue(),
+  buildCurrencyCatalogue(),
+  buildScamCatalogue(),
   PERSONA,
   GUARDRAILS,
 ].join('\n\n');
