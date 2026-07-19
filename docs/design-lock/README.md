@@ -53,6 +53,9 @@ designs go back to an old version."* That is called a **regression**. This folde
 | 6 | Home — **Testimonials** | `components/home/HomeContent.tsx` | `e239732` | [home.md → Testimonials](./home.md#6-testimonials) |
 | 7 | Home — **Bottom CTA** (night-sky band) | `components/home/HomeContent.tsx` | `e239732` | [home.md → Bottom CTA](./home.md#7-bottom-cta) |
 | 8 | **Brand tokens** (colors, fonts, radius, shadow) | `tailwind.config.ts` + `app/globals.css` | `e239732` | [home.md → Brand tokens](./home.md#brand-tokens-global) |
+| 9 | **eSIM Store** (page shell, plan card, device checker) | `app/esim/page.tsx` + `components/esim/*` | `e239732` | [esim.md](./esim.md) |
+| 10 | **Flights** (dark search landing + live tracker) | `app/flights/page.tsx` + `components/flights/*` | `e239732` | [flights.md](./flights.md) |
+| 11 | **Global layout** (Navbar, Footer, Copilot, Logo) | `components/layout/*`, `components/copilot/*`, `components/brand/*` | `e239732` | [layout.md](./layout.md) |
 
 > Add a new row every time a design becomes "final." Never remove a row —
 > if a design is retired, mark it `~~struck through~~` with the date instead.
@@ -95,4 +98,9 @@ Say it in this shape and the change stays surgical:
 > "On the **home hero**, change **only the background** to X. Keep everything
 > else exactly the same."
 
-The map in [`home.md`](./home.md) turns that into one exact line to edit.
+The per-page maps turn that into one exact line to edit:
+
+- 🏠 Home — [`home.md`](./home.md)
+- 📱 eSIM Store — [`esim.md`](./esim.md)
+- ✈️ Flights — [`flights.md`](./flights.md)
+- 🧩 Global layout (Navbar / Footer / Copilot / Logo) — [`layout.md`](./layout.md)

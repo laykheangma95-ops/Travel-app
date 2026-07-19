@@ -19,6 +19,9 @@ Quick list:
 6. Home — Testimonials · `components/home/HomeContent.tsx`
 7. Home — Bottom CTA (night-sky band) · `components/home/HomeContent.tsx`
 8. Brand tokens (colors/fonts) · `tailwind.config.ts` + `app/globals.css`
+9. eSIM Store (page + plan card + device checker) · `app/esim/` + `components/esim/`
+10. Flights (dark search landing + live tracker) · `app/flights/` + `components/flights/`
+11. Global layout (Navbar, Footer, Copilot, Logo) · `components/layout/` · `components/copilot/` · `components/brand/`
 
 Save point: commit **`e239732`** (`git show e239732` to see the exact locked state).
 This commit is the permanent recovery point — see
