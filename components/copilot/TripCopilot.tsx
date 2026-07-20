@@ -110,6 +110,9 @@ export function TripCopilot() {
 
   const suggestions = lang === 'km' ? SUGGESTIONS_KM : SUGGESTIONS_EN;
 
+  // The Apsara hero is a standalone full-screen page — keep the FAB off it.
+  if (pathname === '/apsara-hero') return null;
+
   return (
     <>
       <button

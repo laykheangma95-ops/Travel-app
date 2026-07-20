@@ -68,6 +68,9 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // The Apsara hero is a standalone full-screen page with its own nav.
+  if (pathname === '/apsara-hero') return null;
+
   return (
     <header
       className={cn(
