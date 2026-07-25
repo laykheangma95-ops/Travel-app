@@ -33,7 +33,7 @@ matter of writing the lookup rather than sourcing facts:
 | `visa` | yes | `customsRules.visaInfo` — **7 of 20 countries** |
 | `customs` | yes | `customsRules` — **7 of 20 countries** |
 | `currency` | yes | `destinations.currency` + `usdRate` — all 20 |
-| `safety_scams` | yes | `scamAlerts` — **8 countries**, 20 alerts |
+| `safety_scams` | yes | `scamAlerts` — **8 alerts across 6 countries** |
 | `affiliate` | no | `REFERRAL_DISCOUNT_PCT` (5%), `/affiliate` page |
 
 The remaining 27 need both an answer and a policy decision, because the app has
@@ -110,9 +110,11 @@ those two want real answers either way.
   same wrong claim in its prompt (`scripts/generate-questions.mjs:84`), so it
   will produce training examples asking about Wing.
 - **`esim_coverage` and `visa`/`customs` have uneven data depth.** Coverage
-  answers work for all 20 destinations, but visa and customs only for 7, and
-  scams for 8. A grounded answer must say "I don't have that for this country"
-  for the other 13 rather than implying none exist.
+  answers work for all 20 destinations, but visa and customs only for 7
+  (Vietnam, Thailand, China, Japan, Singapore, South Korea, Malaysia), and scams
+  for 6 (Thailand, Vietnam, China, Japan, Malaysia, Indonesia). A grounded
+  answer must say "I don't have that for this country" for the rest rather than
+  implying none exist.
 - **The file header says "20 destinations"** and that is correct —
   `destinations.length` is 20. The engine's own answer text says "20+".
 
