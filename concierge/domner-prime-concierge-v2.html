@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Domner Prime — Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Khmer:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --lacquer:#101512; --surface:#19201B; --raised:#222B24; --line:#2E3830;
+  --bone:#EFE9DC; --muted:#8B9489; --gold:#D4A94C; --gold-dim:#8A6E2E; --jade:#6E8F76;
+  --display:"Fraunces",Georgia,serif;
+  --body:"Instrument Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --khmer:"Noto Sans Khmer","Instrument Sans",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--lacquer);color:var(--bone);font-family:var(--body);
+  font-size:16px;line-height:1.55;min-height:100vh;padding-bottom:80px}
+body.km{font-family:var(--khmer)}
+body.km .u-display{font-family:var(--khmer);font-weight:600;letter-spacing:0}
+.wrap{max-width:660px;margin:0 auto;padding:0 22px}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:18px 0 16px;border-bottom:1px solid var(--line)}
+.mark{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase}
+.mark span{color:var(--gold)}
+.lang{display:flex;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.lang button{background:none;border:0;cursor:pointer;color:var(--muted);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;padding:6px 11px;
+  transition:background .18s,color .18s}
+.lang button:nth-child(2){font-family:var(--khmer);letter-spacing:0;font-size:12px}
+.lang button.on{background:var(--gold);color:var(--lacquer)}
+.lang button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+
+.hero{padding:52px 0 34px}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px}
+.hero h1{font-family:var(--display);font-weight:300;font-size:clamp(34px,8.5vw,52px);
+  line-height:1.06;letter-spacing:-.015em}
+.hero h1 em{font-style:italic;font-weight:500;color:var(--gold)}
+.hero p{color:var(--muted);margin-top:18px;max-width:44ch;font-size:15px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:3px;position:relative}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;
+  background:linear-gradient(90deg,var(--gold) 0%,var(--gold-dim) 42%,transparent 100%)}
+.row{padding:17px 20px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.lab{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:10px}
+body.km .lab{font-family:var(--khmer);letter-spacing:.04em;font-size:12px}
+
+select,input[type=text]{width:100%;background:transparent;border:0;
+  border-bottom:1px solid var(--line);color:var(--bone);font-family:var(--body);
+  font-size:17px;padding:5px 0 8px;border-radius:0;-webkit-appearance:none;appearance:none;cursor:pointer}
+body.km select,body.km input[type=text]{font-family:var(--khmer)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),
+  linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+  background-position:calc(100% - 9px) calc(50% - 1px),calc(100% - 4px) calc(50% - 1px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:26px}
+select:focus,input:focus{outline:0;border-bottom-color:var(--gold)}
+select option{background:var(--surface);color:var(--bone)}
+input::placeholder{color:#5C6459}
+
+.pair{display:grid;grid-template-columns:1fr 1fr}
+.pair .row:first-child{border-right:1px solid var(--line)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{background:transparent;border:1px solid var(--line);color:var(--muted);
+  border-radius:2px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit;
+  transition:border-color .18s,color .18s,background .18s}
+.chip:hover{border-color:var(--gold-dim);color:var(--bone)}
+.chip.on{background:rgba(212,169,76,.11);border-color:var(--gold);color:var(--gold)}
+.chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.go{width:100%;margin-top:22px;background:var(--gold);color:#14180F;border:0;
+  border-radius:3px;padding:17px;cursor:pointer;font-family:var(--mono);font-size:12px;
+  letter-spacing:.18em;text-transform:uppercase;transition:opacity .18s,transform .1s}
+body.km .go{font-family:var(--khmer);letter-spacing:.03em;font-size:15px;text-transform:none}
+.go:hover{opacity:.9}
+.go:active{transform:translateY(1px)}
+.go:disabled{opacity:.4;cursor:default}
+.go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
+.go.ghost{background:transparent;border:1px solid var(--gold);color:var(--gold)}
+
+.status{margin-top:26px;font-family:var(--mono);font-size:12px;color:var(--jade);
+  letter-spacing:.06em;min-height:18px}
+.status::before{content:"› ";color:var(--gold)}
+.err{margin-top:26px;border-left:2px solid #B4573D;background:rgba(180,87,61,.09);
+  padding:14px 16px;font-size:14px;color:#E8C4B8;border-radius:0 3px 3px 0}
+.err code{font-family:var(--mono);font-size:12px;color:#C99}
+
+.out{margin-top:54px}
+.out-head{border-top:1px solid var(--line);padding-top:26px;margin-bottom:34px}
+.out-head h2{font-family:var(--display);font-weight:300;font-size:27px;line-height:1.2}
+.out-head p{color:var(--muted);font-size:14px;margin-top:9px;max-width:50ch}
+
+.day{opacity:0;transform:translateY(14px);animation:rise .55s cubic-bezier(.22,.7,.3,1) forwards;
+  margin-bottom:38px}
+@keyframes rise{to{opacity:1;transform:none}}
+.day-head{display:flex;align-items:baseline;gap:13px;margin-bottom:6px}
+.day-n{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--gold);
+  border:1px solid var(--gold-dim);border-radius:2px;padding:3px 7px;flex:none}
+.day-theme{font-family:var(--display);font-size:19px;font-weight:400}
+.day-area{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.12em;
+  text-transform:uppercase;margin-top:2px}
+.day-rule{height:1px;background:var(--line);margin:14px 0 4px}
+
+.item{display:grid;grid-template-columns:62px 1fr;gap:14px;padding:14px 0;
+  border-bottom:1px solid rgba(46,56,48,.55)}
+.item:last-child{border-bottom:0}
+.t{font-family:var(--mono);font-size:13px;color:var(--jade);padding-top:2px;
+  font-variant-numeric:tabular-nums}
+.item h4{font-size:16px;font-weight:600;line-height:1.35}
+.item p{color:var(--muted);font-size:14px;margin-top:4px}
+.cost{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:11px;
+  color:var(--gold-dim);letter-spacing:.06em}
+
+.pending{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px;
+  color:var(--muted);letter-spacing:.08em;padding:16px 0}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--gold);flex:none;
+  animation:blink 1.1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+
+.esim{border:1px solid var(--gold-dim);border-radius:3px;padding:19px 20px;margin-top:8px;
+  background:linear-gradient(180deg,rgba(212,169,76,.07),transparent)}
+.esim .lab{color:var(--gold)}
+.esim p{font-size:14.5px;color:var(--bone)}
+.plans{display:grid;gap:8px;margin-top:15px}
+.plan{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  border:1px solid var(--line);border-radius:2px;padding:12px 14px;background:transparent;
+  color:var(--bone);cursor:pointer;font-family:inherit;text-align:left;
+  transition:border-color .18s,background .18s}
+.plan:hover{border-color:var(--gold);background:rgba(212,169,76,.06)}
+.plan:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.plan b{font-weight:600;font-size:14.5px}
+.plan small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.plan span{font-family:var(--mono);font-size:13px;color:var(--gold);flex:none}
+.picked{margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--jade);letter-spacing:.06em}
+
+.foot{margin-top:42px;padding-top:20px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:#5C6459;letter-spacing:.05em;line-height:1.8}
+
+@media (max-width:520px){
+  .pair{grid-template-columns:1fr}
+  .pair .row:first-child{border-right:0}
+  .item{grid-template-columns:52px 1fr;gap:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  .day{animation:none;opacity:1;transform:none}
+  .pulse{animation:none}
+  *{transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div class="mark">Domner <span>Prime</span></div>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="l-en" class="on" onclick="setLang('en')">EN</button>
+      <button id="l-km" onclick="setLang('km')">ខ្មែរ</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow" id="x-eyebrow"></div>
+    <h1 class="u-display" id="x-h1"></h1>
+    <p id="x-sub"></p>
+  </section>
+
+  <div class="card">
+    <div class="pair">
+      <div class="row">
+        <label class="lab" for="city" id="x-l-city"></label>
+        <select id="city">
+          <option>Siem Reap</option><option>Phnom Penh</option><option>Sihanoukville</option>
+          <option>Kampot</option><option>Battambang</option><option>Koh Rong</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="lab" for="days" id="x-l-days"></label>
+        <select id="days">
+          <option value="1">1</option><option value="2">2</option>
+          <option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
+        </select>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="row">
+        <label class="lab" for="arr" id="x-l-arr"></label>
+        <select id="arr">
+          <option>Early morning</option><option selected>Midday</option>
+          <option>Evening</option><option>Late night</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="lab" for="budget" id="x-l-budget"></label>
+        <select id="budget">
+          <option>Backpacker</option><option selected>Comfortable</option><option>Premium</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lab" id="x-l-int"></span>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="row">
+      <label class="lab" for="note" id="x-l-note"></label>
+      <input type="text" id="note" />
+    </div>
+  </div>
+
+  <button class="go" id="go" onclick="build()"></button>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div id="errbox"></div>
+
+  <section class="out" id="out"></section>
+
+  <div class="foot" id="x-foot"></div>
+</div>
+
+<script>
+/* ---------------- copy ---------------- */
+const INTERESTS={
+  en:["Temples","Street food","Nightlife","Nature","Beaches","History","Markets","Wellness","Photography"],
+  km:["ប្រាសាទ","ម្ហូបតាមផ្លូវ","កម្សាន្តពេលយប់","ធម្មជាតិ","ឆ្នេរសមុទ្រ","ប្រវត្តិសាស្ត្រ","ផ្សារ","សុខភាព","ថតរូប"]
+};
+const T={
+  en:{eyebrow:"Concierge · Cambodia",
+    h1:"Tell us when you<br><em>land.</em>",
+    sub:"Built around your arrival time, your budget, and what you actually came for. Not a top-ten list.",
+    city:"Arriving at",days:"Nights",arr:"Landing time",budget:"Budget",
+    int:"Came here for",note:"Anything we should know",
+    ph:"Travelling with a 6-year-old. No spicy food.",
+    go:"Build my itinerary",again:"Build another",
+    foot:"Prototype · Domner Prime<br>AI-generated. Confirm hours and prices before you go.",
+    planning:"Planning the shape of the trip",
+    writing:d=>"Writing day "+d,
+    waiting:"Queued",
+    fail:"Couldn't reach the concierge.",
+    retry:"Try again",
+    tipL:"Local tip",connL:"Staying connected",
+    picked:p=>"Selected: "+p+". Checkout is not wired up in this prototype."},
+  km:{eyebrow:"សេវាណែនាំ · កម្ពុជា",
+    h1:"ប្រាប់យើងពេលអ្នក<br><em>ចុះចត។</em>",
+    sub:"រៀបចំតាមពេលមកដល់ ថវិកា និងអ្វីដែលអ្នកពិតជាចង់បាន។",
+    city:"ចុះចតនៅ",days:"ចំនួនយប់",arr:"ពេលចុះចត",budget:"ថវិកា",
+    int:"មកដើម្បី",note:"មានអ្វីដែលយើងគួរដឹង",
+    ph:"ធ្វើដំណើរជាមួយកូនអាយុ ៦ ឆ្នាំ។ មិនញ៉ាំហឹរ។",
+    go:"បង្កើតកម្មវិធីធ្វើដំណើរ",again:"បង្កើតម្តងទៀត",
+    foot:"គំរូ · Domner Prime<br>បង្កើតដោយ AI។ សូមផ្ទៀងផ្ទាត់ម៉ោង និងតម្លៃមុនពេលទៅ។",
+    planning:"កំពុងរៀបចំគ្រោងដំណើរ",
+    writing:d=>"កំពុងសរសេរថ្ងៃទី "+d,
+    waiting:"រង់ចាំ",
+    fail:"មិនអាចភ្ជាប់ទៅសេវាណែនាំបានទេ។",
+    retry:"ព្យាយាមម្តងទៀត",
+    tipL:"គន្លឹះ",connL:"ការតភ្ជាប់",
+    picked:p=>"បានជ្រើស៖ "+p+"។ ការទូទាត់មិនទាន់ដំណើរការក្នុងគំរូនេះទេ។"}
+};
+const ESIM_PLANS=[
+  {id:"3GB / 7 days",price:"$4.50"},
+  {id:"10GB / 15 days",price:"$11.00"},
+  {id:"Unlimited / 30 days",price:"$26.00"}
+];
+
+let lang="en", picked=new Set([0,1]), lastForm=null, lastPlan=null;
+
+/* ---------------- ui ---------------- */
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function $(id){return document.getElementById(id);}
+
+function renderChips(){
+  const box=$("chips"); box.innerHTML="";
+  INTERESTS[lang].forEach((label,i)=>{
+    const b=document.createElement("button");
+    b.className="chip"+(picked.has(i)?" on":"");
+    b.textContent=label;
+    b.setAttribute("aria-pressed",picked.has(i)?"true":"false");
+    b.onclick=()=>{picked.has(i)?picked.delete(i):picked.add(i);renderChips();};
+    box.appendChild(b);
+  });
+}
+
+function setLang(l){
+  lang=l;
+  document.body.classList.toggle("km",l==="km");
+  $("l-en").classList.toggle("on",l==="en");
+  $("l-km").classList.toggle("on",l==="km");
+  document.documentElement.lang = l==="km"?"km":"en";
+  const t=T[l];
+  $("x-eyebrow").textContent=t.eyebrow;
+  $("x-h1").innerHTML=t.h1;
+  $("x-sub").textContent=t.sub;
+  $("x-l-city").textContent=t.city; $("x-l-days").textContent=t.days;
+  $("x-l-arr").textContent=t.arr;  $("x-l-budget").textContent=t.budget;
+  $("x-l-int").textContent=t.int;  $("x-l-note").textContent=t.note;
+  $("note").placeholder=t.ph;
+  $("go").textContent=lastPlan?t.again:t.go;
+  $("x-foot").innerHTML=t.foot;
+  renderChips();
+  // FIX: results were left in the old language. Regenerate in the new one.
+  if(lastPlan){ $("out").innerHTML=""; lastPlan=null; build(); }
+}
+
+function say(msg){$("status").textContent=msg||"";}
+function fail(detail){
+  $("errbox").innerHTML='<div class="err">'+esc(T[lang].fail)+
+    (detail?' <code>'+esc(detail)+'</code>':'')+
+    '<br><button class="go ghost" style="margin-top:12px" onclick="build()">'+esc(T[lang].retry)+'</button></div>';
+}
+
+/* ---------------- model ---------------- */
+// FIX: pull the JSON object out of whatever the model wrapped it in,
+// instead of assuming a bare response.
+function extractJSON(text){
+  const s=text.indexOf("{"), e=text.lastIndexOf("}");
+  if(s===-1||e===-1||e<s) throw new Error("no JSON in response");
+  return JSON.parse(text.slice(s,e+1));
+}
+
+async function ask(prompt,attempt){
+  attempt=attempt||0;
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,
+      messages:[{role:"user",content:prompt}]})
+  });
+  const data=await res.json();
+  // FIX: surface the real API error instead of a generic network message.
+  if(data.error) throw new Error(data.error.message||data.error.type||"api error");
+  if(!Array.isArray(data.content)) throw new Error("unexpected response shape");
+  const text=data.content.map(b=>b.text||"").join("");
+  try{ return extractJSON(text); }
+  catch(err){
+    // FIX: one retry with an explicit correction before giving up.
+    if(attempt<1) return ask(prompt+"\n\nReturn ONLY the raw JSON object. No prose, no code fences.",attempt+1);
+    throw err;
+  }
+}
+
+function formState(){
+  return {
+    city:$("city").value, nights:parseInt($("days").value,10),
+    arr:$("arr").value, budget:$("budget").value,
+    note:$("note").value.trim(),
+    ints:[...picked].map(i=>INTERESTS.en[i]).join(", ")||"general sightseeing",
+    outLang: lang==="km" ? "Khmer (ភាសាខ្មែរ)" : "English"
+  };
+}
+
+/* Stage 1 — decide the shape of the trip before writing any of it.
+   Small output, so it never truncates, and every day is written knowing
+   what the other days already cover. */
+function planPrompt(f){
+  return `You are the concierge for Domner, a Cambodian travel platform.
+
+Trip: ${f.nights} days in ${f.city}, Cambodia
+Arrival: ${f.arr} on day 1
+Budget: ${f.budget}
+Traveller wants: ${f.ints}
+${f.note?"Traveller notes: "+f.note:""}
+
+Plan the SHAPE of this trip only. Do not write the activities yet.
+- Assign each day one geographic area so the traveller never crosses the city twice in a day.
+- Day 1 must respect a ${f.arr} arrival. Do not plan a full day if they land late.
+- The last day must allow for departure.
+- Do not repeat an area across days.
+Write all traveller-facing text in ${f.outLang}.
+
+Return ONLY raw JSON:
+{"title":"short trip title","summary":"one sentence on how the trip is paced","days":[{"day":1,"theme":"short theme","area":"neighbourhood or district","focus":"what this day is for, one line, for internal use"}],"esim":"one sentence on why mobile data matters on THIS trip specifically","tip":"one non-obvious local tip a guidebook would miss"}`;
+}
+
+/* Stage 2 — one call per day. Each gets the full token budget,
+   so a 5-day trip can no longer truncate. */
+function dayPrompt(f,plan,d){
+  const others=plan.days.filter(x=>x.day!==d.day).map(x=>x.day+": "+x.area).join("; ");
+  return `Concierge for Domner. Write day ${d.day} of a ${f.nights}-day ${f.city} trip.
+
+This day's area: ${d.area}
+This day's purpose: ${d.focus}
+Other days cover: ${others||"nothing else"} — do not duplicate them.
+Budget: ${f.budget}. Traveller wants: ${f.ints}.
+${f.note?"Traveller notes: "+f.note:""}
+${d.day===1?"They land "+f.arr+". Start the day accordingly.":""}
+
+Rules:
+- 4 to 5 items. Name REAL, specific places in ${f.city} — actual restaurants, temples, markets, bars. Never "a local restaurant".
+- Every stop must be inside or adjacent to ${d.area}.
+- Notes are one short sentence each.
+- Costs in USD, realistic for Cambodia at a ${f.budget} budget. Use "Free" where it is free.
+- Times in 24-hour HH:MM.
+Write all text in ${f.outLang}.
+
+Return ONLY raw JSON:
+{"items":[{"time":"14:00","title":"place name","note":"one sentence","cost":"$8"}]}`;
+}
+
+/* ---------------- render ---------------- */
+function shell(plan){
+  let h='<div class="out-head"><h2 class="u-display">'+esc(plan.title)+'</h2><p>'+esc(plan.summary)+'</p></div>';
+  plan.days.forEach((d,i)=>{
+    h+='<div class="day" id="day-'+d.day+'" style="animation-delay:'+(i*0.09)+'s">'
+      +'<div class="day-head"><span class="day-n">'+String(d.day).padStart(2,"0")+'</span>'
+      +'<span class="day-theme u-display">'+esc(d.theme)+'</span></div>'
+      +'<div class="day-area">'+esc(d.area)+'</div><div class="day-rule"></div>'
+      +'<div id="slot-'+d.day+'"><div class="pending"><span class="pulse"></span>'+esc(T[lang].waiting)+'</div></div></div>';
+  });
+  $("out").innerHTML=h;
+  $("out").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function fillDay(day,items){
+  let h="";
+  (items||[]).forEach(it=>{
+    h+='<div class="item"><div class="t">'+esc(it.time)+'</div><div>'
+      +'<h4>'+esc(it.title)+'</h4><p>'+esc(it.note)+'</p>'
+      +(it.cost?'<span class="cost">'+esc(it.cost)+'</span>':'')+'</div></div>';
+  });
+  $("slot-"+day).innerHTML=h;
+}
+
+function tail(plan){
+  let h="";
+  if(plan.tip){
+    h+='<div class="day"><span class="lab">'+esc(T[lang].tipL)+'</span>'
+      +'<p style="font-size:15px">'+esc(plan.tip)+'</p></div>';
+  }
+  if(plan.esim){
+    h+='<div class="esim day"><span class="lab">'+esc(T[lang].connL)+'</span>'
+      +'<p>'+esc(plan.esim)+'</p><div class="plans">';
+    ESIM_PLANS.forEach(p=>{
+      h+='<button class="plan" onclick="pickPlan(\''+esc(p.id)+'\')">'
+        +'<span style="flex:1"><b>'+esc(p.id)+'</b><small>Domner eSIM · instant activation</small></span>'
+        +'<span>'+esc(p.price)+'</span></button>';
+    });
+    h+='</div><div class="picked" id="picked"></div></div>';
+  }
+  $("out").insertAdjacentHTML("beforeend",h);
+}
+
+// FIX: the eSIM button used to render and do nothing.
+function pickPlan(id){ $("picked").textContent=T[lang].picked(id); }
+
+/* ---------------- flow ---------------- */
+async function build(){
+  const btn=$("go");
+  $("errbox").innerHTML=""; $("out").innerHTML=""; lastPlan=null;
+  btn.disabled=true;
+
+  const f=formState(); lastForm=f;
+  try{
+    say(T[lang].planning);
+    const plan=await ask(planPrompt(f));
+    if(!plan.days||!plan.days.length) throw new Error("empty plan");
+    lastPlan=plan;
+    shell(plan);
+
+    for(const d of plan.days){
+      say(T[lang].writing(d.day));
+      $("slot-"+d.day).innerHTML='<div class="pending"><span class="pulse"></span>'+esc(T[lang].writing(d.day))+'</div>';
+      try{
+        const res=await ask(dayPrompt(f,plan,d));
+        fillDay(d.day,res.items);
+      }catch(err){
+        // One bad day no longer kills the whole itinerary.
+        $("slot-"+d.day).innerHTML='<p style="color:var(--muted);font-size:14px">'
+          +esc(T[lang].fail)+'</p>';
+      }
+    }
+    tail(plan);
+  }catch(err){
+    console.error(err);
+    fail(err.message);
+  }finally{
+    say("");
+    btn.disabled=false;
+    btn.textContent=lastPlan?T[lang].again:T[lang].go;
+  }
+}
+
+setLang("en");
+</script>
+</body>
+</html>
