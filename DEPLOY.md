@@ -57,7 +57,7 @@ STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ABA_MERCHANT_ID, ABA_API_KEY, ABA_WEBHOOK_SECRET
 RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID
 FIREBASE_ADMIN_SDK, NEXT_PUBLIC_FIREBASE_CONFIG
-OPENROUTER_API_KEY     # turn the AI Copilot ON — cheap (Claude Haiku via OpenRouter), set a spend limit first
+ANTHROPIC_API_KEY      # turn the AI Copilot ON (console.anthropic.com) — set a spend limit first; without it the Copilot uses the free offline engine
 ADMIN_EMAIL            # gates /admin to you
 NEXT_PUBLIC_APP_URL    # your final domain, e.g. https://domnerapp.com
 # leave RAPIDAPI_KEY empty — free ADS-B tracking covers launch (see COSTS.md)

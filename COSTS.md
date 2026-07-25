@@ -33,7 +33,7 @@ substitute already built into the codebase.
 | 6 | **Resend** (order confirmation emails) | `RESEND_API_KEY` | Free tier 3,000 emails/mo (100/day) → $20/mo | **$0** | 🟢 |
 | 7 | **Live flight tracking** (ADS-B: adsb.lol, airplanes.live, adsb.fi + planespotters photos) | *none — no key needed* | Open / crowdsourced, free | **$0** | 🟢 |
 | 8 | **AeroDataBox** (scheduled flight status: gate, delay, times) | `RAPIDAPI_KEY`, `AEROBOX_HOST` | RapidAPI: small free quota → paid tiers ($ monthly) | **$0 now, real risk later** | 🔴 |
-| 9 | **AI chat — Claude via OpenRouter** (Domner Trip Copilot) | `OPENROUTER_API_KEY` (or `ANTHROPIC_API_KEY`) | Pay-per-token usage | **$0 now, scales with use** | 🔴 |
+| 9 | **AI chat — Claude** (Domner Trip Copilot) | `ANTHROPIC_API_KEY` | Pay-per-token usage | **$0 now, scales with use** | 🔴 |
 | 10 | **Domain** (`domnerapp.com`) | `NEXT_PUBLIC_APP_URL` | ~$12–15 / **year** | **~$1/mo** | 🔴 (tiny, unavoidable) |
 | 11 | **Hosting** (Next.js — e.g. Vercel) | *deployment, not in env* | Free hobby tier → $20/mo Pro | **$0** on hobby | 🟢 → 🔴 if upgraded |
 
@@ -54,19 +54,24 @@ substitute already built into the codebase.
   data + mock scheduled data. Only subscribe once flight tracking is a proven driver of eSIM sales and
   you've decided real gate/delay data is worth paying for. When you do, add a monthly call cap.
 
-### 3b. AI chat (Claude via OpenRouter) — Trip Copilot — **KEEP but cap spend**
+### 3b. AI chat (Claude) — Trip Copilot — **KEEP but cap spend**
 - **Why it's risky:** it's metered per token. Every chat costs money, and there's no per-day budget.
-- **The good news:** with no key set it falls back to a canned bilingual reply, so the feature never
-  breaks — it just isn't "smart." It's already wired to **Claude Haiku**, a fraction of the cost of
-  Opus, and the chatbot accepts either an `OPENROUTER_API_KEY` (checked first) or an
-  `ANTHROPIC_API_KEY`.
+- **The good news:** with no key set it falls back to the free offline keyword engine
+  (`lib/domnerEngine.ts`), so the feature never breaks — it just isn't "smart." Two design choices
+  already hold the bill down: the always-on knowledge is **prompt-cached** (≈a tenth of the price to
+  re-read), and country/airport detail is **looked up only when asked about** rather than sent every
+  message.
+- **Heads up on the model:** it currently runs **Claude Opus 5**, the top tier. That is the best
+  answer quality, and it is *not* the cheapest — Opus is meaningfully more per token than Haiku.
+  Switching is a one-line change in `lib/domnerAI.ts` (`const MODEL = ...`).
 - **Founder call — pick one:**
-  1. **Cheapest:** leave the key empty → $0, canned answers only.
-  2. **Recommended:** keep AI on (already on the cheap Haiku model in `app/api/chat/route.ts`) and
-     set a spend limit in the OpenRouter dashboard (or Anthropic console). Great UX for cents, not
-     dollars.
-  3. Bump the model in `app/api/chat/route.ts` to an Opus-tier model only once Copilot demonstrably
-     converts users to paying customers.
+  1. **Cheapest:** leave the key empty → $0, keyword answers only.
+  2. **Cheap + smart:** set `MODEL` to `'claude-haiku-4-5'` in `lib/domnerAI.ts`. Still a real
+     reasoning model — still far beyond the keyword engine — at a fraction of Opus pricing.
+  3. **Best quality (current default):** leave it on `'claude-opus-5'`.
+
+  Whichever you pick, set a **monthly spend limit in the Anthropic Console** before launch, then
+  watch real usage for a week and adjust. Decide by measured cost per conversation, not by guessing.
 
 ### 3c. Domain — **PAY IT, it's ~$1/month**
 - You cannot run a real brand on a random URL. ~$12–15/year is the one genuinely unavoidable cost.
@@ -122,7 +127,7 @@ NEXT_PUBLIC_FIREBASE_CONFIG=...
 
 # --- LEAVE EMPTY until profitable ---
 # RAPIDAPI_KEY=              # AeroDataBox — free ADS-B + mock covers us
-# OPENROUTER_API_KEY=        # Copilot — leave empty for canned replies, set for live AI (Haiku)
+# ANTHROPIC_API_KEY=         # Copilot — leave empty for the free keyword engine, set for real AI
 ```
 
 **Result: ~$1/month (domain only) to run the whole app in production.** Every "expensive" feature is

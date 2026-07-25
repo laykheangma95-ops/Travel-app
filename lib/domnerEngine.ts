@@ -1,20 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Domner In-App Assistant Engine — the chatbot's own "brain", self-hosted.
+// Domner Offline Engine — the Copilot's safety net, self-hosted.
 //
 // WHAT THIS IS (for beginners):
-//   This is Domner's OWN chatbot engine. It runs entirely inside our app on our
-//   own server — it does NOT call any outside AI service (no OpenAI, no
-//   OpenRouter, no paid API keys). That means:
-//     • It is FREE to run — it can never fail with a "no credits" / 402 error.
-//     • It always answers instantly, even offline from third-party providers.
-//     • Every answer is grounded in OUR real business data (eSIM prices,
-//       countries, policies), so it can't "hallucinate" wrong facts.
+//   This is the SIMPLE half of the Trip Copilot. It is not an AI model and it
+//   cannot reason: for each message it (1) detects the language, (2) guesses the
+//   topic by matching keywords (in Khmer AND English), and (3) returns a
+//   pre-written answer built from our live data files. If nobody wrote an answer
+//   for a question, it can only reply with a friendly "try asking about…".
 //
-//   How it "thinks": for each traveller message it (1) detects the language,
-//   (2) figures out the topic by matching keywords (in Khmer AND English), then
-//   (3) replies with a ready, accurate answer built from our live data files.
-//   As we add countries or change prices in data/destinations.ts, the answers
-//   update automatically — the engine keeps learning from our own catalogue.
+//   That is exactly why adding more text here never made the Copilot feel
+//   smarter — a keyword matcher has no understanding to improve. The thinking
+//   now happens in lib/domnerAI.ts, which sends the question to Claude.
+//
+//   This engine still earns its place, because it:
+//     • is FREE — it can never fail with a "no credits" / 402 error,
+//     • answers instantly, with no network call at all,
+//     • can't "hallucinate", since every reply comes from our own data.
+//   So /api/chat tries Claude first and falls back to this whenever the AI is
+//   switched off or unreachable. The traveller always gets an answer.
 //
 // HOW TO EDIT:
 //   To change wording, edit the plain-text answers below. To teach a new topic,
@@ -23,7 +26,7 @@
 
 import { destinations } from '@/data/destinations';
 import { esimPlans } from '@/data/esimPlans';
-import { DOMNER_FACTS } from '@/lib/domnerBrain';
+import { DOMNER_FACTS, detectCountry } from '@/lib/domnerBrain';
 
 // ── Conversation shapes (must match app/api/chat/route.ts) ───────────────────
 export interface ChatTurn {
@@ -80,46 +83,9 @@ function countryPriceLine(slug: string, lang: Lang): string | null {
       )} (7 days, 2GB/day — most popular), Premium ${money(premium)} (15 days, 3GB/day). ${dest.networkTech} network.`;
 }
 
-// Common short names / nicknames travellers use → destination slug. This lets
-// "korea", "uk", "dubai", etc. resolve to the right catalogue entry.
-const COUNTRY_ALIASES: Record<string, string> = {
-  korea: 'south-korea',
-  's korea': 'south-korea',
-  uk: 'united-kingdom',
-  england: 'united-kingdom',
-  britain: 'united-kingdom',
-  'great britain': 'united-kingdom',
-  america: 'usa',
-  'united states': 'usa',
-  us: 'usa',
-  dubai: 'uae',
-  'abu dhabi': 'uae',
-  emirates: 'uae',
-  hongkong: 'hong-kong',
-  aussie: 'australia',
-  filipino: 'philippines',
-};
-
-// Find which destination (if any) the traveller mentioned, by English name,
-// Khmer name, slug, or a common nickname. Returns the slug or null.
-function detectCountry(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const d of destinations) {
-    const slugWord = d.slug.replace(/-/g, ' ');
-    if (
-      lower.includes(d.name.toLowerCase()) ||
-      lower.includes(slugWord) ||
-      text.includes(d.nameKm)
-    ) {
-      return d.slug;
-    }
-  }
-  // Fall back to nickname matching, longest alias first so "s korea" beats "us".
-  for (const alias of Object.keys(COUNTRY_ALIASES).sort((a, b) => b.length - a.length)) {
-    if (new RegExp(`\\b${alias}\\b`).test(lower)) return COUNTRY_ALIASES[alias];
-  }
-  return null;
-}
+// Which destination the traveller mentioned (English name, Khmer name, slug, or
+// a nickname like "dubai") is worked out by detectCountry in lib/domnerBrain.ts,
+// so the AI layer and this engine always resolve country names the same way.
 
 // ── Intent definitions ───────────────────────────────────────────────────────
 // Each intent is a set of trigger keywords (Khmer + English) and a bilingual
@@ -273,11 +239,12 @@ function fallback(lang: Lang): string {
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 /**
- * generateReply — produce the assistant's answer for a conversation.
+ * generateReply — produce a fallback answer for a conversation.
  *
- * This is the whole "AI": it reads the latest traveller message, works out the
- * language and topic, and returns a grounded reply built from Domner's own data.
- * It never throws and never calls an external service, so it always responds.
+ * Reads the latest traveller message, works out the language and topic, and
+ * returns a grounded reply built from Domner's own data. It never throws and
+ * never calls an external service, so it always responds — which is what makes
+ * it a safe last resort when the Claude layer is unavailable.
  */
 export function generateReply(turns: ChatTurn[], context?: ChatContext): string {
   const lastUser = [...turns].reverse().find((t) => t.role === 'user');
