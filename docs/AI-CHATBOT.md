@@ -11,7 +11,8 @@ No AI/machine-learning background needed.
 | --- | --- |
 | `lib/domnerAI.ts` | **The thinking part.** Sends the traveller's question to Claude (a real AI model) together with Domner's knowledge, and returns the answer. |
 | `lib/domnerBrain.ts` | **The knowledge.** Everything Claude needs to know about Domner — products, eSIM setup, prices, customs rules, scam warnings, airport walkthroughs, phrases, tone, and rules. |
-| `lib/domnerEngine.ts` | **The safety net.** A keyword matcher with pre-written answers. Free, instant, and used automatically whenever Claude is unavailable. |
+| `lib/domnerEngine.ts` | **The free brain.** Answers without any external service — instant, no key, no cost. Used for everyday questions and as the safety net whenever Claude is unavailable. |
+| `lib/domnerSearch.ts` | **The understanding.** Matches questions to answers by MEANING rather than by keyword. This is what makes the free brain actually useful. |
 | `app/api/chat/route.ts` | **The endpoint** (`POST /api/chat`). Tries Claude first, falls back to the safety net. |
 | `components/copilot/TripCopilot.tsx` | **The chat UI** — the floating "✦" button and chat window. |
 
@@ -19,20 +20,55 @@ No AI/machine-learning background needed.
 
 ## Why the Copilot used to feel "not smart"
 
-Before this change, `/api/chat` only ever used `lib/domnerEngine.ts`. That file is
-**not an AI model** — it is a keyword matcher. It scans your message for words it
-was told about ("esim", "price", "vpn") and replies with a sentence someone wrote
-in advance.
+Originally `/api/chat` only ever used `lib/domnerEngine.ts`, and that file matched
+**raw keywords**: it scanned your message for letters it had been told about
+("esim", "price", "flight") and replied with a sentence written in advance.
 
-That design has a hard ceiling. It cannot reason, cannot combine two facts, and
-cannot answer a question nobody wrote an answer for. Adding more text to it does
-not make it cleverer, because there is no understanding there to improve — which
-is exactly why editing it changed nothing.
+Ask *"What can I carry on a flight?"* and it saw the word **flight** and answered
+about flight tracking — confidently wrong. Adding more text to it didn't help,
+because a keyword matcher has no understanding to improve. That is exactly why
+editing it changed nothing.
 
-You can still see the ceiling if Claude is switched off. Ask *"What can I carry on
-a flight?"* and the matcher sees the word **flight** and replies about flight
-tracking — confidently wrong. With Claude on, that question gets a real answer
-about liquids, power banks, and what belongs in checked baggage.
+Both halves of that are now fixed: the free brain understands meaning
+(`lib/domnerSearch.ts`), and Claude handles what it can't.
+
+## The free brain: matching meaning, not words
+
+`lib/domnerSearch.ts` replaces keyword matching with **concepts**. "carry",
+"bring", "pack", "luggage", "liquids", "power bank" and the Khmer "យក" all point
+at one idea — BAGGAGE. Every answer is tagged with the ideas it covers, so a
+question finds the right answer even when it uses wording nobody wrote down.
+
+It scores three signals and takes the best answer above a confidence bar:
+
+1. **Concepts** — which ideas is this question about? (the meaning layer)
+2. **Words** — which answers share rare, informative words with it?
+3. **Places** — did they name a country or airport we have data for?
+
+Real results, all with no API key and no cost:
+
+| Question | Answer it now finds |
+| --- | --- |
+| "What can I carry on a flight?" | Liquids, power banks, prohibited items |
+| "can I bring a power bank in my luggage?" | Same — different words, same idea |
+| "is Thailand safe for tourists?" | Thailand's scam warnings |
+| "someone tried to rip me off in Bangkok" | Thailand's scams (Bangkok ⇒ Thailand) |
+| "how much cash can I bring into Japan" | Japan's cash limit, not eSIM prices |
+| "which handset models does this work with" | Phone compatibility |
+| "my internet is not working after landing" | eSIM setup steps |
+| "what is the capital of Peru" | Honestly says it doesn't know |
+
+That last row matters as much as the rest. If nothing is a confident match it
+says so and points at what it does cover, instead of guessing — a wrong answer
+delivered confidently is worse than no answer.
+
+**Khmer note:** Khmer is written without spaces between words, so it can't be
+split into words the way English can. The search compares short character
+sequences instead, which works for both languages with no Khmer dictionary.
+
+**What it is not:** not a neural AI model. It does not learn, and it cannot reason
+about something genuinely new — it finds prepared answers, it does not invent
+them. Think of it as a very good librarian. Claude is what does the reasoning.
 
 ---
 
@@ -110,7 +146,26 @@ The `messages` array is the whole conversation. Add past turns so the AI has con
 
 ---
 
-## Teaching the Copilot new things
+## Teaching the free brain new wording
+
+Open `lib/domnerSearch.ts`:
+
+- **New way of asking about something it already covers** → add the phrase to the
+  matching entry in `CONCEPTS`. For example, adding `'hand carry'` to `baggage`
+  teaches every baggage answer to recognise it. This is the most common edit and
+  takes seconds.
+- **A brand-new topic** → add an entry to `TOPIC_ANSWERS` with its Khmer and
+  English answer and the concepts it covers.
+- **New countries, prices, scams, customs rules, airports** → just edit the files
+  in `data/`. Those answers are generated automatically; nothing to change here.
+
+> ⚠️ One trap to know about: a passage's concepts are **only** the ones you list
+> in its `concepts` field. They are deliberately not guessed from the answer's own
+> wording — the phone-compatibility answer contains the word "support", which
+> would otherwise tag it as the "contact support" topic and hijack every help
+> request. (That bug was real; this is the fix.)
+
+## Teaching Claude new facts
 
 Open `lib/domnerBrain.ts`. The always-on manual is split into labelled sections:
 
