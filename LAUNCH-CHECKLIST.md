@@ -38,7 +38,7 @@ The PWA is already configured (manifest, 192/512 + maskable icons, apple-touch-i
 worker, standalone display, theme `#14263F`). To experience it:
 
 - [ ] Open the live site on your phone's browser (Safari on iOS, Chrome on Android).
-- [ ] **iOS:** Share → *Add to Home Screen* → confirm the Domer icon + name appear.
+- [ ] **iOS:** Share → *Add to Home Screen* → confirm the Domner icon + name appear.
 - [ ] **Android:** menu → *Install app* / *Add to Home Screen*.
 - [ ] Launch from the home-screen icon — it should open **full-screen (no browser bars)**,
       navy splash, portrait-locked.

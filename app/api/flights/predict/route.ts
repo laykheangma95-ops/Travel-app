@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { predictDelay } from '@/lib/delayPrediction';
 import { todayIso } from '@/lib/utils';
 
-// GET /api/flights/predict?number=QH215&date=2026-07-08 — Domer Intelligence
+// GET /api/flights/predict?number=QH215&date=2026-07-08 — Domner Intelligence
 // inbound-aircraft delay prediction.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

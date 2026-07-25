@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sparkles, X, Send } from 'lucide-react';
-import { DomerMark } from '@/components/brand/DomerMark';
+import { DomnerMark } from '@/components/brand/DomnerMark';
 import { useLang } from '@/lib/i18n';
 
 interface ChatMessage {
@@ -118,7 +118,7 @@ export function TripCopilot() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Close Domer Copilot' : 'Open Domer Copilot'}
+        aria-label={open ? 'Close Domner Copilot' : 'Open Domner Copilot'}
         data-liquid=""
         // [backdrop-filter:none]: the blur is invisible on this opaque gold FAB
         // but rendered a square halo behind the circle (Chromium backdrop-filter
@@ -131,13 +131,13 @@ export function TripCopilot() {
       {open && (
         <div
           role="dialog"
-          aria-label="Domer Trip Copilot"
+          aria-label="Domner Trip Copilot"
           className="fixed bottom-24 right-5 z-[90] flex h-[70vh] max-h-[560px] w-[92vw] max-w-sm flex-col overflow-hidden rounded-card border border-white/10 bg-[#0E1B30]/95 shadow-2xl backdrop-blur-xl animate-fade-up"
         >
           <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3.5">
-            <DomerMark surface="gold" size={24} />
+            <DomnerMark surface="gold" size={24} />
             <div>
-              <p className="font-display text-sm font-bold text-white">Domer Copilot</p>
+              <p className="font-display text-sm font-bold text-white">Domner Copilot</p>
               <p className="font-khmer text-[11px] text-white/50">ជំនួយការធ្វើដំណើររបស់អ្នក</p>
             </div>
           </div>

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { Download, Users } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
-import { DomerLogo } from '@/components/brand/DomerMark';
+import { DomnerLogo } from '@/components/brand/DomnerMark';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
 import { todayIso } from '@/lib/utils';
 
@@ -44,7 +44,7 @@ export default function PublicTrackPage() {
       <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="mb-8 text-center">
           <span className="inline-flex justify-center">
-            <DomerLogo surface="navy" />
+            <DomnerLogo surface="navy" />
           </span>
           <p className="mt-1 text-sm text-white/60">Live flight tracking · ការតាមដានជើងហោះហើរផ្ទាល់</p>
         </div>
@@ -91,14 +91,14 @@ export default function PublicTrackPage() {
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-primary/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <p className="text-sm font-semibold text-white">Get Domer</p>
+            <p className="text-sm font-semibold text-white">Get Domner</p>
             <p className="text-xs text-white/60">eSIM + flight alerts + airport guide, in Khmer</p>
           </div>
           <Link
             href="/"
             className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
-            <Download size={15} /> Open Domer
+            <Download size={15} /> Open Domner
           </Link>
         </div>
       </div>

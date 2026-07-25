@@ -15,14 +15,14 @@ export async function sendOrderConfirmationEmail(order: EsimOrder): Promise<bool
   if (!resend || !order.customer_email) return false;
   try {
     await resend.emails.send({
-      from: 'Domer <orders@domnerapp.com>',
+      from: 'Domner <orders@domnerapp.com>',
       to: order.customer_email,
-      subject: `Your Domer eSIM order ${order.order_number} is confirmed ✈️`,
+      subject: `Your Domner eSIM order ${order.order_number} is confirmed ✈️`,
       html: `
         <div style="font-family: Inter, Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #0F172A;">
           <div style="background: #14263F; padding: 32px; border-radius: 16px 16px 0 0;">
             <h1 style="color: #fff; margin: 0; font-size: 24px;">
-              <span style="color: #E6CB8B;">Domer</span> <span style="color: #C69749; font-size: 11px; letter-spacing: 4px;">TRAVEL</span>
+              <span style="color: #E6CB8B;">Domner</span> <span style="color: #C69749; font-size: 11px; letter-spacing: 4px;">TRAVEL</span>
             </h1>
           </div>
           <div style="padding: 32px; border: 1px solid #E2E8F0; border-top: 0; border-radius: 0 0 16px 16px;">

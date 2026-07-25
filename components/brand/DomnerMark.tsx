@@ -1,6 +1,6 @@
 'use client';
 
-// Domer "Wayfinder Star" mark — 8-point compass rose with a gilded gem at the
+// Domner "Wayfinder Star" mark — 8-point compass rose with a gilded gem at the
 // pivot. Color recipes per surface follow the brand handoff exactly.
 
 import { useLang } from '@/lib/i18n';
@@ -17,13 +17,13 @@ const RECIPES: Record<Surface, { star: string; hub: string; gem: string }> = {
 
 export const WAYFINDER_PATH = 'M50 3 L65.6 34.4 L97 50 L65.6 65.6 L50 97 L34.4 65.6 L3 50 L34.4 34.4 Z';
 
-interface DomerMarkProps {
+interface DomnerMarkProps {
   surface?: Surface;
   size?: number;
   className?: string;
 }
 
-export function DomerMark({ surface = 'light', size = 28, className }: DomerMarkProps) {
+export function DomnerMark({ surface = 'light', size = 28, className }: DomnerMarkProps) {
   const c = RECIPES[surface];
   return (
     <svg
@@ -42,7 +42,7 @@ export function DomerMark({ surface = 'light', size = 28, className }: DomerMark
   );
 }
 
-interface DomerLogoProps {
+interface DomnerLogoProps {
   surface?: 'navy' | 'light';
   size?: number;
   kicker?: boolean;
@@ -53,13 +53,13 @@ interface DomerLogoProps {
 // "Domner" (Marcellus) + "TRAVEL" kicker in English, "ដំណើរ" (Khmer serif) +
 // "DOMNER" kicker in Khmer — so the logo visibly responds to the language
 // toggle instead of staying pinned to English.
-export function DomerLogo({ surface = 'light', size = 30, kicker = true, className }: DomerLogoProps) {
+export function DomnerLogo({ surface = 'light', size = 30, kicker = true, className }: DomnerLogoProps) {
   const { lang, t } = useLang();
   const wordColor = surface === 'navy' ? 'text-sandstone' : 'text-primary';
   const wordFont = lang === 'km' ? 'font-khmer' : 'font-display';
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
-      <DomerMark surface={surface} size={size} />
+      <DomnerMark surface={surface} size={size} />
       <span key={lang} className="leading-none animate-fade-up">
         <span className={`block ${wordFont} text-xl tracking-[0.05em] ${wordColor}`}>{t('brand.word')}</span>
         {kicker && (

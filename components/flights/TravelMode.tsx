@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Plane, BellRing } from 'lucide-react';
 import type { FlightStatus } from '@/types';
 import { FlightStatusBadge } from './FlightStatusBadge';
-import { DomerLogo } from '@/components/brand/DomerMark';
+import { DomnerLogo } from '@/components/brand/DomnerMark';
 import { formatTime } from '@/lib/utils';
 
 interface WakeLockSentinel {
@@ -75,7 +75,7 @@ export function TravelMode({ flight, onClose }: { flight: FlightStatus; onClose:
       {/* Top bar */}
       <div className="relative flex items-center justify-between px-5 pt-5">
         <p className="flex items-center font-display text-sm font-extrabold text-white/80">
-          <DomerLogo surface="navy" size={22} kicker={false} />
+          <DomnerLogo surface="navy" size={22} kicker={false} />
           <span className="ml-2 font-body text-xs font-medium uppercase tracking-widest text-white/40">
             Travel Mode
           </span>

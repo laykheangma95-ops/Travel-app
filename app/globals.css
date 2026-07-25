@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Domer design tokens — Temple Night / Angkor Gold */
+  /* Domner design tokens — Temple Night / Angkor Gold */
   --color-primary: #14263F;
   --color-primary-deep: #0E1B30;
   --color-secondary: #1C3355;
@@ -86,29 +86,29 @@
   }
 }
 
-/* Domer loader keyframes — exact timings from the brand handoff */
-@keyframes domerSpin {
+/* Domner loader keyframes — exact timings from the brand handoff */
+@keyframes domnerSpin {
   0% { transform: rotateY(0deg); }
   100% { transform: rotateY(360deg); }
 }
-@keyframes domerDust {
+@keyframes domnerDust {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-@keyframes domerTwinkle {
+@keyframes domnerTwinkle {
   0%, 100% { opacity: 0.15; transform: scale(0.6); }
   50% { opacity: 1; transform: scale(1.15); }
 }
-@keyframes domerSheen {
+@keyframes domnerSheen {
   0% { opacity: 0; }
   45% { opacity: 0.85; }
   100% { opacity: 0; }
 }
-@keyframes domerPulse {
+@keyframes domnerPulse {
   0%, 100% { opacity: 0.25; transform: translate(-50%, -50%) scale(0.9); }
   50% { opacity: 0.55; transform: translate(-50%, -50%) scale(1.25); }
 }
-@keyframes domerDots {
+@keyframes domnerDots {
   0%, 20% { opacity: 0.2; }
   50% { opacity: 1; }
   80%, 100% { opacity: 0.2; }
@@ -404,11 +404,11 @@
   }
 
   .hero-twinkle {
-    animation: domerTwinkle 2.6s ease-in-out infinite;
+    animation: domnerTwinkle 2.6s ease-in-out infinite;
   }
 
-  /* ── Domer loader (spec: design_handoff_domer_brand/loader.html) ───────── */
-  .domer-splash {
+  /* ── Domner loader (spec: design_handoff_domer_brand/loader.html) ───────── */
+  .domner-splash {
     position: fixed;
     inset: 0;
     z-index: 9999;
@@ -421,12 +421,12 @@
     transition: opacity 0.5s ease, visibility 0.5s ease;
   }
 
-  .domer-splash.is-hidden {
+  .domner-splash.is-hidden {
     opacity: 0;
     visibility: hidden;
   }
 
-  .domer-glow {
+  .domner-glow {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -435,34 +435,34 @@
     border-radius: 50%;
     background: radial-gradient(circle, rgba(230, 203, 139, 0.5), transparent 70%);
     filter: blur(14px);
-    animation: domerPulse 2.6s ease-in-out infinite;
+    animation: domnerPulse 2.6s ease-in-out infinite;
   }
 
-  .domer-dust {
+  .domner-dust {
     position: absolute;
     inset: 0;
-    animation: domerDust 9s linear infinite;
+    animation: domnerDust 9s linear infinite;
   }
 
-  .domer-dust i {
+  .domner-dust i {
     position: absolute;
     border-radius: 50%;
     background: #e6cb8b;
     box-shadow: 0 0 6px #e6cb8b;
-    animation: domerTwinkle 2s ease-in-out infinite;
+    animation: domnerTwinkle 2s ease-in-out infinite;
   }
 
-  .domer-star {
+  .domner-star {
     transform-style: preserve-3d;
-    animation: domerSpin 2.4s cubic-bezier(0.62, 0, 0.62, 1) infinite;
+    animation: domnerSpin 2.4s cubic-bezier(0.62, 0, 0.62, 1) infinite;
   }
 
-  .domer-sheen-path {
-    animation: domerSheen 2.4s ease-in-out infinite;
+  .domner-sheen-path {
+    animation: domnerSheen 2.4s ease-in-out infinite;
     mix-blend-mode: screen;
   }
 
-  .domer-label {
+  .domner-label {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -473,28 +473,28 @@
     color: rgba(246, 241, 231, 0.7);
   }
 
-  .domer-label b {
+  .domner-label b {
     font-weight: 400;
   }
 
-  .domer-label span {
-    animation: domerDots 1.4s infinite;
+  .domner-label span {
+    animation: domnerDots 1.4s infinite;
   }
 
-  .domer-label span:nth-child(2) {
+  .domner-label span:nth-child(2) {
     animation-delay: 0.2s;
   }
 
-  .domer-label span:nth-child(3) {
+  .domner-label span:nth-child(3) {
     animation-delay: 0.4s;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .domer-star,
-    .domer-dust,
-    .domer-glow,
-    .domer-sheen-path,
-    .domer-label span,
+    .domner-star,
+    .domner-dust,
+    .domner-glow,
+    .domner-sheen-path,
+    .domner-label span,
     .hero-dots-drift {
       animation: none;
     }

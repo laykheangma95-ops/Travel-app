@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { FileDown, ImagePlus, QrCode } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { DomerLogo } from '@/components/brand/DomerMark';
+import { DomnerLogo } from '@/components/brand/DomnerMark';
 import { Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { destinations } from '@/data/destinations';
@@ -55,7 +55,7 @@ export default function GenerateEsimPage() {
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html>
-<html><head><title>${form.orderNumber} — Domer eSIM</title>
+<html><head><title>${form.orderNumber} — Domner eSIM</title>
 <style>
   body { font-family: Arial, sans-serif; color: #0F172A; max-width: 640px; margin: 0 auto; padding: 32px; }
   .header { background: #14263F; border-radius: 16px; padding: 28px; text-align: center; }
@@ -71,7 +71,7 @@ export default function GenerateEsimPage() {
   .footer { margin-top: 32px; text-align: center; color: #475569; font-size: 13px; }
   .accent { color: #C69749; }
 </style></head><body>
-  <div class="header"><div class="logo"><span class="d">Domer</span></div></div>
+  <div class="header"><div class="logo"><span class="d">Domner</span></div></div>
   <h2>Your ${dest?.name ?? form.country} eSIM ${dest?.flag ?? ''}</h2>
   <table>
     <tr><td>Order number</td><td>${form.orderNumber}</td></tr>
@@ -152,7 +152,7 @@ export default function GenerateEsimPage() {
         <h2 className="mb-5 font-display font-bold text-ink">Preview</h2>
         <Card className="overflow-hidden">
           <div className="flex justify-center bg-primary p-6">
-            <DomerLogo surface="navy" />
+            <DomnerLogo surface="navy" />
           </div>
           <div className="p-7">
             <h3 className="font-display text-lg font-bold text-ink">

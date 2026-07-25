@@ -24,7 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             Admin <span className="text-accent">Panel</span>
           </h1>
           <span className="rounded-full bg-surface-3 px-3.5 py-1.5 text-xs font-medium text-ink-secondary">
-            Internal · Domer Ops
+            Internal · Domner Ops
           </span>
         </div>
         <div className="mb-8 flex flex-wrap gap-2">

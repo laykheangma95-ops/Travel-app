@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Facebook, Send, Music2 } from 'lucide-react';
-import { DomerLogo } from '@/components/brand/DomerMark';
+import { DomnerLogo } from '@/components/brand/DomnerMark';
 import { useLang, type DictKey } from '@/lib/i18n';
 
 const columns: { titleKey: DictKey; links: { labelKey: DictKey; href: string }[] }[] = [
@@ -48,7 +48,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div>
-            <DomerLogo surface="navy" />
+            <DomnerLogo surface="navy" />
             <p className="mt-2 font-display text-[11px] uppercase tracking-[0.28em] text-white/40">
               The Art of the Journey
             </p>
@@ -56,21 +56,21 @@ export function Footer() {
             <div className="mt-5 flex gap-3">
               <a
                 href="https://facebook.com"
-                aria-label="Domer on Facebook"
+                aria-label="Domner on Facebook"
                 className="rounded-full bg-white/10 p-2.5 transition-colors hover:bg-accent"
               >
                 <Facebook size={16} />
               </a>
               <a
                 href="https://t.me/domnerapp"
-                aria-label="Domer on Telegram"
+                aria-label="Domner on Telegram"
                 className="rounded-full bg-white/10 p-2.5 transition-colors hover:bg-accent"
               >
                 <Send size={16} />
               </a>
               <a
                 href="https://tiktok.com"
-                aria-label="Domer on TikTok"
+                aria-label="Domner on TikTok"
                 className="rounded-full bg-white/10 p-2.5 transition-colors hover:bg-accent"
               >
                 <Music2 size={16} />

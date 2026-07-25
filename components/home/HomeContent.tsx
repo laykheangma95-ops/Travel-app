@@ -31,7 +31,7 @@ const testimonials = [
     name: 'Dara M.',
     trip: 'Japan trip',
     quote:
-      'The gate change notification saved me. I was in the coffee shop and Domer told me before the screen did.',
+      'The gate change notification saved me. I was in the coffee shop and Domner told me before the screen did.',
   },
   {
     initials: 'CS',

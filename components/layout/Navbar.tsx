@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ChevronDown, Menu, ShoppingCart, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
-import { DomerLogo } from '@/components/brand/DomerMark';
+import { DomnerLogo } from '@/components/brand/DomnerMark';
 import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -82,8 +82,8 @@ export function Navbar() {
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
-        <Link href="/" aria-label="Domer home">
-          <DomerLogo surface="light" />
+        <Link href="/" aria-label="Domner home">
+          <DomnerLogo surface="light" />
         </Link>
 
         {/* Desktop nav */}

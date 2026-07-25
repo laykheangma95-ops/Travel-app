@@ -40,10 +40,10 @@ export default function SignInPage() {
   return (
     <AuthCard
       title="Welcome back"
-      subtitle="Sign in to your Domer account"
+      subtitle="Sign in to your Domner account"
       footer={
         <>
-          New to Domer?{' '}
+          New to Domner?{' '}
           <Link href="/sign-up" className="font-semibold text-secondary hover:text-accent">
             Create an account
           </Link>

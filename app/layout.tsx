@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 import { LiquidTouchController } from '@/components/pwa/LiquidTouchController';
-import { DomerSplash } from '@/components/brand/DomerLoader';
+import { DomnerSplash } from '@/components/brand/DomnerLoader';
 import { TripCopilot } from '@/components/copilot/TripCopilot';
 import { LanguageProvider } from '@/lib/i18n';
 import { Suspense } from 'react';
@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
         <LanguageProvider>
-          <DomerSplash />
+          <DomnerSplash />
           <ServiceWorkerRegister />
           <LiquidTouchController />
           <Suspense fallback={null}>

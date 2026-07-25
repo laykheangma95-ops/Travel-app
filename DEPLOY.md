@@ -37,7 +37,7 @@ to your default branch or point Vercel straight at this branch (Step 3 covers bo
 
 1. Open the Vercel URL in **Safari** on your iPhone.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
-3. Launch from the new **Domer** icon — it opens **full-screen, no browser bars**, navy splash,
+3. Launch from the new **Domner** icon — it opens **full-screen, no browser bars**, navy splash,
    portrait. That's the PWA (it's already configured: manifest, icons, service worker).
 4. Try the **Liquid Glass touch feel**: press and drag on the gold **Get Your eSIM** button and
    the **✦ Copilot** button — you'll see the highlight follow your finger and the button settle

@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Domer brand — Temple Night / Angkor Gold (see design_handoff_domer_brand)
+        // Domner brand — Temple Night / Angkor Gold (see design_handoff_domer_brand)
         primary: '#14263F', // Temple Night
         'primary-deep': '#0E1B30',
         secondary: '#1C3355', // Navy tint

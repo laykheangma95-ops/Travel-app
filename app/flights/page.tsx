@@ -64,7 +64,7 @@ export default function FlightTrackerPage() {
             Track any flight, live.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-white/70">
-            Gate changes, delays, boarding calls — Domer tells you before the airport screens do.
+            Gate changes, delays, boarding calls — Domner tells you before the airport screens do.
           </p>
         </div>
 

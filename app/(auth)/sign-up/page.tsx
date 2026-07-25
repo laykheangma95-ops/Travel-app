@@ -76,7 +76,7 @@ export default function SignUpPage() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Travel confidently with Domer"
+      subtitle="Travel confidently with Domner"
       footer={
         <>
           Already have an account?{' '}
