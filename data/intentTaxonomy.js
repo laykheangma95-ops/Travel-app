@@ -4,7 +4,9 @@
  * Grounded in what the app actually does, read from the repo:
  *   20 destinations, 3 plan tiers (basic/standard/premium), per-country base
  *   pricing, flight tracking, airport guides, customs rules, scam alerts,
- *   trip checklist, ABA/Wing/KHQR payments, Telegram support.
+ *   trip checklist, Stripe card + KHQR / ABA PayWay payments, Telegram support.
+ *   Payment methods are read from DOMNER_FACTS.paymentMethods at answer time —
+ *   there is no Wing integration in the app, so do not describe one here.
  *
  * COUNTRIES ARE NOT INTENTS. "how much for japan" and "how much for thailand"
  * are the same intent (esim_price) with different entities — detectCountry()
@@ -77,7 +79,7 @@ export const TAXONOMY = {
   emergency: { desc: 'Urgent trouble — lost passport, theft, accident, police or hospital needed.', grounded: true },
 
   /* ---- commerce ---- */
-  payment_methods: { desc: 'Which payment methods are accepted — ABA, Wing, KHQR, card.', grounded: true },
+  payment_methods: { desc: 'Which payment methods are accepted — international card, KHQR, ABA PayWay.', grounded: true },
   payment_failed: { desc: 'A payment was declined or failed, charged but nothing received.' },
   payment_currency: { desc: 'Paying in USD or riel, whether there are conversion fees.' },
   refund: { desc: 'Requesting a refund, refund policy, how long it takes.' },
@@ -90,7 +92,9 @@ export const TAXONOMY = {
   account_login: { desc: 'Signing in, password reset, account access problems.' },
   account_delete: { desc: 'Deleting an account, removing personal data.' },
   privacy: { desc: 'How personal data is handled, stored, or shared.' },
-  domner_pro: { desc: 'The Domner Pro subscription — what it includes, what it costs.', grounded: true },
+  // NOT grounded: no Pro product exists in the app — no plan, price or tier in
+  // any data file. The answer states it is unavailable; it cannot be computed.
+  domner_pro: { desc: 'Asking about a paid Domner Pro or premium subscription tier.' },
   affiliate: { desc: 'The affiliate or referral programme, earning commission.' },
   products: { desc: 'What Domner sells or does overall, services and features.', grounded: true },
   partnership: { desc: 'Business enquiries, becoming a partner or reseller.' },

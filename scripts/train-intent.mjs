@@ -180,15 +180,24 @@ labels.forEach((l, k) => {
 });
 
 /* ---------- calibrate the accept threshold ----------
-   We want a threshold where predictions we ACCEPT are right ~90% of the time.
-   Everything below it falls through to the keyword engine, so a miss here is
-   cheap — it degrades to today's behaviour rather than answering wrongly. */
-let threshold = 0.5;
-for (let t = 0.95; t >= 0.2; t -= 0.05) {
+   We want the LOWEST threshold at which the predictions we ACCEPT are still
+   right ~90% of the time. Precision rises as the threshold rises, so scanning
+   downward and taking the first match would always pick the *highest* passing
+   threshold — maximum precision over minimum traffic, i.e. a classifier that
+   almost never fires and is pure added latency. Scan upward instead and stop at
+   the first threshold that clears the bar: same precision, most coverage.
+
+   Anything below the threshold falls through to the keyword engine, so a miss
+   is cheap — it degrades to today's behaviour rather than answering wrongly. */
+const PRECISION_BAR = 0.9;
+const MIN_ACCEPTED = 3; // below this the precision estimate is noise
+let threshold = null;
+
+for (let t = 0.2; t <= 0.95 + 1e-9; t += 0.05) {
   const accepted = confidences.filter((c) => c.confidence >= t);
-  if (accepted.length < 3) continue;
+  if (accepted.length < MIN_ACCEPTED) break; // even fewer accepted as t grows
   const precision = accepted.filter((c) => c.correct).length / accepted.length;
-  if (precision >= 0.9) {
+  if (precision >= PRECISION_BAR) {
     threshold = Number(t.toFixed(2));
     console.log(
       `\nthreshold ${threshold} → ${(precision * 100).toFixed(0)}% precision on ` +
@@ -196,6 +205,20 @@ for (let t = 0.95; t >= 0.2; t -= 0.05) {
     );
     break;
   }
+}
+
+if (threshold === null) {
+  /* No threshold reaches the precision bar on held-out data. Do NOT fall back
+     to a permissive value — that ships a model that answers wrongly. Pin it
+     effectively closed so the keyword engine keeps handling everything, and
+     say so loudly. */
+  threshold = 0.99;
+  console.log(
+    `\nNo threshold reached ${PRECISION_BAR * 100}% precision on held-out data.\n` +
+      `  Pinning threshold to ${threshold} so the classifier stays shut and the\n` +
+      `  keyword engine handles all traffic. Get more/better training data before\n` +
+      `  enabling the classifier path.`
+  );
 }
 
 const misses = confidences.filter((c) => !c.correct).slice(0, 5);

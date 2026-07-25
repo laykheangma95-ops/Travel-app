@@ -10,7 +10,7 @@
  * engine runs exactly as it does today. Worst case is current behaviour.
  */
 
-import { featurise } from './intentFeatures.js';
+import { featurise, DIM as FEATURE_DIM } from './intentFeatures.js';
 import modelJson from '@/data/intentModel.json';
 
 type Model = {
@@ -29,11 +29,49 @@ const model = modelJson as Model;
 /* Dequantise once at module load, not per request. */
 const K = model.labels.length;
 const DIM = model.dim;
+
+/**
+ * The model was trained with a specific feature-space size. If the featuriser's
+ * DIM is ever changed without retraining, every weight lines up against the
+ * wrong feature and the classifier degrades silently — the exact train/runtime
+ * drift this shared-featuriser setup exists to prevent. Fail loudly instead.
+ */
+if (DIM !== FEATURE_DIM) {
+  throw new Error(
+    `intentModel.json was trained with dim=${DIM} but intentFeatures.js now uses ` +
+      `DIM=${FEATURE_DIM}. Re-run "npm run intents:train" to rebuild the model.`,
+  );
+}
+if (model.scales.length !== K || model.bias.length !== K) {
+  throw new Error(
+    `intentModel.json is inconsistent: ${K} labels but ${model.scales.length} scales ` +
+      `and ${model.bias.length} biases.`,
+  );
+}
+
+/** base64 → bytes, without assuming Node's Buffer exists (Edge runtime has atob). */
+function decodeBase64(b64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    const raw = Buffer.from(b64, 'base64');
+    return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  }
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 const W = new Float32Array(K * DIM);
 
 {
-  const raw = Buffer.from(model.weights, 'base64');
-  const q = new Int8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  const bytes = decodeBase64(model.weights);
+  if (bytes.byteLength !== K * DIM) {
+    throw new Error(
+      `intentModel.json weight matrix is ${bytes.byteLength} bytes, expected ${K * DIM} ` +
+        `(${K} labels x ${DIM} dims). The model file is truncated or stale.`,
+    );
+  }
+  const q = new Int8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (let k = 0; k < K; k++) {
     const off = k * DIM;
     const scale = model.scales[k];

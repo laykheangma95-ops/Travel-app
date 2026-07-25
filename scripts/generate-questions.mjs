@@ -7,6 +7,9 @@
  * from your own data by domnerEngine, which is the only reason the copilot
  * can be trusted about prices and policies.
  *
+ * This is a ONE-TIME OFFLINE step. The live app never calls an external model:
+ * it loads data/intentModel.json and does local arithmetic. Nothing here ships.
+ *
  * Defaults to 150 per intent across ~60 intents, so roughly 9,000 examples.
  * Past ~150 the model starts repeating itself; the near-duplicate filter will
  * show you when you have hit that ceiling.
@@ -15,18 +18,64 @@
  */
 
 import fs from 'node:fs';
+import Anthropic from '@anthropic-ai/sdk';
 import { TAXONOMY, INTENT_IDS } from '../data/intentTaxonomy.js';
 
-const KEY = process.env.ANTHROPIC_API_KEY;
-if (!KEY) {
+/* The app already depends on @anthropic-ai/sdk, so use it rather than raw
+   fetch: it retries 429s and 5xx with exponential backoff on its own, and
+   surfaces typed errors instead of a bare status code. */
+if (!process.env.ANTHROPIC_API_KEY) {
   console.error('Set ANTHROPIC_API_KEY first.');
   process.exit(1);
 }
+const anthropic = new Anthropic();
+
+/* Sonnet rather than Opus: this is a bulk job of ~9,000 short questions where
+   the task is phrasing variety, not reasoning. Switch to 'claude-opus-5' if
+   the generated phrasings come out bland. */
+const MODEL = 'claude-sonnet-5';
+const MAX_TOKENS = 8000;
 
 const PER_INTENT = Number(process.argv[2] || 150);
 const BATCH = 50;
 const OUT = 'data/intents.jsonl';
 const CONCURRENCY = 4;
+
+/* ---------- app facts, read from the data files ----------
+   These used to be hardcoded in the prompt, which let them drift from the app:
+   the "Wing" payment method described there does not exist in this codebase,
+   and the country list would go stale silently whenever destinations.ts
+   changed. Reading them means generated questions describe the real product. */
+function readAppFacts() {
+  const grab = (file) => fs.readFileSync(file, 'utf8');
+
+  const countries = [
+    ...grab('data/destinations.ts').matchAll(/^\s{4}slug: '[^']+', name: '([^']+)'/gm),
+  ].map((m) => m[1]);
+
+  const tiers = [
+    ...grab('data/esimPlans.ts').matchAll(/name: '([^']+)', durationDays: (\d+)/g),
+  ].map((m) => `${m[1]} ${m[2]} days`);
+
+  // DOMNER_FACTS.paymentMethods — the single source of truth for how people pay.
+  const payBlock = grab('lib/domnerBrain.ts').match(/paymentMethods: \[([^\]]+)\]/);
+  const payments = payBlock ? [...payBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : [];
+
+  if (!countries.length || !tiers.length || !payments.length) {
+    throw new Error(
+      `could not read app facts (countries=${countries.length} tiers=${tiers.length} ` +
+        `payments=${payments.length}) — the data files moved or changed shape. Fix ` +
+        'readAppFacts() rather than generating questions from stale facts.',
+    );
+  }
+  return { countries, tiers, payments };
+}
+
+const FACTS = readAppFacts();
+console.log(
+  `app facts: ${FACTS.countries.length} countries, ${FACTS.tiers.length} tiers, ` +
+    `payments: ${FACTS.payments.join(' / ')}\n`,
+);
 
 /* ---------- load what already exists ---------- */
 const seen = new Set();
@@ -81,7 +130,7 @@ async function generate(intentId, n, avoid) {
         .join('\n')}\n`
     : '';
 
-  const prompt = `You are building training data for a customer-support intent classifier for Domner, a Cambodian travel app. It sells eSIM data plans for 20 countries in three tiers (Basic 3 days, Standard 7 days, Premium 15 days), tracks flights, and provides airport guides, customs rules, scam alerts and a trip checklist. Payments are ABA, Wing and KHQR. Support is via Telegram.
+  const prompt = `You are building training data for a customer-support intent classifier for Domner, a Cambodian travel app. It sells eSIM data plans for ${FACTS.countries.length} countries in ${FACTS.tiers.length} tiers (${FACTS.tiers.join(', ')}), tracks flights, and provides airport guides, customs rules, scam alerts and a trip checklist. Payments are ${FACTS.payments.join(' and ')}. Support is via Telegram.
 
 Write ${n} DIFFERENT ways a real customer might express this ONE intent:
 "${intentId}" — ${desc}
@@ -94,36 +143,30 @@ Requirements:
 - Vary register: terse ("no data"), polite, panicked, rambling, broken English.
 - Include realistic typos, missing punctuation, lowercase. Real customers type badly.
 - Vary length from 2 words to a full sentence.
-- Where natural, mention real countries from the list: Vietnam, Thailand, China, Japan, Singapore, South Korea, Malaysia, Taiwan, Hong Kong, Indonesia, Australia, USA, France, UK, Germany, UAE, India, Philippines, Laos, Canada.
+- Where natural, mention real countries from the list: ${FACTS.countries.join(', ')}.
 - Write QUESTIONS AND STATEMENTS A CUSTOMER WOULD SEND. Never write answers.
 
 Return ONLY a JSON array of strings.`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+  /* The SDK retries 429 and 5xx internally with exponential backoff, so there
+     is no retry loop here. The previous version recursed on 429 with no depth
+     limit, which could spin forever against a persistently throttled key. */
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    messages: [{ role: 'user', content: prompt }],
   });
 
-  if (res.status === 429) {
-    await new Promise((r) => setTimeout(r, 20000));
-    return generate(intentId, n, avoid);
-  }
-
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  const text = data.content.map((b) => b.text || '').join('');
+  const text = message.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
   const s = text.indexOf('[');
   const e = text.lastIndexOf(']');
-  if (s === -1 || e === -1) throw new Error('no JSON array');
+  if (s === -1 || e === -1) {
+    throw new Error(
+      message.stop_reason === 'max_tokens'
+        ? `no JSON array — hit max_tokens (${MAX_TOKENS}); lower BATCH or raise MAX_TOKENS`
+        : `no JSON array (stop_reason=${message.stop_reason})`,
+    );
+  }
   return JSON.parse(text.slice(s, e + 1));
 }
 
@@ -193,7 +236,7 @@ await Promise.all(
       const tag = r.error ? `ERROR ${r.error}` : r.skipped ? 'already full' : `+${r.added}`;
       console.log(`${id.padEnd(24)} ${String(r.total).padStart(4)}  ${tag}`);
     }
-  })
+  }),
 );
 
 out.end();
