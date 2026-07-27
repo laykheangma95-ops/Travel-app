@@ -37,6 +37,16 @@ const config: Config = {
           secondary: '#475569',
           muted: '#94A3B8',
         },
+
+        // ── Corner Map (ជ្រុង) — docs/corner-map-spec.md §3 ──────────────
+        // Time is the palette: hot when live, cooling to ash. These are
+        // scoped to the Corner Map module and are not site brand colours.
+        dusk: '#0A0F0D', // base — near-black with a green undertone
+        slab: '#151E1A', // cards, sheets, map surface
+        live: '#FFB627', // marigold. LIVE only. Never decorative.
+        dust: '#C2A878', // TODAY
+        ash: '#6F827A', // WEEK / ARCHIVE / inactive
+        paper: '#EDE8DC', // primary type on dark
       },
       fontFamily: {
         display: ['var(--font-display)', 'sans-serif'],
@@ -46,6 +56,12 @@ const config: Config = {
         // site to 3 font families instead of 4.
         mono: ['var(--font-body)', 'sans-serif'],
         khmer: ['var(--font-khmer)', 'sans-serif'],
+        // Corner Map type stack (§3). Loaded only on /corner routes — see
+        // app/(corner)/layout.tsx — so the rest of the site stays on 3 faces.
+        'corner-display': ['var(--font-corner-display)', 'sans-serif'],
+        'corner-body': ['var(--font-corner-body)', 'sans-serif'],
+        'corner-mono': ['var(--font-corner-mono)', 'ui-monospace', 'monospace'],
+        'corner-khmer': ['var(--font-corner-khmer)', 'sans-serif'],
       },
       borderRadius: {
         card: '18px',
@@ -91,6 +107,15 @@ const config: Config = {
           '0%, 100%': { opacity: '0.7' },
           '50%': { opacity: '1' },
         },
+        // Corner Map motion (§3) — three moments, nothing else moves.
+        'live-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
+        },
+        'stamp-burn': {
+          from: { opacity: '0', filter: 'blur(3px)' },
+          to: { opacity: '1', filter: 'blur(0)' },
+        },
       },
       animation: {
         'gradient-drift': 'gradient-drift 24s ease-in-out infinite',
@@ -101,6 +126,8 @@ const config: Config = {
         'dash-flow': 'dash-flow 3.2s linear infinite',
         'orb-pulse': 'orb-pulse 3s ease-in-out infinite',
         'globe-glow': 'globe-glow 6s ease-in-out infinite',
+        'live-pulse': 'live-pulse 2.4s ease-in-out infinite',
+        'stamp-burn': 'stamp-burn 220ms cubic-bezier(0.2, 0, 0, 1) both',
       },
     },
   },

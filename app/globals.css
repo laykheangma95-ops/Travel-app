@@ -702,3 +702,133 @@
     animation: none;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   CORNER MAP (ជ្រុង) — docs/corner-map-spec.md §3
+   Scoped to /corner routes. Time is the palette.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.corner-root {
+  --dusk: #0a0f0d;   /* base — near-black with a green undertone */
+  --slab: #151e1a;   /* cards, sheets, map surface */
+  --live: #ffb627;   /* marigold. LIVE only. Never decorative. */
+  --dust: #c2a878;   /* TODAY */
+  --ash: #6f827a;    /* WEEK / ARCHIVE / inactive */
+  --paper: #ede8dc;  /* primary type on dark */
+
+  background: var(--dusk);
+  color: var(--paper);
+  font-family: var(--font-corner-body), system-ui, sans-serif;
+}
+
+/* ── Khmer typesetting — non-negotiable, most apps get these wrong ──────────
+   Khmer stacks subscripts below the baseline and vowels above it, so 1.4
+   line-height clips them. Any letter-spacing breaks cluster shaping. There is
+   no uppercase and no italic form in the script. */
+:lang(km) {
+  line-height: 1.8;
+  letter-spacing: 0;
+  font-feature-settings: normal;
+}
+
+.corner-root :lang(km) {
+  font-family: var(--font-corner-khmer), var(--font-corner-body), sans-serif;
+}
+
+/* Guard rails: these must never apply to Khmer text, whatever a utility class
+   further down the cascade asks for. */
+:lang(km),
+:lang(km) * {
+  text-transform: none !important;
+  font-style: normal !important;
+}
+
+/* Khmer strings run 15–25% longer than English — labels flex, never truncate
+   to a fixed width. */
+.corner-root:lang(km) button,
+.corner-root :lang(km) button,
+.corner-root :lang(km) .corner-label {
+  white-space: normal;
+  min-width: 0;
+  width: auto;
+}
+
+/* ── The timestamp burn (§3 signature element) ─────────────────────────────
+   90s point-and-shoot date stamp: mono, letter-spaced, Latin numerals always
+   — Khmer numerals break the camera-stamp read. */
+.corner-stamp {
+  font-family: var(--font-corner-mono), ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+/* Archive grain — sits over the desaturated image, never over live ones. */
+.corner-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.55'/></svg>");
+}
+
+/* ── Motion: three moments only ────────────────────────────────────────────
+   1. live pulse  2. sheet spring  3. stamp reveal */
+.corner-sheet {
+  transition: transform 380ms cubic-bezier(0.2, 0.9, 0.24, 1);
+}
+
+.corner-sheet[data-dragging='true'] {
+  transition: none;
+}
+
+/* Reduced motion: kill the pulse, replace it with a static ring. */
+@media (prefers-reduced-motion: reduce) {
+  .corner-root .animate-live-pulse,
+  .corner-root .animate-stamp-burn {
+    animation: none !important;
+  }
+
+  .corner-node--live {
+    box-shadow: 0 0 0 3px rgba(255, 182, 39, 0.55);
+  }
+
+  .corner-sheet {
+    transition: none;
+  }
+}
+
+/* Visible keyboard focus everywhere — required, mobile-first at 390px. */
+.corner-root :focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* MapLibre chrome, restyled onto the dusk palette. */
+.corner-root .maplibregl-ctrl-attrib {
+  background: rgba(10, 15, 13, 0.72);
+  color: var(--ash);
+  font-size: 10px;
+}
+
+.corner-root .maplibregl-ctrl-attrib a {
+  color: var(--ash);
+}
+
+.corner-root .maplibregl-canvas:focus {
+  outline: 2px solid var(--live);
+}
+
+/* Corner Map takes the whole viewport (§3: map-first, no competing chrome).
+   The z-index on .corner-root already covers the site header, footer and the
+   Trip Copilot FAB; this removes them from the paint entirely where :has() is
+   supported, so their backdrop-filters don't cost anything underneath. */
+body:has(.corner-root) > header,
+body:has(.corner-root) > footer,
+body:has(.corner-root) > button {
+  display: none;
+}

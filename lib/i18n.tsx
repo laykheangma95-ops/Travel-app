@@ -90,6 +90,80 @@ const dicts = {
     'footer.privacy': 'Privacy Policy',
     'footer.terms': 'Terms',
     'footer.prices': 'All prices in USD',
+
+    // ── Corner Map (ជ្រុង) — docs/corner-map-spec.md ──────────────────────
+    'corner.title': 'Corner',
+    'corner.tagline': 'What this place looks like right now.',
+    'corner.search': 'Search corners',
+    'corner.searchPlaceholder': 'Café, temple, market…',
+    'corner.back': 'Back',
+    'corner.close': 'Close',
+    'corner.myMap': 'My map',
+    'corner.locating': 'Finding your corner…',
+    'corner.locationDenied': 'Location is off, so this is Phnom Penh for now.',
+    // Filters (§5.1)
+    'corner.filter.live': 'Live now',
+    'corner.filter.food': 'Food',
+    'corner.filter.coffee': 'Coffee',
+    'corner.filter.temples': 'Temples',
+    'corner.filter.openLate': 'Open late',
+    'corner.filter.clear': 'Clear filters',
+    // Freshness (§2)
+    'corner.live': 'LIVE',
+    'corner.minAgo': '{n} MIN AGO',
+    'corner.hoursAgo': '{n} h ago',
+    'corner.daysAgo': '{n} d ago',
+    'corner.justNow': 'JUST NOW',
+    'corner.lastSeen': 'Last seen {when}',
+    'corner.noShotsYet': 'No shots yet',
+    // Sheet (§5.2)
+    'corner.nearYou': 'NEAR YOU',
+    'corner.liveCount': '{n} LIVE',
+    'corner.cornerCount': '{n} corners',
+    'corner.save': 'Save to my map',
+    'corner.saved': 'Saved',
+    'corner.unsave': 'Remove from my map',
+    'corner.directions': 'Directions',
+    'corner.shotCount': '{n} shots',
+    'corner.expand': 'Expand',
+    'corner.collapse': 'Collapse',
+    // Report (§5.2, §7)
+    'corner.report': 'Report',
+    'corner.report.title': 'Why report this shot?',
+    'corner.report.person': 'Shows a person',
+    'corner.report.unsafe': 'Unsafe or harmful',
+    'corner.report.spam': 'Spam',
+    'corner.report.wrongPlace': 'Wrong place',
+    'corner.report.other': 'Something else',
+    'corner.report.done': 'Reported. Thank you.',
+    'corner.report.cancel': 'Cancel',
+    // Capture (§5.3)
+    'corner.capture': 'Capture',
+    'corner.capture.choose': 'Take or choose a photo',
+    'corner.capture.retake': 'Choose another',
+    'corner.capture.venue': 'Which place is this?',
+    'corner.capture.venueHint': 'Shots attach to a place, never to your exact location.',
+    'corner.capture.venueRequired': 'Pick a corner before posting.',
+    'corner.capture.venueSearch': 'Search for a place',
+    'corner.capture.noVenues': 'No corners nearby. Try searching.',
+    'corner.capture.caption': 'Caption',
+    'corner.capture.captionOptional': 'Optional, 140 characters',
+    'corner.capture.post': 'Post to this corner',
+    'corner.capture.posting': 'Posting…',
+    'corner.capture.failed': 'That did not post. Try again.',
+    'corner.capture.held': 'Corner Map is for places. Try a shot of the spot itself.',
+    'corner.capture.minor': 'Posting opens at 18. You can still explore every corner.',
+    'corner.capture.signIn': 'Sign in to post a shot.',
+    'corner.capture.exifNote': 'Location and camera data are stripped before your photo is stored.',
+    // Empty states (§5.1, §5.4)
+    'corner.empty.title': 'No shots near you yet.',
+    'corner.empty.cta': 'Be the first corner.',
+    'corner.myMap.empty': 'Nothing saved yet.',
+    'corner.myMap.emptyCta': 'Corners you save land here.',
+    'corner.myMap.yourShots': 'Your shots',
+    'corner.myMap.savedCorners': 'Saved corners',
+    'corner.view.map': 'Map',
+    'corner.view.grid': 'Grid',
   },
   km: {
     // Brand
@@ -175,21 +249,107 @@ const dicts = {
     'footer.privacy': 'គោលការណ៍ឯកជនភាព',
     'footer.terms': 'លក្ខខណ្ឌ',
     'footer.prices': 'គ្រប់តម្លៃជាដុល្លារអាមេរិក',
+
+    // ── Corner Map (ជ្រុង) ────────────────────────────────────────────────
+    // Khmer runs 15–25% longer than English — every label that uses these is
+    // laid out to flex, never to a fixed width (§8).
+    'corner.title': 'ជ្រុង',
+    'corner.tagline': 'មើលថាកន្លែងនេះមានលក្ខណៈយ៉ាងណានៅពេលនេះ។',
+    'corner.search': 'ស្វែងរកជ្រុង',
+    'corner.searchPlaceholder': 'ហាងកាហ្វេ វត្ត ផ្សារ…',
+    'corner.back': 'ត្រឡប់ក្រោយ',
+    'corner.close': 'បិទ',
+    'corner.myMap': 'ផែនទីរបស់ខ្ញុំ',
+    'corner.locating': 'កំពុងស្វែងរកទីតាំងរបស់អ្នក…',
+    'corner.locationDenied': 'ទីតាំងត្រូវបានបិទ ដូច្នេះបង្ហាញភ្នំពេញជាមុនសិន។',
+    // Filters (§5.1)
+    'corner.filter.live': 'កំពុងផ្សាយ',
+    'corner.filter.food': 'អាហារ',
+    'corner.filter.coffee': 'កាហ្វេ',
+    'corner.filter.temples': 'វត្តអារាម',
+    'corner.filter.openLate': 'បើកយប់',
+    'corner.filter.clear': 'សម្អាតតម្រង',
+    // Freshness (§2)
+    'corner.live': 'ថ្មីៗ',
+    'corner.minAgo': '{n} នាទីមុន',
+    'corner.hoursAgo': '{n} ម៉ោងមុន',
+    'corner.daysAgo': '{n} ថ្ងៃមុន',
+    'corner.justNow': 'អម្បាញ់មិញ',
+    'corner.lastSeen': 'ឃើញចុងក្រោយ {when}',
+    'corner.noShotsYet': 'មិនទាន់មានរូបភាព',
+    // Sheet (§5.2)
+    'corner.nearYou': 'នៅជិតអ្នក',
+    'corner.liveCount': 'ថ្មីៗ {n}',
+    'corner.cornerCount': 'ជ្រុង {n}',
+    'corner.save': 'រក្សាទុកក្នុងផែនទីរបស់ខ្ញុំ',
+    'corner.saved': 'បានរក្សាទុក',
+    'corner.unsave': 'ដកចេញពីផែនទីរបស់ខ្ញុំ',
+    'corner.directions': 'ទិសដៅ',
+    'corner.shotCount': 'រូបភាព {n}',
+    'corner.expand': 'ពង្រីក',
+    'corner.collapse': 'បង្រួម',
+    // Report (§5.2, §7)
+    'corner.report': 'រាយការណ៍',
+    'corner.report.title': 'ហេតុអ្វីរាយការណ៍រូបភាពនេះ?',
+    'corner.report.person': 'មានមនុស្សនៅក្នុងរូប',
+    'corner.report.unsafe': 'គ្រោះថ្នាក់ ឬបង្កគ្រោះថ្នាក់',
+    'corner.report.spam': 'សារឥតបានការ',
+    'corner.report.wrongPlace': 'ខុសទីកន្លែង',
+    'corner.report.other': 'មូលហេតុផ្សេងទៀត',
+    'corner.report.done': 'បានរាយការណ៍។ សូមអរគុណ។',
+    'corner.report.cancel': 'បោះបង់',
+    // Capture (§5.3)
+    'corner.capture': 'ថតរូប',
+    'corner.capture.choose': 'ថត ឬជ្រើសរើសរូបភាព',
+    'corner.capture.retake': 'ជ្រើសរើសរូបផ្សេង',
+    'corner.capture.venue': 'តើនេះជាកន្លែងណា?',
+    'corner.capture.venueHint': 'រូបភាពភ្ជាប់ទៅទីកន្លែង មិនមែនទីតាំងពិតប្រាកដរបស់អ្នកឡើយ។',
+    'corner.capture.venueRequired': 'សូមជ្រើសរើសជ្រុងមុននឹងបង្ហោះ។',
+    'corner.capture.venueSearch': 'ស្វែងរកទីកន្លែង',
+    'corner.capture.noVenues': 'គ្មានជ្រុងនៅជិតទេ។ សូមសាកល្បងស្វែងរក។',
+    'corner.capture.caption': 'អត្ថបទពិពណ៌នា',
+    'corner.capture.captionOptional': 'ស្រេចចិត្ត ១៤០ តួអក្សរ',
+    'corner.capture.post': 'បង្ហោះទៅជ្រុងនេះ',
+    'corner.capture.posting': 'កំពុងបង្ហោះ…',
+    'corner.capture.failed': 'បង្ហោះមិនបានសម្រេច។ សូមព្យាយាមម្តងទៀត។',
+    'corner.capture.held': 'ជ្រុងគឺសម្រាប់ទីកន្លែង។ សូមសាកល្បងថតរូបកន្លែងនោះផ្ទាល់។',
+    'corner.capture.minor': 'ការបង្ហោះចាប់ផ្តើមពីអាយុ ១៨ ឆ្នាំ។ អ្នកនៅតែអាចរុករកគ្រប់ជ្រុងបាន។',
+    'corner.capture.signIn': 'សូមចូលគណនីដើម្បីបង្ហោះរូបភាព។',
+    'corner.capture.exifNote': 'ទិន្នន័យទីតាំង និងកាមេរ៉ាត្រូវបានលុបចេញ មុនពេលរក្សាទុករូបភាពរបស់អ្នក។',
+    // Empty states (§5.1, §5.4)
+    'corner.empty.title': 'មិនទាន់មានរូបភាពនៅជិតអ្នកទេ។',
+    'corner.empty.cta': 'ក្លាយជាជ្រុងដំបូងទៅ។',
+    'corner.myMap.empty': 'មិនទាន់មានអ្វីរក្សាទុកទេ។',
+    'corner.myMap.emptyCta': 'ជ្រុងដែលអ្នករក្សាទុកនឹងមកនៅទីនេះ។',
+    'corner.myMap.yourShots': 'រូបភាពរបស់អ្នក',
+    'corner.myMap.savedCorners': 'ជ្រុងដែលបានរក្សាទុក',
+    'corner.view.map': 'ផែនទី',
+    'corner.view.grid': 'ក្រឡាចត្រង្គ',
   },
 } as const;
 
 export type DictKey = keyof typeof dicts.en;
 
+/** Values substituted into `{placeholder}` tokens, e.g. t('corner.liveCount', { n: 3 }). */
+export type TVars = Record<string, string | number>;
+
 interface LangContextValue {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: (key: DictKey) => string;
+  t: (key: DictKey, vars?: TVars) => string;
+}
+
+function interpolate(template: string, vars?: TVars): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in vars ? String(vars[name]) : match
+  );
 }
 
 const LangContext = createContext<LangContextValue>({
   lang: 'en',
   setLang: () => undefined,
-  t: (key) => dicts.en[key],
+  t: (key, vars) => interpolate(dicts.en[key], vars),
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
@@ -212,7 +372,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('domner-lang', l);
   };
 
-  const t = (key: DictKey) => dicts[lang][key] ?? dicts.en[key];
+  const t = (key: DictKey, vars?: TVars) => interpolate(dicts[lang][key] ?? dicts.en[key], vars);
 
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 }
