@@ -26,14 +26,70 @@ const SLAB = '#151E1A';
 const ASH = '#6F827A';
 const PAPER = '#EDE8DC';
 
-/** Default basemap. Override with a Cambodia extract for production. */
-export const PMTILES_URL =
-  process.env.NEXT_PUBLIC_PMTILES_URL || 'https://demo-bucket.protomaps.com/v4.pmtiles';
+/**
+ * Protomaps basemap. Unset by default — see cornerMapStyle() for what happens
+ * then. Point this at your own Cambodia .pmtiles extract for production; the
+ * Protomaps demo bucket is explicitly not for production traffic.
+ */
+export const PMTILES_URL = process.env.NEXT_PUBLIC_PMTILES_URL || '';
 
 /** Glyphs for map labels. Protomaps' public font stack. */
 const GLYPHS = 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf';
 
+/**
+ * Zero-config fallback basemap, used when NEXT_PUBLIC_PMTILES_URL is unset.
+ *
+ * Without this a fresh Vercel deploy renders a black rectangle: correct
+ * behaviour by the letter of the spec, useless in practice, and impossible to
+ * tell apart from a bug. CARTO's dark raster is what components/flights/
+ * LiveMap.tsx already uses, so it is not a new vendor — and the raster paint
+ * properties below pull it onto the dusk palette so the two basemaps read as
+ * the same map.
+ *
+ * Vector Protomaps remains the production path: it is the one that avoids
+ * per-load pricing at Cambodia volumes, which is the whole reason §5.1 picks it.
+ */
+function rasterFallbackStyle(): StyleSpecification {
+  return {
+    version: 8,
+    glyphs: GLYPHS,
+    sources: {
+      carto: {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution:
+          '© <a href="https://openstreetmap.org">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    },
+    layers: [
+      { id: 'background', type: 'background', paint: { 'background-color': DUSK } },
+      {
+        id: 'carto-basemap',
+        type: 'raster',
+        source: 'carto',
+        paint: {
+          // Desaturate and darken onto the dusk palette. The basemap has to
+          // stay quiet enough that a marigold node is the only thing that
+          // catches the eye.
+          'raster-saturation': -0.55,
+          'raster-brightness-max': 0.62,
+          'raster-contrast': 0.05,
+          'raster-opacity': 0.85,
+        },
+      },
+    ],
+  };
+}
+
 export function cornerMapStyle(): StyleSpecification {
+  if (!PMTILES_URL) return rasterFallbackStyle();
+
   return {
     version: 8,
     glyphs: GLYPHS,

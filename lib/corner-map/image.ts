@@ -123,4 +123,14 @@ async function looksFaceHeavy(_webp: Buffer): Promise<boolean> {
  * user has waited for a 12 MB upload.
  */
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+/**
+ * 4 MB, not the 12 MB a phone photo can reach.
+ *
+ * Vercel serverless functions reject request bodies over ~4.5 MB at the
+ * platform edge, before any of this code runs — the caller would get an opaque
+ * 413 with no message from us. The capture screen downscales to MAX_EDGE and
+ * re-encodes to WebP before uploading, which puts a normal photo well under
+ * this, so hitting the limit means something genuinely unusual.
+ */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;

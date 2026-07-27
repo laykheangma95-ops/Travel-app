@@ -27,25 +27,46 @@ const CAPTION_MAX = 140;
 
 type Phase = 'pick' | 'compose' | 'posting' | 'done' | 'held';
 
-/** HEIC → WebP in the browser. Safari decodes HEIC natively; elsewhere this
- *  throws and the user is asked for a different file. */
-async function normalizeForUpload(file: File): Promise<File> {
-  const isHeic =
-    /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
-  if (!isHeic) return file;
+/** Matches MAX_EDGE in lib/corner-map/image.ts — the server resizes to the
+ *  same bound, so sending anything larger is pure upload time. */
+const MAX_EDGE = 1600;
 
+/**
+ * Downscale and re-encode to WebP in the browser, before upload.
+ *
+ * Two reasons, both load-bearing:
+ *  1. Vercel rejects request bodies over ~4.5 MB at the platform edge, and a
+ *     modern phone photo is routinely 3–8 MB. Uploading originals would 413
+ *     with no error message we control.
+ *  2. This is a Cambodian mobile audience. A 1600px WebP is a few hundred KB
+ *     instead of several MB, which is the difference between posting a shot
+ *     and giving up on it.
+ *
+ * It also handles HEIC, which sharp's prebuilt libvips cannot decode — Safari
+ * decodes it natively into the canvas here. None of this is a safety boundary:
+ * the EXIF strip that counts still happens server-side, unconditionally.
+ */
+async function normalizeForUpload(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
+
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas-unavailable');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/webp', 0.9)
+    canvas.toBlob(resolve, 'image/webp', 0.85)
   );
-  if (!blob) throw new Error('heic-convert-failed');
-  return new File([blob], file.name.replace(/\.hei[cf]$/i, '.webp'), { type: 'image/webp' });
+  if (!blob) throw new Error('encode-failed');
+
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', {
+    type: 'image/webp',
+  });
 }
 
 export default function CapturePage() {

@@ -276,3 +276,33 @@ on conflict (id) do nothing;
 drop policy if exists shots_bucket_public_read on storage.objects;
 create policy shots_bucket_public_read on storage.objects
   for select using (bucket_id = 'shots');
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Seed corners — the first places on the map.
+--
+-- These ids are deterministic (uuid5) and are duplicated in data/cornerSeed.ts,
+-- which the client falls back to when this migration has not been applied yet.
+-- Keeping the ids identical means a corner the user sees in the fallback is the
+-- same row they post to once the database is live — otherwise the first upload
+-- to a fallback corner would fail with 'unknown-corner'.
+--
+-- Insert only. `on conflict do nothing` so re-running the migration, or editing
+-- a name in the dashboard afterwards, never clobbers live data.
+-- ═══════════════════════════════════════════════════════════════════════════
+insert into corners (id, name_en, name_km, category, lat, lng) values
+  ('15c19329-8d00-5d6b-b8c1-4407ab69f5bc', 'Wat Phnom', 'វត្តភ្នំ', 'temple', 11.5765, 104.9215),
+  ('bfb4c9f5-954a-5fa1-a07d-93e2c9bf51b2', 'Central Market', 'ផ្សារធំថ្មី', 'market', 11.5695, 104.9211),
+  ('32be62f7-da05-563e-afbc-4863e5b132d8', 'Russian Market', 'ផ្សារទួលទំពូង', 'market', 11.5417, 104.9207),
+  ('96500419-c62a-5fdd-92d7-2315f3cf74ba', 'Sisowath Quay', 'ផ្លូវព្រះស៊ីសុវត្ថិ', 'viewpoint', 11.5697, 104.9315),
+  ('1d44085a-264c-5ec7-b18f-316a94733dfd', 'Royal Palace', 'ព្រះបរមរាជវាំង', 'temple', 11.5637, 104.9314),
+  ('aa1c1faa-f1f9-56ea-8966-9b89d210367c', 'Boeung Keng Kang Café', 'ហាងកាហ្វេបឹងកេងកង', 'cafe', 11.5477, 104.9223),
+  ('a91f5350-7ac5-501c-873d-be7932337d91', 'Street 240', 'ផ្លូវ ២៤០', 'cafe', 11.5595, 104.9276),
+  ('d0825107-d5ca-5224-8b00-9513f24771c2', 'Naga Riverside', 'តំបន់ណាហ្គា', 'bar', 11.5619, 104.9294),
+  ('9dba4867-26b1-5641-8a5c-baef320e20c8', 'Angkor Wat', 'អង្គរវត្ត', 'temple', 13.4125, 103.867),
+  ('7a725a1a-f210-50ce-9fb2-65c9ba508ba9', 'Bayon', 'ប្រាសាទបាយ័ន', 'temple', 13.4413, 103.8587),
+  ('f6dbcff8-da51-56f9-af58-c50158a542a7', 'Pub Street', 'ផ្លូវផាប', 'bar', 13.3549, 103.8558),
+  ('598ae39e-6110-5f45-b68c-fbba736bf2ff', 'Psar Chas', 'ផ្សារចាស់', 'market', 13.3537, 103.8564),
+  ('32399afc-c674-53c8-a2d6-7cbd1abe0fe6', 'Otres Beach', 'ឆ្នេរអូត្រេស', 'viewpoint', 10.5847, 103.5203),
+  ('cb4fc147-b69c-5346-8d69-23d7c1b75bf6', 'Kampot Riverfront', 'មាត់ទន្លេកំពត', 'viewpoint', 10.6104, 104.1812),
+  ('573442d5-03e2-5d99-bac0-4e73b127cd52', 'Kep Crab Market', 'ផ្សារក្តាមកែប', 'restaurant', 10.4833, 104.3)
+on conflict (id) do nothing;

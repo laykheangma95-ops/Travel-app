@@ -35,6 +35,9 @@ function distanceM(aLat: number, aLng: number, bLat: number, bLng: number): numb
 
 export const DEFAULT_RADIUS_M = 1200; // §5.1 — 1.2 km
 
+const seedsNear = (lat: number, lng: number, radiusM: number) =>
+  SEED_CORNERS.filter((c) => distanceM(lat, lng, c.lat, c.lng) <= radiusM);
+
 export async function fetchNearbyCorners(
   lat: number,
   lng: number,
@@ -43,7 +46,7 @@ export async function fetchNearbyCorners(
   const supabase = getSupabase();
   if (!supabase) {
     // Unconfigured: cold seed corners only, so the empty state is honest.
-    return SEED_CORNERS.filter((c) => distanceM(lat, lng, c.lat, c.lng) <= radiusM);
+    return seedsNear(lat, lng, radiusM);
   }
 
   const { data, error } = await supabase.rpc('corners_nearby', {
@@ -52,8 +55,25 @@ export async function fetchNearbyCorners(
     radius_m: Math.round(radiusM),
     in_category: null,
   });
-  if (error) throw error;
-  return (data ?? []) as CornerWithHeat[];
+
+  if (error) {
+    // The most likely error on a fresh deploy is that
+    // supabase/migrations/20260727000000_corner_map.sql has not been run yet,
+    // so corners_nearby() does not exist. Falling back to seeds keeps the map
+    // usable instead of showing an empty screen that looks identical to "no
+    // corners near you" — the one failure mode §5.1 explicitly rules out.
+    console.warn(
+      '[corner-map] corners_nearby() failed, falling back to seed corners. ' +
+        'Has supabase/migrations/20260727000000_corner_map.sql been applied?',
+      error.message
+    );
+    return seedsNear(lat, lng, radiusM);
+  }
+
+  // Migration applied but nobody has seeded any places yet — same fallback, so
+  // the first users still have somewhere to post.
+  const rows = (data ?? []) as CornerWithHeat[];
+  return rows.length > 0 ? rows : seedsNear(lat, lng, radiusM);
 }
 
 /** Venue search for the capture picker (§5.3) and the map search field. */
@@ -61,20 +81,25 @@ export async function searchCorners(query: string, limit = 20): Promise<CornerWi
   const q = query.trim();
   if (!q) return [];
 
-  const supabase = getSupabase();
-  if (!supabase) {
+  const searchSeeds = () => {
     const needle = q.toLowerCase();
     return SEED_CORNERS.filter(
       (c) => c.name_en.toLowerCase().includes(needle) || (c.name_km ?? '').includes(q)
     ).slice(0, limit);
-  }
+  };
+
+  const supabase = getSupabase();
+  if (!supabase) return searchSeeds();
 
   const { data, error } = await supabase
     .from('corners')
     .select('id,name_en,name_km,category,lat,lng,address_en,address_km,bookable')
     .or(`name_en.ilike.%${q}%,name_km.ilike.%${q}%`)
     .limit(limit);
-  if (error) throw error;
+
+  // Same reasoning as fetchNearbyCorners: before the migration lands, the
+  // table does not exist, and a dead search box is worse than a seeded one.
+  if (error) return searchSeeds();
 
   return (data ?? []).map((c) => ({
     ...(c as CornerWithHeat),

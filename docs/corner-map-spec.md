@@ -194,3 +194,63 @@ Not a settings screen. Architecture.
 - Corner names show Khmer primary + English secondary for `km` locale, reversed for `en`
 - Dates: Latin numerals in the stamp always
 - Test every screen at Khmer string length before shipping
+
+---
+
+## 9. Deploying (Vercel)
+
+Corner Map is designed to work on a fresh deploy with **no new environment
+variables**. Everything below is either already configured or optional.
+
+### Required: run the migration
+
+`supabase/migrations/20260727000000_corner_map.sql`, in the Supabase SQL editor.
+It creates the tables, RLS policies, the 3-report auto-hide trigger, the
+`shots` storage bucket, and inserts 15 seed corners across Phnom Penh, Siem
+Reap and the coast.
+
+Until it runs, the client falls back to `data/cornerSeed.ts` — the same places,
+same ids — so the map still works, but posting fails (there is no database to
+post to). The fallback logs a warning naming the migration.
+
+### Already configured
+
+| Thing | Status |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` / `ANON_KEY` / `SUPABASE_SERVICE_KEY` | Already set for the rest of Domner; Corner Map reuses them. |
+| `sharp` | In `dependencies`, and `next.config.mjs` lists it under `serverComponentsExternalPackages` so the upload route loads it natively at runtime. |
+| Upload route runtime | Pinned to `nodejs` — sharp cannot run on the edge. |
+
+### Optional: `NEXT_PUBLIC_PMTILES_URL`
+
+Leave it unset and the basemap uses CARTO dark raster tiles, tinted onto the
+dusk palette — the same tiles `components/flights/LiveMap.tsx` already uses.
+The map works immediately with nothing to configure.
+
+Set it once traffic justifies it. A self-hosted `.pmtiles` archive has no
+per-load cost, which is the reason §5.1 picks Protomaps in the first place;
+the extract command is in `.env.example`.
+
+### Vercel-specific constraints, handled
+
+- **Request body limit.** Serverless functions reject bodies over ~4.5 MB at
+  the platform edge, before any route code runs. Phone photos routinely exceed
+  that, so the capture screen downscales to 1600px and re-encodes to WebP in
+  the browser before uploading, and `MAX_UPLOAD_BYTES` is 4 MB. This also cuts
+  a multi-megabyte upload to a few hundred KB, which matters more on Cambodian
+  mobile data than it does on the platform limit.
+- **HEIC.** sharp's prebuilt libvips has no HEIF decoder. iOS photos are
+  converted in the browser via canvas. The server-side EXIF strip is still
+  unconditional — the client conversion is a convenience, never the guarantee.
+- **maplibre-gl is pinned to 5.24.0.** Under 6.0.0 the map's web worker does
+  not survive Next 14's bundling; it dies on creation, no source ever tiles,
+  and the map renders as a flat background with no nodes and no console error.
+
+### First-run checklist
+
+1. Merge, let Vercel build.
+2. Run the migration.
+3. Open `/map` — expect ~4 cold ash rings if you are in central Phnom Penh,
+   or the "No shots near you yet / Be the first corner" empty state elsewhere.
+4. Sign in, tap the marigold camera, post a shot to a seeded corner.
+5. That corner's node should turn marigold and pulse for the next 60 minutes.
