@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { Sparkles, X, Send } from 'lucide-react';
 import { DomerMark } from '@/components/brand/DomerMark';
 import { useLang } from '@/lib/i18n';
+import { isStandalonePage } from '@/lib/utils';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -110,8 +111,8 @@ export function TripCopilot() {
 
   const suggestions = lang === 'km' ? SUGGESTIONS_KM : SUGGESTIONS_EN;
 
-  // The Apsara hero is a standalone full-screen page — keep the FAB off it.
-  if (pathname === '/apsara-hero') return null;
+  // Standalone pages are their own world — keep the FAB off them.
+  if (isStandalonePage(pathname)) return null;
 
   return (
     <>

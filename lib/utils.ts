@@ -4,6 +4,15 @@ export function cn(...classes: Array<string | false | null | undefined>): string
   return classes.filter(Boolean).join(' ');
 }
 
+// Routes that render their own full-screen world. They supply their own
+// navigation and footer, so the app's nav, footer, splash and Copilot FAB all
+// stand down on them.
+const STANDALONE_ROUTES = ['/apsara-hero', '/arc-01'];
+
+export function isStandalonePage(pathname: string | null | undefined): boolean {
+  return Boolean(pathname && STANDALONE_ROUTES.includes(pathname));
+}
+
 export function formatUsd(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }

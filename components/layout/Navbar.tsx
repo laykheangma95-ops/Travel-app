@@ -8,7 +8,7 @@ import { useCart } from '@/hooks/useCart';
 import { DomerLogo } from '@/components/brand/DomerMark';
 import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useLang, type DictKey } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { cn, isStandalonePage } from '@/lib/utils';
 
 interface NavGroup {
   labelKey: DictKey;
@@ -68,8 +68,8 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // The Apsara hero is a standalone full-screen page with its own nav.
-  if (pathname === '/apsara-hero') return null;
+  // Standalone pages bring their own navigation.
+  if (isStandalonePage(pathname)) return null;
 
   return (
     <header

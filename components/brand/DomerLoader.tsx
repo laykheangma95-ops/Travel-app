@@ -5,7 +5,9 @@
 // pulsing glow, "Preparing your journey" label. Keyframes live in globals.css.
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { WAYFINDER_PATH } from './DomerMark';
+import { isStandalonePage } from '@/lib/utils';
 
 const DUST = [
   { top: '4%', left: '50%', size: 4, delay: '0s' },
@@ -89,8 +91,11 @@ export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { 
 export function DomerSplash() {
   const [visible, setVisible] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const pathname = usePathname();
+  const standalone = isStandalonePage(pathname);
 
   useEffect(() => {
+    if (standalone) return;
     if (sessionStorage.getItem('domer-splash-shown')) return;
     sessionStorage.setItem('domer-splash-shown', '1');
     setVisible(true);
@@ -114,7 +119,7 @@ export function DomerSplash() {
       clearTimeout(safety);
       clearTimeout(dismissTimer);
     };
-  }, []);
+  }, [standalone]);
 
   if (!visible) return null;
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Facebook, Send, Music2 } from 'lucide-react';
 import { DomerLogo } from '@/components/brand/DomerMark';
 import { useLang, type DictKey } from '@/lib/i18n';
+import { isStandalonePage } from '@/lib/utils';
 
 const columns: { titleKey: DictKey; links: { labelKey: DictKey; href: string }[] }[] = [
   {
@@ -40,8 +41,8 @@ export function Footer() {
   const { t } = useLang();
   const pathname = usePathname();
 
-  // The Apsara hero is a standalone full-screen page without site chrome.
-  if (pathname === '/apsara-hero') return null;
+  // Standalone pages bring their own footer.
+  if (isStandalonePage(pathname)) return null;
 
   return (
     <footer className="bg-primary text-white">
