@@ -1,50 +1,124 @@
-import { Smartphone } from 'lucide-react';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Loader2, Smartphone } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { WavyFlag } from '@/components/ui/WavyFlag';
+import { Modal } from '@/components/ui/Modal';
+import { formatDate, formatUsd } from '@/lib/utils';
+import type { OrderStatus } from '@/types';
 
-// Demo orders — served from esim_orders in Supabase once connected.
-const esims = [
-  {
-    orderNumber: 'DN-2026-4821',
-    country: 'Thailand',
-    flag: '🇹🇭',
-    plan: 'Standard',
-    duration: 7,
-    dataDaily: 2,
-    status: 'active' as const,
-    daysLeft: 5,
-    dataUsedPct: 42,
-  },
-  {
-    orderNumber: 'DN-2026-3390',
-    country: 'Japan',
-    flag: '🇯🇵',
-    plan: 'Premium',
-    duration: 15,
-    dataDaily: 3,
-    status: 'expired' as const,
-    daysLeft: 0,
-    dataUsedPct: 100,
-  },
-];
+// Real orders from /api/orders. This page used to render two hardcoded eSIMs
+// ("Thailand, 5 days left") that every customer saw identically, while their
+// actual purchases were invisible.
 
-const statusTone = { active: 'success', pending: 'warning', expired: 'neutral' } as const;
+interface OrderItem {
+  plan_id: string;
+  country_name: string;
+  plan_name: string;
+  quantity: number;
+  duration_days: number;
+  data_gb_daily: number;
+  line_total_usd: number;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  country: string;
+  plan_name: string;
+  duration_days: number;
+  data_gb_daily: number;
+  price_usd: number;
+  status: OrderStatus;
+  qr_code_url: string | null;
+  esim_activation_code: string | null;
+  created_at: string;
+  fulfilled_at: string | null;
+  items?: OrderItem[];
+}
+
+const statusTone: Record<OrderStatus, 'warning' | 'info' | 'success' | 'danger' | 'neutral'> = {
+  pending: 'warning',
+  paid: 'info',
+  fulfilled: 'success',
+  cancelled: 'danger',
+  refunded: 'neutral',
+};
+
+const statusLabel: Record<OrderStatus, string> = {
+  pending: 'Awaiting payment',
+  paid: 'Preparing your eSIM',
+  fulfilled: 'Ready to install',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+};
 
 export default function MyEsimsPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<Order | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/orders', { credentials: 'include' });
+        const data = (await res.json().catch(() => null)) as {
+          orders?: Order[];
+          error?: { message?: string };
+        } | null;
+
+        if (!active) return;
+
+        if (res.status === 401) {
+          setError('Please sign in to see your eSIMs.');
+          return;
+        }
+        if (!res.ok) throw new Error(data?.error?.message ?? 'Could not load your eSIMs.');
+
+        setOrders(data?.orders ?? []);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : 'Could not load your eSIMs.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">My eSIMs</h1>
         <p className="mt-1.5 text-sm text-ink-secondary">
-          Your data plans, QR codes, and usage in one place.
+          Your data plans, QR codes, and order history in one place.
         </p>
       </div>
 
-      {esims.length === 0 ? (
+      {loading && (
+        <p className="flex items-center justify-center gap-2 py-16 text-sm text-ink-muted">
+          <Loader2 size={16} className="animate-spin" aria-hidden="true" /> Loading your eSIMs…
+        </p>
+      )}
+
+      {!loading && error && (
+        <div role="alert" className="rounded-card border border-line bg-surface-3 p-6 text-center">
+          <p className="text-sm text-ink-secondary">{error}</p>
+          <Button href="/sign-in?returnTo=/my-esims" size="sm" className="mt-4">
+            Sign in
+          </Button>
+        </div>
+      )}
+
+      {!loading && !error && orders.length === 0 && (
         <EmptyState
           icon={Smartphone}
           title="No eSIMs yet"
@@ -52,42 +126,44 @@ export default function MyEsimsPage() {
           ctaLabel="Browse eSIM plans"
           ctaHref="/esim"
         />
-      ) : (
+      )}
+
+      {!loading && !error && orders.length > 0 && (
         <div className="space-y-4">
-          {esims.map((e) => (
-            <Card key={e.orderNumber} className="p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-4">
-                  <WavyFlag flag={e.flag} label={`${e.country} flag`} size={52} />
-                  <div>
-                    <h2 className="font-display font-bold text-ink">
-                      {e.country} — {e.plan}
-                    </h2>
-                    <p className="text-sm text-ink-secondary">
-                      {e.duration} days · {e.dataDaily}GB/day ·{' '}
-                      <span className="font-mono text-xs">{e.orderNumber}</span>
-                    </p>
-                  </div>
+          {orders.map((order) => (
+            <Card key={order.id} className="p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-display font-bold text-ink">{order.country}</h2>
+                  <p className="mt-0.5 text-sm text-ink-secondary">
+                    {order.plan_name} · {order.duration_days} days · {order.data_gb_daily}GB/day
+                  </p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    <span className="font-mono">{order.order_number}</span> ·{' '}
+                    {formatDate(order.created_at)} · {formatUsd(Number(order.price_usd))}
+                  </p>
                 </div>
-                <Badge tone={statusTone[e.status]}>{e.status}</Badge>
+                <Badge tone={statusTone[order.status]}>{statusLabel[order.status]}</Badge>
               </div>
-              {e.status === 'active' && (
-                <ProgressBar
-                  value={e.dataUsedPct}
-                  tone="secondary"
-                  label={`${e.daysLeft} days left · ${e.dataUsedPct}% of today's data used`}
-                  className="mt-5"
-                />
+
+              {order.status === 'paid' && (
+                <p className="mt-4 rounded-btn bg-surface-3 p-3 text-sm text-ink-secondary">
+                  Payment received. Your QR code is being prepared and will be emailed within 15
+                  minutes.
+                </p>
               )}
-              <div className="mt-5 flex gap-3 border-t border-line pt-5">
-                <Button variant="outline" size="sm">
-                  View QR code
-                </Button>
+
+              <div className="mt-5 flex flex-wrap gap-3 border-t border-line pt-5">
+                {order.status === 'fulfilled' && (order.qr_code_url || order.esim_activation_code) && (
+                  <Button size="sm" onClick={() => setViewing(order)}>
+                    View QR code
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" href="https://t.me/domnerapp">
                   Get support
                 </Button>
-                {e.status === 'expired' && (
-                  <Button size="sm" href="/esim">
+                {(order.status === 'fulfilled' || order.status === 'refunded') && (
+                  <Button variant="outline" size="sm" href="/esim">
                     Buy again
                   </Button>
                 )}
@@ -96,6 +172,41 @@ export default function MyEsimsPage() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing ? `${viewing.country} eSIM` : ''}
+      >
+        {viewing && (
+          <div className="space-y-4 text-center">
+            {viewing.qr_code_url && (
+              /* eslint-disable-next-line @next/next/no-img-element -- supplier-hosted QR on an
+                 arbitrary domain; next/image would need every supplier allowlisted. */
+              <img
+                src={viewing.qr_code_url}
+                alt={`eSIM QR code for order ${viewing.order_number}`}
+                width={240}
+                height={240}
+                className="mx-auto rounded-card border border-line"
+              />
+            )}
+            {viewing.esim_activation_code && (
+              <div className="text-left">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  Manual activation code
+                </p>
+                <code className="mt-1 block break-all rounded-btn bg-surface-3 p-3 text-xs">
+                  {viewing.esim_activation_code}
+                </code>
+              </div>
+            )}
+            <p className="text-xs text-ink-muted">
+              Install over Wi-Fi before you fly. This QR code can only be scanned once.
+            </p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

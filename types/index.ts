@@ -69,17 +69,56 @@ export interface EsimOrder {
   plan_name: string;
   duration_days: number;
   data_gb_daily: number;
+
+  // Money — every figure is computed server-side in lib/pricing.ts.
+  subtotal_usd: number;
+  discount_usd: number;
   price_usd: number;
+  currency: string;
+  discount_code: string | null;
+  referral_code: string | null;
+
   status: OrderStatus;
+
+  // Fulfilment — provider_* are filled by the eSIM supplier integration.
   qr_code_url: string | null;
+  esim_iccid: string | null;
+  esim_activation_code: string | null;
+  provider_name: string | null;
+  provider_order_id: string | null;
+
   payment_method: PaymentMethod | null;
+  stripe_payment_id: string | null;
+  aba_payment_id: string | null;
+  idempotency_key: string | null;
+
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
   device_type: string | null;
   notes: string | null;
+
   created_at: string;
+  updated_at: string | null;
+  paid_at: string | null;
   fulfilled_at: string | null;
+}
+
+/** A priced line on an order, as stored in `order_items`. */
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  plan_id: string;
+  country_slug: string;
+  country_name: string;
+  plan_name: string;
+  tier: string;
+  duration_days: number;
+  data_gb_daily: number;
+  unit_price_usd: number;
+  quantity: number;
+  line_total_usd: number;
+  created_at: string;
 }
 
 // ─── Flights ─────────────────────────────────────────────────────────────────

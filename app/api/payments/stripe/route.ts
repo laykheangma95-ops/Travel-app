@@ -1,124 +1,210 @@
-import { NextResponse } from 'next/server';
-import { createPaymentIntent, verifyStripeWebhook } from '@/lib/stripe';
-import { getSupabaseAdmin } from '@/lib/supabase';
-import { notifyAdminNewOrder } from '@/lib/telegram';
-import { sendOrderConfirmationEmail } from '@/lib/resend';
+// ─────────────────────────────────────────────────────────────────────────────
+// Stripe payments — POST creates an order, PUT receives the webhook.
+//
+// SECURITY MODEL:
+//   The request body carries INTENT ONLY: which plan, how many, which promo
+//   code, and who the customer is. The amount charged is computed here from the
+//   catalog via lib/pricing.ts. A `totalUsd` sent by the browser is compared for
+//   telemetry and then discarded — it can never influence the charge.
+//
+//   An order becomes `paid` in exactly one place: a webhook whose signature
+//   Stripe verified and whose settled amount covers the order total. Not on the
+//   checkout response, and never because a key happened to be missing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { createPaymentIntent, settledAmountCents, verifyStripeWebhook } from '@/lib/stripe';
+import { announceOrder } from '@/lib/orderNotifications';
 import { generateOrderNumber } from '@/lib/utils';
-import type { CartItem, EsimOrder } from '@/types';
+import { ApiError, ok, readJson, route } from '@/lib/http';
+import { getUser } from '@/lib/auth';
+import { log, redactEmail } from '@/lib/logger';
+import { demoModeAllowed } from '@/lib/env';
+import { detectPriceMismatch, normalizeLines, priceOrder, toCents } from '@/lib/pricing';
+import { parseCheckoutBody } from '@/lib/checkout';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import {
+  createOrder,
+  getOrderByNumber,
+  ordersPersistenceAvailable,
+  transitionOrder,
+} from '@/lib/orders';
+import type Stripe from 'stripe';
 
-interface CheckoutBody {
-  customer: {
-    fullName: string;
-    email: string;
-    phone: string;
-    contactMethod: string;
-    deviceType: string;
-    notes?: string;
-  };
-  items: CartItem[];
-  totalUsd: number;
-  referralCode?: string | null;
-  discountCode?: string | null;
-}
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// POST /api/payments/stripe — create an order + Stripe payment intent
-export async function POST(request: Request) {
-  const body = (await request.json()) as CheckoutBody;
-  if (!body.customer?.email || !Array.isArray(body.items) || body.items.length === 0) {
-    return NextResponse.json({ error: 'Invalid checkout payload' }, { status: 400 });
-  }
+// ── POST /api/payments/stripe — create an order + Stripe payment intent ───────
 
-  const orderNumber = generateOrderNumber();
-  const first = body.items[0];
+export const POST = route(
+  async (request) => {
+    const body = await readJson<Record<string, unknown>>(request);
+    const { customer, idempotencyKey } = parseCheckoutBody(body);
 
-  const order: EsimOrder = {
-    id: orderNumber,
-    user_id: null,
-    order_number: orderNumber,
-    country: body.items.map((i) => i.countryName).join(', '),
-    plan_name: body.items.map((i) => `${i.countryName} ${i.planName}`).join(', '),
-    duration_days: first.durationDays,
-    data_gb_daily: first.dataGbDaily,
-    price_usd: body.totalUsd,
-    status: 'pending',
-    qr_code_url: null,
-    payment_method: 'stripe',
-    customer_name: body.customer.fullName,
-    customer_email: body.customer.email,
-    customer_phone: body.customer.phone,
-    device_type: body.customer.deviceType,
-    notes: body.customer.notes ?? null,
-    created_at: new Date().toISOString(),
-    fulfilled_at: null,
-  };
-
-  const intent = await createPaymentIntent({
-    amountUsd: body.totalUsd,
-    orderNumber,
-    customerEmail: body.customer.email,
-  });
-
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    await supabase.from('esim_orders').insert({
-      order_number: orderNumber,
-      country: order.country,
-      plan_name: order.plan_name,
-      duration_days: order.duration_days,
-      data_gb_daily: order.data_gb_daily,
-      price_usd: order.price_usd,
-      status: intent.demo ? 'paid' : 'pending',
-      payment_method: 'stripe',
-      stripe_payment_id: intent.paymentIntentId,
-      customer_name: order.customer_name,
-      customer_email: order.customer_email,
-      customer_phone: order.customer_phone,
-      device_type: order.device_type,
-      notes: order.notes,
+    // The only numbers that matter are computed here, from the catalog.
+    const priced = priceOrder({
+      lines: normalizeLines(body.items),
+      discountCode: typeof body.discountCode === 'string' ? body.discountCode : null,
+      referralCode: typeof body.referralCode === 'string' ? body.referralCode : null,
     });
-  }
 
-  // In demo mode, treat the order as paid immediately so the flow completes.
-  if (intent.demo) {
-    await Promise.allSettled([notifyAdminNewOrder(order), sendOrderConfirmationEmail(order)]);
-  }
-
-  return NextResponse.json({
-    orderNumber,
-    clientSecret: intent.clientSecret,
-    demo: intent.demo,
-  });
-}
-
-// PUT /api/payments/stripe — Stripe webhook (payment_intent.succeeded / failed)
-export async function PUT(request: Request) {
-  const payload = await request.text();
-  const signature = request.headers.get('stripe-signature') ?? '';
-  const event = verifyStripeWebhook(payload, signature);
-  if (!event) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-  }
-
-  const supabase = getSupabaseAdmin();
-  if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
-    const intent = event.data.object as { id: string; metadata?: { order_number?: string } };
-    const orderNumber = intent.metadata?.order_number;
-    const status = event.type === 'payment_intent.succeeded' ? 'paid' : 'cancelled';
-    if (supabase && orderNumber) {
-      const { data: updated } = await supabase
-        .from('esim_orders')
-        .update({ status })
-        .eq('order_number', orderNumber)
-        .select('*')
-        .single();
-      if (updated && status === 'paid') {
-        await Promise.allSettled([
-          notifyAdminNewOrder(updated as EsimOrder),
-          sendOrderConfirmationEmail(updated as EsimOrder),
-        ]);
-      }
+    const mismatch = detectPriceMismatch(body.totalUsd, priced.totalUsd);
+    if (mismatch !== null) {
+      // Not fatal — the customer simply pays the catalog price — but a
+      // persistent gap means a stale client or someone probing the checkout.
+      log.warn('checkout.price_mismatch', {
+        clientTotal: body.totalUsd,
+        serverTotal: priced.totalUsd,
+        deltaUsd: mismatch,
+        email: redactEmail(customer.email),
+      });
     }
-  }
 
-  return NextResponse.json({ received: true });
+    const user = await getUser(request);
+    const orderNumber = generateOrderNumber();
+
+    const intent = await createPaymentIntent({
+      amountCents: priced.totalCents,
+      orderNumber,
+      customerEmail: customer.email,
+      idempotencyKey,
+      metadata: { user_id: user?.id ?? 'guest' },
+    });
+
+    if (!ordersPersistenceAvailable()) {
+      // Development without Supabase: the UI flow still works, but nothing is
+      // recorded and nothing is claimed to be paid.
+      log.warn('checkout.no_persistence', { orderNumber });
+      return ok(
+        {
+          orderNumber,
+          clientSecret: intent.clientSecret,
+          demo: intent.demo,
+          totalUsd: priced.totalUsd,
+          persisted: false,
+        },
+        { status: 201 }
+      );
+    }
+
+    const order = await createOrder({
+      orderNumber,
+      priced,
+      customer,
+      paymentMethod: 'stripe',
+      userId: user?.id ?? null,
+      idempotencyKey,
+      demo: intent.demo,
+    });
+
+    await attachPatch(order.order_number, { stripe_payment_id: intent.paymentIntentId });
+
+    // Development convenience only: with no Stripe keys there will never be a
+    // webhook, so the order is settled here. `demoModeAllowed` is false in
+    // production, and createPaymentIntent would have thrown before reaching it.
+    if (intent.demo && demoModeAllowed) {
+      const result = await transitionOrder(order.order_number, 'paid', {
+        actor: 'demo-mode',
+        detail: { reason: 'stripe not configured; development fallback' },
+      });
+      if (result.changed) await announceOrder(result.order);
+    }
+
+    return ok(
+      {
+        orderNumber: order.order_number,
+        clientSecret: intent.clientSecret,
+        demo: intent.demo,
+        totalUsd: priced.totalUsd,
+        subtotalUsd: priced.subtotalUsd,
+        discountUsd: priced.discountUsd,
+        persisted: true,
+      },
+      { status: 201 }
+    );
+  },
+  { rateLimit: 'checkout', name: 'payments.stripe.create' }
+);
+
+// ── PUT /api/payments/stripe — Stripe webhook ────────────────────────────────
+
+export const PUT = route(
+  async (request) => {
+    const payload = await request.text();
+    const signature = request.headers.get('stripe-signature') ?? '';
+
+    const event = verifyStripeWebhook(payload, signature);
+    if (!event) {
+      throw new ApiError('BAD_REQUEST', 'Invalid webhook signature.');
+    }
+
+    if (
+      event.type !== 'payment_intent.succeeded' &&
+      event.type !== 'payment_intent.payment_failed'
+    ) {
+      return ok({ received: true, ignored: event.type });
+    }
+
+    const intent = event.data.object as Stripe.PaymentIntent;
+    const orderNumber = intent.metadata?.order_number;
+
+    if (!orderNumber) {
+      log.warn('stripe.webhook_missing_order_number', { intentId: intent.id, type: event.type });
+      return ok({ received: true, ignored: 'no order_number in metadata' });
+    }
+
+    if (event.type === 'payment_intent.payment_failed') {
+      await transitionOrder(orderNumber, 'cancelled', {
+        actor: 'stripe-webhook',
+        detail: { intentId: intent.id, reason: intent.last_payment_error?.message ?? null },
+      });
+      return ok({ received: true });
+    }
+
+    // Reconcile before settling: never fulfil an order for less than its price.
+    const order = await getOrderByNumber(orderNumber);
+    if (!order) {
+      log.warn('stripe.webhook_unknown_order', { orderNumber, intentId: intent.id });
+      return ok({ received: true, ignored: 'unknown order' });
+    }
+
+    const settled = settledAmountCents(intent);
+    const expected = toCents(Number(order.price_usd));
+
+    if (settled < expected) {
+      log.error('stripe.underpayment', {
+        orderNumber,
+        intentId: intent.id,
+        settledCents: settled,
+        expectedCents: expected,
+      });
+      // Left pending on purpose so a human reconciles, rather than the system
+      // handing out an eSIM that was underpaid.
+      return ok({ received: true, flagged: 'amount_mismatch' });
+    }
+
+    const result = await transitionOrder(orderNumber, 'paid', {
+      actor: 'stripe-webhook',
+      patch: { stripe_payment_id: intent.id },
+      detail: { intentId: intent.id, settledCents: settled },
+    });
+
+    // `changed` is false when Stripe redelivers the same event, so the customer
+    // gets exactly one confirmation email however many times it fires.
+    if (result.changed) await announceOrder(result.order);
+
+    return ok({ received: true });
+  },
+  { name: 'payments.stripe.webhook' }
+);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function attachPatch(orderNumber: string, patch: Record<string, string>): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('esim_orders')
+    .update(patch)
+    .eq('order_number', orderNumber);
+  if (error) log.warn('order.attach_payment_id_failed', { orderNumber, error });
 }

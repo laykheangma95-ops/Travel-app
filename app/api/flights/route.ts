@@ -1,55 +1,28 @@
-import { NextResponse } from 'next/server';
+// GET /api/flights?number=QH215&date=2026-07-04 — scheduled flight status.
+
 import { fetchFlightStatus } from '@/lib/aeroDataBox';
-import { getSupabaseAdmin } from '@/lib/supabase';
 import { todayIso } from '@/lib/utils';
+import { ApiError, ok, route } from '@/lib/http';
+import { parseFlightNumber, parseIsoDate } from '@/lib/flightInput';
+import { log } from '@/lib/logger';
 
-// GET /api/flights?number=QH215&date=2026-07-04 — live flight status
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const number = searchParams.get('number');
-  const date = searchParams.get('date') ?? todayIso();
+export const runtime = 'nodejs';
 
-  if (!number) {
-    return NextResponse.json({ error: 'Missing flight number' }, { status: 400 });
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ error: 'Invalid date format, expected YYYY-MM-DD' }, { status: 400 });
-  }
+export const GET = route(
+  async (request) => {
+    const { searchParams } = new URL(request.url);
+    const number = parseFlightNumber(searchParams.get('number'));
+    const date = parseIsoDate(searchParams.get('date'), todayIso());
 
-  try {
-    const status = await fetchFlightStatus(number, date);
-    return NextResponse.json(status, {
-      headers: { 'Cache-Control': 's-maxage=90, stale-while-revalidate=30' },
-    });
-  } catch {
-    return NextResponse.json({ error: 'Flight not found' }, { status: 404 });
-  }
-}
-
-// POST /api/flights — save a flight to the user's trip (and create share row)
-export async function POST(request: Request) {
-  const body = (await request.json()) as { flightNumber?: string; date?: string };
-  if (!body.flightNumber || !body.date) {
-    return NextResponse.json({ error: 'Missing flightNumber or date' }, { status: 400 });
-  }
-
-  const shareToken = `${body.flightNumber.replace(/\s+/g, '').toLowerCase()}-${body.date}`;
-
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    const { data: saved } = await supabase
-      .from('saved_flights')
-      .insert({
-        flight_number: body.flightNumber.replace(/\s+/g, '').toUpperCase(),
-        flight_date: body.date,
-        share_token: shareToken,
-      })
-      .select('id')
-      .single();
-    if (saved) {
-      await supabase.from('flight_shares').insert({ saved_flight_id: saved.id, share_token: shareToken });
+    try {
+      const status = await fetchFlightStatus(number, date);
+      return ok(status, {
+        headers: { 'Cache-Control': 's-maxage=90, stale-while-revalidate=30' },
+      });
+    } catch (error) {
+      log.warn('flights.status_unavailable', { number, date, error });
+      throw new ApiError('NOT_FOUND', 'We could not find that flight. Check the number and date.');
     }
-  }
-
-  return NextResponse.json({ ok: true, shareToken });
-}
+  },
+  { rateLimit: 'flightData', name: 'flights.status' }
+);

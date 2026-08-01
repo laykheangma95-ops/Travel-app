@@ -1,86 +1,150 @@
-import { NextResponse } from 'next/server';
+// ─────────────────────────────────────────────────────────────────────────────
+// Flight alert registration and delivery.
+//
+//   POST /api/notifications — a traveler registers alerts for a flight
+//   PUT  /api/notifications — the alert job sends a push (ADMIN OR SERVICE ONLY)
+//
+// The PUT handler used to be completely open: anyone could POST an arbitrary
+// FCM token and an arbitrary event and we would deliver a push notification
+// carrying the Domner brand. It now requires an admin session or the
+// DOMNER_SERVICE_TOKEN that the scheduled job holds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { z } from 'zod';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendPushNotification, notificationTemplates } from '@/lib/firebase';
+import { ApiError, ok, readJson, route } from '@/lib/http';
+import { getUser, requireAdminOrService } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
-interface AlertRegistration {
-  flightNumber: string;
-  date: string;
-  preferences: {
-    gateChange: boolean;
-    delay: boolean;
-    boarding: boolean;
-    landing: boolean;
-    contact: string;
-    language: 'km' | 'en';
-  };
-  fcmToken?: string;
-}
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// POST /api/notifications — register flight alert preferences
-export async function POST(request: Request) {
-  const body = (await request.json()) as AlertRegistration;
-  if (!body.flightNumber || !body.date) {
-    return NextResponse.json({ error: 'Missing flightNumber or date' }, { status: 400 });
-  }
+const registerSchema = z.object({
+  flightNumber: z
+    .string()
+    .trim()
+    .min(2)
+    .max(10)
+    .regex(/^[A-Za-z0-9\s]+$/, 'That does not look like a flight number.'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD.'),
+  preferences: z
+    .object({
+      gateChange: z.boolean().optional(),
+      delay: z.boolean().optional(),
+      boarding: z.boolean().optional(),
+      landing: z.boolean().optional(),
+      contact: z.string().max(120).optional(),
+      language: z.enum(['km', 'en']).optional(),
+    })
+    .optional(),
+  fcmToken: z.string().trim().max(512).optional(),
+});
 
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    await supabase.from('saved_flights').insert({
-      flight_number: body.flightNumber.replace(/\s+/g, '').toUpperCase(),
-      flight_date: body.date,
-      notify_gate_change: body.preferences?.gateChange ?? true,
-      notify_delay: body.preferences?.delay ?? true,
-      notify_boarding: body.preferences?.boarding ?? true,
-      notify_landing: body.preferences?.landing ?? true,
-    });
-    if (body.fcmToken) {
-      await supabase.from('push_subscriptions').insert({ fcm_token: body.fcmToken, device_type: 'web' });
+export const POST = route(
+  async (request) => {
+    const parsed = registerSchema.safeParse(await readJson<unknown>(request));
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new ApiError('BAD_REQUEST', issue?.message ?? 'Invalid alert registration.');
     }
-  }
 
-  return NextResponse.json({ ok: true });
-}
+    const input = parsed.data;
+    const supabase = getSupabaseAdmin();
 
-// PUT /api/notifications — admin/cron: send a flight event push
-// Body: { event, flight, fcmToken, language, params }
-export async function PUT(request: Request) {
-  const body = (await request.json()) as {
-    event: 'gateChange' | 'delay' | 'boarding' | 'landed';
-    flight: string;
-    fcmToken: string;
-    language?: 'km' | 'en';
-    params?: Record<string, string | number>;
-  };
+    if (!supabase) {
+      return ok({ ok: true, persisted: false });
+    }
 
-  if (!body.event || !body.flight || !body.fcmToken) {
-    return NextResponse.json({ error: 'Missing event, flight, or fcmToken' }, { status: 400 });
-  }
+    // Attach the alert to the signed-in traveler when there is one, so it shows
+    // up in their dashboard and is covered by RLS. Guests are still allowed —
+    // this is the pre-flight anxiety moment, not the place to force a signup.
+    const user = await getUser(request);
 
-  const lang = body.language ?? 'km';
-  const p = body.params ?? {};
-  let message: { title: string; body: string };
+    const { error } = await supabase.from('saved_flights').upsert(
+      {
+        user_id: user?.id ?? null,
+        guest_email: user ? null : (input.preferences?.contact ?? null),
+        flight_number: input.flightNumber.replace(/\s+/g, '').toUpperCase(),
+        flight_date: input.date,
+        notify_gate_change: input.preferences?.gateChange ?? true,
+        notify_delay: input.preferences?.delay ?? true,
+        notify_boarding: input.preferences?.boarding ?? true,
+        notify_landing: input.preferences?.landing ?? true,
+      },
+      { onConflict: 'user_id,flight_number,flight_date', ignoreDuplicates: false }
+    );
 
-  switch (body.event) {
-    case 'gateChange':
-      message = notificationTemplates.gateChange(body.flight, String(p.oldGate ?? '?'), String(p.newGate ?? '?'))[lang];
-      break;
-    case 'delay':
-      message = notificationTemplates.delay(body.flight, Number(p.minutes ?? 0), String(p.newTime ?? '?'))[lang];
-      break;
-    case 'boarding':
-      message = notificationTemplates.boarding(body.flight, String(p.gate ?? '?'))[lang];
-      break;
-    case 'landed':
-      message = notificationTemplates.landed(body.flight, String(p.city ?? ''))[lang];
-      break;
-    default:
-      return NextResponse.json({ error: 'Unknown event' }, { status: 400 });
-  }
+    if (error) {
+      log.warn('notifications.register_failed', { error });
+      throw new ApiError('INTERNAL', 'Could not register the alert. Please try again.');
+    }
 
-  const sent = await sendPushNotification(body.fcmToken, {
-    ...message,
-    url: `/flights/${body.flight.replace(/\s+/g, '')}`,
-  });
+    if (input.fcmToken) {
+      // onConflict on the token keeps one row per device instead of a new row
+      // on every page load.
+      await supabase
+        .from('push_subscriptions')
+        .upsert(
+          { user_id: user?.id ?? null, fcm_token: input.fcmToken, device_type: 'web' },
+          { onConflict: 'fcm_token' }
+        );
+    }
 
-  return NextResponse.json({ ok: true, sent });
-}
+    return ok({ ok: true, persisted: true });
+  },
+  { rateLimit: 'notifications', name: 'notifications.register' }
+);
+
+const sendSchema = z.object({
+  event: z.enum(['gateChange', 'delay', 'boarding', 'landed']),
+  flight: z.string().trim().min(2).max(10),
+  fcmToken: z.string().trim().min(8).max(512),
+  language: z.enum(['km', 'en']).default('km'),
+  params: z.record(z.union([z.string(), z.number()])).default({}),
+});
+
+export const PUT = route(
+  async (request) => {
+    // Admin session or the scheduled job's service token. Nothing else.
+    await requireAdminOrService(request);
+
+    const parsed = sendSchema.safeParse(await readJson<unknown>(request));
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new ApiError('BAD_REQUEST', issue?.message ?? 'Invalid notification payload.');
+    }
+
+    const { event, flight, fcmToken, language, params } = parsed.data;
+
+    const message = (() => {
+      switch (event) {
+        case 'gateChange':
+          return notificationTemplates.gateChange(
+            flight,
+            String(params.oldGate ?? '?'),
+            String(params.newGate ?? '?')
+          )[language];
+        case 'delay':
+          return notificationTemplates.delay(
+            flight,
+            Number(params.minutes ?? 0),
+            String(params.newTime ?? '?')
+          )[language];
+        case 'boarding':
+          return notificationTemplates.boarding(flight, String(params.gate ?? '?'))[language];
+        case 'landed':
+          return notificationTemplates.landed(flight, String(params.city ?? ''))[language];
+      }
+    })();
+
+    const sent = await sendPushNotification(fcmToken, {
+      ...message,
+      url: `/flights/${flight.replace(/\s+/g, '')}`,
+    });
+
+    log.info('notifications.sent', { event, flight, sent });
+    return ok({ ok: true, sent });
+  },
+  { rateLimit: 'notifications', name: 'notifications.send' }
+);

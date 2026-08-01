@@ -24,6 +24,25 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 
 type PayMethod = 'stripe' | 'aba';
 
+/** Submits the signed ABA PayWay field set as a real form POST. */
+function postToGateway(url: string, fields: Record<string, string>): void {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
 export default function CheckoutPage() {
   const cart = useCart();
   const router = useRouter();
@@ -31,6 +50,11 @@ export default function CheckoutPage() {
   const [payMethod, setPayMethod] = useState<PayMethod>('stripe');
   const [processing, setProcessing] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Generated once per visit to the checkout, not per submit, so a retry after
+  // a network blip resolves to the same order instead of creating a second one.
+  const [idempotencyKey] = useState(() =>
+    globalThis.crypto?.randomUUID?.() ?? `ck-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 
   const {
     register,
@@ -58,6 +82,8 @@ export default function CheckoutPage() {
     );
   }
 
+  // Displayed to the customer only. The server re-derives every figure from the
+  // catalog and charges its own number — see lib/pricing.ts.
   const total = cart.total();
 
   const onSubmit = async (form: CheckoutForm) => {
@@ -70,20 +96,42 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer: form,
-          items: cart.items,
-          totalUsd: total,
+          // Intent only: which plan and how many. No prices are sent — a total
+          // from the browser cannot influence what the customer is charged.
+          items: cart.items.map((i) => ({ planId: i.planId, quantity: i.quantity })),
           referralCode: cart.referralCode,
           discountCode: cart.discountCode,
+          // Stable for this checkout attempt so a double-tap cannot create two
+          // orders or two charges.
+          idempotencyKey,
         }),
       });
-      if (!res.ok) throw new Error('Payment could not be started. Please try again.');
-      const data = (await res.json()) as { orderNumber: string; paymentUrl?: string };
-      cart.clear();
-      if (data.paymentUrl && !data.paymentUrl.startsWith('/order-confirmation')) {
-        window.location.href = data.paymentUrl;
-      } else {
-        router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);
+
+      const data = (await res.json().catch(() => null)) as
+        | {
+            orderNumber?: string;
+            paymentUrl?: string;
+            fields?: Record<string, string>;
+            totalUsd?: number;
+            error?: { message?: string };
+          }
+        | null;
+
+      if (!res.ok || !data?.orderNumber) {
+        throw new Error(
+          data?.error?.message ?? 'Payment could not be started. Please try again.'
+        );
       }
+
+      cart.clear();
+
+      // ABA PayWay expects a signed form POST, not a redirect with query params.
+      if (data.paymentUrl && data.fields) {
+        postToGateway(data.paymentUrl, data.fields);
+        return;
+      }
+
+      router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : 'Something went wrong');
       setProcessing(false);

@@ -28,7 +28,8 @@
 // RESPONSE (not flying): { "live": false, "reason": "not-airborne" | "unavailable" }
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NextResponse } from 'next/server';
+import { ok, route } from '@/lib/http';
+import { parseFlightNumber } from '@/lib/flightInput';
 
 export const runtime = 'nodejs';
 
@@ -216,18 +217,19 @@ async function fetchLiveFlight(flightNumber: string): Promise<LiveFlightResult> 
 }
 
 // GET /api/flightradar?flight=VN841  (also accepts ?number=VN841)
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const number = searchParams.get('flight') ?? searchParams.get('number');
-  if (!number) {
-    return NextResponse.json(
-      { error: 'Missing flight number. Try ?flight=VN841' },
-      { status: 400 }
+export const GET = route(
+  async (request) => {
+    const { searchParams } = new URL(request.url);
+    const number = parseFlightNumber(
+      searchParams.get('flight') ?? searchParams.get('number')
     );
-  }
 
-  const result = await fetchLiveFlight(number);
-  return NextResponse.json(result, {
-    headers: { 'Cache-Control': 's-maxage=15, stale-while-revalidate=15' },
-  });
-}
+    const result = await fetchLiveFlight(number);
+    return ok(result, {
+      headers: { 'Cache-Control': 's-maxage=15, stale-while-revalidate=15' },
+    });
+  },
+  // adsb.lol, airplanes.live and adsb.fi are free, volunteer-run networks. An
+  // unthrottled proxy in front of them gets our egress IP banned for everyone.
+  { rateLimit: 'flightData', name: 'flightradar' }
+);

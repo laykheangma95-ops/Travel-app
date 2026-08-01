@@ -89,6 +89,7 @@ const dicts = {
     'footer.about': 'About',
     'footer.privacy': 'Privacy Policy',
     'footer.terms': 'Terms',
+    'footer.refunds': 'Refunds',
     'footer.prices': 'All prices in USD',
   },
   km: {
@@ -174,6 +175,7 @@ const dicts = {
     'footer.about': 'អំពីយើង',
     'footer.privacy': 'គោលការណ៍ឯកជនភាព',
     'footer.terms': 'លក្ខខណ្ឌ',
+    'footer.refunds': 'ការសងប្រាក់វិញ',
     'footer.prices': 'គ្រប់តម្លៃជាដុល្លារអាមេរិក',
   },
 } as const;
@@ -192,14 +194,45 @@ const LangContext = createContext<LangContextValue>({
   t: (key) => dicts.en[key],
 });
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>('en');
+/** Shared with the server layout, which reads this cookie to set <html lang>. */
+export const LANG_COOKIE = 'domner-lang';
 
-  // Restore saved choice after mount (avoids SSR hydration mismatch).
+function persistLang(lang: Lang): void {
+  try {
+    localStorage.setItem(LANG_COOKIE, lang);
+  } catch {
+    // Private browsing can refuse localStorage; the cookie below still works.
+  }
+  // A cookie (not just localStorage) so the SERVER knows the language too and
+  // can render <html lang="km"> in the initial HTML. Search engines and screen
+  // readers only ever see that first response — a value applied later by an
+  // effect is invisible to them.
+  document.cookie = `${LANG_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
+}
+
+export function LanguageProvider({
+  children,
+  initialLang = 'en',
+}: {
+  children: ReactNode;
+  /** Read from the cookie during SSR so the first paint is already correct. */
+  initialLang?: Lang;
+}) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+
+  // Reconcile with a stored preference set before cookies existed, and keep
+  // the cookie fresh so its expiry rolls forward on every visit.
   useEffect(() => {
-    const saved = localStorage.getItem('domner-lang');
-    if (saved === 'km' || saved === 'en') setLangState(saved);
-  }, []);
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(LANG_COOKIE);
+    } catch {
+      saved = null;
+    }
+    const next = saved === 'km' || saved === 'en' ? saved : initialLang;
+    setLangState(next);
+    persistLang(next);
+  }, [initialLang]);
 
   // Reflect the language on <html> and switch body font for Khmer.
   useEffect(() => {
@@ -209,7 +242,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLang = (l: Lang) => {
     setLangState(l);
-    localStorage.setItem('domner-lang', l);
+    persistLang(l);
   };
 
   const t = (key: DictKey) => dicts[lang][key] ?? dicts.en[key];

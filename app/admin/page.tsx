@@ -1,95 +1,185 @@
-import { DollarSign, Package, TrendingUp, Users, Plane, LifeBuoy } from 'lucide-react';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { DollarSign, Package, TrendingUp, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { formatUsd } from '@/lib/utils';
+import type { OrderStatus } from '@/types';
 
-// Demo metrics — real values are aggregated from Supabase once connected.
-const stats = [
-  { label: 'Orders today', value: '14', icon: Package, change: '+3 vs yesterday' },
-  { label: 'Orders this week', value: '87', icon: TrendingUp, change: '+12%' },
-  { label: 'Revenue this month', value: '$2,840', icon: DollarSign, change: '+18%' },
-  { label: 'Active users', value: '1,203', icon: Users, change: '+241 this month' },
-];
+// Live figures from esim_orders. These tiles previously showed invented numbers
+// ("Orders today: 14", "+18%") that never moved regardless of real trade.
 
-const recentOrders = [
-  { number: 'DN-2026-4821', country: 'Thailand 🇹🇭', plan: 'Standard', total: 9.99, status: 'paid' as const },
-  { number: 'DN-2026-4820', country: 'Vietnam 🇻🇳', plan: 'Basic', total: 3.99, status: 'fulfilled' as const },
-  { number: 'DN-2026-4819', country: 'Japan 🇯🇵', plan: 'Premium', total: 25.99, status: 'pending' as const },
-  { number: 'DN-2026-4818', country: 'Singapore 🇸🇬', plan: 'Standard', total: 10.99, status: 'fulfilled' as const },
-];
+interface OrderStats {
+  total: number;
+  byStatus: Record<OrderStatus, number>;
+  revenueUsd: number;
+  last7dRevenueUsd: number;
+}
 
-const statusTone = { paid: 'info', fulfilled: 'success', pending: 'warning' } as const;
+interface RecentOrder {
+  id: string;
+  order_number: string;
+  country: string;
+  plan_name: string;
+  price_usd: number;
+  status: OrderStatus;
+  created_at: string;
+}
+
+const statusTone: Record<OrderStatus, 'warning' | 'info' | 'success' | 'danger' | 'neutral'> = {
+  pending: 'warning',
+  paid: 'info',
+  fulfilled: 'success',
+  cancelled: 'danger',
+  refunded: 'neutral',
+};
 
 export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [recent, setRecent] = useState<RecentOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/orders?limit=8', { credentials: 'include' });
+      const data = (await res.json().catch(() => null)) as {
+        orders?: RecentOrder[];
+        stats?: OrderStats;
+        error?: { message?: string };
+      } | null;
+
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Could not load dashboard data.');
+
+      setStats(data?.stats ?? null);
+      setRecent(data?.orders ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const awaitingFulfilment = stats?.byStatus.paid ?? 0;
+
+  const tiles = [
+    {
+      label: 'Awaiting fulfilment',
+      value: String(awaitingFulfilment),
+      icon: AlertTriangle,
+      hint: awaitingFulfilment > 0 ? 'Customers are waiting for their eSIM' : 'All caught up',
+      urgent: awaitingFulfilment > 0,
+    },
+    {
+      label: 'Fulfilled orders',
+      value: String(stats?.byStatus.fulfilled ?? 0),
+      icon: Package,
+      hint: 'Delivered to customers',
+      urgent: false,
+    },
+    {
+      label: 'Revenue (7 days)',
+      value: formatUsd(stats?.last7dRevenueUsd ?? 0),
+      icon: TrendingUp,
+      hint: 'Paid and fulfilled orders',
+      urgent: false,
+    },
+    {
+      label: 'Revenue (all time)',
+      value: formatUsd(stats?.revenueUsd ?? 0),
+      icon: DollarSign,
+      hint: 'Settled money only',
+      urgent: false,
+    },
+  ];
+
   return (
     <div className="space-y-8">
-      {/* Stats */}
+      {error && (
+        <div role="alert" className="rounded-card border border-red-200 bg-red-50 p-4 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label} className="p-5">
+        {tiles.map((tile) => (
+          <Card key={tile.label} className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{s.label}</p>
-              <s.icon size={17} className="text-accent" aria-hidden="true" />
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                {tile.label}
+              </p>
+              <tile.icon
+                size={17}
+                className={tile.urgent ? 'text-danger' : 'text-accent'}
+                aria-hidden="true"
+              />
             </div>
-            <p className="mt-2 font-display text-2xl font-bold text-ink">{s.value}</p>
-            <p className="mt-1 text-xs text-success">{s.change}</p>
+            <p className="mt-2 font-display text-2xl font-bold text-ink">
+              {loading ? '—' : tile.value}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">{tile.hint}</p>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent orders */}
-        <Card className="p-6 lg:col-span-2">
-          <h2 className="mb-4 font-display font-bold text-ink">Recent orders</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                  <th className="pb-3 pr-4 font-medium">Order</th>
-                  <th className="pb-3 pr-4 font-medium">Country</th>
-                  <th className="pb-3 pr-4 font-medium">Plan</th>
-                  <th className="pb-3 pr-4 font-medium">Total</th>
-                  <th className="pb-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {recentOrders.map((o) => (
-                  <tr key={o.number}>
-                    <td className="py-3 pr-4 font-mono text-xs">{o.number}</td>
-                    <td className="py-3 pr-4">{o.country}</td>
-                    <td className="py-3 pr-4">{o.plan}</td>
-                    <td className="py-3 pr-4 font-semibold">${o.total.toFixed(2)}</td>
-                    <td className="py-3">
-                      <Badge tone={statusTone[o.status]}>{o.status}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        {/* Side widgets */}
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink">
-              <Plane size={17} className="text-accent" aria-hidden="true" /> Flight alerts
-            </h2>
-            <p className="mt-2 text-sm text-ink-secondary">
-              <strong className="text-ink">31 users</strong> are tracking flights right now.
-            </p>
-            <p className="mt-1 text-xs text-ink-muted">2 delayed flights need manual notifications.</p>
-          </Card>
-          <Card className="p-6">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink">
-              <LifeBuoy size={17} className="text-accent" aria-hidden="true" /> Support tickets
-            </h2>
-            <p className="mt-2 text-sm text-ink-secondary">
-              <strong className="text-ink">3 open tickets</strong> · 1 high priority
-            </p>
-            <p className="mt-1 text-xs text-ink-muted">Oldest ticket: 2 hours ago</p>
-          </Card>
+      <Card className="p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display font-bold text-ink">Recent orders</h2>
+          <Link
+            href="/admin/orders"
+            className="inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-accent"
+          >
+            All orders <ArrowRight size={14} aria-hidden="true" />
+          </Link>
         </div>
-      </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">The eight most recent orders</caption>
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
+                <th scope="col" className="pb-3 pr-4 font-medium">Order</th>
+                <th scope="col" className="pb-3 pr-4 font-medium">Country</th>
+                <th scope="col" className="pb-3 pr-4 font-medium">Plan</th>
+                <th scope="col" className="pb-3 pr-4 font-medium">Total</th>
+                <th scope="col" className="pb-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {recent.map((order) => (
+                <tr key={order.id}>
+                  <td className="py-3 pr-4 font-mono text-xs">{order.order_number}</td>
+                  <td className="py-3 pr-4">{order.country}</td>
+                  <td className="py-3 pr-4 text-ink-secondary">{order.plan_name}</td>
+                  <td className="py-3 pr-4 font-semibold">{formatUsd(Number(order.price_usd))}</td>
+                  <td className="py-3">
+                    <Badge tone={statusTone[order.status]}>{order.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {loading && (
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
+            <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading…
+          </p>
+        )}
+        {!loading && recent.length === 0 && !error && (
+          <p className="py-8 text-center text-sm text-ink-muted">
+            No orders yet. They will appear here the moment a payment settles.
+          </p>
+        )}
+      </Card>
     </div>
   );
 }
