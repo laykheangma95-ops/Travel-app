@@ -164,7 +164,7 @@ export function FlightDashboard({ flight, onNotify, onShare, onSave, compact = f
           <button
             type="button"
             onClick={onNotify}
-            className="liquid-glass-accent liquid-sheen inline-flex flex-1 items-center justify-center gap-2 rounded-btn px-5 py-3 text-sm font-semibold text-white transition-all duration-200 ease-smooth hover:brightness-110 active:scale-[0.98]"
+            className="liquid-glass-accent liquid-sheen inline-flex flex-1 items-center justify-center gap-2 rounded-btn px-5 py-3 text-sm font-semibold text-primary-deep transition-all duration-200 ease-smooth hover:brightness-110 active:scale-[0.98]"
           >
             <Bell size={16} /> Notify Me
           </button>

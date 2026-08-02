@@ -305,6 +305,39 @@ export interface CustomsRule {
   notes: string[];
 }
 
+/** National emergency numbers. `tourist` is a dedicated tourist/EU line. */
+export interface EmergencyNumbers {
+  police: string;
+  ambulance: string;
+  fire: string;
+  tourist?: string;
+}
+
+/**
+ * The "help before you buy" layer for a destination — see data/destinationGuides.ts
+ * for what belongs here and, importantly, what deliberately does not.
+ * Every field is static and factual so the guide works offline.
+ */
+export interface DestinationGuide {
+  countrySlug: string;
+  /** IANA zone, e.g. 'Asia/Tokyo' — drives the live local clock. */
+  timezone: string;
+  /** Socket letters, e.g. ['A','B']. Compared against Cambodia's A/C/G. */
+  plugTypes: string[];
+  /** Mains voltage. Matters even when the plug fits — Japan is 100V. */
+  voltage: number;
+  languages: string[];
+  bestMonths: string;
+  climate: string;
+  /** Rough per-person, per-day spend excluding flights, in USD. */
+  dailyBudgetUsd: { budget: number; comfortable: number };
+  tippingNote: string;
+  highlights: string[];
+  hiddenGems: string[];
+  tips: string[];
+  emergency: EmergencyNumbers;
+}
+
 export interface ScamAlert {
   countrySlug: string;
   title: string;

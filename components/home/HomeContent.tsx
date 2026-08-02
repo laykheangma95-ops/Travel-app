@@ -5,11 +5,10 @@ import { Smartphone, BellRing, MapPinned, ArrowRight, Star } from 'lucide-react'
 import { Button } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Reveal } from '@/components/ui/Reveal';
-import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { GlobeHero } from '@/components/home/GlobeHero';
 import { JourneyCompanion } from '@/components/home/JourneyCompanion';
-import { popularDestinations } from '@/data/destinations';
+import { TravelFeed } from '@/components/home/TravelFeed';
 import { useLang, type DictKey } from '@/lib/i18n';
 
 const features: { icon: typeof Smartphone; nameKey: DictKey; descKey: DictKey; href: string }[] = [
@@ -62,6 +61,17 @@ export function HomeContent() {
           light cards (see .claude/skills/ui-ux → "rule of continuity"). ── */}
       <div className="night-canvas">
         <div className="night-stars" aria-hidden="true" />
+
+        {/* ── Travel feed: inspire, inform, then sell ──────────────────────
+            Trending destinations, practical tips and standing safety advisories
+            come BEFORE the product explainer below. A visitor who never buys
+            today should still leave with something useful — that is the entire
+            argument for choosing this over a plain eSIM store.
+
+            This sits where a "Popular destinations" grid of the same countries
+            used to be. The trending rail carries live local time, best season
+            and daily budget, so keeping both would have shown one list twice. */}
+        <TravelFeed />
 
         {/* ── Feature showcase ── */}
         <section
@@ -132,31 +142,6 @@ export function HomeContent() {
                 </Reveal>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* ── Popular destinations ── */}
-        <section
-          className="relative section-pad"
-          data-journey-section
-          data-journey-label={t('dest.eyebrow')}
-        >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
-            <Reveal>
-              <SectionHeading eyebrow={t('dest.eyebrow')} title={t('dest.title')} description={t('dest.desc')} dark />
-            </Reveal>
-            <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-              {popularDestinations.map((dest, i) => (
-                <Reveal key={dest.slug} delay={(i % 4) * 80}>
-                  <DestinationCard destination={dest} dark />
-                </Reveal>
-              ))}
-            </div>
-            <Reveal className="mt-12 text-center">
-              <Button href="/esim" variant="liquid" size="lg">
-                {t('dest.viewAll')} <ArrowRight size={16} />
-              </Button>
-            </Reveal>
           </div>
         </section>
 

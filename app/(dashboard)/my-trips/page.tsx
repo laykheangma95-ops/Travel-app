@@ -41,7 +41,7 @@ export default function MyTripsPage() {
         </div>
         <Link
           href="/checklist"
-          className="rounded-btn bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:brightness-110"
+          className="rounded-btn bg-accent px-4 py-2.5 text-sm font-semibold text-primary-deep transition-colors hover:brightness-110"
         >
           + New Trip
         </Link>

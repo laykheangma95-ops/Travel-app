@@ -96,7 +96,7 @@ export default function PublicTrackPage() {
           </div>
           <Link
             href="/"
-            className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
+            className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-primary-deep transition-all hover:brightness-110"
           >
             <Download size={15} /> Open Domer
           </Link>

@@ -7,11 +7,25 @@ interface EmptyStateProps {
   description: string;
   ctaLabel?: string;
   ctaHref?: string;
+  /**
+   * In-place recovery (clear a search, reset a filter) for empty states whose
+   * fix is client state rather than a different URL. Takes precedence over
+   * `ctaHref` when both are given.
+   */
+  onCtaClick?: () => void;
   /** Night-surface variant for use inside .night-canvas sections. */
   dark?: boolean;
 }
 
-export function EmptyState({ icon: Icon, title, description, ctaLabel, ctaHref, dark = false }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  ctaLabel,
+  ctaHref,
+  onCtaClick,
+  dark = false,
+}: EmptyStateProps) {
   return (
     <div
       className={
@@ -25,8 +39,12 @@ export function EmptyState({ icon: Icon, title, description, ctaLabel, ctaHref, 
       </div>
       <h3 className={`font-display text-lg font-bold ${dark ? 'text-white' : 'text-ink'}`}>{title}</h3>
       <p className={`mt-1.5 max-w-sm text-sm ${dark ? 'text-white/65' : 'text-ink-secondary'}`}>{description}</p>
-      {ctaLabel && ctaHref && (
-        <Button href={ctaHref} variant={dark ? 'liquid-accent' : 'primary'} className="mt-6">
+      {ctaLabel && (onCtaClick || ctaHref) && (
+        <Button
+          {...(onCtaClick ? { onClick: onCtaClick } : { href: ctaHref })}
+          variant={dark ? 'liquid-accent' : 'primary'}
+          className="mt-6"
+        >
           {ctaLabel}
         </Button>
       )}

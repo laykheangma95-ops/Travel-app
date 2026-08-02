@@ -100,7 +100,7 @@ export default function FlightDetailPage() {
             </p>
             <Link
               href="/flights"
-              className="liquid-glass-accent liquid-sheen mt-6 rounded-btn px-5 py-2.5 text-sm font-semibold text-white"
+              className="liquid-glass-accent liquid-sheen mt-6 rounded-btn px-5 py-2.5 text-sm font-semibold text-primary-deep"
             >
               Try again
             </Link>

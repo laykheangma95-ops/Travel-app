@@ -28,6 +28,8 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type * as ThreeNS from 'three';
 import { useLang } from '@/lib/i18n';
+import { HeroGreeting } from '@/components/home/HeroGreeting';
+import { DestinationSearch } from '@/components/home/DestinationSearch';
 import {
   createGlobeEngine,
   latLonToXYZ,
@@ -545,25 +547,29 @@ export function GlobeHero() {
 
       {/* Copy layer */}
       <div ref={copyRef} className="dgh-copy">
-        <span className="dgh-badge dgh-reveal">{t('hero.badge')}</span>
-        <h1 className="dgh-title dgh-reveal">
-          {t('hero.t1')}
-          <span className="dgh-title-accent"> {t('hero.t2')}</span>
-          <br />
-          {t('hero.t3')}
-        </h1>
-        <p className="dgh-sub dgh-reveal">{t('hero.sub')}</p>
-        <div className="dgh-ctas dgh-reveal">
-          <Link
-            href="/esim"
-            className="dgh-cta"
-            onMouseMove={onCtaMove}
-            onMouseLeave={onCtaLeave}
-          >
-            {t('hero.ctaEsim')}
-          </Link>
-          <Link href="/flights" className="dgh-cta-ghost">
+        {/* The hero opens by asking, not selling. A returning traveller is
+            greeted by name of day; a first-time visitor is asked where they are
+            going before anything is offered to them. The eSIM CTA moved below
+            the search — it is one answer to that question, not the question. */}
+        <div className="dgh-reveal">
+          <HeroGreeting />
+        </div>
+        <h1 className="dgh-title dgh-reveal">{t('hero.headline')}</h1>
+        <p className="dgh-sub dgh-reveal">{t('hero.subheadline')}</p>
+        <div className="dgh-search dgh-reveal">
+          <DestinationSearch />
+        </div>
+        {/* The two large CTAs that used to sit here ("Get Your eSIM" / "Track
+            My Flight") were the hero's primary action before the search existed.
+            Keeping them meant three competing primary actions in one viewport,
+            an overcrowded fold on a phone, and a shop-front feel the search is
+            meant to replace. Flight tracking is a genuinely different job the
+            search cannot serve, so it survives as one quiet link; the eSIM path
+            is the whole rest of the page. */}
+        <div className="dgh-alt dgh-reveal">
+          <Link href="/flights" className="dgh-alt-link">
             {t('hero.ctaFlight')}
+            <span aria-hidden="true"> →</span>
           </Link>
         </div>
         {/* Interaction affordance: the globe is draggable but nothing said so.
@@ -739,7 +745,10 @@ const CSS_TEXT = `
   width: 100%;
   max-width: 64rem;
   margin: 0 auto;
-  padding: clamp(6.5rem, 14vh, 9rem) 1rem 0;
+  /* Tightened from 6.5rem: the hero now carries a greeting, headline, sub,
+     search field and destination chips, and all of it has to breathe inside
+     one 100svh viewport on a phone. */
+  padding: clamp(5.25rem, 11vh, 7.5rem) 1rem 0;
   text-align: center;
 }
 .dgh-badge {
@@ -760,10 +769,12 @@ const CSS_TEXT = `
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 24px rgba(87, 200, 255, 0.10);
 }
 .dgh-title {
-  margin: 2rem 0 0;
+  /* One question on (ideally) one or two lines rather than a stacked
+     three-line statement, so the ceiling comes down from 6rem. */
+  margin: 1.1rem 0 0;
   font-weight: 800;
-  font-size: clamp(2.9rem, 7.5vw, 6rem);
-  line-height: 1.08;
+  font-size: clamp(2.35rem, 5.6vw, 4.5rem);
+  line-height: 1.1;
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
@@ -774,14 +785,62 @@ const CSS_TEXT = `
   color: transparent;
 }
 .dgh-sub {
-  margin: 1.5rem auto 0;
+  margin: 1.15rem auto 0;
   max-width: 40rem;
   font-size: clamp(1.05rem, 1.6vw, 1.25rem);
   line-height: 1.65;
   color: rgba(255, 255, 255, 0.72);
 }
+
+/* Search sits directly under the promise it answers. Centred as its own row so
+   the field and the destination chips share one optical centre with the copy. */
+.dgh-search {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+  /* The suggestion list is absolutely positioned inside; keep it above the
+     chips row and the frosted stat pills below. */
+  position: relative;
+  z-index: 6;
+}
+/* Secondary route out of the hero — deliberately quiet so it cannot compete
+   with the search field above it. */
+.dgh-alt {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+.dgh-alt-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.35rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  /* The globe's bright particle rim rises to roughly this height on a desktop
+     viewport, so plain text here becomes unreadable against it. Ambient glass
+     (skill §5, tier 1) keeps the link legible over any part of the scene. */
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dgh-alt-link:hover {
+  color: #e6cb8b;
+  border-color: rgba(230, 203, 139, 0.45);
+}
+.dgh-alt-link:focus-visible {
+  outline: 2px solid #e6cb8b;
+  outline-offset: 3px;
+}
+
 .dgh-ctas {
-  margin-top: 2.5rem;
+  margin-top: 1.9rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -839,7 +898,10 @@ const CSS_TEXT = `
 /* ── Drag hint: quiet glass pill + sliding gold dot ── */
 .dgh-hint {
   margin-top: 1.5rem;
-  display: inline-flex;
+  /* Drag-to-spin is disabled on touch, so this pill was advertising an
+     interaction phones do not have — while costing the mobile fold ~60px it
+     badly needs. Shown only on fine pointers, where it is actually true. */
+  display: none;
   align-items: center;
   gap: 0.65rem;
   padding: 0.5rem 1.15rem;
@@ -854,6 +916,9 @@ const CSS_TEXT = `
   -webkit-backdrop-filter: blur(12px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: opacity 0.6s ease, transform 0.6s ease;
+}
+@media (pointer: fine) {
+  .dgh-hint { display: inline-flex; }
 }
 .dgh-hint-km {
   font-size: 0.72rem;
