@@ -7,7 +7,8 @@ import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 import { LiquidTouchController } from '@/components/pwa/LiquidTouchController';
 import { DomerSplash } from '@/components/brand/DomerLoader';
 import { TripCopilot } from '@/components/copilot/TripCopilot';
-import { LanguageProvider } from '@/lib/i18n';
+import { LanguageProvider, LANG_COOKIE, type Lang } from '@/lib/i18n';
+import { cookies } from 'next/headers';
 import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
@@ -55,10 +56,17 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Read the language on the server so the FIRST response already carries the
+  // right <html lang> and the right body font. Previously this was applied by a
+  // client effect, meaning crawlers and screen readers always saw lang="en"
+  // even for a Khmer-speaking visitor.
+  const cookieLang = cookies().get(LANG_COOKIE)?.value;
+  const lang: Lang = cookieLang === 'km' ? 'km' : 'en';
+
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${khmer.variable}`}>
-      <body className="flex min-h-screen flex-col">
-        <LanguageProvider>
+    <html lang={lang} className={`${display.variable} ${body.variable} ${khmer.variable}`}>
+      <body className={`flex min-h-screen flex-col${lang === 'km' ? ' lang-km' : ''}`}>
+        <LanguageProvider initialLang={lang}>
           {/* Keyboard skip link — first tab stop, visible only on focus. */}
           <a
             href="#main-content"

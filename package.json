@@ -1,9 +1,9 @@
 {
   "name": "domner-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Domner App \u2014 Cambodia's first Khmer-language travel super app",
+  "description": "Domner App — Cambodia's first Khmer-language travel super app",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,19 +13,23 @@
     "intents:gap": "node scripts/intent-gap.mjs",
     "intents:seed": "node scripts/seed-data.mjs",
     "intents:generate": "node scripts/generate-questions.mjs",
-    "intents:train": "node scripts/train-intent.mjs"
+    "intents:train": "node scripts/train-intent.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "audit:check": "node scripts/audit-check.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@hookform/resolvers": "^3.9.0",
     "@stripe/stripe-js": "^4.8.0",
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.45.0",
-    "@types/leaflet": "^1.9.21",
     "framer-motion": "^11.11.0",
     "gsap": "^3.15.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.454.0",
-    "next": "^14.2.15",
+    "next": "14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
@@ -36,13 +40,17 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.185.1",
     "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.35",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.10"
   }
 }

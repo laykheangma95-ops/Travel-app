@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, QrCode, Users } from 'lucide-react';
+import { LayoutDashboard, Package, QrCode, Users, Server } from 'lucide-react';
 import { AdminGate } from '@/components/admin/AdminGate';
 import { cn } from '@/lib/utils';
 
 const adminNav = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Orders', href: '/admin/orders', icon: Package },
+  { label: 'Suppliers', href: '/admin/providers', icon: Server },
   { label: 'Generate eSIM', href: '/admin/generate-esim', icon: QrCode },
   { label: 'Affiliates', href: '/admin/affiliates', icon: Users },
 ];
