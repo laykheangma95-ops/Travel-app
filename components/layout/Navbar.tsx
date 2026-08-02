@@ -41,6 +41,10 @@ const navGroups: NavGroup[] = [
       { labelKey: 'nav.emergency', href: '/emergency' },
     ],
   },
+  // Corner Map (ជ្រុង). Top-level rather than nested under Tools: it is a
+  // destination in its own right, and it is the only entry point into the
+  // module — inside it there is no site chrome to navigate back through.
+  { labelKey: 'nav.corner', href: '/map' },
   { labelKey: 'nav.support', href: '/affiliate' },
 ];
 
