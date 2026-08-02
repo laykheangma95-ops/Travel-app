@@ -1,17 +1,23 @@
-import { NextResponse } from 'next/server';
-import { fetchLiveFlight } from '@/lib/liveFlight';
-
 // GET /api/flights/live?number=VN841 — real-time aircraft position from the
 // open ADS-B network (no API key required).
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const number = searchParams.get('number');
-  if (!number) {
-    return NextResponse.json({ error: 'Missing flight number' }, { status: 400 });
-  }
 
-  const result = await fetchLiveFlight(number);
-  return NextResponse.json(result, {
-    headers: { 'Cache-Control': 's-maxage=15, stale-while-revalidate=15' },
-  });
-}
+import { fetchLiveFlight } from '@/lib/liveFlight';
+import { ok, route } from '@/lib/http';
+import { parseFlightNumber } from '@/lib/flightInput';
+
+export const runtime = 'nodejs';
+
+export const GET = route(
+  async (request) => {
+    const { searchParams } = new URL(request.url);
+    const number = parseFlightNumber(searchParams.get('number'));
+
+    const result = await fetchLiveFlight(number);
+    return ok(result, {
+      headers: { 'Cache-Control': 's-maxage=15, stale-while-revalidate=15' },
+    });
+  },
+  // These providers are free, community-funded networks we do not own. Being a
+  // bad neighbour here gets our egress IP banned for every user.
+  { rateLimit: 'flightData', name: 'flights.live' }
+);

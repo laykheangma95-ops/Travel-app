@@ -1,55 +1,40 @@
-import { NextResponse } from 'next/server';
+// ─────────────────────────────────────────────────────────────────────────────
+// eSIM catalog.
+//
+//   GET /api/esim            — all destinations + plans
+//   GET /api/esim?country=x  — plans for one destination
+//
+// The PATCH handler that used to live here marked ANY order fulfilled and
+// attached ANY QR code URL, with no authentication whatsoever. It has moved to
+// PATCH /api/admin/orders, behind requireAdmin().
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { destinations } from '@/data/destinations';
 import { esimPlans, getPlansForCountry } from '@/data/esimPlans';
-import { getSupabaseAdmin } from '@/lib/supabase';
-import { deliverEsim } from '@/lib/esimDelivery';
-import type { EsimOrder } from '@/types';
+import { ApiError, ok, route } from '@/lib/http';
 
-// GET /api/esim            — all destinations + plans
-// GET /api/esim?country=x  — plans for one destination
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const country = searchParams.get('country');
+export const runtime = 'nodejs';
 
-  if (country) {
-    const plans = getPlansForCountry(country);
-    if (plans.length === 0) {
-      return NextResponse.json({ error: 'Unknown destination' }, { status: 404 });
+// The catalog is static per deploy, so it can be cached hard at the edge.
+const CATALOG_CACHE = 'public, s-maxage=3600, stale-while-revalidate=86400';
+
+export const GET = route(
+  async (request) => {
+    const { searchParams } = new URL(request.url);
+    const country = searchParams.get('country');
+
+    if (country) {
+      const plans = getPlansForCountry(country);
+      if (plans.length === 0) {
+        throw new ApiError('NOT_FOUND', 'We do not offer that destination yet.');
+      }
+      return ok({ plans }, { headers: { 'Cache-Control': CATALOG_CACHE } });
     }
-    return NextResponse.json({ plans });
-  }
 
-  return NextResponse.json({ destinations, plans: esimPlans });
-}
-
-// PATCH /api/esim — admin: mark an order fulfilled and attach the QR code URL
-export async function PATCH(request: Request) {
-  const body = (await request.json()) as { orderNumber?: string; qrCodeUrl?: string };
-  if (!body.orderNumber) {
-    return NextResponse.json({ error: 'Missing orderNumber' }, { status: 400 });
-  }
-
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return NextResponse.json({ ok: true, demo: true });
-  }
-
-  const { data: updated, error } = await supabase
-    .from('esim_orders')
-    .update({
-      status: 'fulfilled',
-      qr_code_url: body.qrCodeUrl ?? null,
-      fulfilled_at: new Date().toISOString(),
-    })
-    .eq('order_number', body.orderNumber)
-    .select('*')
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // Push the QR out on whichever channels the customer picked at checkout.
-  const delivery = await deliverEsim(updated as EsimOrder);
-  return NextResponse.json({ ok: true, delivery });
-}
+    return ok(
+      { destinations, plans: esimPlans },
+      { headers: { 'Cache-Control': CATALOG_CACHE } }
+    );
+  },
+  { rateLimit: 'catalog', name: 'esim.catalog' }
+);

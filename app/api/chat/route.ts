@@ -23,42 +23,51 @@
 //     -d '{"messages":[{"role":"user","content":"How does my eSIM work?"}]}'
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NextResponse } from 'next/server';
 import { generateReply, type ChatTurn, type ChatContext } from '@/lib/domnerEngine';
+import { ApiError, ok, route } from '@/lib/http';
+import { log } from '@/lib/logger';
 
 // Run on Vercel's Node runtime, and disable caching so every message gets a
 // fresh answer.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
-  // ── Step 1: Read and validate the incoming conversation ──────────────────
-  // We defend against bad input so the endpoint never crashes.
-  const body = (await request.json().catch(() => null)) as {
-    messages?: ChatTurn[];
-    context?: ChatContext;
-  } | null;
+/** Longest single message we will consider. Beyond this it is not a question. */
+const MAX_MESSAGE_CHARS = 2000;
 
-  const turns: ChatTurn[] = (body?.messages ?? [])
-    .filter((m) => (m?.role === 'user' || m?.role === 'assistant') && m?.content?.trim())
-    .slice(-20); // cap history so a runaway client can't blow up memory
+export const POST = route(
+  async (request) => {
+    // ── Step 1: Read and validate the incoming conversation ────────────────
+    const body = (await request.json().catch(() => null)) as {
+      messages?: ChatTurn[];
+      context?: ChatContext;
+    } | null;
 
-  if (turns.length === 0) {
-    return NextResponse.json({ error: 'Please send at least one message.' }, { status: 400 });
-  }
+    const turns: ChatTurn[] = (body?.messages ?? [])
+      .filter((m) => (m?.role === 'user' || m?.role === 'assistant') && m?.content?.trim())
+      // Cap each message as well as the history: 20 turns of unbounded text is
+      // still unbounded memory.
+      .map((m) => ({ ...m, content: m.content.slice(0, MAX_MESSAGE_CHARS) }))
+      .slice(-20);
 
-  // ── Step 2: Answer with our own engine — no external call, never fails ────
-  try {
-    const reply = generateReply(turns, body?.context ?? undefined);
-    return NextResponse.json({ reply });
-  } catch (error) {
-    // The engine is designed never to throw, but we guard anyway so the widget
-    // always gets a usable, friendly reply instead of a hard error.
-    console.error('[chat] engine error:', error instanceof Error ? error.message : error);
-    return NextResponse.json({
-      reply:
-        'ខ្ញុំនៅទីនេះដើម្បីជួយអំពី eSIM, ជើងហោះហើរ និងការធ្វើដំណើររបស់អ្នក។ សូមសាកសួរម្តងទៀត។ ' +
-        "(I'm here to help with eSIMs, flights, and your trip — please ask again.)",
-    });
-  }
-}
+    if (turns.length === 0) {
+      throw new ApiError('BAD_REQUEST', 'Please send at least one message.');
+    }
+
+    // ── Step 2: Answer with our own engine — no external call, never fails ──
+    try {
+      const reply = generateReply(turns, body?.context ?? undefined);
+      return ok({ reply });
+    } catch (error) {
+      // The engine is designed never to throw, but we guard anyway so the
+      // widget always gets a usable, friendly reply instead of a hard error.
+      log.error('chat.engine_error', { error });
+      return ok({
+        reply:
+          'ខ្ញុំនៅទីនេះដើម្បីជួយអំពី eSIM, ជើងហោះហើរ និងការធ្វើដំណើររបស់អ្នក។ សូមសាកសួរម្តងទៀត។ ' +
+          "(I'm here to help with eSIMs, flights, and your trip — please ask again.)",
+      });
+    }
+  },
+  { rateLimit: 'chat', name: 'chat' }
+);

@@ -38,6 +38,25 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 
 type PayMethod = 'stripe' | 'aba';
 
+/** Submits the signed ABA PayWay field set as a real form POST. */
+function postToGateway(url: string, fields: Record<string, string>): void {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
 export default function CheckoutPage() {
   const cart = useCart();
   const router = useRouter();
@@ -45,6 +64,11 @@ export default function CheckoutPage() {
   const [payMethod, setPayMethod] = useState<PayMethod>('stripe');
   const [processing, setProcessing] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Generated once per visit to the checkout, not per submit, so a retry after
+  // a network blip resolves to the same order instead of creating a second one.
+  const [idempotencyKey] = useState(() =>
+    globalThis.crypto?.randomUUID?.() ?? `ck-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 
   const {
     register,
@@ -87,14 +111,17 @@ export default function CheckoutPage() {
     );
   }
 
+  // Displayed to the customer only. The server re-derives every figure from the
+  // catalog and charges its own number — see lib/pricing.ts.
   const total = cart.total();
 
   const onSubmit = async (form: CheckoutForm) => {
     setProcessing(true);
     setPayError(null);
     try {
-      const endpoint = payMethod === 'stripe' ? '/api/payments/stripe' : '/api/payments/aba';
-      const res = await fetch(endpoint, {
+      // One route serves every gateway; the segment IS the provider id, so
+      // adding a payment method never touches this file.
+      const res = await fetch(`/api/payments/${payMethod}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,30 +131,59 @@ export default function CheckoutPage() {
             // country from a locally-formatted string.
             phone: form.phone.trim() ? toE164(form.phoneCountry, form.phone) : '',
           },
-          items: cart.items,
-          totalUsd: total,
+          // Intent only: which plan and how many. No prices are sent — a total
+          // from the browser cannot influence what the customer is charged.
+          items: cart.items.map((i) => ({ planId: i.planId, quantity: i.quantity })),
           referralCode: cart.referralCode,
           discountCode: cart.discountCode,
+          // Stable for this checkout attempt so a double-tap cannot create two
+          // orders or two charges.
+          idempotencyKey,
         }),
       });
-      if (!res.ok) throw new Error('Payment could not be started. Please try again.');
-      const data = (await res.json()) as {
-        orderNumber: string;
-        paymentUrl?: string;
-        telegramConnectUrl?: string | null;
-      };
+      const data = (await res.json().catch(() => null)) as
+        | {
+            orderNumber?: string;
+            /** 'client-secret' | 'redirect' | 'form-post' — set by the gateway adapter. */
+            kind?: string;
+            clientSecret?: string | null;
+            paymentUrl?: string;
+            fields?: Record<string, string>;
+            totalUsd?: number;
+            telegramConnectUrl?: string | null;
+            error?: { message?: string };
+          }
+        | null;
+
+      if (!res.ok || !data?.orderNumber) {
+        throw new Error(
+          data?.error?.message ?? 'Payment could not be started. Please try again.'
+        );
+      }
+
       cart.clear();
+
       // Hand the deep link to the confirmation page. Kept in sessionStorage
       // rather than the URL so the one-time token never lands in browser
       // history, a referrer header, or an analytics log.
       if (data.telegramConnectUrl) {
         sessionStorage.setItem(`domner-tg-${data.orderNumber}`, data.telegramConnectUrl);
       }
-      if (data.paymentUrl && !data.paymentUrl.startsWith('/order-confirmation')) {
-        window.location.href = data.paymentUrl;
-      } else {
-        router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);
+
+      // Continue however this particular gateway needs to. Handling all three
+      // shapes here means a new payment method is a server-side change only.
+      if (data.kind === 'form-post' && data.paymentUrl && data.fields) {
+        // ABA PayWay expects a signed form POST, not a redirect with query params.
+        postToGateway(data.paymentUrl, data.fields);
+        return;
       }
+
+      if (data.kind === 'redirect' && data.paymentUrl && /^https?:\/\//.test(data.paymentUrl)) {
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : 'Something went wrong');
       setProcessing(false);

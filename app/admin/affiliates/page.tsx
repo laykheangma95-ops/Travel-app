@@ -1,110 +1,166 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, X, DollarSign } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, X, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { formatUsd } from '@/lib/utils';
 
-interface AdminAffiliate {
+// Live rows from the affiliates table. The approve/reject buttons previously
+// only mutated local React state, so an "approved" affiliate was never actually
+// activated and their referral code never worked.
+
+type AffiliateStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+interface Affiliate {
   id: string;
   name: string;
-  telegram: string;
-  code: string;
-  clicks: number;
-  orders: number;
-  earned: number;
-  unpaid: number;
-  status: 'pending' | 'approved' | 'rejected';
+  email: string;
+  telegram: string | null;
+  referral_code: string;
+  commission_rate: number;
+  total_clicks: number;
+  total_orders: number;
+  total_earned_usd: number;
+  status: AffiliateStatus;
+  created_at: string;
 }
 
-// Demo rows — real data lives in the affiliates table.
-const initialAffiliates: AdminAffiliate[] = [
-  { id: '1', name: 'Sokha Prak', telegram: '@sokha', code: 'SOKHA30', clicks: 184, orders: 23, earned: 96.6, unpaid: 42.3, status: 'approved' },
-  { id: '2', name: 'Dara Meas', telegram: '@daratravel', code: 'DARA30', clicks: 67, orders: 8, earned: 31.2, unpaid: 31.2, status: 'approved' },
-  { id: '3', name: 'Bopha Chea', telegram: '@bophagoes', code: '—', clicks: 0, orders: 0, earned: 0, unpaid: 0, status: 'pending' },
-  { id: '4', name: 'Rithy Long', telegram: '@rithyvlogs', code: '—', clicks: 0, orders: 0, earned: 0, unpaid: 0, status: 'pending' },
-];
-
-const statusTone = { pending: 'warning', approved: 'success', rejected: 'danger' } as const;
+const statusTone = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  suspended: 'neutral',
+} as const;
 
 export default function AdminAffiliatesPage() {
-  const [affiliates, setAffiliates] = useState(initialAffiliates);
+  const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const setStatus = (id: string, status: AdminAffiliate['status']) => {
-    setAffiliates((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, status, code: status === 'approved' && a.code === '—' ? `${a.name.split(' ')[0].toUpperCase()}30` : a.code }
-          : a
-      )
-    );
-  };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/affiliates', { credentials: 'include' });
+      const data = (await res.json().catch(() => null)) as {
+        affiliates?: Affiliate[];
+        error?: { message?: string };
+      } | null;
 
-  const markPaid = (id: string) => {
-    setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, unpaid: 0 } : a)));
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Could not load affiliates.');
+      setAffiliates(data?.affiliates ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load affiliates.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const decide = async (id: string, status: AffiliateStatus) => {
+    setSavingId(id);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/affiliates', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+
+      const data = (await res.json().catch(() => null)) as {
+        affiliate?: Affiliate;
+        error?: { message?: string };
+      } | null;
+
+      if (!res.ok || !data?.affiliate) {
+        throw new Error(data?.error?.message ?? 'Could not update this affiliate.');
+      }
+
+      // Reconcile with the row the server actually persisted.
+      setAffiliates((prev) => prev.map((a) => (a.id === id ? data.affiliate! : a)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update this affiliate.');
+    } finally {
+      setSavingId(null);
+    }
   };
 
   return (
     <Card className="overflow-x-auto p-6">
-      <h2 className="mb-4 font-display font-bold text-ink">Affiliate applications & stats</h2>
-      <table className="w-full min-w-[760px] text-left text-sm">
+      <h2 className="mb-4 font-display font-bold text-ink">Affiliate applications &amp; stats</h2>
+
+      {error && (
+        <div role="alert" className="mb-4 rounded-btn bg-red-50 p-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
+      <table className="w-full min-w-[820px] text-left text-sm">
+        <caption className="sr-only">Affiliate partners</caption>
         <thead>
           <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-            <th className="pb-3 pr-4 font-medium">Affiliate</th>
-            <th className="pb-3 pr-4 font-medium">Code</th>
-            <th className="pb-3 pr-4 font-medium">Clicks</th>
-            <th className="pb-3 pr-4 font-medium">Orders</th>
-            <th className="pb-3 pr-4 font-medium">Earned</th>
-            <th className="pb-3 pr-4 font-medium">Unpaid</th>
-            <th className="pb-3 pr-4 font-medium">Status</th>
-            <th className="pb-3 font-medium">Actions</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Affiliate</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Code</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Rate</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Clicks</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Orders</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Earned</th>
+            <th scope="col" className="pb-3 pr-4 font-medium">Status</th>
+            <th scope="col" className="pb-3 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {affiliates.map((a) => (
-            <tr key={a.id}>
+          {affiliates.map((affiliate) => (
+            <tr key={affiliate.id}>
               <td className="py-3.5 pr-4">
-                <p className="font-medium">{a.name}</p>
-                <p className="text-xs text-ink-muted">{a.telegram}</p>
+                <p className="font-medium">{affiliate.name}</p>
+                <p className="text-xs text-ink-muted">
+                  {affiliate.telegram ?? affiliate.email}
+                </p>
               </td>
-              <td className="py-3.5 pr-4 font-mono text-xs">{a.code}</td>
-              <td className="py-3.5 pr-4">{a.clicks}</td>
-              <td className="py-3.5 pr-4">{a.orders}</td>
-              <td className="py-3.5 pr-4 font-semibold">${a.earned.toFixed(2)}</td>
-              <td className="py-3.5 pr-4 font-semibold text-accent">${a.unpaid.toFixed(2)}</td>
+              <td className="py-3.5 pr-4 font-mono text-xs">{affiliate.referral_code}</td>
+              <td className="py-3.5 pr-4">{Math.round(Number(affiliate.commission_rate) * 100)}%</td>
+              <td className="py-3.5 pr-4">{affiliate.total_clicks}</td>
+              <td className="py-3.5 pr-4">{affiliate.total_orders}</td>
+              <td className="py-3.5 pr-4 font-semibold">
+                {formatUsd(Number(affiliate.total_earned_usd))}
+              </td>
               <td className="py-3.5 pr-4">
-                <Badge tone={statusTone[a.status]}>{a.status}</Badge>
+                <Badge tone={statusTone[affiliate.status]}>{affiliate.status}</Badge>
               </td>
               <td className="py-3.5">
                 <div className="flex gap-1.5">
-                  {a.status === 'pending' && (
+                  {savingId === affiliate.id ? (
+                    <Loader2 size={14} className="animate-spin text-ink-muted" aria-hidden="true" />
+                  ) : (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setStatus(a.id, 'approved')}
-                        className="rounded-btn bg-success p-1.5 text-white transition-opacity hover:opacity-90"
-                        aria-label={`Approve ${a.name}`}
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStatus(a.id, 'rejected')}
-                        className="rounded-btn bg-danger p-1.5 text-white transition-opacity hover:opacity-90"
-                        aria-label={`Reject ${a.name}`}
-                      >
-                        <X size={14} />
-                      </button>
+                      {affiliate.status !== 'approved' && (
+                        <button
+                          type="button"
+                          onClick={() => decide(affiliate.id, 'approved')}
+                          className="rounded-btn bg-success p-1.5 text-white transition-opacity hover:opacity-90"
+                          aria-label={`Approve ${affiliate.name}`}
+                        >
+                          <Check size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                      {affiliate.status !== 'rejected' && (
+                        <button
+                          type="button"
+                          onClick={() => decide(affiliate.id, 'rejected')}
+                          className="rounded-btn bg-danger p-1.5 text-white transition-opacity hover:opacity-90"
+                          aria-label={`Reject ${affiliate.name}`}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      )}
                     </>
-                  )}
-                  {a.status === 'approved' && a.unpaid > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => markPaid(a.id)}
-                      className="inline-flex items-center gap-1 rounded-btn bg-secondary px-2.5 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                      <DollarSign size={12} /> Mark paid
-                    </button>
                   )}
                 </div>
               </td>
@@ -112,6 +168,15 @@ export default function AdminAffiliatesPage() {
           ))}
         </tbody>
       </table>
+
+      {loading && (
+        <p className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
+          <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading affiliates…
+        </p>
+      )}
+      {!loading && affiliates.length === 0 && !error && (
+        <p className="py-8 text-center text-sm text-ink-muted">No affiliate applications yet.</p>
+      )}
     </Card>
   );
 }

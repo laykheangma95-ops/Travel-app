@@ -1,0 +1,38 @@
+{
+  "$comment": [
+    "Advisories we have reviewed and accepted, with the reason and the exit plan.",
+    "A package is only allowed to sit here if the ONLY available fix is a major",
+    "version bump that needs planning on its own. Anything with a non-breaking fix",
+    "must be fixed, not listed. scripts/audit-check.mjs fails CI on every high or",
+    "critical advisory whose package is NOT listed below, so a newly introduced",
+    "vulnerable dependency still breaks the build.",
+    "Review this file whenever the Next.js upgrade lands."
+  ],
+  "packages": {
+    "next": {
+      "reason": "Every listed advisory is fixed only in next@16. This app is on Next 14 App Router and calls cookies() synchronously in app/layout.tsx, which Next 15+ forbids — the upgrade is a planned migration, not a dependency bump. The advisories that carry real weight here (Image Optimizer DoS, rewrite SSRF, cache poisoning) are self-hosting and rewrite/i18n issues; this app deploys on Vercel, defines no rewrites, and uses the App Router without i18n routing.",
+      "acceptedUntilUpgrade": "next@16",
+      "reviewed": "2026-08-02"
+    },
+    "postcss": {
+      "reason": "Not a direct dependency — it is bundled under node_modules/next and only runs at build time on our own stylesheets, never on attacker-supplied CSS. Resolves when next is upgraded.",
+      "acceptedUntilUpgrade": "next@16",
+      "reviewed": "2026-08-02"
+    },
+    "glob": {
+      "reason": "devDependency only, reached through eslint-config-next. The advisory is command injection through the glob CLI's -c/--cmd flag; we never invoke the glob CLI, and this package is not shipped to production.",
+      "acceptedUntilUpgrade": "eslint-config-next@16",
+      "reviewed": "2026-08-02"
+    },
+    "@next/eslint-plugin-next": {
+      "reason": "devDependency only. Flagged solely because it depends on the glob version above.",
+      "acceptedUntilUpgrade": "eslint-config-next@16",
+      "reviewed": "2026-08-02"
+    },
+    "eslint-config-next": {
+      "reason": "devDependency only. Flagged solely because it depends on @next/eslint-plugin-next above.",
+      "acceptedUntilUpgrade": "eslint-config-next@16",
+      "reviewed": "2026-08-02"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · Domner</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(180deg, #0e1b30 0%, #14263f 50%, #23406a 100%);
+        color: #fff;
+      }
+      .wrap { max-width: 380px; }
+      .mark { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #e6cb8b; }
+      .kicker { font-size: 10px; letter-spacing: 5px; color: #c69749; margin-top: 2px; }
+      h1 { font-size: 20px; margin: 28px 0 8px; }
+      p { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, 0.7); margin: 0 0 8px; }
+      .km { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
+      .links { margin-top: 28px; display: grid; gap: 10px; }
+      a {
+        display: block;
+        padding: 13px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.07);
+        color: #fff;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      button {
+        margin-top: 18px;
+        width: 100%;
+        padding: 13px 18px;
+        border: 0;
+        border-radius: 12px;
+        background: #c69749;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="mark">Domner</div>
+      <div class="kicker">TRAVEL</div>
+
+      <h1>You&rsquo;re offline</h1>
+      <p>No internet connection right now — but these pages were saved to your phone.</p>
+      <p class="km">អ្នកគ្មានអ៊ីនធឺណិតទេ។ ទំព័រខាងក្រោមនៅតែប្រើបានក្រៅបណ្ដាញ។</p>
+
+      <div class="links">
+        <a href="/emergency">🆘 Emergency Phrases · ឃ្លាបន្ទាន់</a>
+        <a href="/airport-guide">🛫 Airport Guide · មគ្គុទ្ទេសក៍អាកាសយានដ្ឋាន</a>
+        <a href="/checklist">✅ Travel Checklist · បញ្ជីត្រៀម</a>
+      </div>
+
+      <button type="button" onclick="location.reload()">Try again · ព្យាយាមម្ដងទៀត</button>
+    </div>
+  </body>
+</html>
