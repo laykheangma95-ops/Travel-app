@@ -2,13 +2,18 @@
   "name": "domner-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Domner App — Cambodia's first Khmer-language travel super app",
+  "type": "module",
+  "description": "Domner App \u2014 Cambodia's first Khmer-language travel super app",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "intents:gap": "node scripts/intent-gap.mjs",
+    "intents:seed": "node scripts/seed-data.mjs",
+    "intents:generate": "node scripts/generate-questions.mjs",
+    "intents:train": "node scripts/train-intent.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Domner Prime — Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Khmer:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --lacquer:#101512;
+  --surface:#19201B;
+  --raised:#222B24;
+  --line:#2E3830;
+  --bone:#EFE9DC;
+  --muted:#8B9489;
+  --gold:#D4A94C;
+  --gold-dim:#8A6E2E;
+  --jade:#6E8F76;
+  --display:"Fraunces",Georgia,serif;
+  --body:"Instrument Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --khmer:"Noto Sans Khmer","Instrument Sans",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--lacquer);
+  color:var(--bone);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.55;
+  min-height:100vh;
+  padding-bottom:80px;
+}
+body.km{font-family:var(--khmer)}
+body.km .u-display{font-family:var(--khmer);font-weight:600;letter-spacing:0}
+
+.wrap{max-width:660px;margin:0 auto;padding:0 22px}
+
+/* ---------- masthead ---------- */
+.bar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:18px 0 16px;
+  border-bottom:1px solid var(--line);
+}
+.mark{
+  font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--bone);
+}
+.mark span{color:var(--gold)}
+.lang{display:flex;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.lang button{
+  background:none;border:0;cursor:pointer;color:var(--muted);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  padding:6px 11px;transition:background .18s,color .18s;
+}
+.lang button:nth-child(2){font-family:var(--khmer);letter-spacing:0;font-size:12px}
+.lang button.on{background:var(--gold);color:var(--lacquer)}
+.lang button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+
+/* ---------- hero ---------- */
+.hero{padding:52px 0 34px}
+.eyebrow{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px;
+}
+.hero h1{
+  font-family:var(--display);font-weight:300;
+  font-size:clamp(34px,8.5vw,52px);line-height:1.06;
+  letter-spacing:-.015em;
+}
+.hero h1 em{font-style:italic;font-weight:500;color:var(--gold)}
+.hero p{color:var(--muted);margin-top:18px;max-width:44ch;font-size:15px}
+
+/* ---------- boarding card ---------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:3px;
+  position:relative;
+}
+.card::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:2px;
+  background:linear-gradient(90deg,var(--gold) 0%,var(--gold-dim) 42%,transparent 100%);
+}
+.row{padding:17px 20px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.lab{
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);display:block;margin-bottom:10px;
+}
+body.km .lab{font-family:var(--khmer);letter-spacing:.04em;font-size:12px}
+
+select,input[type=text]{
+  width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);
+  color:var(--bone);font-family:var(--body);font-size:17px;padding:5px 0 8px;
+  border-radius:0;-webkit-appearance:none;appearance:none;cursor:pointer;
+}
+body.km select,body.km input[type=text]{font-family:var(--khmer)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+  background-position:calc(100% - 9px) calc(50% - 1px),calc(100% - 4px) calc(50% - 1px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:26px}
+select:focus,input:focus{outline:0;border-bottom-color:var(--gold)}
+select option{background:var(--surface);color:var(--bone)}
+input::placeholder{color:#5C6459}
+
+.pair{display:grid;grid-template-columns:1fr 1fr}
+.pair .row{border-bottom:1px solid var(--line)}
+.pair .row:first-child{border-right:1px solid var(--line)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  border-radius:2px;padding:7px 12px;font-size:13px;cursor:pointer;
+  font-family:inherit;transition:border-color .18s,color .18s,background .18s;
+}
+.chip:hover{border-color:var(--gold-dim);color:var(--bone)}
+.chip.on{background:rgba(212,169,76,.11);border-color:var(--gold);color:var(--gold)}
+.chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.go{
+  width:100%;margin-top:22px;background:var(--gold);color:#14180F;
+  border:0;border-radius:3px;padding:17px;cursor:pointer;
+  font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  transition:opacity .18s,transform .1s;
+}
+body.km .go{font-family:var(--khmer);letter-spacing:.03em;font-size:15px;text-transform:none}
+.go:hover{opacity:.9}
+.go:active{transform:translateY(1px)}
+.go:disabled{opacity:.4;cursor:default}
+.go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
+
+/* ---------- status ---------- */
+.status{
+  margin-top:26px;font-family:var(--mono);font-size:12px;
+  color:var(--jade);letter-spacing:.06em;min-height:18px;
+}
+.status::before{content:"› ";color:var(--gold)}
+.err{
+  margin-top:26px;border-left:2px solid #B4573D;background:rgba(180,87,61,.09);
+  padding:14px 16px;font-size:14px;color:#E8C4B8;border-radius:0 3px 3px 0;
+}
+
+/* ---------- itinerary ---------- */
+.out{margin-top:54px}
+.out-head{border-top:1px solid var(--line);padding-top:26px;margin-bottom:34px}
+.out-head h2{font-family:var(--display);font-weight:300;font-size:27px;line-height:1.2}
+.out-head p{color:var(--muted);font-size:14px;margin-top:9px;max-width:50ch}
+
+.day{
+  opacity:0;transform:translateY(14px);
+  animation:rise .6s cubic-bezier(.22,.7,.3,1) forwards;
+  margin-bottom:38px;
+}
+@keyframes rise{to{opacity:1;transform:none}}
+.day-head{display:flex;align-items:baseline;gap:13px;margin-bottom:6px}
+.day-n{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--gold);
+  border:1px solid var(--gold-dim);border-radius:2px;padding:3px 7px;flex:none;
+}
+.day-theme{font-family:var(--display);font-size:19px;font-weight:400}
+.day-rule{height:1px;background:var(--line);margin:14px 0 4px}
+
+.item{display:grid;grid-template-columns:62px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid rgba(46,56,48,.55)}
+.item:last-child{border-bottom:0}
+.t{font-family:var(--mono);font-size:13px;color:var(--jade);padding-top:2px;font-variant-numeric:tabular-nums}
+.item h4{font-size:16px;font-weight:600;line-height:1.35}
+.item p{color:var(--muted);font-size:14px;margin-top:4px}
+.cost{
+  display:inline-block;margin-top:7px;font-family:var(--mono);font-size:11px;
+  color:var(--gold-dim);letter-spacing:.06em;
+}
+
+.esim{
+  border:1px solid var(--gold-dim);border-radius:3px;padding:19px 20px;margin-top:8px;
+  background:linear-gradient(180deg,rgba(212,169,76,.07),transparent);
+}
+.esim .lab{color:var(--gold)}
+.esim p{font-size:14.5px;color:var(--bone)}
+.esim .go{margin-top:16px}
+
+.foot{margin-top:42px;padding-top:20px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:#5C6459;letter-spacing:.05em;line-height:1.8}
+
+@media (max-width:520px){
+  .pair{grid-template-columns:1fr}
+  .pair .row:first-child{border-right:0}
+  .item{grid-template-columns:52px 1fr;gap:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  .day{animation:none;opacity:1;transform:none}
+  *{transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div class="mark">Domner <span>Prime</span></div>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="l-en" class="on" onclick="setLang('en')">EN</button>
+      <button id="l-km" onclick="setLang('km')">ខ្មែរ</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow" id="x-eyebrow">Concierge · Cambodia</div>
+    <h1 class="u-display" id="x-h1">Tell us when you<br><em>land.</em></h1>
+    <p id="x-sub">Every itinerary is built for your arrival time, your budget, and what you actually came for. Not a top-ten list.</p>
+  </section>
+
+  <div class="card">
+    <div class="pair">
+      <div class="row">
+        <label class="lab" for="city" id="x-l-city">Arriving at</label>
+        <select id="city">
+          <option>Siem Reap</option>
+          <option>Phnom Penh</option>
+          <option>Sihanoukville</option>
+          <option>Kampot</option>
+          <option>Battambang</option>
+          <option>Koh Rong</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="lab" for="days" id="x-l-days">Staying</label>
+        <select id="days">
+          <option value="1">1 day</option>
+          <option value="2">2 days</option>
+          <option value="3" selected>3 days</option>
+          <option value="4">4 days</option>
+          <option value="5">5 days</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pair">
+      <div class="row">
+        <label class="lab" for="arr" id="x-l-arr">Landing time</label>
+        <select id="arr">
+          <option>Early morning</option>
+          <option selected>Midday</option>
+          <option>Evening</option>
+          <option>Late night</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="lab" for="budget" id="x-l-budget">Budget</label>
+        <select id="budget">
+          <option>Backpacker</option>
+          <option selected>Comfortable</option>
+          <option>Premium</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="lab" id="x-l-int">Came here for</span>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="row">
+      <label class="lab" for="note" id="x-l-note">Anything we should know</label>
+      <input type="text" id="note" placeholder="Travelling with a 6-year-old. No spicy food." />
+    </div>
+  </div>
+
+  <button class="go" id="go" onclick="build()">Build my itinerary</button>
+  <div class="status" id="status"></div>
+  <div id="errbox"></div>
+
+  <section class="out" id="out"></section>
+
+  <div class="foot" id="x-foot">
+    Prototype · Domner Prime<br>
+    Itineraries are AI-generated. Confirm opening hours and prices before you go.
+  </div>
+</div>
+
+<script>
+const INTERESTS = {
+  en:["Temples","Street food","Nightlife","Nature","Beaches","History","Markets","Wellness","Photography"],
+  km:["ប្រាសាទ","ម្ហូបតាមផ្លូវ","កម្សាន្តពេលយប់","ធម្មជាតិ","ឆ្នេរសមុទ្រ","ប្រវត្តិសាស្ត្រ","ផ្សារ","សុខភាព","ថតរូប"]
+};
+
+const T = {
+  en:{
+    eyebrow:"Concierge · Cambodia",
+    h1:"Tell us when you<br><em>land.</em>",
+    sub:"Every itinerary is built for your arrival time, your budget, and what you actually came for. Not a top-ten list.",
+    city:"Arriving at", days:"Staying", arr:"Landing time", budget:"Budget",
+    int:"Came here for", note:"Anything we should know",
+    ph:"Travelling with a 6-year-old. No spicy food.",
+    go:"Build my itinerary", again:"Build another",
+    foot:"Prototype · Domner Prime<br>Itineraries are AI-generated. Confirm opening hours and prices before you go.",
+    steps:["Reading your arrival window","Matching places to your budget","Ordering the days so you're not backtracking","Writing it up"],
+    fail:"Couldn't reach the concierge. Check your connection and try again.",
+    esimGo:"Add a Domner eSIM"
+  },
+  km:{
+    eyebrow:"សេវាណែនាំ · កម្ពុជា",
+    h1:"ប្រាប់យើងពេលអ្នក<br><em>ចុះចត។</em>",
+    sub:"កម្មវិធីធ្វើដំណើរនីមួយៗ ត្រូវបានរៀបចំតាមពេលមកដល់ ថវិកា និងអ្វីដែលអ្នកពិតជាចង់បាន។",
+    city:"ចុះចតនៅ", days:"ស្នាក់នៅ", arr:"ពេលចុះចត", budget:"ថវិកា",
+    int:"មកដើម្បី", note:"មានអ្វីដែលយើងគួរដឹង",
+    ph:"ធ្វើដំណើរជាមួយកូនអាយុ ៦ ឆ្នាំ។ មិនញ៉ាំហឹរ។",
+    go:"បង្កើតកម្មវិធីធ្វើដំណើរ", again:"បង្កើតម្តងទៀត",
+    foot:"គំរូ · Domner Prime<br>កម្មវិធីធ្វើដំណើរបង្កើតដោយ AI។ សូមផ្ទៀងផ្ទាត់ម៉ោងបើក និងតម្លៃមុនពេលទៅ។",
+    steps:["កំពុងអានពេលមកដល់របស់អ្នក","កំពុងផ្គូផ្គងទីកន្លែងតាមថវិកា","កំពុងរៀបចំថ្ងៃនីមួយៗ","កំពុងសរសេរ"],
+    fail:"មិនអាចភ្ជាប់ទៅសេវាណែនាំបានទេ។ សូមពិនិត្យអ៊ីនធឺណិត រួចព្យាយាមម្តងទៀត។",
+    esimGo:"បន្ថែម eSIM Domner"
+  }
+};
+
+let lang="en";
+let picked=new Set([0,1]);
+
+function renderChips(){
+  const box=document.getElementById("chips");
+  box.innerHTML="";
+  INTERESTS[lang].forEach((label,i)=>{
+    const b=document.createElement("button");
+    b.className="chip"+(picked.has(i)?" on":"");
+    b.textContent=label;
+    b.setAttribute("aria-pressed",picked.has(i));
+    b.onclick=()=>{picked.has(i)?picked.delete(i):picked.add(i);renderChips();};
+    box.appendChild(b);
+  });
+}
+
+function setLang(l){
+  lang=l;
+  document.body.classList.toggle("km",l==="km");
+  document.getElementById("l-en").classList.toggle("on",l==="en");
+  document.getElementById("l-km").classList.toggle("on",l==="km");
+  const t=T[l];
+  document.getElementById("x-eyebrow").textContent=t.eyebrow;
+  document.getElementById("x-h1").innerHTML=t.h1;
+  document.getElementById("x-sub").textContent=t.sub;
+  document.getElementById("x-l-city").textContent=t.city;
+  document.getElementById("x-l-days").textContent=t.days;
+  document.getElementById("x-l-arr").textContent=t.arr;
+  document.getElementById("x-l-budget").textContent=t.budget;
+  document.getElementById("x-l-int").textContent=t.int;
+  document.getElementById("x-l-note").textContent=t.note;
+  document.getElementById("note").placeholder=t.ph;
+  document.getElementById("go").textContent=t.go;
+  document.getElementById("x-foot").innerHTML=t.foot;
+  renderChips();
+}
+
+let timer=null;
+function runStatus(){
+  const steps=T[lang].steps;
+  let i=0;
+  const el=document.getElementById("status");
+  el.textContent=steps[0];
+  timer=setInterval(()=>{i=(i+1)%steps.length;el.textContent=steps[i];},2200);
+}
+function stopStatus(){clearInterval(timer);document.getElementById("status").textContent="";}
+
+async function build(){
+  const btn=document.getElementById("go");
+  document.getElementById("errbox").innerHTML="";
+  document.getElementById("out").innerHTML="";
+  btn.disabled=true;
+  runStatus();
+
+  const city=document.getElementById("city").value;
+  const days=document.getElementById("days").value;
+  const arr=document.getElementById("arr").value;
+  const budget=document.getElementById("budget").value;
+  const note=document.getElementById("note").value.trim();
+  const ints=[...picked].map(i=>INTERESTS.en[i]).join(", ")||"general sightseeing";
+  const outLang = lang==="km" ? "Khmer (ភាសាខ្មែរ)" : "English";
+
+  const prompt = `You are the concierge for Domner, a Cambodian travel platform. Build a realistic ${days}-day itinerary.
+
+Destination: ${city}, Cambodia
+Arrival: ${arr} on day 1
+Budget: ${budget}
+Traveller wants: ${ints}
+${note ? "Notes from traveller: "+note : ""}
+
+Rules:
+- Use REAL, specific places in ${city}. Name actual restaurants, temples, markets, bars. No generic "a local restaurant".
+- Day 1 must respect the ${arr} arrival — do not schedule a 7am activity if they land late at night.
+- 4 to 5 items per day maximum. Keep notes to one short sentence.
+- Costs in USD, realistic for Cambodia and for a ${budget} budget.
+- Group each day geographically so the traveller is not crossing the city repeatedly.
+- Write ALL output text in ${outLang}.
+
+Respond with ONLY raw JSON, no markdown fences, no preamble:
+{"title":"short itinerary title","summary":"one sentence on the shape of the trip","days":[{"day":1,"theme":"short theme","items":[{"time":"14:00","title":"place name","note":"one sentence","cost":"$8"}]}],"esim":"one sentence on why mobile data matters for this specific trip","tip":"one non-obvious local tip"}`;
+
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        messages:[{role:"user",content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = data.content.map(b=>b.text||"").join("");
+    const clean = text.replace(/```json|```/g,"").trim();
+    render(JSON.parse(clean));
+  }catch(e){
+    console.error(e);
+    document.getElementById("errbox").innerHTML=
+      '<div class="err">'+T[lang].fail+'</div>';
+  }finally{
+    stopStatus();
+    btn.disabled=false;
+    btn.textContent=T[lang].again;
+  }
+}
+
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function render(d){
+  const out=document.getElementById("out");
+  let h='<div class="out-head"><h2 class="u-display">'+esc(d.title)+'</h2><p>'+esc(d.summary)+'</p></div>';
+
+  (d.days||[]).forEach((day,i)=>{
+    h+='<div class="day" style="animation-delay:'+(i*0.13)+'s">';
+    h+='<div class="day-head"><span class="day-n">'+String(day.day).padStart(2,"0")+'</span>';
+    h+='<span class="day-theme u-display">'+esc(day.theme)+'</span></div><div class="day-rule"></div>';
+    (day.items||[]).forEach(it=>{
+      h+='<div class="item"><div class="t">'+esc(it.time)+'</div><div>';
+      h+='<h4>'+esc(it.title)+'</h4><p>'+esc(it.note)+'</p>';
+      if(it.cost) h+='<span class="cost">'+esc(it.cost)+'</span>';
+      h+='</div></div>';
+    });
+    h+='</div>';
+  });
+
+  if(d.tip){
+    h+='<div class="day" style="animation-delay:'+((d.days||[]).length*0.13)+'s">';
+    h+='<span class="lab">'+(lang==="km"?"គន្លឹះ":"Local tip")+'</span><p style="font-size:15px">'+esc(d.tip)+'</p></div>';
+  }
+  if(d.esim){
+    h+='<div class="esim day" style="animation-delay:'+(((d.days||[]).length+1)*0.13)+'s">';
+    h+='<span class="lab">'+(lang==="km"?"ការតភ្ជាប់":"Staying connected")+'</span>';
+    h+='<p>'+esc(d.esim)+'</p>';
+    h+='<button class="go">'+T[lang].esimGo+'</button></div>';
+  }
+  out.innerHTML=h;
+  out.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+renderChips();
+</script>
+</body>
+</html>

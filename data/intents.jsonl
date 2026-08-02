@@ -1,0 +1,222 @@
+{"intent":"greeting","text":"hello"}
+{"intent":"greeting","text":"hi there"}
+{"intent":"greeting","text":"hey"}
+{"intent":"greeting","text":"good morning"}
+{"intent":"greeting","text":"good evening"}
+{"intent":"greeting","text":"hello anyone there"}
+{"intent":"greeting","text":"hi can you help me"}
+{"intent":"greeting","text":"yo"}
+{"intent":"greeting","text":"hey there"}
+{"intent":"greeting","text":"morning"}
+{"intent":"greeting","text":"is anyone online"}
+{"intent":"greeting","text":"សួស្តី"}
+{"intent":"greeting","text":"ជម្រាបសួរ"}
+{"intent":"greeting","text":"អរុណសួស្តី"}
+{"intent":"greeting","text":"សួស្តីបង"}
+{"intent":"greeting","text":"ជួយបានទេ"}
+{"intent":"greeting","text":"មានអ្នកនៅទេ"}
+{"intent":"greeting","text":"hallo"}
+{"intent":"greeting","text":"helo"}
+{"intent":"greeting","text":"hi domner"}
+{"intent":"esim_setup","text":"how do I install my esim"}
+{"intent":"esim_setup","text":"how to set up the esim"}
+{"intent":"esim_setup","text":"where is my qr code"}
+{"intent":"esim_setup","text":"i cant activate my esim"}
+{"intent":"esim_setup","text":"how do i scan the qr"}
+{"intent":"esim_setup","text":"esim not working after install"}
+{"intent":"esim_setup","text":"my internet is not working"}
+{"intent":"esim_setup","text":"no signal after installing"}
+{"intent":"esim_setup","text":"how do i turn on the data"}
+{"intent":"esim_setup","text":"setup instructions please"}
+{"intent":"esim_setup","text":"i bought an esim what now"}
+{"intent":"esim_setup","text":"how to activate"}
+{"intent":"esim_setup","text":"the qr code wont scan"}
+{"intent":"esim_setup","text":"do i scan before i fly"}
+{"intent":"esim_setup","text":"my data isnt connecting"}
+{"intent":"esim_setup","text":"របៀបដំឡើង esim"}
+{"intent":"esim_setup","text":"ស្កេន qr មិនបាន"}
+{"intent":"esim_setup","text":"អ៊ីនធឺណិតមិនដើរ"}
+{"intent":"esim_setup","text":"របៀបប្រើ esim"}
+{"intent":"esim_setup","text":"បើកម៉ាស៊ីនហើយតែគ្មានសេវា"}
+{"intent":"esim_setup","text":"ដំឡើងមិនបាន"}
+{"intent":"esim_setup","text":"ធ្វើម៉េចទើបប្រើបាន"}
+{"intent":"esim_compatibility","text":"does my phone support esim"}
+{"intent":"esim_compatibility","text":"is iphone 11 compatible"}
+{"intent":"esim_compatibility","text":"will this work on samsung"}
+{"intent":"esim_compatibility","text":"can i use esim on my device"}
+{"intent":"esim_compatibility","text":"which phones work with esim"}
+{"intent":"esim_compatibility","text":"is my phone supported"}
+{"intent":"esim_compatibility","text":"do i need an unlocked phone"}
+{"intent":"esim_compatibility","text":"does xiaomi support this"}
+{"intent":"esim_compatibility","text":"compatible devices list"}
+{"intent":"esim_compatibility","text":"my phone is old will it work"}
+{"intent":"esim_compatibility","text":"can i check compatibility"}
+{"intent":"esim_compatibility","text":"huawei esim support"}
+{"intent":"esim_compatibility","text":"ទូរស័ព្ទខ្ញុំប្រើបានទេ"}
+{"intent":"esim_compatibility","text":"iphone ចាស់ប្រើបានទេ"}
+{"intent":"esim_compatibility","text":"samsung ប្រើ esim បានទេ"}
+{"intent":"esim_compatibility","text":"ឧបករណ៍អ្វីខ្លះប្រើបាន"}
+{"intent":"esim_compatibility","text":"ទូរស័ព្ទត្រូវដោះសោទេ"}
+{"intent":"china_vpn","text":"do i need a vpn in china"}
+{"intent":"china_vpn","text":"will whatsapp work in china"}
+{"intent":"china_vpn","text":"is google blocked in china"}
+{"intent":"china_vpn","text":"can i use facebook in china"}
+{"intent":"china_vpn","text":"china internet restrictions"}
+{"intent":"china_vpn","text":"does the esim bypass the firewall"}
+{"intent":"china_vpn","text":"vpn for china travel"}
+{"intent":"china_vpn","text":"social media blocked china"}
+{"intent":"china_vpn","text":"will instagram work in beijing"}
+{"intent":"china_vpn","text":"do i need vpn for shanghai"}
+{"intent":"china_vpn","text":"is line blocked in china"}
+{"intent":"china_vpn","text":"ទៅចិនត្រូវការ vpn ទេ"}
+{"intent":"china_vpn","text":"facebook នៅចិនប្រើបានទេ"}
+{"intent":"china_vpn","text":"ចិនប្លុក google មែនទេ"}
+{"intent":"china_vpn","text":"whatsapp នៅចិនដើរទេ"}
+{"intent":"china_vpn","text":"ត្រូវការ vpn ទេ"}
+{"intent":"flight","text":"track my flight"}
+{"intent":"flight","text":"is my flight delayed"}
+{"intent":"flight","text":"flight status please"}
+{"intent":"flight","text":"where is my plane"}
+{"intent":"flight","text":"when does my flight land"}
+{"intent":"flight","text":"has flight ak123 departed"}
+{"intent":"flight","text":"check flight arrival time"}
+{"intent":"flight","text":"my flight number is qr456 status"}
+{"intent":"flight","text":"live flight tracking"}
+{"intent":"flight","text":"is the flight on time"}
+{"intent":"flight","text":"how do i track a flight"}
+{"intent":"flight","text":"flight alerts"}
+{"intent":"flight","text":"did my flight take off"}
+{"intent":"flight","text":"តាមដានជើងហោះហើរ"}
+{"intent":"flight","text":"ជើងហោះហើរយឺតទេ"}
+{"intent":"flight","text":"យន្តហោះមកដល់ម៉ោងណា"}
+{"intent":"flight","text":"ពិនិត្យស្ថានភាពជើងហោះហើរ"}
+{"intent":"flight","text":"យន្តហោះហោះហើយឬនៅ"}
+{"intent":"airport","text":"phnom penh airport guide"}
+{"intent":"airport","text":"where is the immigration counter"}
+{"intent":"airport","text":"airport wifi password"}
+{"intent":"airport","text":"how early should i arrive at the airport"}
+{"intent":"airport","text":"siem reap airport facilities"}
+{"intent":"airport","text":"is there a lounge at pnh"}
+{"intent":"airport","text":"where to eat at the airport"}
+{"intent":"airport","text":"airport transfer options"}
+{"intent":"airport","text":"how long is security"}
+{"intent":"airport","text":"duty free at phnom penh"}
+{"intent":"airport","text":"which terminal do i use"}
+{"intent":"airport","text":"ព្រលានយន្តហោះភ្នំពេញ"}
+{"intent":"airport","text":"ត្រូវទៅមុនប៉ុន្មានម៉ោង"}
+{"intent":"airport","text":"wifi ព្រលានយន្តហោះ"}
+{"intent":"airport","text":"កន្លែងញ៉ាំនៅព្រលាន"}
+{"intent":"airport","text":"ការិយាល័យអន្តោប្រវេសន៍នៅណា"}
+{"intent":"checklist","text":"what should i pack"}
+{"intent":"checklist","text":"trip checklist"}
+{"intent":"checklist","text":"what do i need before i travel"}
+{"intent":"checklist","text":"things to prepare for my trip"}
+{"intent":"checklist","text":"do i have everything ready"}
+{"intent":"checklist","text":"travel prep list"}
+{"intent":"checklist","text":"what documents do i need"}
+{"intent":"checklist","text":"packing list for cambodia"}
+{"intent":"checklist","text":"first time travel advice"}
+{"intent":"checklist","text":"help me get ready for the trip"}
+{"intent":"checklist","text":"what should i bring"}
+{"intent":"checklist","text":"បញ្ជីត្រៀមដំណើរ"}
+{"intent":"checklist","text":"ត្រូវយកអ្វីខ្លះ"}
+{"intent":"checklist","text":"ត្រៀមអ្វីខ្លះមុនទៅ"}
+{"intent":"checklist","text":"ឯកសារអ្វីខ្លះត្រូវការ"}
+{"intent":"checklist","text":"វេចខ្ចប់អ្វីខ្លះ"}
+{"intent":"emergency","text":"i lost my passport"}
+{"intent":"emergency","text":"emergency contact number"}
+{"intent":"emergency","text":"i need a hospital"}
+{"intent":"emergency","text":"police number in cambodia"}
+{"intent":"emergency","text":"i had an accident"}
+{"intent":"emergency","text":"my wallet was stolen"}
+{"intent":"emergency","text":"urgent help needed"}
+{"intent":"emergency","text":"where is the embassy"}
+{"intent":"emergency","text":"i need a doctor now"}
+{"intent":"emergency","text":"someone robbed me"}
+{"intent":"emergency","text":"emergency services number"}
+{"intent":"emergency","text":"បាត់លិខិតឆ្លងដែន"}
+{"intent":"emergency","text":"លេខទូរស័ព្ទបន្ទាន់"}
+{"intent":"emergency","text":"ត្រូវការមន្ទីរពេទ្យ"}
+{"intent":"emergency","text":"មានគ្រោះថ្នាក់"}
+{"intent":"emergency","text":"លួចយកកាបូប"}
+{"intent":"payment","text":"how can i pay"}
+{"intent":"payment","text":"do you accept aba"}
+{"intent":"payment","text":"can i pay with wing"}
+{"intent":"payment","text":"payment methods"}
+{"intent":"payment","text":"is credit card accepted"}
+{"intent":"payment","text":"can i pay in riel"}
+{"intent":"payment","text":"do you take khqr"}
+{"intent":"payment","text":"my payment failed"}
+{"intent":"payment","text":"is paypal supported"}
+{"intent":"payment","text":"how do i checkout"}
+{"intent":"payment","text":"can i pay with usd"}
+{"intent":"payment","text":"payment declined what do i do"}
+{"intent":"payment","text":"បង់ប្រាក់យ៉ាងម៉េច"}
+{"intent":"payment","text":"ទទួល aba ទេ"}
+{"intent":"payment","text":"បង់តាម wing បានទេ"}
+{"intent":"payment","text":"ប្រើកាតបានទេ"}
+{"intent":"payment","text":"ការទូទាត់មិនបាន"}
+{"intent":"support","text":"i need to talk to someone"}
+{"intent":"support","text":"how do i contact support"}
+{"intent":"support","text":"is there a human agent"}
+{"intent":"support","text":"customer service please"}
+{"intent":"support","text":"can i get help from a person"}
+{"intent":"support","text":"telegram support link"}
+{"intent":"support","text":"i want to speak to staff"}
+{"intent":"support","text":"contact number"}
+{"intent":"support","text":"how to reach you"}
+{"intent":"support","text":"this bot isnt helping"}
+{"intent":"support","text":"connect me to support"}
+{"intent":"support","text":"ចង់និយាយជាមួយបុគ្គលិក"}
+{"intent":"support","text":"ទាក់ទងជំនួយយ៉ាងម៉េច"}
+{"intent":"support","text":"មានមនុស្សពិតទេ"}
+{"intent":"support","text":"លេខទំនាក់ទំនង"}
+{"intent":"support","text":"ត្រូវការជំនួយ"}
+{"intent":"refund_booking","text":"can i get a refund"}
+{"intent":"refund_booking","text":"i want to cancel my order"}
+{"intent":"refund_booking","text":"how do i change my booking"}
+{"intent":"refund_booking","text":"refund policy"}
+{"intent":"refund_booking","text":"i bought the wrong plan"}
+{"intent":"refund_booking","text":"can i cancel the esim"}
+{"intent":"refund_booking","text":"money back please"}
+{"intent":"refund_booking","text":"i want to return this"}
+{"intent":"refund_booking","text":"how long does a refund take"}
+{"intent":"refund_booking","text":"change my dates"}
+{"intent":"refund_booking","text":"cancel my purchase"}
+{"intent":"refund_booking","text":"សុំប្រាក់វិញបានទេ"}
+{"intent":"refund_booking","text":"ចង់លុបចោលការកម្មង់"}
+{"intent":"refund_booking","text":"ប្តូរកាលបរិច្ឆេទបានទេ"}
+{"intent":"refund_booking","text":"គោលការណ៍សងប្រាក់វិញ"}
+{"intent":"refund_booking","text":"ទិញខុសផែនការ"}
+{"intent":"products","text":"what do you sell"}
+{"intent":"products","text":"what services do you offer"}
+{"intent":"products","text":"tell me about domner"}
+{"intent":"products","text":"what can i buy here"}
+{"intent":"products","text":"do you sell sim cards"}
+{"intent":"products","text":"what is domner pro"}
+{"intent":"products","text":"what plans are available"}
+{"intent":"products","text":"show me your products"}
+{"intent":"products","text":"what does this app do"}
+{"intent":"products","text":"what features do you have"}
+{"intent":"products","text":"do you do flight booking"}
+{"intent":"products","text":"អ្នកលក់អ្វីខ្លះ"}
+{"intent":"products","text":"មានសេវាកម្មអ្វីខ្លះ"}
+{"intent":"products","text":"domner ជាអ្វី"}
+{"intent":"products","text":"មានផលិតផលអ្វីខ្លះ"}
+{"intent":"products","text":"កម្មវិធីនេះធ្វើអ្វី"}
+{"intent":"thanks","text":"thank you"}
+{"intent":"thanks","text":"thanks a lot"}
+{"intent":"thanks","text":"thanks that helped"}
+{"intent":"thanks","text":"perfect thank you"}
+{"intent":"thanks","text":"great thanks"}
+{"intent":"thanks","text":"ok thanks"}
+{"intent":"thanks","text":"appreciate it"}
+{"intent":"thanks","text":"cheers"}
+{"intent":"thanks","text":"thank you so much"}
+{"intent":"thanks","text":"that was helpful thanks"}
+{"intent":"thanks","text":"nice thanks"}
+{"intent":"thanks","text":"អរគុណ"}
+{"intent":"thanks","text":"អរគុណច្រើន"}
+{"intent":"thanks","text":"អរគុណបង"}
+{"intent":"thanks","text":"ល្អណាស់អរគុណ"}
+{"intent":"thanks","text":"បានហើយអរគុណ"}
