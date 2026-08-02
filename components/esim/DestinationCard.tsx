@@ -34,11 +34,16 @@ export function DestinationCard({ destination, dark = false }: { destination: De
           {destination.networkQuality}
         </Badge>
       </div>
+      {/* The call to action used to be opacity-0 until :hover. On a phone —
+          which is most of this audience — there is no hover, so every card
+          showed a blank gap where its CTA should be and never looked tappable.
+          It is visible by default now and only *lifts* on hover, so the desktop
+          flourish survives without costing mobile the affordance. */}
       <span
         className={
           dark
-            ? 'mt-4 inline-flex items-center justify-center rounded-btn border border-gold-light/40 bg-gold-light/10 px-4 py-2 text-sm font-semibold text-gold-light opacity-0 transition-opacity duration-200 group-hover:opacity-100'
-            : 'mt-4 inline-flex items-center justify-center rounded-btn bg-accent px-4 py-2 text-sm font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100'
+            ? 'mt-4 inline-flex items-center justify-center rounded-btn border border-gold-light/40 bg-gold-light/10 px-4 py-2 text-sm font-semibold text-gold-light transition-all duration-200 ease-smooth group-hover:border-gold-light/70 group-hover:bg-gold-light/20'
+            : 'mt-4 inline-flex items-center justify-center rounded-btn bg-accent px-4 py-2 text-sm font-semibold text-primary-deep transition-all duration-200 ease-smooth group-hover:brightness-110'
         }
       >
         {t('dest.viewPlans')}

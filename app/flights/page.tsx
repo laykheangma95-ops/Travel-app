@@ -135,7 +135,7 @@ export default function FlightTrackerPage() {
           />
           <button
             type="submit"
-            className="liquid-glass-accent liquid-sheen inline-flex items-center justify-center gap-2 rounded-btn px-6 py-3.5 text-sm font-semibold text-white transition-all duration-200 ease-smooth hover:brightness-110 active:scale-[0.98]"
+            className="liquid-glass-accent liquid-sheen inline-flex items-center justify-center gap-2 rounded-btn px-6 py-3.5 text-sm font-semibold text-primary-deep transition-all duration-200 ease-smooth hover:brightness-110 active:scale-[0.98]"
           >
             <Search size={16} /> Track Flight →
           </button>

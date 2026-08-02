@@ -26,10 +26,15 @@ The short version of the invariants — the full list is in `docs/LOCKED.md`:
 npm run dev        # local dev server
 npm run build      # production build
 npm run typecheck  # tsc --noEmit
+npm run lint       # next lint
+npm test           # vitest run
+npm run verify     # typecheck + lint + test together
 ```
 
-There is no test suite and ESLint is not configured; `npm run build` and
-`npm run typecheck` are the gates.
+`npm run verify` plus `npm run build` are the gates. (This section previously
+said there was no test suite and no ESLint config — both now exist: `tests/`
+holds 136 vitest cases covering pricing, checkout, orders, rate limiting and the
+provider registries, and `.eslintrc.json` is wired to `eslint-config-next`.)
 
 ## Conventions
 
@@ -49,5 +54,6 @@ There is no test suite and ESLint is not configured; `npm run build` and
 | `docs/AUTH.md` | Sign-in methods, why phone verification is optional, anti-abuse |
 | `docs/DELIVERY.md` | eSIM QR delivery by email/Telegram, data protection |
 | `docs/LOCKED.md` | The locked file list, invariants, and unlock procedure |
+| `docs/UX-AUDIT.md` | Product/UX audit: per-surface scores, journey gaps, roadmap |
 | `DEPLOY.md` | Deployment |
 | `STRATEGY.md` | Product strategy |
