@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2, RefreshCw, Search, X } from 'lucide-react';
+import { CheckCircle2, Loader2, RefreshCw, Search, X, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -76,6 +76,8 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fulfilling, setFulfilling] = useState<AdminOrder | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +113,41 @@ export default function AdminOrdersPage() {
     const timer = setTimeout(load, search ? 350 : 0);
     return () => clearTimeout(timer);
   }, [load, search]);
+
+  /** Re-runs automatic provisioning — useful once a failed supplier recovers. */
+  const retry = async (orderNumber: string) => {
+    setRetrying(orderNumber);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/admin/providers', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderNumber }),
+      });
+
+      const data = (await res.json().catch(() => null)) as {
+        result?: { status: 'fulfilled' | 'manual'; providerId?: string; reason?: string };
+        error?: { message?: string };
+      } | null;
+
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Retry failed.');
+
+      if (data?.result?.status === 'fulfilled') {
+        setNotice(`${orderNumber} delivered via ${data.result.providerId}.`);
+        await load();
+      } else {
+        setNotice(
+          `${orderNumber} still needs manual delivery (${data?.result?.reason ?? 'no supplier available'}).`
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Retry failed.');
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const tiles = useMemo(
     () =>
@@ -199,6 +236,12 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
+      {notice && (
+        <div role="status" className="rounded-card border border-line bg-surface-3 p-4 text-sm text-ink-secondary">
+          {notice}
+        </div>
+      )}
+
       <Card className="overflow-x-auto p-6">
         <table className="w-full min-w-[860px] text-left text-sm">
           <caption className="sr-only">eSIM orders</caption>
@@ -235,13 +278,30 @@ export default function AdminOrdersPage() {
                 </td>
                 <td className="py-3.5">
                   {order.status === 'paid' && (
-                    <button
-                      type="button"
-                      onClick={() => setFulfilling(order)}
-                      className="inline-flex items-center gap-1.5 rounded-btn bg-success px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                      <CheckCircle2 size={13} aria-hidden="true" /> Deliver eSIM
-                    </button>
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* Retry first: if a supplier has recovered, this delivers
+                          the order without anyone pasting a QR code by hand. */}
+                      <button
+                        type="button"
+                        onClick={() => retry(order.order_number)}
+                        disabled={retrying === order.order_number}
+                        className="inline-flex items-center gap-1.5 rounded-btn border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-secondary hover:text-secondary disabled:opacity-50"
+                      >
+                        {retrying === order.order_number ? (
+                          <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Zap size={13} aria-hidden="true" />
+                        )}
+                        Auto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFulfilling(order)}
+                        className="inline-flex items-center gap-1.5 rounded-btn bg-success px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                      >
+                        <CheckCircle2 size={13} aria-hidden="true" /> Deliver
+                      </button>
+                    </div>
                   )}
                   {order.status === 'fulfilled' && order.qr_code_url && (
                     <a

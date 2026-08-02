@@ -54,6 +54,31 @@ export async function notifyAdminNewOrder(order: EsimOrder): Promise<boolean> {
   return sendTelegram(text, 'new_order');
 }
 
+/**
+ * Automatic provisioning could not deliver — a human needs to act.
+ * This is the highest-priority alert in the system: money has been taken and
+ * the customer has nothing yet.
+ */
+export async function notifyAdminFulfilmentFailed(
+  order: EsimOrder,
+  reason: string
+): Promise<boolean> {
+  return sendTelegram(
+    [
+      '🚨 MANUAL FULFILMENT NEEDED',
+      `Order: ${order.order_number}`,
+      `Reason: ${reason}`,
+      '',
+      `${order.country} · ${order.plan_name}`,
+      `Paid: $${money(order.price_usd)}`,
+      `Customer: ${order.customer_email ?? '—'}`,
+      '',
+      'The customer has paid and is waiting. Deliver at /admin/orders.',
+    ].join('\n'),
+    'fulfilment_failed'
+  );
+}
+
 /** Warns ops when an order has been paid but not fulfilled for too long. */
 export async function notifyAdminStaleOrder(order: EsimOrder, ageMinutes: number): Promise<boolean> {
   return sendTelegram(

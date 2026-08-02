@@ -38,6 +38,11 @@ is an outage, never a free order.
 sent, and every `/api/admin/*` route independently calls `requireAdmin()`. The React gate is
 cosmetic — forcing it open reveals an empty panel.
 
+**4. No supplier or gateway is load-bearing.** Nothing in the app calls an eSIM supplier or a
+payment provider directly — everything goes through a port (`lib/providers/`). Adding a supplier
+is one adapter file; switching supplier is one environment variable; a supplier failing mid-order
+fails over to the next one automatically. See [docs/ADDING-A-SUPPLIER.md](docs/ADDING-A-SUPPLIER.md).
+
 ## Getting started
 
 ```bash
@@ -97,24 +102,45 @@ allowlist, and the database policies check the role.
 ## Order lifecycle
 
 ```
-checkout  →  POST /api/payments/{stripe,aba}
+checkout  →  POST /api/payments/{provider}             ← one route, any gateway
              ├─ prices the cart from the catalog       (lib/pricing.ts)
              ├─ creates the order + line items         (lib/orders.ts)
-             └─ returns a client secret / payment form
+             └─ returns a client secret / redirect / signed form
 
-payment   →  PUT /api/payments/{stripe,aba}            ← signature verified
+payment   →  PUT /api/payments/{provider}              ← signature verified
              ├─ reconciles the settled amount against the order total
              ├─ pending → paid                         (single transition)
-             └─ emails the customer, alerts ops on Telegram
+             ├─ emails the customer, alerts ops on Telegram
+             └─ triggers automatic fulfilment          (lib/fulfilment.ts)
 
-delivery  →  PATCH /api/admin/orders                   ← requireAdmin()
-             ├─ attaches QR code / activation code / supplier ref
-             ├─ paid → fulfilled
-             └─ emails the customer their eSIM
+delivery  →  supplier registry                         ← failover + circuit breaker
+             ├─ first configured supplier that carries the plan
+             ├─ on failure, the next one, within the same request
+             ├─ success → paid → fulfilled, customer emailed the QR
+             └─ all failed → stays `paid`, ops alerted, manual queue
 ```
 
 Every transition is recorded in `order_events`, and a redelivered webhook is a no-op — a customer
-gets exactly one confirmation email however many times the gateway fires.
+gets exactly one confirmation email and one fulfilment attempt however many times the gateway fires.
+
+**An order is only ever marked `fulfilled` when a real eSIM exists.** If every supplier is down
+the order stays `paid` and lands in the ops queue; the customer is never told their eSIM is ready
+when it is not. When a supplier recovers, **Auto** on the order row re-runs provisioning and the
+backlog clears itself.
+
+## Supplier independence
+
+`/admin/providers` shows routing live: who is primary, who is configured, whose circuit is open,
+and whether automatic delivery is currently active.
+
+| Concern | Answer |
+| --- | --- |
+| Supplier has an outage | Failover to the next one, mid-request. After 3 failures they are suspended for 60s, then re-probed. |
+| Supplier drops a country | No SKU mapped → skipped automatically for that plan only. |
+| Supplier changes terms | Reorder `ESIM_PROVIDER_ORDER`. No deploy. |
+| Add a second supplier | One adapter file + SKU rows + registry line. |
+| Add a payment gateway | One adapter file + registry line. `/api/payments/{id}` already routes. |
+| Nobody can fulfil | Order stays `paid`, ops alerted, manual delivery from the admin queue. |
 
 ## Project structure
 

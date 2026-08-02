@@ -90,8 +90,9 @@ export default function CheckoutPage() {
     setProcessing(true);
     setPayError(null);
     try {
-      const endpoint = payMethod === 'stripe' ? '/api/payments/stripe' : '/api/payments/aba';
-      const res = await fetch(endpoint, {
+      // One route serves every gateway; the segment IS the provider id, so
+      // adding a payment method never touches this file.
+      const res = await fetch(`/api/payments/${payMethod}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,6 +111,9 @@ export default function CheckoutPage() {
       const data = (await res.json().catch(() => null)) as
         | {
             orderNumber?: string;
+            /** 'client-secret' | 'redirect' | 'form-post' — set by the gateway adapter. */
+            kind?: string;
+            clientSecret?: string | null;
             paymentUrl?: string;
             fields?: Record<string, string>;
             totalUsd?: number;
@@ -125,9 +129,16 @@ export default function CheckoutPage() {
 
       cart.clear();
 
-      // ABA PayWay expects a signed form POST, not a redirect with query params.
-      if (data.paymentUrl && data.fields) {
+      // Continue however this particular gateway needs to. Handling all three
+      // shapes here means a new payment method is a server-side change only.
+      if (data.kind === 'form-post' && data.paymentUrl && data.fields) {
+        // ABA PayWay expects a signed form POST, not a redirect with query params.
         postToGateway(data.paymentUrl, data.fields);
+        return;
+      }
+
+      if (data.kind === 'redirect' && data.paymentUrl && /^https?:\/\//.test(data.paymentUrl)) {
+        window.location.href = data.paymentUrl;
         return;
       }
 
