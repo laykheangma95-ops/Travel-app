@@ -24,6 +24,26 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 
 type PayMethod = 'stripe' | 'aba';
 
+/**
+ * ABA PayWay's checkout endpoint only accepts a form POST, so we submit a
+ * hidden form rather than navigating to the URL.
+ */
+function postToGateway(url: string, fields: Record<string, string>) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
 export default function CheckoutPage() {
   const cart = useCart();
   const router = useRouter();
@@ -77,9 +97,17 @@ export default function CheckoutPage() {
         }),
       });
       if (!res.ok) throw new Error('Payment could not be started. Please try again.');
-      const data = (await res.json()) as { orderNumber: string; paymentUrl?: string };
+      const data = (await res.json()) as {
+        orderNumber: string;
+        paymentUrl?: string;
+        fields?: Record<string, string>;
+      };
       cart.clear();
-      if (data.paymentUrl && !data.paymentUrl.startsWith('/order-confirmation')) {
+      if (data.paymentUrl && data.fields) {
+        // Live ABA PayWay: POST the signed fields to the gateway.
+        postToGateway(data.paymentUrl, data.fields);
+      } else if (data.paymentUrl && !data.paymentUrl.startsWith('/order-confirmation')) {
+        // Stripe returns a hosted checkout URL we can navigate to directly.
         window.location.href = data.paymentUrl;
       } else {
         router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);

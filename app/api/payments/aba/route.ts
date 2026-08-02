@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAbaPayment, verifyAbaWebhook } from '@/lib/aba';
+import { createAbaPayment } from '@/lib/aba';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { notifyAdminNewOrder } from '@/lib/telegram';
 import { sendOrderConfirmationEmail } from '@/lib/resend';
@@ -35,7 +35,15 @@ export async function POST(request: Request) {
     customerName: body.customer.fullName,
     customerEmail: body.customer.email,
     customerPhone: body.customer.phone,
-    returnUrl: `${appUrl}/order-confirmation/${orderNumber}?method=aba`,
+    items: body.items.map((i) => ({
+      name: `${i.countryName} ${i.planName}`,
+      quantity: i.quantity,
+      priceUsd: i.priceUsd,
+    })),
+    // Server-to-server confirmation — ABA POSTs here once the payment settles.
+    pushbackUrl: `${appUrl}/api/payments/aba/callback`,
+    successUrl: `${appUrl}/order-confirmation/${orderNumber}?method=aba`,
+    cancelUrl: `${appUrl}/cart?cancelled=1`,
   });
 
   const order: EsimOrder = {
@@ -90,30 +98,5 @@ export async function POST(request: Request) {
   });
 }
 
-// PUT /api/payments/aba — ABA PayWay webhook: verify signature, update order
-export async function PUT(request: Request) {
-  const body = (await request.json()) as Record<string, string>;
-  if (!verifyAbaWebhook(body)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-  }
-
-  const supabase = getSupabaseAdmin();
-  const orderNumber = body.tran_id;
-  const paid = body.status === '00' || body.status === 'APPROVED';
-  if (supabase && orderNumber) {
-    const { data: updated } = await supabase
-      .from('esim_orders')
-      .update({ status: paid ? 'paid' : 'cancelled', aba_payment_id: body.apv ?? null })
-      .eq('order_number', orderNumber)
-      .select('*')
-      .single();
-    if (updated && paid) {
-      await Promise.allSettled([
-        notifyAdminNewOrder(updated as EsimOrder),
-        sendOrderConfirmationEmail(updated as EsimOrder),
-      ]);
-    }
-  }
-
-  return NextResponse.json({ received: true });
-}
+// The ABA PayWay pushback (webhook) lives at /api/payments/aba/callback —
+// PayWay POSTs to it, which would otherwise collide with the handler above.
