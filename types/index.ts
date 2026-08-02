@@ -311,3 +311,76 @@ export interface ScamAlert {
   description: string;
   severity: 'low' | 'medium' | 'high';
 }
+
+// ─── Destination journey (homepage globe experience) ─────────────────────────
+
+/**
+ * Cinematic sky mood for the destination reveal. Each mood is built only from
+ * existing brand tokens (gold, starlight blue, jade, clay, secondary navy) so
+ * the night sky shifts hue per destination without inventing a new palette.
+ * The recipes live in `components/home/skyMoods.ts`.
+ */
+export type SkyMood = 'aurora' | 'ember' | 'jade' | 'dusk' | 'monsoon';
+
+export interface NamedPlace {
+  name: string;
+  note: string;
+}
+
+export interface TravelApp {
+  name: string;
+  use: string;
+}
+
+export interface EmergencyNumber {
+  label: string;
+  number: string;
+}
+
+/**
+ * Everything the homepage needs to tell a destination's story *before* it ever
+ * mentions an eSIM. One profile per sellable destination; keyed by the same
+ * slug as `data/destinations.ts`.
+ */
+export interface DestinationProfile {
+  slug: string;
+  /** Primary city the globe flies to — also the anchor for local time. */
+  city: string;
+  lat: number;
+  lon: number;
+  /** IANA zone, drives the live local clock. */
+  timezone: string;
+  mood: SkyMood;
+  /** One line of art direction for the hero — what this place feels like. */
+  essence: string;
+  /** Shown when the live weather lookup is unavailable or still loading. */
+  climate: { tempC: number; summary: string };
+
+  // Chapter 2 — the practical essentials
+  currencyName: string;
+  currencySymbol: string;
+  languages: string[];
+  plugTypes: string;
+  voltage: string;
+  internetNote: string;
+
+  // Chapter 3 — arrive prepared
+  tips: string[];
+  /** Entry guidance for a Cambodian passport. Always paired with a verify note. */
+  visa: { headline: string; detail: string };
+  safety: { score: number; note: string };
+  emergency: EmergencyNumber[];
+
+  // Chapter 4 — moving around
+  transport: string[];
+  apps: TravelApp[];
+  payments: string;
+  localTip: string;
+
+  // Chapter 5 — inspiration
+  attractions: NamedPlace[];
+  hiddenGems: NamedPlace[];
+  inspiration: string;
+  /** Standing seasonal advisory, or null when there is nothing to flag. */
+  alert: string | null;
+}
