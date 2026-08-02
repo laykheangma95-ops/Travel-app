@@ -1,3 +1,4 @@
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { countriesByCode, DEFAULT_NSN, type Country } from '@/data/countries';
 
 /** Strip everything that is not a digit. */

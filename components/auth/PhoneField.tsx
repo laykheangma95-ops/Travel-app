@@ -1,5 +1,6 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { FieldWrapper } from '@/components/ui/Input';
 import { CountryPicker } from '@/components/ui/CountryPicker';
 

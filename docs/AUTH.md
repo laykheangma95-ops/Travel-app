@@ -1,5 +1,7 @@
 # Account & verification strategy
 
+> 🔒 **This area is locked** — see [`docs/LOCKED.md`](LOCKED.md) before changing anything described here.
+
 How Domner handles sign-up, sign-in and verification — and why phone
 verification is deliberately **optional**.
 
@@ -174,6 +176,7 @@ still read next year.
 | OAuth callback route | Done |
 | Schema: verification columns, recovery codes, OTP log | Done (migration `001`) |
 | Guest checkout (email-only purchase) | Not started — highest-value next step |
+| eSIM QR delivery by email / Telegram | Done — see `docs/DELIVERY.md` |
 | Telegram / WhatsApp OTP | Not started |
 | Passkeys | Not started |
 | Recovery code generation UI | Not started (table exists) |

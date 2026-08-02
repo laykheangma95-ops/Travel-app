@@ -1,3 +1,4 @@
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { getSupabase } from '@/lib/supabase';
 
 export type OAuthProvider = 'google' | 'apple';

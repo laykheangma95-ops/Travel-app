@@ -1,3 +1,4 @@
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 // ISO 3166-1 country list with E.164 calling codes.
 // Used by the phone field on sign-up/sign-in and by the passport-country picker.
 // `nsn` is the min/max length of the national significant number (the digits

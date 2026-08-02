@@ -1,5 +1,6 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

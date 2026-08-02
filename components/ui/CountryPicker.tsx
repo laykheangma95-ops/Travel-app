@@ -1,5 +1,6 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { countries, countriesByCode, flagEmoji, PRIORITY_COUNTRY_CODES } from '@/data/countries';

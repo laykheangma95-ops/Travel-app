@@ -1,0 +1,32 @@
+# Locked areas — see docs/LOCKED.md
+#
+# Every path below requires the repository owner's review. For this to be
+# enforced rather than advisory, turn on branch protection for the default
+# branch with "Require review from Code Owners".
+
+# Authentication & identity
+/lib/auth.ts                          @laykheangma95-ops
+/lib/phone.ts                         @laykheangma95-ops
+/data/countries.ts                    @laykheangma95-ops
+/components/auth/                     @laykheangma95-ops
+/components/ui/CountryPicker.tsx      @laykheangma95-ops
+/app/(auth)/                          @laykheangma95-ops
+/app/auth/                            @laykheangma95-ops
+
+# eSIM delivery & customer contact data
+/lib/esimDelivery.ts                  @laykheangma95-ops
+/lib/telegram.ts                      @laykheangma95-ops
+/lib/resend.ts                        @laykheangma95-ops
+/components/esim/DeliveryOptions.tsx  @laykheangma95-ops
+/components/esim/TelegramConnectCard.tsx @laykheangma95-ops
+/app/api/telegram/                    @laykheangma95-ops
+/app/api/payments/                    @laykheangma95-ops
+/app/esim/checkout/                   @laykheangma95-ops
+
+# Schema — RLS lives here
+/supabase/                            @laykheangma95-ops
+
+# The lock itself
+/CLAUDE.md                            @laykheangma95-ops
+/docs/LOCKED.md                       @laykheangma95-ops
+/.github/CODEOWNERS                   @laykheangma95-ops

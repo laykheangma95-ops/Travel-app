@@ -4,13 +4,16 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { notifyAdminNewOrder } from '@/lib/telegram';
 import { sendOrderConfirmationEmail } from '@/lib/resend';
 import { generateOrderNumber } from '@/lib/utils';
-import type { CartItem, EsimOrder } from '@/types';
+import { createTelegramConnect } from '@/lib/esimDelivery';
+import type { CartItem, DeliveryChannel, EsimOrder } from '@/types';
 
 interface CheckoutBody {
   customer: {
     fullName: string;
     email: string;
     phone: string;
+    phoneCountry: string;
+    deliveryChannel: DeliveryChannel;
     deviceType: string;
     notes?: string;
   };
@@ -57,6 +60,8 @@ export async function POST(request: Request) {
     notes: body.customer.notes ?? null,
     created_at: new Date().toISOString(),
     fulfilled_at: null,
+    delivery_channel: body.customer.deliveryChannel ?? 'email',
+    customer_phone_country: body.customer.phoneCountry ?? null,
   };
 
   const supabase = getSupabaseAdmin();
@@ -75,18 +80,26 @@ export async function POST(request: Request) {
       customer_phone: order.customer_phone,
       device_type: order.device_type,
       notes: order.notes,
+      delivery_channel: order.delivery_channel,
+      customer_phone_country: order.customer_phone_country,
     });
   }
 
+  const telegramConnectUrl =
+    order.delivery_channel !== 'email'
+      ? await createTelegramConnect(orderNumber, order.customer_phone)
+      : null;
+
   if (payment.demo) {
     await Promise.allSettled([notifyAdminNewOrder(order), sendOrderConfirmationEmail(order)]);
-    return NextResponse.json({ orderNumber, demo: true });
+    return NextResponse.json({ orderNumber, demo: true, telegramConnectUrl });
   }
 
   return NextResponse.json({
     orderNumber,
     paymentUrl: payment.paymentUrl,
     fields: payment.fields,
+    telegramConnectUrl,
   });
 }
 

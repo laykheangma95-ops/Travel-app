@@ -1,5 +1,6 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 

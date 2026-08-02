@@ -1,3 +1,4 @@
+-- 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 -- Auth: multiple sign-in methods + optional, verify-later phone.
 -- Run after schema.sql. Safe to re-run.
 

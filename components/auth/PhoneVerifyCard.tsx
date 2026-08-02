@@ -1,5 +1,6 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useState } from 'react';
 import { BadgeCheck, ShieldQuestion } from 'lucide-react';
 import { Card } from '@/components/ui/Card';

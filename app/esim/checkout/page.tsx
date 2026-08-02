@@ -9,16 +9,30 @@ import { CreditCard, Landmark, Loader2, ShoppingCart } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PhoneField } from '@/components/auth/PhoneField';
+import { DeliveryOptions } from '@/components/esim/DeliveryOptions';
+import { toE164, validatePhone } from '@/lib/phone';
 import { cn, formatKhr, formatUsd } from '@/lib/utils';
 
-const checkoutSchema = z.object({
-  fullName: z.string().min(2, 'Please enter your full name'),
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().min(6, 'Please enter your phone number'),
-  contactMethod: z.enum(['telegram', 'whatsapp', 'email']),
-  deviceType: z.enum(['iphone', 'android', 'not-sure']),
-  notes: z.string().optional(),
-});
+const checkoutSchema = z
+  .object({
+    fullName: z.string().min(2, 'Please enter your full name'),
+    email: z.string().email('Please enter a valid email address'),
+    phoneCountry: z.string().min(2),
+    phone: z.string(),
+    deliveryChannel: z.enum(['email', 'telegram', 'both']),
+    deviceType: z.enum(['iphone', 'android', 'not-sure']),
+    notes: z.string().optional(),
+  })
+  // A number is only required when the customer asked for Telegram delivery —
+  // an email-only buyer should never be blocked on a field they do not need.
+  .superRefine((data, ctx) => {
+    if (data.deliveryChannel === 'email' && !data.phone.trim()) return;
+    const invalid = validatePhone(data.phoneCountry, data.phone);
+    if (invalid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['phone'], message: invalid });
+    }
+  });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
@@ -35,11 +49,22 @@ export default function CheckoutPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { contactMethod: 'telegram', deviceType: 'iphone' },
+    defaultValues: {
+      deliveryChannel: 'both',
+      deviceType: 'iphone',
+      phoneCountry: 'KH',
+      phone: '',
+    },
   });
+
+  const deliveryChannel = watch('deliveryChannel');
+  const phoneCountry = watch('phoneCountry');
+  const phone = watch('phone');
 
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6" aria-busy="true" />;
@@ -69,7 +94,12 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer: form,
+          customer: {
+            ...form,
+            // Send the number in E.164 so the server never has to guess a
+            // country from a locally-formatted string.
+            phone: form.phone.trim() ? toE164(form.phoneCountry, form.phone) : '',
+          },
           items: cart.items,
           totalUsd: total,
           referralCode: cart.referralCode,
@@ -77,8 +107,18 @@ export default function CheckoutPage() {
         }),
       });
       if (!res.ok) throw new Error('Payment could not be started. Please try again.');
-      const data = (await res.json()) as { orderNumber: string; paymentUrl?: string };
+      const data = (await res.json()) as {
+        orderNumber: string;
+        paymentUrl?: string;
+        telegramConnectUrl?: string | null;
+      };
       cart.clear();
+      // Hand the deep link to the confirmation page. Kept in sessionStorage
+      // rather than the URL so the one-time token never lands in browser
+      // history, a referrer header, or an analytics log.
+      if (data.telegramConnectUrl) {
+        sessionStorage.setItem(`domner-tg-${data.orderNumber}`, data.telegramConnectUrl);
+      }
       if (data.paymentUrl && !data.paymentUrl.startsWith('/order-confirmation')) {
         window.location.href = data.paymentUrl;
       } else {
@@ -117,19 +157,22 @@ export default function CheckoutPage() {
                 error={errors.email?.message}
                 {...register('email')}
               />
-              <Input
-                id="phone"
-                label="Phone Number (WhatsApp/Telegram)"
-                required
-                placeholder="+855 12 345 678"
+              <PhoneField
+                label={
+                  deliveryChannel === 'email' ? 'Phone number (optional)' : 'Phone number'
+                }
+                required={deliveryChannel !== 'email'}
+                country={phoneCountry}
+                onCountryChange={(code) => setValue('phoneCountry', code)}
+                number={phone}
+                onNumberChange={(value) => setValue('phone', value, { shouldValidate: true })}
                 error={errors.phone?.message}
-                {...register('phone')}
+                hint={
+                  deliveryChannel === 'email'
+                    ? 'Only used if we need to reach you about this order.'
+                    : 'Used to confirm your Telegram chat belongs to you.'
+                }
               />
-              <Select id="contactMethod" label="Preferred contact" {...register('contactMethod')}>
-                <option value="telegram">Telegram</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="email">Email</option>
-              </Select>
               <Select id="deviceType" label="Device Type" {...register('deviceType')}>
                 <option value="iphone">iPhone</option>
                 <option value="android">Android</option>
@@ -142,6 +185,14 @@ export default function CheckoutPage() {
                 {...register('notes')}
               />
             </div>
+          </div>
+
+          <div className="rounded-card border border-line/60 bg-white p-7 shadow-card">
+            <h2 className="mb-5 font-display text-lg font-bold text-ink">QR code delivery</h2>
+            <DeliveryOptions
+              value={deliveryChannel}
+              onChange={(value) => setValue('deliveryChannel', value, { shouldValidate: true })}
+            />
           </div>
         </div>
 
