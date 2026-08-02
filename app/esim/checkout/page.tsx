@@ -168,22 +168,27 @@ export default function CheckoutPage() {
                   error={errors.email?.message}
                   {...register('email')}
                 />
-                <PhoneField
-                  label={
-                    deliveryChannel === 'email' ? 'Phone number (optional)' : 'Phone number'
-                  }
-                  required={deliveryChannel !== 'email'}
-                  country={phoneCountry}
-                  onCountryChange={(code) => setValue('phoneCountry', code)}
-                  number={phone}
-                  onNumberChange={(value) => setValue('phone', value, { shouldValidate: true })}
-                  error={errors.phone?.message}
-                  hint={
-                    deliveryChannel === 'email'
-                      ? 'Only used if we need to reach you about this order.'
-                      : 'Used to confirm your Telegram chat belongs to you.'
-                  }
-                />
+                {/* PhoneField and CountryPicker are locked and ship light-surface
+                    classes; .night-locked-surface repaints them for the night
+                    canvas from globals.css without touching the locked files. */}
+                <div className="night-locked-surface">
+                  <PhoneField
+                    label={
+                      deliveryChannel === 'email' ? 'Phone number (optional)' : 'Phone number'
+                    }
+                    required={deliveryChannel !== 'email'}
+                    country={phoneCountry}
+                    onCountryChange={(code) => setValue('phoneCountry', code)}
+                    number={phone}
+                    onNumberChange={(value) => setValue('phone', value, { shouldValidate: true })}
+                    error={errors.phone?.message}
+                    hint={
+                      deliveryChannel === 'email'
+                        ? 'Only used if we need to reach you about this order.'
+                        : 'Used to confirm your Telegram chat belongs to you.'
+                    }
+                  />
+                </div>
                 <Select id="deviceType" label="Device Type" dark {...register('deviceType')}>
                   <option value="iphone">iPhone</option>
                   <option value="android">Android</option>
@@ -199,7 +204,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="night-card p-7">
+            <div className="night-card night-locked-surface p-7">
               <h2 className="mb-5 font-display text-lg font-bold text-white">QR code delivery</h2>
               <DeliveryOptions
                 value={deliveryChannel}

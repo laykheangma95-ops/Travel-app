@@ -635,6 +635,75 @@
     0 0 0 1px rgba(198, 151, 73, 0.18);
 }
 
+/* ── Locked components on the night surface ────────────────────────────────
+   PhoneField, CountryPicker and DeliveryOptions are locked (docs/LOCKED.md),
+   so they ship hard-coded light-surface classes — dark ink on a dark glass
+   card, which fails contrast the moment the funnel turns nocturnal. Rather
+   than edit a locked file, the checkout wraps them in .night-locked-surface
+   and the night palette is repainted from here. Presentation only: no locked
+   markup, prop, or delivery behaviour changes.
+   Descendant selectors outrank the single-class Tailwind utilities, so these
+   win without !important. Keep in sync with the light classes those three
+   components use. */
+.night-locked-surface :is(label, legend) {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.night-locked-surface .text-ink {
+  color: #fff;
+}
+
+.night-locked-surface .text-ink-secondary {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.night-locked-surface .text-ink-muted {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.night-locked-surface .text-secondary {
+  color: var(--color-gold-light);
+}
+
+.night-locked-surface .bg-white,
+.night-locked-surface .bg-surface-2,
+.night-locked-surface .bg-surface-3 {
+  background-color: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.night-locked-surface .border-line,
+.night-locked-surface .border-line\/70 {
+  border-color: rgba(230, 203, 139, 0.2);
+}
+
+/* Selected delivery option / focused control — gold instead of navy-on-navy. */
+.night-locked-surface .border-secondary {
+  border-color: rgba(230, 203, 139, 0.55);
+}
+
+.night-locked-surface .bg-secondary\/5 {
+  background-color: rgba(198, 151, 73, 0.12);
+}
+
+.night-locked-surface .ring-secondary\/20 {
+  --tw-ring-color: rgba(230, 203, 139, 0.28);
+}
+
+.night-locked-surface .hover\:bg-surface-2:hover,
+.night-locked-surface .hover\:border-ink-muted:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(230, 203, 139, 0.4);
+}
+
+/* The country dropdown is a popover: give it real opacity so the list is not
+   read through the starfield. */
+.night-locked-surface .shadow-card {
+  background-color: rgba(14, 27, 48, 0.96);
+  box-shadow: 0 18px 48px rgba(2, 8, 23, 0.6);
+}
+
 /* Gold-rimmed icon tile — the one gold focal point inside a night card. */
 .night-icon {
   display: inline-flex;
