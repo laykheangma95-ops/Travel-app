@@ -28,6 +28,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type * as ThreeNS from 'three';
 import { useLang } from '@/lib/i18n';
+import { HOME_CHAPTER } from '@/data/journeyChapters';
 import {
   createGlobeEngine,
   latLonToXYZ,
@@ -86,10 +87,11 @@ export function GlobeHero() {
     // Assert non-null so the type is preserved inside the async init() closure
     // below (same reason `section!` is used throughout).
     const wrap = canvasWrapRef.current!;
-    // The globe layer is an absolute child of .dgh-stage, the wrapper that
+    // The globe layer is an absolute descendant of .dgh-stage, the wrapper that
     // holds both the hero and the Cambodia showcase. Sizing + pointer maths use
-    // the stage box so the sphere spans both sections.
-    const stage = wrap.parentElement ?? section;
+    // the stage box so the sphere spans both sections — resolve it by class
+    // rather than by parent, so chapter wrappers can nest in between.
+    const stage = wrap.closest<HTMLElement>('.dgh-stage') ?? wrap.parentElement ?? section;
 
     let disposed = false;
     let disposeScene: (() => void) | null = null;
@@ -277,6 +279,18 @@ export function GlobeHero() {
       const mousePx = { x: -1e4, y: -1e4 };
       const BASE_SPIN = (Math.PI * 2) / 90; // one revolution / 90s
 
+      /* ── Scroll narrative: the first beat of the journey spine ──
+         `dock` runs 0 → 1 across the hero (driven by ScrollTrigger below). At 0
+         the planet free-spins on the world view; as it approaches 1 the spin
+         slows and the globe turns until Cambodia faces the camera, so arriving
+         at the Cambodia showcase reads as flying home rather than as a cut.
+         Dragging always wins — the reader's hand outranks the narrative. */
+      let dock = 0;
+      const TAU = Math.PI * 2;
+      // Rotation.y that brings a longitude to face the camera, given
+      // latLonToXYZ's mapping (z' peaks when sin(rotY + lon) = -1).
+      const DOCK_ANGLE = -Math.PI / 2 - (HOME_CHAPTER.lon * Math.PI) / 180;
+
       const onMouseMove = (e: MouseEvent) => {
         const rect = wrap.getBoundingClientRect();
         parallax.tx = (e.clientX - rect.left) / rect.width - 0.5;
@@ -392,10 +406,18 @@ export function GlobeHero() {
 
       /* ── Per-frame home behaviour (engine drives uTime + render) ── */
       engine.onFrame((dt) => {
-        // Perpetual spin + user inertia decaying back to the base speed.
+        // Perpetual spin + user inertia decaying back to the base speed. The
+        // ambient drift eases off as the globe docks so the two don't fight.
         if (!dragging) {
-          spinGroup.rotation.y += (BASE_SPIN + spinVel) * dt;
+          spinGroup.rotation.y += (BASE_SPIN * (1 - dock * 0.9) + spinVel) * dt;
           spinVel *= Math.pow(0.12, dt); // smooth exponential decay
+
+          if (dock > 0.002) {
+            // Nearest equivalent of the docking angle, so the globe always
+            // takes the short way round instead of unwinding a full turn.
+            const target = DOCK_ANGLE + Math.round((spinGroup.rotation.y - DOCK_ANGLE) / TAU) * TAU;
+            spinGroup.rotation.y += (target - spinGroup.rotation.y) * Math.min(1, dt * 1.8 * dock);
+          }
         }
 
         // 3-layer parallax: globe (1x), stars (counter, 0.35x).
@@ -480,8 +502,21 @@ export function GlobeHero() {
           .to(copyRef.current, { y: -70, opacity: 0, ease: 'none' }, 0)
           .to(chipsRef.current, { y: -30, opacity: 0, ease: 'none' }, 0);
 
+        // Chapter beat: drive the dock across the hero's scroll so the planet
+        // has finished turning to Cambodia by the time the showcase arrives.
+        const dockST = ScrollTrigger.create({
+          trigger: section!,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: true,
+          onUpdate: (self) => {
+            dock = self.progress;
+          },
+        });
+
         killGsap = () => {
           intro.kill();
+          dockST.kill();
           scrub.scrollTrigger?.kill();
           scrub.kill();
         };
