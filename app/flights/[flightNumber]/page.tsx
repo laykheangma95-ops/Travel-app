@@ -7,13 +7,14 @@ import { ArrowLeft, RefreshCw, Plane, MonitorSmartphone } from 'lucide-react';
 import { useFlightTracking } from '@/hooks/useFlightTracking';
 import { FlightDashboard } from '@/components/flights/FlightDashboard';
 import { FlightLiveTracker } from '@/components/flights/FlightLiveTracker';
+import { FlightRouteGlobe } from '@/components/flights/FlightRouteGlobe';
 import { DelayIntelligence } from '@/components/flights/DelayIntelligence';
 import { TravelMode } from '@/components/flights/TravelMode';
 import { NotifyModal } from '@/components/flights/NotifyModal';
 import { ShareModal } from '@/components/flights/ShareModal';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
 import { getAirportCoords } from '@/lib/airportCoords';
-import { haversineKm } from '@/lib/liveFlight';
+import { haversineKm, type LiveFlightData } from '@/lib/liveFlight';
 import { todayIso } from '@/lib/utils';
 
 export default function FlightDetailPage() {
@@ -27,6 +28,7 @@ export default function FlightDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [savedToTrip, setSavedToTrip] = useState(false);
   const [liveProgress, setLiveProgress] = useState<number | null>(null);
+  const [liveFix, setLiveFix] = useState<LiveFlightData | null>(null);
   const [travelMode, setTravelMode] = useState(false);
   const prevRef = useRef<{ gate?: string; status?: string }>({});
 
@@ -121,6 +123,9 @@ export default function FlightDetailPage() {
               onShare={() => setShareOpen(true)}
               onSave={saveToTrip}
             />
+            {/* Seatback route view: engine-driven globe framed on the route,
+                fed by the same live poll as the tracker below. */}
+            <FlightRouteGlobe flight={flight} live={liveFix} />
             <DelayIntelligence flightNumber={flightNumber} date={date} />
             {/* Travel Mode: full-screen always-awake card for the travel day */}
             <button
@@ -138,6 +143,8 @@ export default function FlightDetailPage() {
               depIata={flight.departure.airport}
               arrIata={flight.arrival.airport}
               onLive={(live) => {
+                // One poll feeds both the route globe and the progress bar.
+                setLiveFix(live);
                 // Derive true progress from the aircraft's real position
                 // along the route (distance flown ÷ total route distance).
                 if (!live || live.onGround) {

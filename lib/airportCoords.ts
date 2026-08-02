@@ -66,3 +66,38 @@ export function getAirportCoords(iata?: string | null): [number, number] | null 
   if (!iata) return null;
   return AIRPORT_COORDS[iata.toUpperCase()] ?? null;
 }
+
+// Country names (English + Khmer) for the seatback route readouts on the
+// flight page. Grouped per country, keyed by the same IATA codes as above.
+const COUNTRY_GROUPS: [string[], { en: string; km: string }][] = [
+  [['PNH', 'KTI', 'SAI', 'REP', 'KOS'], { en: 'Cambodia', km: 'កម្ពុជា' }],
+  [['BKK', 'DMK', 'HKT', 'CNX'], { en: 'Thailand', km: 'ថៃ' }],
+  [['SGN', 'HAN', 'DAD', 'CXR'], { en: 'Vietnam', km: 'វៀតណាម' }],
+  [['SIN'], { en: 'Singapore', km: 'សិង្ហបុរី' }],
+  [['KUL'], { en: 'Malaysia', km: 'ម៉ាឡេស៊ី' }],
+  [['CGK', 'DPS'], { en: 'Indonesia', km: 'ឥណ្ឌូណេស៊ី' }],
+  [['MNL', 'CEB'], { en: 'Philippines', km: 'ហ្វីលីពីន' }],
+  [['PEK', 'PKX', 'PVG', 'SHA', 'CAN', 'SZX', 'KMG'], { en: 'China', km: 'ចិន' }],
+  [['HKG'], { en: 'Hong Kong', km: 'ហុងកុង' }],
+  [['TPE'], { en: 'Taiwan', km: 'តៃវ៉ាន់' }],
+  [['MFM'], { en: 'Macau', km: 'ម៉ាកាវ' }],
+  [['NRT', 'HND', 'KIX', 'FUK', 'CTS'], { en: 'Japan', km: 'ជប៉ុន' }],
+  [['ICN', 'GMP', 'PUS'], { en: 'South Korea', km: 'កូរ៉េខាងត្បូង' }],
+  [['DEL', 'BOM'], { en: 'India', km: 'ឥណ្ឌា' }],
+  [['DXB', 'AUH'], { en: 'United Arab Emirates', km: 'អេមីរ៉ាតអារ៉ាប់រួម' }],
+  [['DOH'], { en: 'Qatar', km: 'កាតា' }],
+  [['SYD', 'MEL'], { en: 'Australia', km: 'អូស្ត្រាលី' }],
+  [['LAX', 'SFO'], { en: 'United States', km: 'សហរដ្ឋអាមេរិក' }],
+  [['LHR'], { en: 'United Kingdom', km: 'ចក្រភពអង់គ្លេស' }],
+  [['CDG'], { en: 'France', km: 'បារាំង' }],
+  [['FRA'], { en: 'Germany', km: 'អាល្លឺម៉ង់' }],
+];
+
+export const AIRPORT_COUNTRY: Record<string, { en: string; km: string }> = Object.fromEntries(
+  COUNTRY_GROUPS.flatMap(([codes, country]) => codes.map((code) => [code, country])),
+);
+
+export function getAirportCountry(iata?: string | null): { en: string; km: string } | null {
+  if (!iata) return null;
+  return AIRPORT_COUNTRY[iata.toUpperCase()] ?? null;
+}
