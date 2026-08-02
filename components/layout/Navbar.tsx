@@ -130,8 +130,14 @@ export function Navbar() {
         'sticky top-0 z-40 transition-all duration-300 ease-smooth backdrop-blur-xl',
         night
           ? scrolled
-            ? 'border-b border-gold-light/15 bg-primary-deep/80 shadow-[0_8px_32px_rgba(2,8,23,0.45)]'
-            : 'border-b border-transparent bg-primary-deep/35'
+            ? // Once scrolled the bar overlays the dark page, so it can be
+              // translucent and let the night sky through.
+              'border-b border-gold-light/15 bg-primary-deep/80 shadow-[0_8px_32px_rgba(2,8,23,0.45)]'
+            : // At rest the header sits in normal flow ABOVE the content, so
+              // what shows through is the near-white `body` (bg-surface-2) —
+              // not the hero. A translucent bar here washes out to pale grey
+              // and puts white nav text on it. Stay opaque until scrolled.
+              'border-b border-transparent bg-primary-deep'
           : scrolled
             ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
             : 'border-b border-transparent bg-white/60'
