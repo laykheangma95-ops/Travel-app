@@ -20,7 +20,7 @@ const ESIM_UNSUPPORTED = [
 
 type Result = 'supported' | 'unsupported' | 'unknown' | null;
 
-export function DeviceChecker() {
+export function DeviceChecker({ dark = false }: { dark?: boolean }) {
   const [model, setModel] = useState('');
   const [result, setResult] = useState<Result>(null);
 
@@ -33,9 +33,11 @@ export function DeviceChecker() {
   };
 
   return (
-    <div className="rounded-card border border-line/60 bg-white p-8 shadow-card">
-      <h3 className="font-display text-lg font-bold text-ink">Is my phone eSIM compatible?</h3>
-      <p className="mt-1.5 text-sm text-ink-secondary">
+    <div className={dark ? 'night-card p-8' : 'rounded-card border border-line/60 bg-white p-8 shadow-card'}>
+      <h3 className={dark ? 'font-display text-lg font-bold text-white' : 'font-display text-lg font-bold text-ink'}>
+        Is my phone eSIM compatible?
+      </h3>
+      <p className={dark ? 'mt-1.5 text-sm text-white/70' : 'mt-1.5 text-sm text-ink-secondary'}>
         Type your phone model and we&apos;ll check for you.
       </p>
       <form
@@ -54,11 +56,19 @@ export function DeviceChecker() {
           }}
           placeholder="e.g. iPhone 14 Pro, Galaxy S23"
           aria-label="Phone model"
-          className="flex-1 rounded-btn border border-line px-4 py-2.5 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+          className={
+            dark
+              ? 'min-h-[2.75rem] flex-1 rounded-btn border border-gold-light/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/40 backdrop-blur-md focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25'
+              : 'min-h-[2.75rem] flex-1 rounded-btn border border-line px-4 py-2.5 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20'
+          }
         />
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-btn bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#162c4a]"
+          className={
+            dark
+              ? 'liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-primary-deep transition-all hover:brightness-110'
+              : 'inline-flex min-h-[2.75rem] items-center gap-2 rounded-btn bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-secondary-high'
+          }
         >
           <Search size={16} /> Check
         </button>
