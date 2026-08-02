@@ -1121,3 +1121,233 @@
     animation: none;
   }
 }
+
+/* The spine takes over from the companion where there is room for it, so only
+   one traveller is ever on screen. */
+@media (min-width: 1024px) {
+  .jc { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Journey spine (components/home/JourneySpine)
+   The scroll-narrative rail: a gold spine down the left edge with one node per
+   chapter, positioned at the scroll fraction where that section centres. A
+   miniature planet rides it as the reader scrolls. Desktop only — below 1024px
+   the .jc companion above keeps its bottom-left post instead.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.spine {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .spine {
+    position: fixed;
+    left: max(1.75rem, env(safe-area-inset-left));
+    top: 50%;
+    z-index: 60;
+    display: block;
+    opacity: 0;
+    transform: translateY(-50%) translateX(-10px);
+    transition:
+      opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+  .spine.spine-visible {
+    opacity: 1;
+    transform: translateY(-50%);
+    pointer-events: auto;
+  }
+}
+
+/* ── The rail ── */
+.spine-rail {
+  position: relative;
+  width: 2px;
+  height: 46vh;
+  max-height: 26rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(230, 203, 139, 0.06) 0%,
+    rgba(230, 203, 139, 0.22) 18%,
+    rgba(230, 203, 139, 0.22) 82%,
+    rgba(230, 203, 139, 0.06) 100%
+  );
+}
+/* Travelled portion — the only gold that grows, so it reads as progress. */
+.spine-rail-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f7eac0 0%, #e6cb8b 55%, #c69749 100%);
+  box-shadow: 0 0 10px rgba(230, 203, 139, 0.45);
+}
+
+.spine-list {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── Chapter nodes ──
+   The button is a 44px touch target hung off the rail; only the dot and the
+   label are painted, so the rail stays a hairline. */
+.spine-node {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: max-content;
+  min-height: 44px;
+  padding: 0 0.5rem 0 0;
+  transform: translate(-22px, -50%);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+.spine-node:focus-visible {
+  outline: 2px solid #8fd8ff;
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+.spine-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: 20.5px; /* centres the dot on the 2px rail */
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(230, 203, 139, 0.35);
+  box-shadow: 0 0 0 3px rgba(11, 22, 46, 0.85);
+  transition:
+    background-color 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.spine-node:hover .spine-dot,
+.spine-node-on .spine-dot {
+  background: #f7eac0;
+  transform: scale(1.45);
+}
+/* Chapter names stay hidden until hover/focus so the rail reads as a quiet
+   hairline; the active chapter is named by the traveller instead. */
+.spine-node-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.82);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.spine-node:hover .spine-node-label,
+.spine-node:focus-visible .spine-node-label {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── The traveller: a miniature of the hero planet ── */
+.spine-traveller {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.spine-planet {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 32% 24%, #24406b 0%, #14263f 46%, #0b162e 74%, #060d1c 100%);
+  border: 1px solid rgba(230, 203, 139, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 18px rgba(198, 151, 73, 0.35),
+    0 6px 16px rgba(2, 8, 23, 0.55);
+}
+/* World dial: a gold meridian that turns to the chapter's longitude. */
+.spine-dial {
+  position: absolute;
+  inset: -20%;
+  background:
+    conic-gradient(from 0deg, transparent 0deg, rgba(230, 203, 139, 0.42) 40deg, transparent 120deg, transparent 360deg);
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.spine-orbit {
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  animation: jc-spin 7s linear infinite;
+}
+.spine-comet {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 9999px;
+  background: #f7eac0;
+  box-shadow: 0 0 8px 1px rgba(230, 203, 139, 0.9);
+}
+/* The active chapter's name rides with the traveller. It shows while the reader
+   is moving (or pointing at the spine) and fades out when they settle, so it
+   never parks on top of the left-hand column of the content. */
+.spine-label {
+  position: absolute;
+  left: calc(100% + 0.85rem);
+  top: 50%;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.4s ease;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #f7eac0;
+  background: rgba(14, 27, 48, 0.72);
+  border: 1px solid rgba(230, 203, 139, 0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.4);
+}
+.spine-naming .spine-label,
+.spine:hover .spine-label,
+.spine:focus-within .spine-label {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spine,
+  .spine.spine-visible {
+    transition: opacity 0.3s ease;
+    transform: translateY(-50%);
+  }
+  .spine-orbit { animation: none; }
+  .spine-dial,
+  .spine-dot,
+  .spine-label,
+  .spine-node-label { transition: none; }
+}

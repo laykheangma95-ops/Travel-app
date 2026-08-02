@@ -38,6 +38,12 @@ const dicts = {
     'hero.stat1': '150+ Countries',
     'hero.stat2': '24/7 Khmer Support',
     'hero.stat3': 'Instant Delivery',
+    // Journey spine — the scroll-narrative chapter rail. The four night-canvas
+    // chapters reuse their section eyebrows; only the two globe-stage chapters
+    // need names of their own.
+    'chapter.nav': 'Journey chapters',
+    'chapter.origin': 'Departure',
+    'chapter.cambodia': 'Home ground',
     // Features
     'features.eyebrow': 'Why Domer',
     'features.title': 'Everything a Cambodian traveler needs',
@@ -123,6 +129,10 @@ const dicts = {
     'hero.stat1': '150+ ប្រទេស',
     'hero.stat2': 'ជំនួយភាសាខ្មែរ 24/7',
     'hero.stat3': 'ដឹកជញ្ជូនភ្លាមៗ',
+    // Journey spine
+    'chapter.nav': 'ជំពូកនៃដំណើរ',
+    'chapter.origin': 'ការចេញដំណើរ',
+    'chapter.cambodia': 'ស្រុកកំណើត',
     // Features
     'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domer',
     'features.title': 'អ្វីៗគ្រប់យ៉ាងដែលអ្នកដំណើរខ្មែរត្រូវការ',

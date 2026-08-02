@@ -9,6 +9,7 @@ import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
 import { GlobeHero } from '@/components/home/GlobeHero';
 import { JourneyCompanion } from '@/components/home/JourneyCompanion';
+import { JourneySpine } from '@/components/home/JourneySpine';
 import { popularDestinations } from '@/data/destinations';
 import { useLang, type DictKey } from '@/lib/i18n';
 
@@ -52,9 +53,17 @@ export function HomeContent() {
       {/* ── Hero + Cambodia showcase share ONE full 3D globe. The .dgh-stage
           wrapper (styled inside GlobeHero) lets a single sphere span both
           sections so they read as one continuous page. ── */}
+      {/* `data-journey-id` marks each chapter of the scroll narrative; the
+          spine (JourneySpine) maps them onto its rail and the ids are the
+          anchor for its jump-to-chapter buttons. Keep them in step with
+          data/journeyChapters. */}
       <div className="dgh-stage">
-        <GlobeHero />
-        <CambodiaShowcase />
+        <div data-journey-id="origin">
+          <GlobeHero />
+        </div>
+        <div data-journey-id="cambodia">
+          <CambodiaShowcase />
+        </div>
       </div>
 
       {/* ── One continuous night sky from here down. The globe hero flows into
@@ -67,6 +76,7 @@ export function HomeContent() {
         <section
           className="relative section-pad"
           data-journey-section
+          data-journey-id="why"
           data-journey-label={t('features.eyebrow')}
         >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -105,6 +115,7 @@ export function HomeContent() {
           id="how-it-works"
           className="relative section-pad"
           data-journey-section
+          data-journey-id="how"
           data-journey-label={t('how.eyebrow')}
         >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -139,6 +150,7 @@ export function HomeContent() {
         <section
           className="relative section-pad"
           data-journey-section
+          data-journey-id="where"
           data-journey-label={t('dest.eyebrow')}
         >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -164,6 +176,7 @@ export function HomeContent() {
         <section
           className="relative section-pad"
           data-journey-section
+          data-journey-id="stories"
           data-journey-label={t('testi.eyebrow')}
         >
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -220,7 +233,9 @@ export function HomeContent() {
         </section>
       </div>
 
-      {/* Persistent mini-globe that rides the night sky (scroll companion). */}
+      {/* The scroll narrative's spine: a chapter rail on desktop, and the
+          compact companion orb on narrower screens (CSS picks exactly one). */}
+      <JourneySpine />
       <JourneyCompanion />
     </>
   );
