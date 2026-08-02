@@ -1,11 +1,12 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useState } from 'react';
 import Link from 'next/link';
 import { Loader2, MailCheck } from 'lucide-react';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { Input } from '@/components/ui/Input';
-import { getSupabase } from '@/lib/supabase';
+import { resetPassword } from '@/lib/auth';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -17,16 +18,12 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const supabase = getSupabase();
-    if (supabase) {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
-      if (resetError) {
-        setError(resetError.message);
-        setLoading(false);
-        return;
-      }
-    }
+    const { error: resetError } = await resetPassword(email);
     setLoading(false);
+    if (resetError) {
+      setError(resetError);
+      return;
+    }
     setSent(true);
   };
 

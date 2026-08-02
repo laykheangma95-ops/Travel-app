@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { destinations } from '@/data/destinations';
 import { esimPlans, getPlansForCountry } from '@/data/esimPlans';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { deliverEsim } from '@/lib/esimDelivery';
+import type { EsimOrder } from '@/types';
 
 // GET /api/esim            — all destinations + plans
 // GET /api/esim?country=x  — plans for one destination
@@ -32,17 +34,22 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, demo: true });
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('esim_orders')
     .update({
       status: 'fulfilled',
       qr_code_url: body.qrCodeUrl ?? null,
       fulfilled_at: new Date().toISOString(),
     })
-    .eq('order_number', body.orderNumber);
+    .eq('order_number', body.orderNumber)
+    .select('*')
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+
+  // Push the QR out on whichever channels the customer picked at checkout.
+  const delivery = await deliverEsim(updated as EsimOrder);
+  return NextResponse.json({ ok: true, delivery });
 }

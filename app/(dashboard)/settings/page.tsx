@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { Check } from 'lucide-react';
-import { Input, Select } from '@/components/ui/Input';
+import { Input, Select, FieldWrapper } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { CountryPicker } from '@/components/ui/CountryPicker';
+import { PhoneVerifyCard } from '@/components/auth/PhoneVerifyCard';
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState({
     fullName: 'Sokha Prak',
-    phone: '+855 12 345 678',
     telegram: '@sokha',
     passportCountry: 'KH',
     language: 'km',
@@ -39,28 +40,19 @@ export default function SettingsPage() {
             onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
           />
           <Input
-            id="phone"
-            label="Phone number"
-            value={profile.phone}
-            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-          />
-          <Input
             id="telegram"
             label="Telegram username"
             value={profile.telegram}
             onChange={(e) => setProfile({ ...profile, telegram: e.target.value })}
           />
-          <Select
-            id="passportCountry"
-            label="Passport country"
-            value={profile.passportCountry}
-            onChange={(e) => setProfile({ ...profile, passportCountry: e.target.value })}
-          >
-            <option value="KH">Cambodia 🇰🇭</option>
-            <option value="TH">Thailand 🇹🇭</option>
-            <option value="VN">Vietnam 🇻🇳</option>
-            <option value="OTHER">Other</option>
-          </Select>
+          <FieldWrapper label="Passport country" htmlFor="passportCountry">
+            <CountryPicker
+              id="passportCountry"
+              value={profile.passportCountry}
+              onChange={(passportCountry) => setProfile({ ...profile, passportCountry })}
+              aria-label="Passport country"
+            />
+          </FieldWrapper>
           <Select
             id="language"
             label="Preferred language"
@@ -80,6 +72,8 @@ export default function SettingsPage() {
           </div>
         </form>
       </Card>
+
+      <PhoneVerifyCard initialCountry="KH" initialNumber="12 345 678" />
 
       <Card className="p-7">
         <h2 className="font-display font-bold text-ink">Notifications</h2>

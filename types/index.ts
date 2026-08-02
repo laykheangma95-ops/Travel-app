@@ -80,7 +80,17 @@ export interface EsimOrder {
   notes: string | null;
   created_at: string;
   fulfilled_at: string | null;
+  // Delivery — see docs/DELIVERY.md
+  delivery_channel?: DeliveryChannel;
+  customer_phone_country?: string | null;
+  telegram_chat_id?: number | null;
+  telegram_username?: string | null;
+  delivered_email_at?: string | null;
+  delivered_telegram_at?: string | null;
 }
+
+/** Where the customer wants their eSIM QR code sent. */
+export type DeliveryChannel = 'email' | 'telegram' | 'both';
 
 // ─── Flights ─────────────────────────────────────────────────────────────────
 

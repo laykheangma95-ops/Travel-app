@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Check, MessageCircle, Plane, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TelegramConnectCard } from '@/components/esim/TelegramConnectCard';
 
 const nextSteps = [
   {
@@ -13,7 +14,7 @@ const nextSteps = [
   {
     n: 2,
     title: 'You receive the QR code',
-    description: 'By Telegram, WhatsApp, or email — whichever you chose at checkout.',
+    description: 'By email, and on Telegram too if you connected it below.',
   },
   {
     n: 3,
@@ -57,6 +58,8 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
           We will send your QR code within <strong className="text-ink">15 minutes</strong>.
         </p>
       </motion.div>
+
+      <TelegramConnectCard orderNumber={params.id} />
 
       {/* What happens next timeline */}
       <motion.div

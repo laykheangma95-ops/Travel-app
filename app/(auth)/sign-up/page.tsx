@@ -1,20 +1,16 @@
 'use client';
 
+// 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2, MailCheck } from 'lucide-react';
-import { AuthCard, OAuthButtons, Divider } from '@/components/auth/AuthCard';
-import { Input, Select } from '@/components/ui/Input';
-import { getSupabase } from '@/lib/supabase';
-
-const passportCountries = [
-  { code: 'KH', label: 'Cambodia 🇰🇭' },
-  { code: 'TH', label: 'Thailand 🇹🇭' },
-  { code: 'VN', label: 'Vietnam 🇻🇳' },
-  { code: 'LA', label: 'Laos 🇱🇦' },
-  { code: 'OTHER', label: 'Other' },
-];
+import { Info, MailCheck } from 'lucide-react';
+import { AuthCard, AuthError, AuthSubmit, OAuthButtons, Divider } from '@/components/auth/AuthCard';
+import { PhoneField } from '@/components/auth/PhoneField';
+import { Input, FieldWrapper } from '@/components/ui/Input';
+import { CountryPicker } from '@/components/ui/CountryPicker';
+import { toE164, validatePhone } from '@/lib/phone';
+import { consumeReturnTo, signUpWithPassword } from '@/lib/auth';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -23,6 +19,7 @@ export default function SignUpPage() {
     email: '',
     password: '',
     phone: '',
+    phoneCountry: 'KH',
     passportCountry: 'KH',
   });
   const [error, setError] = useState<string | null>(null);
@@ -32,26 +29,30 @@ export default function SignUpPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
-    const supabase = getSupabase();
-    if (!supabase) {
-      router.push('/dashboard');
-      return;
+
+    // Phone is optional. Only validate it when something was actually typed —
+    // an empty field must never block account creation.
+    if (form.phone.trim()) {
+      const invalid = validatePhone(form.phoneCountry, form.phone);
+      if (invalid) {
+        setError(invalid);
+        return;
+      }
     }
-    const { error: authError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: {
-          full_name: form.fullName,
-          phone: form.phone,
-          passport_country: form.passportCountry,
-        },
-      },
+
+    setLoading(true);
+    const { error: authError, demo } = await signUpWithPassword(form.email, form.password, {
+      fullName: form.fullName,
+      phone: form.phone.trim() ? toE164(form.phoneCountry, form.phone) : undefined,
+      passportCountry: form.passportCountry,
     });
     setLoading(false);
+    if (demo) {
+      router.push(consumeReturnTo());
+      return;
+    }
     if (authError) {
-      setError(authError.message);
+      setError(authError);
       return;
     }
     setVerifySent(true);
@@ -67,6 +68,9 @@ export default function SignUpPage() {
           <p className="mt-4 text-sm text-ink-secondary">
             We sent a verification link to <strong className="text-ink">{form.email}</strong>. Click
             it to activate your account, then sign in.
+          </p>
+          <p className="mt-3 text-xs text-ink-muted">
+            Already abroad? This link works on any wi-fi — no mobile signal needed.
           </p>
         </div>
       </AuthCard>
@@ -86,7 +90,7 @@ export default function SignUpPage() {
         </>
       }
     >
-      <OAuthButtons />
+      <OAuthButtons onError={setError} />
       <Divider />
       <form onSubmit={onSubmit} className="space-y-4">
         <Input
@@ -119,35 +123,35 @@ export default function SignUpPage() {
           placeholder="At least 8 characters"
           autoComplete="new-password"
         />
-        <Input
-          id="phone"
-          label="Phone number"
-          value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          placeholder="+855 12 345 678"
-          autoComplete="tel"
+
+        <PhoneField
+          label="Phone number (optional)"
+          country={form.phoneCountry}
+          onCountryChange={(phoneCountry) => setForm({ ...form, phoneCountry })}
+          number={form.phone}
+          onNumberChange={(phone) => setForm({ ...form, phone })}
+          hint="For delivery updates and account recovery. You can add or verify it any time from Settings."
         />
-        <Select
-          id="passportCountry"
-          label="Passport country"
-          value={form.passportCountry}
-          onChange={(e) => setForm({ ...form, passportCountry: e.target.value })}
-        >
-          {passportCountries.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.label}
-            </option>
-          ))}
-        </Select>
-        {error && <p className="rounded-btn bg-red-50 p-3 text-sm text-danger">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
-        >
-          {loading && <Loader2 size={16} className="animate-spin" />}
-          Create Account
-        </button>
+
+        <FieldWrapper label="Passport country" htmlFor="passportCountry">
+          <CountryPicker
+            id="passportCountry"
+            value={form.passportCountry}
+            onChange={(passportCountry) => setForm({ ...form, passportCountry })}
+            aria-label="Passport country"
+          />
+        </FieldWrapper>
+
+        <p className="flex items-start gap-2 rounded-btn bg-surface-2 p-3 text-xs text-ink-secondary">
+          <Info size={15} className="mt-0.5 shrink-0 text-ink-muted" aria-hidden="true" />
+          <span>
+            We never make you verify a phone number to buy an eSIM. Most of our customers are
+            already abroad with roaming switched off — your email is all we need.
+          </span>
+        </p>
+
+        <AuthError message={error} />
+        <AuthSubmit loading={loading}>Create Account</AuthSubmit>
       </form>
     </AuthCard>
   );
