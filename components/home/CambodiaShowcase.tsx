@@ -20,9 +20,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, MapPin, ArrowRight } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
+import { DestinationArt } from '@/components/home/destinationArt';
 
 interface Destination {
-  emoji: string;
   name: string;
   nameKm: string;
   region: string;
@@ -32,46 +32,47 @@ interface Destination {
   gradient: string;
 }
 
-// Eight signature Cambodian destinations. Each medallion is a rich radial
-// gradient evoking the place — temple gold, island turquoise, highland green.
+// Eight signature Cambodian destinations. Each medallion pairs a rich radial
+// gradient "sky" with a bespoke SVG scene (see destinationArt.tsx) — temple
+// gold, island turquoise, highland green — no emoji placeholders.
 const DESTINATIONS: Destination[] = [
   {
-    emoji: '🛕', name: 'Angkor Wat', nameKm: 'អង្គរវត្ត', region: 'Siem Reap', regionKm: 'សៀមរាប',
+    name: 'Angkor Wat', nameKm: 'អង្គរវត្ត', region: 'Siem Reap', regionKm: 'សៀមរាប',
     tagline: 'The soul of a nation, carved in stone.', taglineKm: 'ព្រលឹងជាតិ ឆ្លាក់លើថ្ម។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #F7EAC0 0%, #C69749 42%, #6B4E1E 100%)',
   },
   {
-    emoji: '🏙️', name: 'Phnom Penh', nameKm: 'ភ្នំពេញ', region: 'Capital', regionKm: 'រាជធានី',
+    name: 'Phnom Penh', nameKm: 'ភ្នំពេញ', region: 'Capital', regionKm: 'រាជធានី',
     tagline: 'Riverside energy meets royal heritage.', taglineKm: 'មាត់ទន្លេរស់រវើក និងបេតិកភណ្ឌរាជវង្ស។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #7FC8DA 0%, #1C3355 55%, #0E1B30 100%)',
   },
   {
-    emoji: '🏝️', name: 'Koh Rong', nameKm: 'កោះរុង', region: 'Islands', regionKm: 'កោះ',
+    name: 'Koh Rong', nameKm: 'កោះរុង', region: 'Islands', regionKm: 'កោះ',
     tagline: 'White sand by day, glowing plankton by night.', taglineKm: 'ខ្សាច់សរពេលថ្ងៃ ភ្លុកតុងភ្លឺពេលយប់។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #8FF0DE 0%, #1FA3A3 52%, #0E5B63 100%)',
   },
   {
-    emoji: '🌿', name: 'Kampot', nameKm: 'កំពត', region: 'Riverlands', regionKm: 'តំបន់ទន្លេ',
+    name: 'Kampot', nameKm: 'កំពត', region: 'Riverlands', regionKm: 'តំបន់ទន្លេ',
     tagline: 'Pepper farms and slow river sunsets.', taglineKm: 'ចម្ការម្រេច និងថ្ងៃលិចលើទន្លេ។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #C4E88F 0%, #4E8B3B 52%, #1E3A1E 100%)',
   },
   {
-    emoji: '🌊', name: 'Sihanoukville', nameKm: 'ក្រុងព្រះសីហនុ', region: 'The Coast', regionKm: 'ឆ្នេរសមុទ្រ',
+    name: 'Sihanoukville', nameKm: 'ក្រុងព្រះសីហនុ', region: 'The Coast', regionKm: 'ឆ្នេរសមុទ្រ',
     tagline: 'Gulf-of-Thailand beaches and island ferries.', taglineKm: 'ឆ្នេរឈូងសមុទ្រថៃ និងសំពៅទៅកោះ។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #8FD0F5 0%, #2A6FB0 52%, #123A63 100%)',
   },
   {
-    emoji: '🎨', name: 'Battambang', nameKm: 'បាត់ដំបង', region: 'Arts & Rice', regionKm: 'សិល្បៈ',
+    name: 'Battambang', nameKm: 'បាត់ដំបង', region: 'Arts & Rice', regionKm: 'សិល្បៈ',
     tagline: 'Colonial charm and the famous bamboo train.', taglineKm: 'ស្ថាបត្យកម្មបុរាណ និងរថភ្លើងឫស្សីដ៏ល្បី។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #F5CE86 0%, #C6853A 52%, #6B3E1E 100%)',
   },
   {
-    emoji: '🦀', name: 'Kep', nameKm: 'កែប', region: 'Seaside', regionKm: 'តាមឆ្នេរ',
+    name: 'Kep', nameKm: 'កែប', region: 'Seaside', regionKm: 'តាមឆ្នេរ',
     tagline: 'The legendary crab market by the sea.', taglineKm: 'ផ្សារក្ដាមល្បីល្បាញនៅមាត់សមុទ្រ។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #F7B79A 0%, #D65A3A 52%, #7A2A1E 100%)',
   },
   {
-    emoji: '🐘', name: 'Mondulkiri', nameKm: 'មណ្ឌលគិរី', region: 'Highlands', regionKm: 'ខ្ពង់រាប',
+    name: 'Mondulkiri', nameKm: 'មណ្ឌលគិរី', region: 'Highlands', regionKm: 'ខ្ពង់រាប',
     tagline: 'Misty hills and ethical elephant sanctuaries.', taglineKm: 'ភ្នំអ័ព្ទ និងជម្រកដំរីប្រកបដោយក្រមសីលធម៌។',
     gradient: 'radial-gradient(125% 125% at 30% 18%, #9AE0B3 0%, #2F7A4E 52%, #123A24 100%)',
   },
@@ -257,15 +258,18 @@ export function CambodiaShowcase() {
                     }}
                   >
                     <div
-                      className="cam-medallion liquid-sheen flex flex-col items-center justify-center gap-1 transition-transform duration-500"
+                      className="cam-medallion liquid-sheen flex flex-col items-center justify-end transition-transform duration-500"
                       style={{
                         background: d.gradient,
                         transform: isActive ? 'scale(1.12)' : 'scale(1)',
                       }}
                     >
-                      <span className="cam-emoji" style={{ fontSize: geo.item * 0.34 }}>{d.emoji}</span>
+                      {/* Bespoke destination scene fills the medallion behind the label. */}
+                      <DestinationArt name={d.name} className="cam-art absolute inset-0 h-full w-full" />
+                      {/* Legibility scrim so the label reads over any scene. */}
+                      <span className="cam-scrim pointer-events-none absolute inset-x-0 bottom-0 h-1/2" aria-hidden="true" />
                       <span
-                        className="cam-caption px-2 text-center font-display font-bold leading-tight text-white"
+                        className="cam-caption relative z-[2] px-2 pb-3 text-center font-display font-bold leading-tight text-white"
                         style={{ fontSize: Math.max(10, geo.item * 0.1) }}
                       >
                         {km ? d.nameKm : d.name}

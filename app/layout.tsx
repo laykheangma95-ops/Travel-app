@@ -59,6 +59,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${khmer.variable}`}>
       <body className="flex min-h-screen flex-col">
         <LanguageProvider>
+          {/* Keyboard skip link — first tab stop, visible only on focus. */}
+          <a
+            href="#main-content"
+            className="sr-only rounded-btn focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-primary-deep focus:px-4 focus:py-2.5 focus:font-semibold focus:text-white focus:shadow-card-hover focus:outline-none focus:ring-2 focus:ring-gold-light"
+          >
+            Skip to content
+          </a>
           <DomerSplash />
           <ServiceWorkerRegister />
           <LiquidTouchController />
@@ -66,7 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ReferralTracker />
           </Suspense>
           <Navbar />
-          <main className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">{children}</main>
           <Footer />
           <TripCopilot />
         </LanguageProvider>

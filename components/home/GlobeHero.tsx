@@ -1,19 +1,22 @@
 'use client';
 
 /**
- * GlobeHero — cinematic 3D particle-globe hero section.
+ * GlobeHero — cinematic 3D particle-globe hero section: the "home spine" mode
+ * of the shared globe engine.
  *
  * A standalone, drop-in <section>. Every style is scoped under the `dgh-`
  * (Domner Globe Hero) prefix so nothing leaks into the rest of the site.
  *
  * Tech:
- *  - Three.js (lazy-loaded when the section enters the viewport) renders the
- *    globe as ~20k glowing dots mapped to real continent landmass data
- *    (Natural Earth 110m, embedded as a bit mask in ./globeLandMask).
- *  - GSAP + ScrollTrigger (also lazy-loaded) drive the entrance reveal and
- *    the scroll-linked scale/dim of the globe.
- *  - Custom shaders: dot flicker + limb fade, fresnel atmosphere rim,
- *    travelling arc pulses, rising hub beams, twinkling starfield.
+ *  - The shared engine (components/globe/globeEngine) owns the core scene:
+ *    ~20k glowing dots mapped to real continent landmass data (Natural Earth
+ *    110m bit mask), the occluder sphere, fresnel atmosphere rim, twinkling
+ *    starfield, and the frame loop. Lazy-loaded when the section enters the
+ *    viewport. (The flight pages reuse the same engine in flight focus mode —
+ *    see components/flights/FlightRouteGlobe.)
+ *  - This component adds the home set dressing: hub nodes, travelling arc
+ *    pulses, rising hub beams — and GSAP + ScrollTrigger for the entrance
+ *    reveal and the scroll-linked scrub.
  *
  * Interactivity: 3-layer mouse parallax (globe / stars / clouds), drag to
  * spin with inertia (desktop), hub hover -> pulse + city label, gyroscope
@@ -25,7 +28,16 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type * as ThreeNS from 'three';
 import { useLang } from '@/lib/i18n';
-import { isLand } from './globeLandMask';
+import {
+  createGlobeEngine,
+  latLonToXYZ,
+  ARC_VERT,
+  ARC_FRAG,
+  BEAM_VERT,
+  BEAM_FRAG,
+  HUB_VERT,
+  HUB_FRAG,
+} from '@/components/globe/globeEngine';
 
 /* ────────────────────────── Scene data ────────────────────────── */
 
@@ -55,177 +67,6 @@ const ARC_ROUTES: [number, number][] = [
   [2, 13], [3, 12], [4, 12], [7, 10], [7, 8], [8, 9],
   [10, 11], [11, 12], [6, 7],
 ];
-
-/** Latitude/longitude (degrees) to a unit-sphere position. */
-function latLonToXYZ(lat: number, lon: number): [number, number, number] {
-  const la = (lat * Math.PI) / 180;
-  const lo = (lon * Math.PI) / 180;
-  return [Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo)];
-}
-
-/* ────────────────────────── Shaders ────────────────────────── */
-
-const DOTS_VERT = /* glsl */ `
-  attribute float aSize;
-  attribute float aPhase;
-  uniform float uTime;
-  uniform float uScale;      // px-per-world-unit at z=1
-  uniform float uGlobeScale; // globe group scale (points ignore parent scale for size)
-  varying float vAlpha;
-  void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    // Fade dots as they turn away from the camera (soft limb).
-    vec3 n = normalize(normalMatrix * normalize(position));
-    float facing = smoothstep(-0.05, 0.45, n.z);
-    // Gentle city-light flicker, unique phase per dot.
-    float flicker = 0.72 + 0.28 * sin(uTime * 1.4 + aPhase);
-    vAlpha = facing * flicker;
-    gl_PointSize = aSize * uGlobeScale * uScale / -mv.z;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const DOTS_FRAG = /* glsl */ `
-  precision mediump float;
-  uniform vec3 uColor;
-  varying float vAlpha;
-  void main() {
-    float d = length(gl_PointCoord - 0.5);
-    float a = smoothstep(0.5, 0.14, d) * vAlpha;
-    if (a < 0.02) discard;
-    gl_FragColor = vec4(uColor, a);
-  }
-`;
-
-const ATMO_VERT = /* glsl */ `
-  varying vec3 vNormal;
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-// Fresnel rim on a back-side sphere: brightest at the silhouette edge.
-const ATMO_FRAG = /* glsl */ `
-  precision mediump float;
-  uniform vec3 uColor;
-  uniform float uIntensity;
-  varying vec3 vNormal;
-  void main() {
-    float rim = pow(clamp(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 4.5);
-    gl_FragColor = vec4(uColor, 1.0) * rim * uIntensity;
-  }
-`;
-
-const ARC_VERT = /* glsl */ `
-  varying float vT;
-  void main() {
-    vT = uv.x; // 0..1 along the tube
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-// Faint base line + a gaussian light pulse travelling from 0 -> 1.
-const ARC_FRAG = /* glsl */ `
-  precision mediump float;
-  uniform float uPulse;
-  uniform float uAlpha;
-  uniform vec3 uColor;
-  uniform vec3 uPulseColor;
-  varying float vT;
-  void main() {
-    float ends = smoothstep(0.0, 0.10, vT) * (1.0 - smoothstep(0.90, 1.0, vT));
-    float d = vT - uPulse;
-    float pulse = exp(-d * d * 320.0);
-    vec3 col = uColor * 0.35 + uPulseColor * pulse;
-    float a = (0.24 + pulse) * uAlpha * ends;
-    if (a < 0.015) discard;
-    gl_FragColor = vec4(col, a);
-  }
-`;
-
-const BEAM_VERT = /* glsl */ `
-  varying float vY;
-  void main() {
-    vY = uv.y;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const BEAM_FRAG = /* glsl */ `
-  precision mediump float;
-  uniform float uTime;
-  uniform float uPhase;
-  uniform vec3 uColor;
-  varying float vY;
-  void main() {
-    float breathe = 0.55 + 0.45 * sin(uTime * 0.9 + uPhase);
-    float a = pow(1.0 - vY, 2.6) * 0.55 * breathe;
-    gl_FragColor = vec4(uColor, a);
-  }
-`;
-
-const HUB_VERT = /* glsl */ `
-  attribute float aHover;
-  attribute float aPhase;
-  uniform float uTime;
-  uniform float uScale;
-  uniform float uGlobeScale;
-  varying float vAlpha;
-  varying float vHover;
-  void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vec3 n = normalize(normalMatrix * normalize(position));
-    float facing = smoothstep(0.05, 0.4, n.z);
-    float breathe = 0.85 + 0.15 * sin(uTime * 2.0 + aPhase);
-    vHover = aHover;
-    vAlpha = facing * breathe;
-    float size = 0.030 * (1.0 + aHover * 0.9 + 0.10 * sin(uTime * 2.0 + aPhase));
-    gl_PointSize = size * uGlobeScale * uScale / -mv.z;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const HUB_FRAG = /* glsl */ `
-  precision mediump float;
-  uniform vec3 uColor;
-  uniform vec3 uHoverColor;
-  varying float vAlpha;
-  varying float vHover;
-  void main() {
-    float d = length(gl_PointCoord - 0.5);
-    float core = smoothstep(0.22, 0.05, d);
-    float halo = smoothstep(0.5, 0.1, d) * 0.5;
-    float a = (core + halo) * vAlpha;
-    if (a < 0.02) discard;
-    gl_FragColor = vec4(mix(uColor, uHoverColor, vHover), a);
-  }
-`;
-
-const STAR_VERT = /* glsl */ `
-  attribute float aSize;
-  attribute float aPhase;
-  uniform float uTime;
-  uniform float uPixelRatio;
-  varying float vAlpha;
-  void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vAlpha = 0.35 + 0.65 * (0.5 + 0.5 * sin(uTime * 0.6 + aPhase));
-    gl_PointSize = aSize * uPixelRatio;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const STAR_FRAG = /* glsl */ `
-  precision mediump float;
-  varying float vAlpha;
-  void main() {
-    float d = length(gl_PointCoord - 0.5);
-    float a = smoothstep(0.5, 0.1, d) * vAlpha;
-    if (a < 0.02) discard;
-    gl_FragColor = vec4(0.85, 0.92, 1.0, a);
-  }
-`;
 
 /* ────────────────────────── Component ────────────────────────── */
 
@@ -273,102 +114,17 @@ export function GlobeHero() {
     io.observe(section);
 
     async function init() {
-      const THREE = await import('three');
-      if (disposed) return;
-
-      /* ── Renderer / camera / scene ── */
-      const renderer = new THREE.WebGLRenderer({
-        canvas: canvas as HTMLCanvasElement,
-        alpha: true,
-        antialias: false,
-        powerPreference: 'high-performance',
-      });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 120);
-      camera.position.set(0, 0, 2.9);
-
-      // tiltGroup carries the axial tilt + parallax drift; spinGroup rotates.
-      const tiltGroup = new THREE.Group();
-      const spinGroup = new THREE.Group();
-      tiltGroup.add(spinGroup);
-      tiltGroup.rotation.z = THREE.MathUtils.degToRad(-17);
-      // Start with East Asia's hubs (Tokyo/Seoul) rising over the horizon.
-      spinGroup.rotation.y = 1.96;
-      scene.add(tiltGroup);
-
-      const disposables: { dispose(): void }[] = [];
-      const track = <T extends { dispose(): void }>(x: T): T => {
-        disposables.push(x);
-        return x;
-      };
-
-      /* ── Continent particle field (~20k dots on land, fibonacci sphere) ── */
-      const targetDots = isMobile ? 8000 : 20000;
-      // Land covers ~1/3 of the mask, so oversample candidates accordingly.
-      const candidates = Math.floor(targetDots * 3.3);
-      const positions: number[] = [];
-      const sizes: number[] = [];
-      const phases: number[] = [];
-      const GA = Math.PI * (3 - Math.sqrt(5)); // golden angle
-      for (let i = 0; i < candidates && positions.length / 3 < targetDots; i++) {
-        const y = 1 - (2 * (i + 0.5)) / candidates;
-        const r = Math.sqrt(Math.max(0, 1 - y * y));
-        const th = GA * i;
-        const x = Math.cos(th) * r;
-        const z = Math.sin(th) * r;
-        const lat = (Math.asin(y) * 180) / Math.PI;
-        const lon = (Math.atan2(-z, x) * 180) / Math.PI;
-        if (!isLand(lat, lon)) continue;
-        positions.push(x, y, z);
-        sizes.push(0.0032 + Math.random() * 0.0036);
-        phases.push(Math.random() * Math.PI * 2);
+      const engine = await createGlobeEngine(canvas as HTMLCanvasElement, { isMobile });
+      if (disposed) {
+        engine.dispose();
+        return;
       }
+      const { THREE, camera, tiltGroup, spinGroup, starGroup, track } = engine;
 
-      const dotsGeo = track(new THREE.BufferGeometry());
-      dotsGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      dotsGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
-      dotsGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
-      const dotsMat = track(
-        new THREE.ShaderMaterial({
-          vertexShader: DOTS_VERT,
-          fragmentShader: DOTS_FRAG,
-          uniforms: {
-            uTime: { value: 0 },
-            uScale: { value: 1 },
-            uGlobeScale: { value: 1 },
-            uColor: { value: new THREE.Color('#f2d9a4') }, // warm white-gold
-          },
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      spinGroup.add(new THREE.Points(dotsGeo, dotsMat));
-
-      /* ── Dark occluder sphere (hides far-side dots, gives the disc) ── */
-      const occGeo = track(new THREE.SphereGeometry(0.992, 48, 48));
-      const occMat = track(new THREE.MeshBasicMaterial({ color: new THREE.Color('#060f2c') }));
-      tiltGroup.add(new THREE.Mesh(occGeo, occMat));
-
-      /* ── Cyan fresnel atmosphere rim ── */
-      const atmoGeo = track(new THREE.SphereGeometry(1.05, 48, 48));
-      const atmoMat = track(
-        new THREE.ShaderMaterial({
-          vertexShader: ATMO_VERT,
-          fragmentShader: ATMO_FRAG,
-          uniforms: {
-            uColor: { value: new THREE.Color('#57c8ff') },
-            uIntensity: { value: 0.9 },
-          },
-          side: THREE.BackSide,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      tiltGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
+      // Axial tilt + starting orientation: East Asia's hubs (Tokyo/Seoul)
+      // rising over the horizon.
+      tiltGroup.rotation.z = THREE.MathUtils.degToRad(-17);
+      spinGroup.rotation.y = 1.96;
 
       /* ── Hub nodes ── */
       const hubPos: number[] = [];
@@ -398,6 +154,8 @@ export function GlobeHero() {
         }),
       );
       spinGroup.add(new THREE.Points(hubGeo, hubMat));
+      engine.pointMats.push(hubMat); // keep uScale/uGlobeScale in sync
+      engine.timeMats.push(hubMat);
 
       /* ── Bezier arc connections with travelling pulses ── */
       type ArcState = { mat: ThreeNS.ShaderMaterial; t: number; dur: number };
@@ -454,7 +212,6 @@ export function GlobeHero() {
       };
 
       /* ── Rising light beams from major hubs ── */
-      const beamMats: ThreeNS.ShaderMaterial[] = [];
       const beamGeo = track(new THREE.CylinderGeometry(0.006, 0.017, 0.34, 6, 1, true));
       beamGeo.translate(0, 0.17, 0); // base sits on the surface
       const up = new THREE.Vector3(0, 1, 0);
@@ -479,42 +236,8 @@ export function GlobeHero() {
         mesh.position.copy(n);
         mesh.quaternion.setFromUnitVectors(up, n.clone().normalize());
         spinGroup.add(mesh);
-        beamMats.push(mat);
+        engine.timeMats.push(mat);
       }
-
-      /* ── Starfield (twinkling, slow parallax layer) ── */
-      const starCount = isMobile ? 450 : 900;
-      const starPos = new Float32Array(starCount * 3);
-      const starSize = new Float32Array(starCount);
-      const starPhase = new Float32Array(starCount);
-      for (let i = 0; i < starCount; i++) {
-        // Random directions on a far shell, biased to the visible hemisphere.
-        const th = Math.random() * Math.PI * 2;
-        const ph = Math.acos(2 * Math.random() - 1);
-        const r = 40 + Math.random() * 40;
-        starPos[i * 3] = r * Math.sin(ph) * Math.cos(th);
-        starPos[i * 3 + 1] = r * Math.cos(ph) * 0.7;
-        starPos[i * 3 + 2] = -Math.abs(r * Math.sin(ph) * Math.sin(th)) - 8;
-        starSize[i] = 0.7 + Math.random() * 1.9;
-        starPhase[i] = Math.random() * Math.PI * 2;
-      }
-      const starGeo = track(new THREE.BufferGeometry());
-      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-      starGeo.setAttribute('aSize', new THREE.BufferAttribute(starSize, 1));
-      starGeo.setAttribute('aPhase', new THREE.BufferAttribute(starPhase, 1));
-      const starMat = track(
-        new THREE.ShaderMaterial({
-          vertexShader: STAR_VERT,
-          fragmentShader: STAR_FRAG,
-          uniforms: { uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      const starGroup = new THREE.Group();
-      starGroup.add(new THREE.Points(starGeo, starMat));
-      scene.add(starGroup);
 
       /* ── Layout: one full sphere centred on the hero/showcase seam ──
          The canvas spans the whole stage (hero + showcase). We place the
@@ -524,32 +247,22 @@ export function GlobeHero() {
          FULL_FACTOR sets the sphere diameter as a fraction of viewport width;
          it is tuned ~30% smaller than the old horizon globe. */
       const FULL_FACTOR = 0.44;
-      let globeScale = 1;
       const layout = () => {
         const w = wrap.clientWidth;
         const h = wrap.clientHeight; // full stage height (hero + showcase)
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
+        engine.setViewport(w, h);
         const dist = camera.position.z;
         const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
         const halfW = halfH * camera.aspect;
         // Radius as a fraction of the viewport half-width, capped so a tall
         // stage never lets the sphere overflow its vertical room.
-        globeScale = Math.min(halfH * 0.92, halfW * FULL_FACTOR);
+        const scale = Math.min(halfH * 0.92, halfW * FULL_FACTOR);
         // Screen fraction of the seam (bottom of the hero within the stage).
         const heroH = section!.offsetHeight || h * 0.5;
-        const fSeam = Math.min(0.985, (heroH - globeScale * 0.02) / h);
+        const fSeam = Math.min(0.985, (heroH - scale * 0.02) / h);
         // World-Y that projects to that screen fraction on the z=0 plane.
-        tiltGroup.scale.setScalar(globeScale);
+        engine.setGlobeScale(scale);
         tiltGroup.position.y = halfH * (1 - 2 * fSeam);
-        const pxScale =
-          (h * renderer.getPixelRatio()) /
-          (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-        dotsMat.uniforms.uScale.value = pxScale;
-        dotsMat.uniforms.uGlobeScale.value = globeScale;
-        hubMat.uniforms.uScale.value = pxScale;
-        hubMat.uniforms.uGlobeScale.value = globeScale;
       };
       layout();
       const ro = new ResizeObserver(layout);
@@ -595,6 +308,8 @@ export function GlobeHero() {
         dragging = true;
         lastDragX = e.clientX;
         stage.classList.add('dgh-dragging');
+        // First real drag — the hint chip has done its job, fade it out.
+        section!.classList.add('dgh-interacted');
       };
       const onPointerUp = () => {
         dragging = false;
@@ -675,21 +390,8 @@ export function GlobeHero() {
         if (dirty) hubGeo.getAttribute('aHover').needsUpdate = true;
       };
 
-      /* ── Render loop ── */
-      let prevMs = performance.now();
-      let time = 0;
-      let raf = 0;
-      let running = true;
-      let inView = true;
-      let pageVisible = !document.hidden;
-
-      const frame = () => {
-        raf = requestAnimationFrame(frame);
-        const nowMs = performance.now();
-        const dt = Math.min((nowMs - prevMs) / 1000, 0.05);
-        prevMs = nowMs;
-        time += dt;
-
+      /* ── Per-frame home behaviour (engine drives uTime + render) ── */
+      engine.onFrame((dt) => {
         // Perpetual spin + user inertia decaying back to the base speed.
         if (!dragging) {
           spinGroup.rotation.y += (BASE_SPIN + spinVel) * dt;
@@ -699,31 +401,21 @@ export function GlobeHero() {
         // 3-layer parallax: globe (1x), stars (counter, 0.35x).
         parallax.x += (parallax.tx - parallax.x) * Math.min(1, dt * 4);
         parallax.y += (parallax.ty - parallax.y) * Math.min(1, dt * 4);
-        tiltGroup.position.x = parallax.x * 0.08 * globeScale * 0.25;
+        tiltGroup.position.x = parallax.x * 0.08 * engine.getGlobeScale() * 0.25;
         tiltGroup.rotation.x = parallax.y * 0.05;
         starGroup.rotation.y = -parallax.x * 0.045;
         starGroup.rotation.x = -parallax.y * 0.03;
 
-        dotsMat.uniforms.uTime.value = time;
-        hubMat.uniforms.uTime.value = time;
-        starMat.uniforms.uTime.value = time;
-        for (const m of beamMats) m.uniforms.uTime.value = time;
         updateArcs(dt);
         updateHover();
+      });
 
-        renderer.render(scene, camera);
-      };
-
+      /* ── Run only while in view, page visible, and motion allowed ── */
+      let inView = true;
+      let pageVisible = !document.hidden;
       const setRunning = () => {
-        const next = inView && pageVisible && !reducedMotion;
-        if (next === running) return;
-        running = next;
-        if (running) {
-          prevMs = performance.now(); // swallow the pause gap
-          raf = requestAnimationFrame(frame);
-        } else {
-          cancelAnimationFrame(raf);
-        }
+        if (inView && pageVisible && !reducedMotion) engine.start();
+        else engine.stop();
       };
       const viewIO = new IntersectionObserver(
         (entries) => {
@@ -743,16 +435,15 @@ export function GlobeHero() {
 
       if (reducedMotion) {
         // Static frame: light a few arcs mid-flight, render once, done.
-        running = false;
         arcs.forEach((arc, i) => {
           if (i % 3 !== 0) return;
           arc.mat.uniforms.uAlpha.value = 0.8;
           arc.mat.uniforms.uPulse.value = 0.2 + (i / arcs.length) * 0.6;
         });
-        renderer.render(scene, camera);
+        engine.renderOnce();
         section!.classList.remove('dgh-anim');
       } else {
-        raf = requestAnimationFrame(frame);
+        engine.start();
         await initGsap();
       }
 
@@ -798,7 +489,6 @@ export function GlobeHero() {
 
       /* ── Teardown ── */
       disposeScene = () => {
-        cancelAnimationFrame(raf);
         ro.disconnect();
         viewIO.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
@@ -808,8 +498,7 @@ export function GlobeHero() {
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('deviceorientation', onOrientation);
         killGsap?.();
-        for (const d of disposables) d.dispose();
-        renderer.dispose();
+        engine.dispose();
       };
     }
 
@@ -877,6 +566,24 @@ export function GlobeHero() {
             {t('hero.ctaFlight')}
           </Link>
         </div>
+        {/* Interaction affordance: the globe is draggable but nothing said so.
+            A quiet glass pill with a sliding gold dot invites the first spin;
+            it fades once the visitor actually drags (dgh-interacted). Desktop
+            only — drag is disabled on touch. Decorative, so aria-hidden. */}
+        {/* The reveal class sits on a wrapper: GSAP leaves inline opacity on
+            .dgh-reveal elements, which would override the fade-on-drag rule
+            if it lived on the pill itself. */}
+        <div className="dgh-reveal">
+          <div className="dgh-hint" aria-hidden="true">
+            <span className="dgh-hint-track">
+              <i className="dgh-hint-dot" />
+            </span>
+            <span>
+              Drag to spin the globe
+              <span className="dgh-hint-km font-khmer"> · អូសបង្វិលផែនដី</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Frosted feature chips floating above the horizon */}
@@ -913,6 +620,14 @@ const CSS_TEXT = `
     linear-gradient(180deg, #050b2e 0%, #08163a 28%, #0a1a4a 44%, #0b1c40 62%, #0e1b30 100%);
 }
 .dgh-stage.dgh-dragging { cursor: grabbing; }
+
+/* Drag affordance: on fine pointers the hero reads as grabbable. Links and
+   buttons keep their own cursors; the Cambodia showcase (excluded from the
+   globe drag) is outside .dgh-hero so it is not affected. */
+@media (pointer: fine) {
+  .dgh-hero { cursor: grab; }
+  .dgh-stage.dgh-dragging .dgh-hero { cursor: grabbing; }
+}
 
 /* Shared globe canvas layer — spans the full stage, sits behind section content. */
 .dgh-globe-layer {
@@ -1121,6 +836,74 @@ const CSS_TEXT = `
   box-shadow: 0 0 24px rgba(143, 216, 255, 0.22);
 }
 
+/* ── Drag hint: quiet glass pill + sliding gold dot ── */
+.dgh-hint {
+  margin-top: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.dgh-hint-km {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.42);
+}
+/* Chevron rails + a gold dot gliding between them = "drag me" in miniature. */
+.dgh-hint-track {
+  position: relative;
+  width: 38px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.dgh-hint-track::before,
+.dgh-hint-track::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-54%);
+  font-size: 0.85rem;
+  line-height: 1;
+  color: rgba(230, 203, 139, 0.75);
+}
+.dgh-hint-track::before { content: '‹'; left: 0; }
+.dgh-hint-track::after { content: '›'; right: 0; }
+.dgh-hint-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: #e6cb8b;
+  box-shadow: 0 0 8px rgba(230, 203, 139, 0.85);
+  animation: dgh-hint-slide 1.7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+@keyframes dgh-hint-slide {
+  from { transform: translateX(-9px); }
+  to { transform: translateX(9px); }
+}
+/* Job done: fade out after the first real drag. */
+.dgh-interacted .dgh-hint {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+/* Drag is desktop-only, so the invitation is too. */
+@media (pointer: coarse) {
+  .dgh-hint { display: none; }
+}
+
 /* ── Frosted feature chips ── */
 .dgh-chips {
   position: relative;
@@ -1182,7 +965,8 @@ const CSS_TEXT = `
 /* ── Reduced motion: static frame, everything visible, no animation ── */
 @media (prefers-reduced-motion: reduce) {
   .dgh-anim .dgh-reveal { opacity: 1; transform: none; filter: none; }
-  .dgh-cloud, .dgh-grain, .dgh-chip { animation: none; }
+  .dgh-cloud, .dgh-grain, .dgh-chip, .dgh-hint-dot { animation: none; }
+  .dgh-hint { transition: none; }
   .dgh-clouds { transition: none; }
   .dgh-cta, .dgh-cta-ghost { transition: none; }
 }

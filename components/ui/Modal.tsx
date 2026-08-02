@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -10,15 +10,54 @@ interface ModalProps {
   children: ReactNode;
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
 export function Modal({ open, onClose, title, children }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+
+    // Remember what had focus so we can restore it when the dialog closes.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Move focus into the dialog (first focusable, else the panel itself).
+    const panel = panelRef.current;
+    const focusables = panel ? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];
+    (focusables[0] ?? panel)?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !panel) return;
+      // Trap Tab within the dialog.
+      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const activeEl = document.activeElement;
+      if (e.shiftKey && (activeEl === first || activeEl === panel)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && activeEl === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      // Restore focus to the trigger so keyboard users aren't dropped at page top.
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 
@@ -34,10 +73,15 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       <button
         type="button"
         aria-label="Close modal"
+        tabIndex={-1}
         className="absolute inset-0 bg-primary/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md rounded-card bg-white p-6 shadow-card-hover animate-fade-up">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative w-full max-w-md rounded-card bg-white p-6 shadow-card-hover animate-fade-up focus:outline-none"
+      >
         <div className="mb-4 flex items-center justify-between">
           {title && <h3 className="font-display text-lg font-bold text-ink">{title}</h3>}
           <button

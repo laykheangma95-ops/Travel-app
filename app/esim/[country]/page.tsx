@@ -35,10 +35,12 @@ export default function CountryPlansPage({ params }: PageProps) {
   const customs = getCustomsRule(dest.slug);
 
   return (
-    <>
+    // One continuous night sky for the whole plan page — hero flows into the
+    // body so the funnel never drops into flat light (.claude/skills/ui-ux §9).
+    <div className="night-canvas">
+      <div className="night-stars" aria-hidden="true" />
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#0E1B30_0%,#14263F_55%,#1C3355_100%)] py-16">
-        <div className="stars-far" aria-hidden="true" />
+      <section className="relative overflow-hidden py-16">
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
             <div>
@@ -69,21 +71,21 @@ export default function CountryPlansPage({ params }: PageProps) {
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
+      <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6">
         {/* Plans */}
         <div className="grid gap-6 pt-4 md:grid-cols-3">
           {plans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} destination={dest} />
+            <PlanCard key={plan.id} plan={plan} destination={dest} dark />
           ))}
         </div>
 
         {customs && (
-          <div className="mt-8 rounded-card border border-amber-200 bg-amber-50 p-6">
+          <div className="mt-8 night-card p-6">
             <div className="flex items-start gap-3">
               <Badge tone="warning">Entry info</Badge>
             </div>
-            <p className="mt-3 text-sm font-medium text-ink">{customs.visaInfo}</p>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink-secondary">
+            <p className="mt-3 text-sm font-medium text-white">{customs.visaInfo}</p>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-white/70">
               {customs.notes.map((n) => (
                 <li key={n}>{n}</li>
               ))}
@@ -93,13 +95,13 @@ export default function CountryPlansPage({ params }: PageProps) {
 
         {/* Device compatibility */}
         <div className="mt-14">
-          <DeviceChecker />
+          <DeviceChecker dark />
         </div>
 
         {/* Installation guide */}
         <div className="mt-14" id="install">
-          <h2 className="mb-6 font-display text-2xl font-bold text-ink">Installation guide</h2>
-          <Accordion>
+          <h2 className="mb-6 font-display text-2xl font-bold text-white">Installation guide</h2>
+          <Accordion dark>
             <AccordionItem title="📱 iPhone installation steps" defaultOpen>
               <ol className="list-inside list-decimal space-y-2">
                 <li>Open <strong>Settings → Cellular → Add eSIM</strong></li>
@@ -123,10 +125,10 @@ export default function CountryPlansPage({ params }: PageProps) {
 
         {/* FAQ */}
         <div className="mt-14" id="faq">
-          <h2 className="mb-6 font-display text-2xl font-bold text-ink">
+          <h2 className="mb-6 font-display text-2xl font-bold text-white">
             {dest.name} eSIM — frequently asked questions
           </h2>
-          <Accordion>
+          <Accordion dark>
             <AccordionItem title={`When should I activate my ${dest.name} eSIM?`}>
               Install the eSIM before you fly, but only turn it on after you land in {dest.name}.
               The validity period starts when the eSIM first connects to a local network.
@@ -151,6 +153,6 @@ export default function CountryPlansPage({ params }: PageProps) {
           </Accordion>
         </div>
       </div>
-    </>
+    </div>
   );
 }
