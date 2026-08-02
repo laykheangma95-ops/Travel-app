@@ -1,6 +1,12 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { DomerLogo } from '@/components/brand/DomerMark';
+import { consumeReturnTo, signInWithProvider, type OAuthProvider } from '@/lib/auth';
+import { cn } from '@/lib/utils';
 
 interface AuthCardProps {
   title: string;
@@ -27,31 +33,123 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
   );
 }
 
-export function OAuthButtons() {
+export function OAuthButtons({ onError }: { onError?: (message: string) => void }) {
+  const router = useRouter();
+  const [pending, setPending] = useState<OAuthProvider | null>(null);
+
+  // OAuth is the best path for a traveller with no cellular service: the whole
+  // handshake runs over whatever wi-fi they are on, and Google/Apple have
+  // already verified the identity for us.
+  const start = async (provider: OAuthProvider) => {
+    setPending(provider);
+    const { error, demo } = await signInWithProvider(provider);
+    if (demo) {
+      router.push(consumeReturnTo());
+      return;
+    }
+    if (error) {
+      setPending(null);
+      onError?.(error);
+    }
+    // On success the browser is redirected to the provider; nothing to do here.
+  };
+
   return (
     <div className="space-y-3">
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-3 rounded-btn border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-all duration-200 hover:border-ink-muted hover:bg-surface-2"
+        onClick={() => start('google')}
+        disabled={pending !== null}
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-all duration-200 hover:border-ink-muted hover:bg-surface-2 disabled:opacity-60"
       >
+        {pending === 'google' ? (
+          <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+        ) : (
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
           <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84z" />
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
         </svg>
+        )}
         Continue with Google
       </button>
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-3 rounded-btn bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black"
+        onClick={() => start('apple')}
+        disabled={pending !== null}
+        className="flex w-full items-center justify-center gap-3 rounded-btn bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black disabled:opacity-60"
       >
+        {pending === 'apple' ? (
+          <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+        ) : (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
         </svg>
+        )}
         Continue with Apple
       </button>
     </div>
+  );
+}
+
+interface AuthTabsProps<T extends string> {
+  tabs: Array<{ id: T; label: string }>;
+  active: T;
+  onChange: (id: T) => void;
+}
+
+export function AuthTabs<T extends string>({ tabs, active, onChange }: AuthTabsProps<T>) {
+  return (
+    <div role="tablist" className="mb-5 grid grid-cols-2 gap-1 rounded-btn bg-surface-2 p-1">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            'rounded-btn px-4 py-2 text-sm font-semibold transition-all duration-200',
+            active === tab.id
+              ? 'bg-white text-ink shadow-card'
+              : 'text-ink-secondary hover:text-ink'
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function AuthError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="rounded-btn bg-red-50 p-3 text-sm text-danger">
+      {message}
+    </p>
+  );
+}
+
+export function AuthSubmit({
+  loading,
+  children,
+  disabled,
+}: {
+  loading?: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={loading || disabled}
+      className="inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
+    >
+      {loading && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
+      {children}
+    </button>
   );
 }
 
