@@ -7,6 +7,7 @@ import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Reveal } from '@/components/ui/Reveal';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { CambodiaShowcase } from '@/components/home/CambodiaShowcase';
+import { GlobeChapters } from '@/components/home/GlobeChapters';
 import { GlobeHero } from '@/components/home/GlobeHero';
 import { JourneyCompanion } from '@/components/home/JourneyCompanion';
 import { popularDestinations } from '@/data/destinations';
@@ -49,12 +50,14 @@ export function HomeContent() {
 
   return (
     <>
-      {/* ── Hero + Cambodia showcase share ONE full 3D globe. The .dgh-stage
-          wrapper (styled inside GlobeHero) lets a single sphere span both
-          sections so they read as one continuous page. ── */}
+      {/* ── The globe spine: hero, Cambodia showcase and narrative chapters
+          share ONE 3D planet. The .dgh-stage wrapper (styled inside GlobeHero)
+          hosts a sticky canvas whose planet is glued to the hero/showcase seam,
+          then glides between the GlobeChapters as you scroll. ── */}
       <div className="dgh-stage">
         <GlobeHero />
         <CambodiaShowcase />
+        <GlobeChapters />
       </div>
 
       {/* ── One continuous night sky from here down. The globe hero flows into

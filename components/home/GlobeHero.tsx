@@ -18,10 +18,18 @@
  *    pulses, rising hub beams — and GSAP + ScrollTrigger for the entrance
  *    reveal and the scroll-linked scrub.
  *
+ * Scroll spine: the canvas lives in a sticky viewport-sized wrapper inside
+ * .dgh-stage. Scroll position is sampled every frame against a keyframe track:
+ * through the hero and Cambodia showcase the sphere's centre is glued to the
+ * seam between the two sections (so it reads as a planet printed on the page),
+ * then it detaches and glides between the narrative chapters that follow
+ * (see GlobeChapters) — repositioning, rescaling and rotating to face each
+ * chapter's destination while the copy tells the story alongside.
+ *
  * Interactivity: 3-layer mouse parallax (globe / stars / clouds), drag to
  * spin with inertia (desktop), hub hover -> pulse + city label, gyroscope
  * parallax on Android, scroll scrub. Honours prefers-reduced-motion by
- * rendering a single static frame with no animation.
+ * rendering static frames with no animation beyond the page's own scroll.
  */
 
 import { useEffect, useRef } from 'react';
@@ -75,6 +83,8 @@ export function GlobeHero() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glowWarmRef = useRef<HTMLDivElement>(null);
+  const glowHazeRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
@@ -86,10 +96,11 @@ export function GlobeHero() {
     // Assert non-null so the type is preserved inside the async init() closure
     // below (same reason `section!` is used throughout).
     const wrap = canvasWrapRef.current!;
-    // The globe layer is an absolute child of .dgh-stage, the wrapper that
-    // holds both the hero and the Cambodia showcase. Sizing + pointer maths use
-    // the stage box so the sphere spans both sections.
-    const stage = wrap.parentElement ?? section;
+    // `wrap` is the sticky viewport-sized canvas holder inside the absolute
+    // .dgh-globe-layer, which spans .dgh-stage — the wrapper that holds the
+    // hero, the Cambodia showcase and the narrative chapters. Pointer maths use
+    // the wrap box; scroll maths use the stage box.
+    const stage = wrap.closest<HTMLElement>('.dgh-stage') ?? wrap.parentElement ?? section;
 
     let disposed = false;
     let disposeScene: (() => void) | null = null;
@@ -124,7 +135,11 @@ export function GlobeHero() {
       // Axial tilt + starting orientation: East Asia's hubs (Tokyo/Seoul)
       // rising over the horizon.
       tiltGroup.rotation.z = THREE.MathUtils.degToRad(-17);
-      spinGroup.rotation.y = 1.96;
+      // Free-running spin angle. The rendered rotation blends this with each
+      // chapter's focus angle (see applySpine), so narrative focus can take
+      // over and hand back without a snap.
+      let freeSpin = 1.96;
+      spinGroup.rotation.y = freeSpin;
 
       /* ── Hub nodes ── */
       const hubPos: number[] = [];
@@ -190,11 +205,14 @@ export function GlobeHero() {
       }
 
       const updateArcs = (dt: number) => {
+        // spine.arc > 1 in the flight-tracking chapter: brighter arcs that
+        // relaunch sooner, so the sky visibly fills with routes.
+        const boost = Math.max(0.4, spine.arc);
         for (const arc of arcs) {
           arc.t += dt;
           const p = arc.t / arc.dur;
           if (p >= 1) {
-            arc.t = -(1.5 + Math.random() * 6);
+            arc.t = -(1.5 + Math.random() * 6) / boost;
             arc.dur = 5.5 + Math.random() * 4.5;
             arc.mat.uniforms.uAlpha.value = 0;
             continue;
@@ -206,7 +224,7 @@ export function GlobeHero() {
           // Fade in, hold, fade out; pulse sweeps the arc once per cycle.
           const env =
             Math.min(1, p / 0.14) * (1 - Math.max(0, (p - 0.78) / 0.22));
-          arc.mat.uniforms.uAlpha.value = env;
+          arc.mat.uniforms.uAlpha.value = env * (0.6 + 0.4 * boost);
           arc.mat.uniforms.uPulse.value = p;
         }
       };
@@ -239,34 +257,167 @@ export function GlobeHero() {
         engine.timeMats.push(mat);
       }
 
-      /* ── Layout: one full sphere centred on the hero/showcase seam ──
-         The canvas spans the whole stage (hero + showcase). We place the
-         sphere's centre at the seam between the two sections, so the top
-         hemisphere lives in the hero and the bottom hemisphere sits behind the
-         Cambodia carousel — reading as a single planet across both.
-         FULL_FACTOR sets the sphere diameter as a fraction of viewport width;
-         it is tuned ~30% smaller than the old horizon globe. */
+      /* ── Layout + scroll spine ──
+         The canvas fills the sticky viewport-sized wrapper. Where the planet
+         sits inside it is decided per frame by sampling the scroll offset
+         against a keyframe track:
+           - Keys 0..1 glue the sphere's centre to the hero/showcase seam
+             (linear segments, so the planet is document-locked — pixel-exact
+             tracking while those sections scroll past).
+           - One key per [data-dgc] chapter element then glides the planet to
+             that chapter's declared position / scale / focus lat-lon.
+         FULL_FACTOR sets the sphere diameter as a fraction of viewport width. */
       const FULL_FACTOR = 0.44;
+      const DEG = Math.PI / 180;
+      let globeScale = 1;
+      let halfHWorld = 1;
+      let halfWWorld = 1;
+      let radiusPx = 0;
+      let vwPx = 1;
+      let vhPx = 1;
+
+      type SpineKey = {
+        st: number; // stage scroll offset (px past stage top) this key sits at
+        x: number; // globe centre, fraction of wrap width
+        y: number; // globe centre, fraction of wrap height
+        scale: number; // multiplier on the base globe scale
+        arc: number; // arc-activity boost (1 = normal)
+        focusW: number; // 0 = free spin, 1 = locked to focusR
+        focusR: number; // spin angle that puts the chapter's lon front-centre
+        tiltX: number; // extra x-tilt to raise the chapter's lat
+        linear?: boolean; // linear (not eased) interp to the NEXT key
+      };
+      let keys: SpineKey[] = [];
+
+      const buildKeys = () => {
+        const h = wrap.clientHeight || 1;
+        const stageRect = stage.getBoundingClientRect();
+        const seamY = section!.getBoundingClientRect().bottom - stageRect.top;
+        // Seam-locked centre-y (fraction of wrap height) at stage offset st.
+        const yAt = (st: number) => (seamY - st) / h;
+        const base = { x: 0.5, scale: 1, arc: 1, focusW: 0, focusR: 0, tiltX: 0 };
+        // Reduced motion: seam-lock only — the planet scrolls with the page
+        // like a printed element and never glides on its own.
+        const els = reducedMotion
+          ? []
+          : Array.from(stage.querySelectorAll<HTMLElement>('[data-dgc]'));
+        keys = [{ st: 0, y: yAt(0), ...base, linear: true }];
+        if (els.length === 0) {
+          keys.push({ st: stageRect.height, y: yAt(stageRect.height), ...base, linear: true });
+          return;
+        }
+        // Hold the seam lock until the first chapter is about to enter.
+        const firstTop = els[0].getBoundingClientRect().top - stageRect.top;
+        const stHold = Math.max(1, firstTop - h);
+        keys.push({ st: stHold, y: yAt(stHold), ...base });
+        // Compact viewports: the width-scaled globe is tiny, so per-chapter
+        // sizes would vanish behind the copy card. Centre it and blow it up
+        // instead — the card's glass backdrop floats on the planet.
+        const compact = (wrap.clientWidth || 0) < 768;
+        for (const el of els) {
+          const r = el.getBoundingClientRect();
+          const d = el.dataset;
+          const lat = parseFloat(d.lat ?? '0');
+          const lon = parseFloat(d.lon ?? '105');
+          keys.push({
+            st: r.top - stageRect.top + r.height / 2 - h / 2,
+            x: compact ? 0.5 : parseFloat(d.x ?? '0.5'),
+            y: parseFloat(d.y ?? '0.5'),
+            scale: compact ? 1.85 : parseFloat(d.scale ?? '0.6'),
+            arc: parseFloat(d.arc ?? '1'),
+            focusW: 1,
+            // rotation.y that brings `lon` to face the camera (see latLonToXYZ).
+            focusR: -Math.PI / 2 - lon * DEG,
+            tiltX: Math.max(-0.45, Math.min(0.45, lat * DEG * 0.7)),
+          });
+        }
+        // Seed the seam-lock keys with the first chapter's angle so the blend
+        // has a fixed target while focusW rises (no mid-glide retargeting).
+        keys[0].focusR = keys[1].focusR = keys[2].focusR;
+      };
+
       const layout = () => {
         const w = wrap.clientWidth;
-        const h = wrap.clientHeight; // full stage height (hero + showcase)
+        const h = wrap.clientHeight;
+        vwPx = w;
+        vhPx = h;
         engine.setViewport(w, h);
         const dist = camera.position.z;
-        const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
-        const halfW = halfH * camera.aspect;
-        // Radius as a fraction of the viewport half-width, capped so a tall
-        // stage never lets the sphere overflow its vertical room.
-        const scale = Math.min(halfH * 0.92, halfW * FULL_FACTOR);
-        // Screen fraction of the seam (bottom of the hero within the stage).
-        const heroH = section!.offsetHeight || h * 0.5;
-        const fSeam = Math.min(0.985, (heroH - scale * 0.02) / h);
-        // World-Y that projects to that screen fraction on the z=0 plane.
-        engine.setGlobeScale(scale);
-        tiltGroup.position.y = halfH * (1 - 2 * fSeam);
+        halfHWorld = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
+        halfWWorld = halfHWorld * camera.aspect;
+        // Radius as a fraction of the viewport half-width, capped so a short
+        // wrap never lets the sphere overflow its vertical room.
+        globeScale = Math.min(halfHWorld * 0.92, halfWWorld * FULL_FACTOR);
+        radiusPx = (globeScale / halfHWorld) * (h / 2);
+        engine.setGlobeScale(globeScale);
+        buildKeys();
+        if (reducedMotion) renderStatic();
       };
+
+      const shortAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+      // Current interpolated spine state (also read by updateArcs / spin).
+      const spine = { x: 0.5, y: 1, scale: 1, arc: 1, focusW: 0, focusR: 0, tiltX: 0 };
+
+      const sampleSpine = (st: number) => {
+        let a = keys[0];
+        let b = keys[0];
+        for (let i = 0; i < keys.length; i++) {
+          if (keys[i].st <= st) {
+            a = keys[i];
+            b = keys[Math.min(i + 1, keys.length - 1)];
+          }
+        }
+        const span = b.st - a.st;
+        let u = span > 0 ? Math.min(1, Math.max(0, (st - a.st) / span)) : 1;
+        if (!a.linear) u = u * u * (3 - 2 * u); // smoothstep the glides
+        spine.x = a.x + (b.x - a.x) * u;
+        spine.y = a.y + (b.y - a.y) * u;
+        spine.scale = a.scale + (b.scale - a.scale) * u;
+        spine.arc = a.arc + (b.arc - a.arc) * u;
+        spine.focusW = a.focusW + (b.focusW - a.focusW) * u;
+        spine.focusR = a.focusR + shortAngle(b.focusR - a.focusR) * u;
+        spine.tiltX = a.tiltX + (b.tiltX - a.tiltX) * u;
+      };
+
+      const glowWarm = glowWarmRef.current;
+      const glowHaze = glowHazeRef.current;
+
+      // Sample the scroll position and pose the planet (and its CSS glow).
+      const applySpine = () => {
+        sampleSpine(-stage.getBoundingClientRect().top);
+        const s = spine;
+        engine.setGlobeScale(globeScale * s.scale);
+        tiltGroup.position.x =
+          (s.x - 0.5) * 2 * halfWWorld + parallax.x * 0.08 * globeScale * 0.25;
+        tiltGroup.position.y = halfHWorld * (1 - 2 * s.y);
+        tiltGroup.rotation.x = parallax.y * 0.05 + s.tiltX;
+        spinGroup.rotation.y = freeSpin + shortAngle(s.focusR - freeSpin) * s.focusW;
+        if (glowWarm && glowHaze) {
+          const cx = s.x * vwPx;
+          const cy = s.y * vhPx;
+          glowWarm.style.transform = `translate(${cx}px, ${cy - radiusPx * s.scale * 0.55}px) translate(-50%, -50%) scale(${s.scale})`;
+          glowHaze.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%) scale(${Math.max(0.7, s.scale)})`;
+        }
+      };
+
+      // Reduced motion renders discrete frames: once now, and again whenever
+      // scroll moves the seam-locked planet (no animation of its own).
+      let rmQueued = false;
+      const renderStatic = () => {
+        if (rmQueued || disposed) return;
+        rmQueued = true;
+        requestAnimationFrame(() => {
+          rmQueued = false;
+          applySpine();
+          engine.renderOnce();
+        });
+      };
+
       layout();
       const ro = new ResizeObserver(layout);
       ro.observe(stage);
+      ro.observe(wrap);
 
       /* ── Interaction state ── */
       const parallax = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -289,7 +440,7 @@ export function GlobeHero() {
         if (dragging) {
           const dx = e.clientX - lastDragX;
           lastDragX = e.clientX;
-          spinGroup.rotation.y += dx * 0.0045;
+          freeSpin += dx * 0.0045;
           spinVel = dx * 0.0045 * 60; // convert px/frame to rad/s feel
         }
       };
@@ -302,9 +453,11 @@ export function GlobeHero() {
       };
       const onPointerDown = (e: PointerEvent) => {
         if (isMobile || e.pointerType === 'touch') return; // no drag on mobile
+        // While a chapter has rotational focus, drag would be invisible.
+        if (spine.focusW > 0.5) return;
         const target = e.target as HTMLElement;
-        // Don't hijack links/buttons or the Cambodia carousel's own drag/controls.
-        if (target.closest('a, button, input, [role="tablist"], .cam-stage')) return;
+        // Don't hijack links/buttons, the Cambodia carousel, or chapter cards.
+        if (target.closest('a, button, input, [role="tablist"], .cam-stage, .dgc-card')) return;
         dragging = true;
         lastDragX = e.clientX;
         stage.classList.add('dgh-dragging');
@@ -393,18 +546,22 @@ export function GlobeHero() {
       /* ── Per-frame home behaviour (engine drives uTime + render) ── */
       engine.onFrame((dt) => {
         // Perpetual spin + user inertia decaying back to the base speed.
+        // Base spin winds down as a chapter takes rotational focus, so the
+        // free angle doesn't drift far from what's on screen while locked.
         if (!dragging) {
-          spinGroup.rotation.y += (BASE_SPIN + spinVel) * dt;
+          freeSpin += (BASE_SPIN * (1 - spine.focusW) + spinVel) * dt;
           spinVel *= Math.pow(0.12, dt); // smooth exponential decay
         }
 
-        // 3-layer parallax: globe (1x), stars (counter, 0.35x).
+        // 3-layer parallax: globe (1x), stars (counter, 0.35x). The globe's own
+        // placement is applied by applySpine, which folds parallax.x in.
         parallax.x += (parallax.tx - parallax.x) * Math.min(1, dt * 4);
         parallax.y += (parallax.ty - parallax.y) * Math.min(1, dt * 4);
-        tiltGroup.position.x = parallax.x * 0.08 * engine.getGlobeScale() * 0.25;
-        tiltGroup.rotation.x = parallax.y * 0.05;
         starGroup.rotation.y = -parallax.x * 0.045;
         starGroup.rotation.x = -parallax.y * 0.03;
+
+        // Pose the planet from the scroll spine (position, scale, focus).
+        applySpine();
 
         updateArcs(dt);
         updateHover();
@@ -434,13 +591,15 @@ export function GlobeHero() {
       let killGsap: (() => void) | null = null;
 
       if (reducedMotion) {
-        // Static frame: light a few arcs mid-flight, render once, done.
+        // Static frames: light a few arcs mid-flight, then only re-render when
+        // scroll moves the seam-locked planet — no motion of its own.
         arcs.forEach((arc, i) => {
           if (i % 3 !== 0) return;
           arc.mat.uniforms.uAlpha.value = 0.8;
           arc.mat.uniforms.uPulse.value = 0.2 + (i / arcs.length) * 0.6;
         });
-        engine.renderOnce();
+        renderStatic();
+        window.addEventListener('scroll', renderStatic, { passive: true });
         section!.classList.remove('dgh-anim');
       } else {
         engine.start();
@@ -497,6 +656,7 @@ export function GlobeHero() {
         stage.removeEventListener('pointerdown', onPointerDown);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('deviceorientation', onOrientation);
+        window.removeEventListener('scroll', renderStatic);
         killGsap?.();
         engine.dispose();
       };
@@ -523,13 +683,20 @@ export function GlobeHero() {
 
   return (
     <>
-      {/* Shared globe canvas. It is positioned absolutely against .dgh-stage
-          (see HomeContent), which wraps BOTH this hero and the Cambodia
-          showcase below — so a single full sphere reads as one planet spanning
-          the two sections. Lazy-initialised when scrolled near. */}
-      <div ref={canvasWrapRef} className="dgh-globe-layer" aria-hidden="true">
-        <canvas ref={canvasRef} className="dgh-canvas" />
-        <div ref={labelRef} className="dgh-hublabel" />
+      {/* Shared globe canvas. The outer layer spans the whole .dgh-stage (see
+          HomeContent) — hero, Cambodia showcase and narrative chapters — while
+          the inner sticky wrapper keeps the canvas viewport-sized. Scroll
+          keyframes glue the planet to the hero/showcase seam, then glide it
+          between chapters. Lazy-initialised when scrolled near. */}
+      <div className="dgh-globe-layer" aria-hidden="true">
+        <div ref={canvasWrapRef} className="dgh-globe-sticky">
+          <div className="dgh-glow">
+            <div ref={glowHazeRef} className="dgh-glow-haze" />
+            <div ref={glowWarmRef} className="dgh-glow-warm" />
+          </div>
+          <canvas ref={canvasRef} className="dgh-canvas" />
+          <div ref={labelRef} className="dgh-hublabel" />
+        </div>
       </div>
 
       <section ref={sectionRef} className="dgh-hero dgh-anim" aria-label={t('hero.badge')}>
@@ -608,16 +775,24 @@ const GRAIN_URI =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E\")";
 
 const CSS_TEXT = `
-/* .dgh-stage wraps the hero AND the Cambodia showcase (see HomeContent). It
-   owns the continuous deep-space gradient and hosts the shared globe layer, so
-   one planet spans both sections as a single "page". */
+/* .dgh-stage wraps the hero, the Cambodia showcase AND the narrative chapters
+   (see HomeContent). It owns the continuous deep-space gradient and hosts the
+   shared globe layer, so one planet travels the whole spine as a single
+   "page". The warm/blue radial glows live in the sticky globe wrapper so they
+   follow the planet as it glides. */
 .dgh-stage {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(52% 26% at 50% 41%, rgba(230, 176, 90, 0.12) 0%, transparent 62%),
-    radial-gradient(120% 48% at 50% 39%, rgba(30, 64, 122, 0.55) 0%, transparent 60%),
-    linear-gradient(180deg, #050b2e 0%, #08163a 28%, #0a1a4a 44%, #0b1c40 62%, #0e1b30 100%);
+  background: linear-gradient(
+    180deg,
+    #050b2e 0%,
+    #08163a 14%,
+    #0a1a4a 26%,
+    #0b1c40 40%,
+    #0a173c 62%,
+    #0c1836 82%,
+    #0e1b30 100%
+  );
 }
 .dgh-stage.dgh-dragging { cursor: grabbing; }
 
@@ -635,7 +810,48 @@ const CSS_TEXT = `
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  will-change: transform, opacity;
+}
+
+/* Sticky viewport-sized holder: the canvas rides along while the stage
+   scrolls, and the scroll spine poses the planet inside it. */
+.dgh-globe-sticky {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  /* The glow layers are deliberately far wider than the viewport so the
+     falloff is soft; clip them here or they widen the document and the page
+     scrolls sideways. */
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* Planet glow layers — repositioned every frame to track the sphere. */
+.dgh-glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+.dgh-canvas-on .dgh-glow { opacity: 1; }
+.dgh-glow-warm,
+.dgh-glow-haze {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.dgh-glow-warm {
+  width: 150vmin;
+  height: 76vmin;
+  background: radial-gradient(closest-side, rgba(230, 176, 90, 0.13) 0%, transparent 70%);
+  transform: translate(50vw, 92vh) translate(-50%, -50%);
+}
+.dgh-glow-haze {
+  width: 220vmin;
+  height: 115vmin;
+  background: radial-gradient(closest-side, rgba(30, 64, 122, 0.5) 0%, transparent 66%);
+  transform: translate(50vw, 100vh) translate(-50%, -50%);
 }
 
 .dgh-hero {
