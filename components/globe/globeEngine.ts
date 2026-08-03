@@ -27,13 +27,24 @@ export function latLonToXYZ(lat: number, lon: number): [number, number, number] 
 
 /* ────────────────────────── Shaders ────────────────────────── */
 
+// The land-dot shader carries an optional day/night terminator.
+//
+// `uNightMix` at 0 reproduces the original look exactly, so the flight-route
+// globe and anything else sharing this engine are unaffected. At 1 the dots
+// split at the real terminator: warm, flickering city lights on the night side,
+// cooler and steadier on the daylit side. `uSunDir` is supplied in VIEW space —
+// the CPU transforms it once per frame, which keeps this shader to one dot
+// product (see components/globe/sun.ts).
 export const DOTS_VERT = /* glsl */ `
   attribute float aSize;
   attribute float aPhase;
   uniform float uTime;
   uniform float uScale;      // px-per-world-unit at z=1
   uniform float uGlobeScale; // globe group scale (points ignore parent scale for size)
+  uniform vec3 uSunDir;      // view space, normalised
+  uniform float uNightMix;   // 0 = legacy look, 1 = terminator active
   varying float vAlpha;
+  varying float vDay;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     // Fade dots as they turn away from the camera (soft limb).
@@ -41,7 +52,11 @@ export const DOTS_VERT = /* glsl */ `
     float facing = smoothstep(-0.05, 0.45, n.z);
     // Gentle city-light flicker, unique phase per dot.
     float flicker = 0.72 + 0.28 * sin(uTime * 1.4 + aPhase);
-    vAlpha = facing * flicker;
+    // Sunlit fraction, softened across the terminator band.
+    float day = smoothstep(-0.12, 0.22, dot(n, uSunDir)) * uNightMix;
+    vDay = day;
+    // City lights twinkle at night; daylight is steady.
+    vAlpha = facing * mix(flicker, 1.0, day);
     gl_PointSize = aSize * uGlobeScale * uScale / -mv.z;
     gl_Position = projectionMatrix * mv;
   }
@@ -49,13 +64,15 @@ export const DOTS_VERT = /* glsl */ `
 
 export const DOTS_FRAG = /* glsl */ `
   precision mediump float;
-  uniform vec3 uColor;
+  uniform vec3 uColor;    // night side — warm city-light gold
+  uniform vec3 uDayColor; // day side — cool, quieter
   varying float vAlpha;
+  varying float vDay;
   void main() {
     float d = length(gl_PointCoord - 0.5);
-    float a = smoothstep(0.5, 0.14, d) * vAlpha;
+    float a = smoothstep(0.5, 0.14, d) * vAlpha * mix(1.0, 0.62, vDay);
     if (a < 0.02) discard;
-    gl_FragColor = vec4(uColor, a);
+    gl_FragColor = vec4(mix(uColor, uDayColor, vDay), a);
   }
 `;
 
@@ -197,6 +214,10 @@ export interface GlobeEngineOptions {
   dotCount?: number;
   /** Starfield points (default 450 mobile / 900 desktop). */
   starCount?: number;
+  /** Device-pixel-ratio ceiling (default 1.5 mobile / 2 desktop). */
+  maxDpr?: number;
+  /** Throttle the render loop, e.g. 30 on low-end devices. 0 = uncapped. */
+  targetFps?: number;
 }
 
 export interface GlobeEngine {
@@ -219,6 +240,14 @@ export interface GlobeEngine {
   track<T extends { dispose(): void }>(x: T): T;
   /** Resize renderer + camera and refresh px-scale uniforms. */
   setViewport(w: number, h: number): void;
+  /**
+   * Dolly the camera and optionally narrow the lens. This is what makes a
+   * descent read as approach rather than as zoom — scaling the globe group
+   * (setGlobeScale) only ever gives you a bigger sphere of the same dots.
+   */
+  setCamera(distance: number, fov?: number): void;
+  /** Terminator control. `mix` 0 keeps the original flat-lit look. */
+  setSun(dirWorld: { x: number; y: number; z: number }, mix: number): void;
   /** Scale the globe group and refresh dot-size uniforms. */
   setGlobeScale(s: number): void;
   getGlobeScale(): number;
@@ -244,7 +273,9 @@ export async function createGlobeEngine(
     antialias: false,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
+  renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio || 1, opts.maxDpr ?? (isMobile ? 1.5 : 2)),
+  );
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 120);
@@ -297,6 +328,9 @@ export async function createGlobeEngine(
         uScale: { value: 1 },
         uGlobeScale: { value: 1 },
         uColor: { value: new THREE.Color('#f2d9a4') }, // warm white-gold
+        uDayColor: { value: new THREE.Color('#9fc6e8') }, // cool daylit land
+        uSunDir: { value: new THREE.Vector3(0, 0, 1) },
+        uNightMix: { value: 0 }, // off by default — existing callers unchanged
       },
       transparent: true,
       depthWrite: false,
@@ -385,13 +419,36 @@ export async function createGlobeEngine(
     applyDotUniforms(pxScale);
   };
 
-  const setGlobeScale = (s: number) => {
-    globeScale = s;
-    tiltGroup.scale.setScalar(s);
+  const refreshPxScale = () => {
     const pxScale =
       (lastH * renderer.getPixelRatio()) /
       (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     applyDotUniforms(pxScale);
+  };
+
+  const setGlobeScale = (s: number) => {
+    globeScale = s;
+    tiltGroup.scale.setScalar(s);
+    refreshPxScale();
+  };
+
+  const setCamera = (distance: number, fov?: number) => {
+    camera.position.z = distance;
+    if (fov != null && fov !== camera.fov) camera.fov = fov;
+    camera.updateProjectionMatrix();
+    refreshPxScale();
+  };
+
+  // The sun direction arrives in world space; the dot shader wants it in view
+  // space so it can be compared against the view-space normal with a single
+  // dot product. Transform once per call rather than per vertex.
+  const sunWorld = new THREE.Vector3(0, 0, 1);
+  const sunView = new THREE.Vector3();
+  const setSun = (dirWorld: { x: number; y: number; z: number }, mix: number) => {
+    sunWorld.set(dirWorld.x, dirWorld.y, dirWorld.z).normalize();
+    sunView.copy(sunWorld).transformDirection(camera.matrixWorldInverse).normalize();
+    dotsMat.uniforms.uSunDir.value.copy(sunView);
+    dotsMat.uniforms.uNightMix.value = mix;
   };
 
   /* ── Frame loop ── */
@@ -402,12 +459,23 @@ export async function createGlobeEngine(
   let running = false;
   let disposed = false;
 
+  // Frame budget. 0 = render every rAF; 30 halves the work on a phone that
+  // cannot hold 60 without the fans (or the battery) noticing.
+  const frameBudgetMs = opts.targetFps && opts.targetFps > 0 ? 1000 / opts.targetFps - 1 : 0;
+
   const frame = () => {
     raf = requestAnimationFrame(frame);
     const nowMs = performance.now();
+    if (frameBudgetMs && nowMs - prevMs < frameBudgetMs) return;
     const dt = Math.min((nowMs - prevMs) / 1000, 0.05);
     prevMs = nowMs;
     time += dt;
+
+    // Keep the terminator correct as the camera moves.
+    if (dotsMat.uniforms.uNightMix.value > 0) {
+      sunView.copy(sunWorld).transformDirection(camera.matrixWorldInverse).normalize();
+      dotsMat.uniforms.uSunDir.value.copy(sunView);
+    }
 
     dotsMat.uniforms.uTime.value = time;
     starMat.uniforms.uTime.value = time;
@@ -431,6 +499,8 @@ export async function createGlobeEngine(
     timeMats,
     track,
     setViewport,
+    setCamera,
+    setSun,
     setGlobeScale,
     getGlobeScale: () => globeScale,
     onFrame: (fn) => frameFns.push(fn),
