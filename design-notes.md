@@ -61,6 +61,39 @@ quiet text link appears six hundred milliseconds after the first frame settles;
 typing a destination we sell puts the eSIM as the last suggestion row, two taps
 from keystroke to checkout. A first-timer never sees any of it.
 
+**The light path is the journey, not the network.** Choosing a destination runs a
+filament of light from Phnom Penh across the surface of the planet to where you
+are going, and the pin ignites the instant it arrives — the camera follows the
+light rather than the other way round. Every competitor ships a permanent web of
+glowing arcs meaning "we have global coverage"; that is wallpaper, and it is the
+same wallpaper on all three. This is one line, drawn once, from your city to
+your city, at the moment you decide, and it is gone by the time you land. You
+cannot see it until you have asked for it, which is what makes it yours.
+
+**The world listens while you type.** Whatever the search currently matches is
+already glowing on the globe before you commit to it. It costs nothing — the
+pins were already there — and it converts typing from data entry into a
+conversation. This is the single cheapest "it's alive" moment on the page.
+
+**The map is the collectible system, and it is not a collectible system.** Every
+place you read about keeps a faint line from Phnom Penh; every place you actually
+bought an eSIM for keeps a gold one with the city lit. Come back and it draws
+itself in, staggered, so you watch your own history appear. No drops, no
+rarities, no seasonal sets — those work by manufacturing scarcity and charging
+to relieve it, and you cannot run a slot machine on the same page where you ask
+someone to trust a visa rule. The attachment is to your own record, not to our
+economy, and it stays true if you never spend a dollar.
+
+**Sound, synthesised at runtime.** Not one audio file is downloaded: a tasteful
+sample set is 200–500KB and this audience pays for data. The palette is D major
+pentatonic — Cambodian pinpeat sits on a seven-tone equidistant scale that does
+not map onto Western tuning and faking it would be pastiche, but pentatonic
+shares its openness and has no leading tone, so **nothing ever resolves.** The
+world is still waiting for you to go somewhere. `unlock` opens upward and
+`confirm` closes downward, because choosing a destination and buying a plan are
+opposite gestures. Off by default, because a site that makes noise uninvited is
+not luxurious.
+
 ## Which real travel problem each chapter solves
 
 | Chapter | The actual problem |
@@ -225,6 +258,20 @@ taken verbatim from the actual published policy rather than written fresh.
 quotes, plus "thousands of Cambodian travelers", were live on the site. They are
 gone. This was not a v3 requirement; it was a correction.
 
+## Rejected on the collectible system
+
+**Drops, rarities, seasonal sets, hidden achievements.** Requested, considered,
+and cut — every one of them works by manufacturing scarcity and then charging to
+relieve it. Put a slot machine on the same page as a visa rule and you have told
+the visitor exactly how much to trust the visa rule.
+
+**What was built instead** is the light path leaving a trace: every place you
+have read about keeps a faint line from Phnom Penh, every place you actually
+bought an eSIM for keeps a gold one, and the map writes itself in when you come
+back. Emotional attachment without a reward loop, because the thing you are
+attached to is your own history rather than our economy. It is also the only
+version that stays true if you never spend a dollar.
+
 ## Rejected on craft
 
 **GSAP on this page.** Already a dependency, and still removed: three.js plus
@@ -280,7 +327,16 @@ and typing an answer.
    trip is recommended the 15-day plan. The card behaves correctly given the
    catalogue; the catalogue is what limits it.
 
-5. **Total blocking time is still ~2.9s on a throttled mobile profile.** Down
+5. **The sound mix has never been heard.** The synthesis is deliberate —
+   frequencies, envelopes, reverb tail and per-cue gains are all chosen — but it
+   was written by someone who cannot listen to it. Every level is a single
+   constant in `lib/sound.ts`. Budget one pass with real ears before launch.
+
+6. **The map is local-only.** Clearing site data clears it. Acceptable for
+   something that needs no account, but orders remain the source of truth for
+   anything a customer paid for.
+
+7. **Total blocking time is still ~2.9s on a throttled mobile profile.** Down
    from 17.8s, but WebGL on a mid-range phone is inherently expensive. If it
    needs to go lower, the next lever is not starting the globe until first
    interaction — which costs the moment the page is built around.

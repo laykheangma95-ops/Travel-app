@@ -22,7 +22,13 @@ import { useBi, useLang } from '@/lib/i18n';
 import { USAGE_LINES, DEFAULT_LINE_IDS, estimateUsage } from '@/content/usage-model';
 import type { DestinationGuide } from '@/content/schema';
 
-export function Recommendation({ guide }: { guide: DestinationGuide }) {
+export function Recommendation({
+  guide,
+  onBought,
+}: {
+  guide: DestinationGuide;
+  onBought?: () => void;
+}) {
   const { t } = useLang();
   const bi = useBi();
   const addItem = useCart((s) => s.addItem);
@@ -73,6 +79,7 @@ export function Recommendation({ guide }: { guide: DestinationGuide }) {
     // Resolved downward, the opposite shape to the unlock cue: choosing a
     // destination opens something, buying settles it.
     play('confirm');
+    onBought?.();
   };
 
   return (

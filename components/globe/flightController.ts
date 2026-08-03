@@ -71,6 +71,24 @@ const PATH_FRAG = /* glsl */ `
   }
 `;
 
+// The persistent trace left by a journey you have already made. Even and faint
+// along its length, with a soft bloom at the far end where the city is — so a
+// map with five marks reads as five places, not five lines.
+const TRACE_FRAG = /* glsl */ `
+  precision mediump float;
+  uniform float uProgress;
+  uniform float uFade;
+  uniform vec3 uColor;
+  varying float vT;
+  void main() {
+    if (vT > uProgress) discard;
+    float endGlow = exp(-(1.0 - vT) * 24.0) * 0.9;
+    float a = (0.30 + endGlow) * uFade;
+    if (a < 0.02) discard;
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
 /** Framing at rest: the whole planet, comfortably inside the viewport. */
 export const IDLE_DISTANCE = 4.2;
 export const IDLE_FOV = 38;
@@ -151,6 +169,13 @@ export interface FlightController {
   hitTest(px: number, py: number, w: number, h: number): PinHit | null;
   /** Light a pin under the pointer. Pass null to clear. */
   setHover(slug: string | null): void;
+  /**
+   * Draw the visitor's own map: a line from home to every place they have
+   * looked into, gold for the ones they actually travelled to. They draw
+   * themselves in on arrival, staggered — a returning visitor watches their
+   * history write itself across the planet.
+   */
+  setTraces(traces: { slug: string; lat: number; lon: number; kind: 'explored' | 'travelled' }[]): void;
   dispose(): void;
 }
 
@@ -405,6 +430,82 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     spinGroup.add(pathMesh);
   };
 
+  /* ── Persistent journey traces: the visitor's own map ── */
+  const traceMeshes: ThreeNS.Mesh[] = [];
+  const traceMats: ThreeNS.ShaderMaterial[] = [];
+  let traceTween: TweenHandle | null = null;
+
+  const clearTraces = () => {
+    traceTween?.cancel();
+    traceTween = null;
+    for (const m of traceMeshes) {
+      spinGroup.remove(m);
+      m.geometry.dispose();
+    }
+    traceMeshes.length = 0;
+    for (const m of traceMats) m.dispose();
+    traceMats.length = 0;
+  };
+
+  const arcTo = (lat: number, lon: number, radius: number) => {
+    const a = new THREE.Vector3(...latLonToXYZ(HOME.lat, HOME.lon));
+    const b = new THREE.Vector3(...latLonToXYZ(lat, lon));
+    if (a.distanceTo(b) < 0.02) return null;
+    const angle = a.angleTo(b);
+    const lift = 1 + 0.012 + 0.05 * (angle / Math.PI);
+    const c1 = a.clone().lerp(b, 0.28).normalize().multiplyScalar(lift);
+    const c2 = a.clone().lerp(b, 0.72).normalize().multiplyScalar(lift);
+    return new THREE.TubeGeometry(new THREE.CubicBezierCurve3(a, c1, c2, b), 64, radius, 5, false);
+  };
+
+  const setTraces = (
+    traces: { slug: string; lat: number; lon: number; kind: 'explored' | 'travelled' }[],
+  ) => {
+    clearTraces();
+    if (!traces.length) return;
+
+    for (const tr of traces) {
+      const travelled = tr.kind === 'travelled';
+      const geo = arcTo(tr.lat, tr.lon, travelled ? 0.0032 : 0.0022);
+      if (!geo) continue;
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: PATH_VERT,
+        fragmentShader: TRACE_FRAG,
+        uniforms: {
+          uProgress: { value: 0 },
+          // Somewhere you went is worth more than somewhere you read about.
+          uFade: { value: travelled ? 0.85 : 0.32 },
+          uColor: { value: new THREE.Color(travelled ? '#e6cb8b' : '#8fd8ff') },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      spinGroup.add(mesh);
+      traceMeshes.push(mesh);
+      traceMats.push(mat);
+    }
+
+    // They write themselves in, one after another, rather than simply being
+    // there. Watching your own map appear is the moment; a static overlay is
+    // just a chart.
+    const stagger = 220;
+    const each = 900;
+    const total = each + stagger * Math.max(0, traceMats.length - 1);
+    traceTween = tween({
+      duration: total,
+      ease: (x) => x,
+      onUpdate: (_e, raw) => {
+        const elapsed = raw * total;
+        traceMats.forEach((m, i) => {
+          const local = Math.max(0, Math.min(1, (elapsed - i * stagger) / each));
+          m.uniforms.uProgress.value = easeFlight(local);
+        });
+      },
+    });
+  };
+
   /* ── Atmosphere colour ── */
   const atmoMesh = tiltGroup.children.find(
     (c): c is ThreeNS.Mesh =>
@@ -604,6 +705,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     returnToGlobe,
     refresh: applyPose,
     setPins,
+    setTraces,
     hitTest,
     setHover,
     get phase() {
@@ -616,6 +718,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
       handle?.cancel();
       clearPatch();
       clearPath();
+      clearTraces();
       pathMat.dispose();
       pinGeo.dispose();
       pinMat.dispose();

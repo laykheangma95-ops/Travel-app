@@ -25,6 +25,7 @@ import { useCart } from '@/hooks/useCart';
 import { useLang } from '@/lib/i18n';
 import { detectTier, TIER_SETTINGS, type Tier } from '@/lib/tier';
 import { play } from '@/lib/sound';
+import { getJourneys, recordJourney } from '@/lib/journeys';
 import type { DestinationGuide } from '@/content/schema';
 import { FirstScreen } from './FirstScreen';
 import { DestinationJourney, UnwrittenDestination } from './DestinationJourney';
@@ -55,6 +56,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   const [flying, setFlying] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [marks, setMarks] = useState<{ slug: string; kind: 'explored' | 'travelled' }[]>([]);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
   const globeRef = useRef<GlobeApi | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -106,21 +108,47 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
     } catch {
       /* private browsing */
     }
+    setMarks(getJourneys().map((m) => ({ slug: m.slug, kind: m.kind })));
+  }, []);
+
+  // The map, in the shape the globe draws it. Only places we have written up
+  // can be marked — we cannot draw a line to a city we cannot describe.
+  const traces = marks
+    .map((m) => {
+      const g = getGuide(m.slug);
+      return g ? { slug: g.slug, lat: g.geo.lat, lon: g.geo.lon, kind: m.kind } : null;
+    })
+    .filter((x): x is { slug: string; lat: number; lon: number; kind: 'explored' | 'travelled' } =>
+      x !== null,
+    );
+
+  const addMark = useCallback((slug: string, kind: 'explored' | 'travelled') => {
+    const isNew = recordJourney(slug, kind);
+    if (isNew) {
+      setMarks(getJourneys().map((m) => ({ slug: m.slug, kind: m.kind })));
+      // The only cue in the system that sounds like a small victory, and it
+      // fires exactly when the map actually grew.
+      if (kind === 'travelled') play('achieve');
+    }
   }, []);
 
   /* ── Landing on a destination ──────────────────────────────────────────── */
 
-  const land = useCallback((guide: DestinationGuide) => {
-    setView({ kind: 'guide', guide });
-    setFlying(false);
-    play('arrive');
-    try {
-      localStorage.setItem(LAST_KEY, guide.slug);
-    } catch {
-      /* ignore */
-    }
-    window.history.pushState({ domnerSlug: guide.slug }, '', `/destination/${guide.slug}`);
-  }, []);
+  const land = useCallback(
+    (guide: DestinationGuide) => {
+      setView({ kind: 'guide', guide });
+      setFlying(false);
+      play('arrive');
+      addMark(guide.slug, 'explored');
+      try {
+        localStorage.setItem(LAST_KEY, guide.slug);
+      } catch {
+        /* ignore */
+      }
+      window.history.pushState({ domnerSlug: guide.slug }, '', `/destination/${guide.slug}`);
+    },
+    [addMark],
+  );
 
   const goToGuide = useCallback(
     (guide: DestinationGuide) => {
@@ -246,6 +274,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
           tier={tier}
           active={showGlobeScene}
           preview={preview}
+          traces={traces}
           onPinSelect={(slug) => {
             const g = getGuide(slug);
             if (g) goToGuide(g);
@@ -274,7 +303,11 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
       {view.kind !== 'globe' && (
         <div className="v3-landed">
           {view.kind === 'guide' ? (
-            <DestinationJourney guide={view.guide} onBack={goHome} />
+            <DestinationJourney
+              guide={view.guide}
+              onBack={goHome}
+              onTravelled={() => addMark(view.guide.slug, 'travelled')}
+            />
           ) : (
             <>
               <button type="button" className="v3-back v3-back-floating" onClick={goHome}>

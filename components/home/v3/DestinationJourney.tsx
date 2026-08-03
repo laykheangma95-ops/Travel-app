@@ -127,9 +127,12 @@ function Chapter({
 export function DestinationJourney({
   guide,
   onBack,
+  onTravelled,
 }: {
   guide: DestinationGuide;
   onBack?: () => void;
+  /** Fired when an eSIM for this place is bought — the mark turns gold. */
+  onTravelled?: () => void;
 }) {
   const { t } = useLang();
   const bi = useBi();
@@ -515,7 +518,7 @@ export function DestinationJourney({
 
       {/* ── Chapter 6 · And only now, the eSIM ── */}
       <Chapter id="esim" eyebrow={t('v3.ch6.eyebrow')} title={t('v3.ch6.title')}>
-        <Recommendation guide={guide} />
+        <Recommendation guide={guide} onBought={onTravelled} />
 
         <div className="v3-trust">
           <p className="v3-card-label">{t('v3.trust.title')}</p>

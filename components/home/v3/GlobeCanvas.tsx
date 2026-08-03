@@ -28,6 +28,7 @@ export default function GlobeCanvas({
   tier,
   active,
   preview,
+  traces,
   onReady,
   onPhase,
   onArrivalProgress,
@@ -38,6 +39,8 @@ export default function GlobeCanvas({
   active: boolean;
   /** Slug to light while the visitor is still typing. */
   preview?: string | null;
+  /** The visitor's own map — every place they have been, drawn from home. */
+  traces?: { slug: string; lat: number; lon: number; kind: 'explored' | 'travelled' }[];
   /** A lit city was pressed. */
   onPinSelect?: (slug: string) => void;
   onReady?: (api: GlobeApi) => void;
@@ -50,6 +53,8 @@ export default function GlobeCanvas({
   const selectRef = useRef(onPinSelect);
   const activeRef = useRef(active);
   const controllerRef = useRef<FlightController | null>(null);
+  const tracesRef = useRef(traces);
+  tracesRef.current = traces;
 
   useEffect(() => {
     selectRef.current = onPinSelect;
@@ -60,6 +65,12 @@ export default function GlobeCanvas({
   useEffect(() => {
     controllerRef.current?.setHover(preview ?? null);
   }, [preview]);
+
+  // Redrawn whenever the map grows, so a new mark appears the moment it is
+  // earned rather than on the next visit.
+  useEffect(() => {
+    if (traces) controllerRef.current?.setTraces(traces);
+  }, [traces]);
   const syncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -107,6 +118,7 @@ export default function GlobeCanvas({
       flight = controller;
       controllerRef.current = controller;
       controller.setPins(idlePins);
+      if (tracesRef.current?.length) controller.setTraces(tracesRef.current);
 
       const layout = () => {
         created.setViewport(wrap.clientWidth, wrap.clientHeight);

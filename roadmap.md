@@ -108,6 +108,31 @@ the world; completion describes a person.
 
 ---
 
+## 4b. The map — BUILT, and deliberately not a gacha
+
+`lib/journeys.ts` + the trace layer in `flightController` now draw the visitor's
+own history on the globe: a faint line from Phnom Penh to every place they have
+read about, gold to every place they actually bought an eSIM for, with the city
+lit at the far end. It draws itself in, staggered, on every return visit.
+
+This is the answer to the collectibles question, and the answer is that there
+are no collectibles — no drops, no rarities, no seasonal sets, nothing random.
+Those mechanics work by manufacturing scarcity and charging to relieve it, and
+this product's whole argument is that it tells you the truth when the category
+will not. A farmable reward loop would undercut that on the same screen where we
+ask someone to trust a visa rule.
+
+What is left is better: a record of things you actually did.
+
+**What is missing:** it is `localStorage` today, so the map does not follow a
+person across devices. When trip records land (§1) this becomes a read of real
+trips — `JourneyMark { slug, kind, at }` is already the shape that needs, and
+`recordJourney` is the only call site to change.
+
+**Passport stamps** are the natural next surface for the same data: the trace is
+the map view, a stamp is the object view. Both read the same marks. Do not build
+a second store for them.
+
 ## 5. Small delight moments
 
 Boarding-pass animation, rain reminder, exchange-rate animation, activation
@@ -154,7 +179,12 @@ Written down honestly, so nobody is surprised.
    trivial — but the "typical use, not a guarantee" framing must survive the
    change unless the numbers become genuinely measured, per customer.
 
-5. **No photography.** The destination scenes are drawn SVG anchored to each
+5. **The map is local-only.** Anyone clearing site data loses it. That is an
+   acceptable trade for something that costs nothing and needs no account, but
+   it means the map must never be the *only* record of anything a customer
+   paid for — orders remain the source of truth for purchases.
+
+6. **No photography.** The destination scenes are drawn SVG anchored to each
    guide's `arrival.skyColor`. The schema has an optional `photo` field ready.
    Adding real photography later means filling that field and teaching
    `DestinationScene` to prefer it — but whatever replaces the drawing has to
