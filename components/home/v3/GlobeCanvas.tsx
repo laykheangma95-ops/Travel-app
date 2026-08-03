@@ -26,17 +26,27 @@ export interface GlobeApi {
 
 export default function GlobeCanvas({
   tier,
+  active,
   onReady,
   onPhase,
   onArrivalProgress,
 }: {
   tier: Exclude<Tier, 'static'>;
+  /** False once we have landed: the globe is not just invisible, it stops. */
+  active: boolean;
   onReady?: (api: GlobeApi) => void;
   onPhase?: (phase: FlightPhase, slug: string | null) => void;
   onArrivalProgress?: (arrival: number, skyColor: string | null) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const activeRef = useRef(active);
+  const syncRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    activeRef.current = active;
+    syncRef.current?.();
+  }, [active]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -68,6 +78,8 @@ export default function GlobeCanvas({
         engine: created,
         descend: settings.descend,
         durationMs: settings.flightMs,
+        idleFps: settings.idleFps,
+        flightFps: settings.targetFps,
         lodPatch: settings.lodPatch,
         terminator: settings.terminator,
         onPhase,
@@ -99,10 +111,15 @@ export default function GlobeCanvas({
         created.onFrame((dt) => watchdog(dt));
       }
 
-      // Run only while visible and only while the tab is in front.
+      // Run only while visible, only while the tab is in front, and only while
+      // the globe is actually part of what the visitor is looking at. Fading it
+      // out but leaving the render loop running was costing a frame budget for
+      // the entire time somebody read a destination guide.
       let inView = true;
       let visible = !document.hidden;
-      const sync = () => (inView && visible ? created.start() : created.stop());
+      const sync = () =>
+        inView && visible && activeRef.current ? created.start() : created.stop();
+      syncRef.current = sync;
       const io = new IntersectionObserver((entries) => {
         inView = entries.some((e) => e.isIntersecting);
         sync();

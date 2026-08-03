@@ -74,6 +74,9 @@ export interface FlightControllerOptions {
   /** Per-tier: whether the camera really descends and how long it takes. */
   descend: boolean;
   durationMs: number;
+  /** Frame budget while turning, versus during a flight. See lib/tier.ts. */
+  idleFps: number;
+  flightFps: number;
   lodPatch: boolean;
   terminator: boolean;
   onPhase?: (phase: FlightPhase, slug: string | null) => void;
@@ -339,6 +342,10 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     phase = 'flying';
     opts.onPhase?.('flying', next.slug);
 
+    // Smoothness matters for the two and a half seconds it is actually moving,
+    // and not at all for the minutes it spends turning slowly.
+    engine.setTargetFps(opts.flightFps);
+
     const toSpin = -next.lon * DEG - Math.PI / 2;
     const toTilt = next.lat * DEG;
     const toDistance = descend ? next.altitude : IDLE_DISTANCE * 0.72;
@@ -379,6 +386,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
       },
       onComplete: () => {
         phase = 'arrived';
+        engine.setTargetFps(opts.idleFps);
         opts.onPhase?.('arrived', next.slug);
       },
     });
@@ -389,6 +397,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     clearPatch();
     const from: Pose = { ...pose };
     phase = 'returning';
+    engine.setTargetFps(opts.flightFps);
     opts.onPhase?.('returning', activeSlug);
     pin.visible = false;
     pinT = 0;
@@ -410,12 +419,14 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
         target = null;
         activeSlug = null;
         phase = 'idle';
+        engine.setTargetFps(opts.idleFps);
         opts.onPhase?.('idle', null);
       },
     });
   };
 
   applyPose();
+  engine.setTargetFps(opts.idleFps);
 
   return {
     flyTo,

@@ -82,7 +82,7 @@ export function Navbar() {
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
-        <Link href="/" aria-label="Domer home">
+        <Link href="/">
           <DomerLogo surface="light" />
         </Link>
 
@@ -136,7 +136,9 @@ export function Navbar() {
             type="button"
             onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
             className="flex items-center gap-2 rounded-btn px-2.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3"
-            aria-label={lang === 'en' ? 'ប្តូរទៅភាសាខ្មែរ' : 'Switch to English'}
+            // WCAG 2.5.3 — the accessible name has to contain the visible text
+            // ("EN" / "KM"), or voice-control users cannot say what they see.
+            aria-label={lang === 'en' ? 'EN — ប្តូរទៅភាសាខ្មែរ' : 'KM — Switch to English'}
           >
             <WavyFlag
               flag={lang === 'en' ? '🇬🇧' : '🇰🇭'}

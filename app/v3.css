@@ -31,6 +31,10 @@
 .v3-root {
   --v3-arrival: 0;
   --v3-sky: #0b1c40;
+  /* An opaque floor of its own. The night sky is a fixed layer, so without this
+     anything that scrolls past it — the destination index at the foot of the
+     page — was white-on-white against the body's light surface. */
+  background: #050b2e;
   position: relative;
   isolation: isolate;
   min-height: 100svh;
@@ -1289,7 +1293,7 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   font-size: 0.8125rem;
 }
 .v3-index a {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.62);
   transition: color var(--d-micro) var(--ease-smooth);
 }
 .v3-index a:hover {
