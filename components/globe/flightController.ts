@@ -32,6 +32,15 @@ const DEG = Math.PI / 180;
 /** Framing at rest: the whole planet, comfortably inside the viewport. */
 export const IDLE_DISTANCE = 4.2;
 export const IDLE_FOV = 38;
+/**
+ * At rest the globe is an *object* sitting in the upper part of the screen with
+ * the copy beneath it — not a wallpaper the text has to fight. These two numbers
+ * are that framing: a scale (fraction of the viewport half-height) and a lift
+ * (how far above centre the sphere sits). Both resolve to 1 and 0 during a
+ * flight, so on arrival the destination genuinely fills the frame.
+ */
+const IDLE_SCALE = 0.66;
+const IDLE_LIFT = 0.4;
 /** Framing on arrival, unless a destination overrides it. */
 export const ARRIVAL_FOV = 31;
 /** One revolution every 90 seconds, matching the previous hero. */
@@ -42,6 +51,10 @@ export interface Pose {
   tiltX: number;
   distance: number;
   fov: number;
+  /** Globe radius as a fraction of the viewport half-height. */
+  framing: number;
+  /** How far above centre the sphere sits, in half-heights. */
+  lift: number;
   /** 0 = space, 1 = fully arrived. Drives atmosphere bloom and dot fade. */
   arrival: number;
 }
@@ -71,6 +84,8 @@ export interface FlightControllerOptions {
 export interface FlightController {
   flyTo(target: FlightTarget): void;
   returnToGlobe(): void;
+  /** Re-apply the pose after a resize — framing is aspect-dependent. */
+  refresh(): void;
   readonly phase: FlightPhase;
   readonly activeSlug: string | null;
   /** Pins shown while idle. */
@@ -90,6 +105,8 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     tiltX: -0.16,
     distance: IDLE_DISTANCE,
     fov: IDLE_FOV,
+    framing: IDLE_SCALE,
+    lift: IDLE_LIFT,
     arrival: 0,
   };
 
@@ -255,6 +272,16 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     spinGroup.rotation.y = pose.spinY;
     tiltGroup.rotation.x = pose.tiltX;
     engine.setCamera(pose.distance, pose.fov);
+    // Half-height of the view at the globe's plane, so framing and lift are
+    // expressed in screen fractions rather than arbitrary world units.
+    const halfH = Math.tan((pose.fov / 2) * DEG) * pose.distance;
+    const halfW = halfH * camera.aspect;
+    // The field of view is vertical, so a radius that frames well on a desktop
+    // runs off both edges of a 390px phone. Cap by width as well — and release
+    // the cap as we arrive, because by then filling the frame is the point.
+    const radius = Math.min(pose.framing, halfW * (0.82 + 4 * pose.arrival));
+    engine.setGlobeScale(radius);
+    tiltGroup.position.y = halfH * pose.lift;
     if (atmoMat) {
       const sky = target ? hexToRgb(target.skyColor) : spaceRim;
       const t = pose.arrival;
@@ -340,6 +367,11 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
         pose.tiltX = lerp(from.tiltX, toTilt, rot);
         pose.distance = lerp(from.distance, toDistance, dolly);
         pose.fov = lerp(from.fov, toFov, dolly);
+        // The globe grows to full size and settles to centre as we descend, so
+        // the destination ends up filling the frame rather than sitting in the
+        // upper third where it lived at rest.
+        pose.framing = lerp(from.framing, 1, dolly);
+        pose.lift = lerp(from.lift, 0, dolly);
         // The bloom is the last third — it is the wipe into the destination.
         pose.arrival = easeSettle(Math.max(0, (raw - 0.66) / 0.34));
         if (raw > 0.55 && !pin.visible) pin.visible = true;
@@ -369,6 +401,8 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
         pose.distance = lerp(from.distance, IDLE_DISTANCE, e);
         pose.fov = lerp(from.fov, IDLE_FOV, e);
         pose.tiltX = lerp(from.tiltX, -0.16, e);
+        pose.framing = lerp(from.framing, IDLE_SCALE, e);
+        pose.lift = lerp(from.lift, IDLE_LIFT, e);
         pose.arrival = lerp(from.arrival, 0, Math.min(1, raw * 1.6));
         applyPose();
       },
@@ -386,6 +420,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
   return {
     flyTo,
     returnToGlobe,
+    refresh: applyPose,
     setPins,
     get phase() {
       return phase;

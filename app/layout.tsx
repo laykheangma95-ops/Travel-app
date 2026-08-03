@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Manrope, Marcellus, Noto_Serif_Khmer } from 'next/font/google';
+import { Manrope, Marcellus, Noto_Sans_Khmer, Noto_Serif_Khmer } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
@@ -13,12 +13,35 @@ import { Suspense } from 'react';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
 
-// Domner brand type — kept to three families: Marcellus (display/wordmark),
-// Manrope (UI/body, also flight & order data with tabular numerals — see
-// .font-mono in globals.css), Noto Serif Khmer (Khmer script).
+// Domner brand type — two *pairs*, not four unrelated faces:
+//
+//   display   Marcellus  ↔  Noto Serif Khmer   (editorial, headings)
+//   body/UI   Manrope    ↔  Noto Sans Khmer    (interface, running text)
+//
+// Noto Sans Khmer is new. The design system asked for three families, which was
+// a rule written from a Latin-only point of view: previously `body.lang-km`
+// swapped the *whole* font, so Latin words and every numeral inside Khmer copy
+// rendered in Noto Serif Khmer's Latin — a different design at a different
+// metric — and headings silently lost Marcellus altogether. Pairing a sans with
+// the sans and a serif with the serif, split by unicode-range in globals.css,
+// is what makes Khmer read as a first-class script here rather than a
+// substitution. Cost: one extra Khmer-range subset. See design-notes.md.
 const display = Marcellus({ subsets: ['latin'], weight: '400', variable: '--font-display' });
 const body = Manrope({ subsets: ['latin'], variable: '--font-body' });
-const khmer = Noto_Serif_Khmer({ subsets: ['khmer'], weight: ['400', '600', '700'], variable: '--font-khmer' });
+// Weights are deliberately lean: the serif is only ever used at display sizes,
+// where 400 is the whole point of the pairing, and the sans carries the two the
+// interface actually needs. Six Khmer weight files would have been a lot of
+// bytes on a Cambodian mobile connection for weights nothing renders.
+const khmerSerif = Noto_Serif_Khmer({
+  subsets: ['khmer'],
+  weight: ['400'],
+  variable: '--font-khmer',
+});
+const khmerSans = Noto_Sans_Khmer({
+  subsets: ['khmer'],
+  weight: ['400', '600'],
+  variable: '--font-khmer-sans',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://domnerapp.com'),
@@ -64,7 +87,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const lang: Lang = cookieLang === 'km' ? 'km' : 'en';
 
   return (
-    <html lang={lang} className={`${display.variable} ${body.variable} ${khmer.variable}`}>
+    <html
+      lang={lang}
+      className={`${display.variable} ${body.variable} ${khmerSerif.variable} ${khmerSans.variable}`}
+    >
       <body className={`flex min-h-screen flex-col${lang === 'km' ? ' lang-km' : ''}`}>
         <LanguageProvider initialLang={lang}>
           {/* Keyboard skip link — first tab stop, visible only on focus. */}

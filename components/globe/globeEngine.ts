@@ -16,6 +16,7 @@
 // `pointMats`/`timeMats` + `onFrame`.
 
 import type * as ThreeNS from 'three';
+import type * as ThreeSubset from './three';
 import { isLand } from '@/components/home/globeLandMask';
 
 /** Latitude/longitude (degrees) to a unit-sphere position. */
@@ -221,7 +222,8 @@ export interface GlobeEngineOptions {
 }
 
 export interface GlobeEngine {
-  THREE: typeof ThreeNS;
+  /** The trimmed three.js surface — see components/globe/three.ts. */
+  THREE: typeof ThreeSubset;
   renderer: ThreeNS.WebGLRenderer;
   scene: ThreeNS.Scene;
   camera: ThreeNS.PerspectiveCamera;
@@ -248,6 +250,9 @@ export interface GlobeEngine {
   setCamera(distance: number, fov?: number): void;
   /** Terminator control. `mix` 0 keeps the original flat-lit look. */
   setSun(dirWorld: { x: number; y: number; z: number }, mix: number): void;
+  /** Change the frame budget at runtime — the watchdog uses this to shed load
+   *  on a device that cannot hold 60fps, instead of stuttering the whole page. */
+  setTargetFps(fps: number): void;
   /** Scale the globe group and refresh dot-size uniforms. */
   setGlobeScale(s: number): void;
   getGlobeScale(): number;
@@ -263,7 +268,9 @@ export async function createGlobeEngine(
   canvas: HTMLCanvasElement,
   opts: GlobeEngineOptions,
 ): Promise<GlobeEngine> {
-  const THREE = await import('three');
+  // Only the symbols we use (see ./three) — importing the whole package
+  // costs an extra ~87KB gzipped in export glue alone.
+  const THREE = await import('./three');
   const { isMobile } = opts;
 
   /* ── Renderer / camera / scene ── */
@@ -461,7 +468,10 @@ export async function createGlobeEngine(
 
   // Frame budget. 0 = render every rAF; 30 halves the work on a phone that
   // cannot hold 60 without the fans (or the battery) noticing.
-  const frameBudgetMs = opts.targetFps && opts.targetFps > 0 ? 1000 / opts.targetFps - 1 : 0;
+  let frameBudgetMs = opts.targetFps && opts.targetFps > 0 ? 1000 / opts.targetFps - 1 : 0;
+  const setTargetFps = (fps: number) => {
+    frameBudgetMs = fps > 0 ? 1000 / fps - 1 : 0;
+  };
 
   const frame = () => {
     raf = requestAnimationFrame(frame);
@@ -501,6 +511,7 @@ export async function createGlobeEngine(
     setViewport,
     setCamera,
     setSun,
+    setTargetFps,
     setGlobeScale,
     getGlobeScale: () => globeScale,
     onFrame: (fn) => frameFns.push(fn),

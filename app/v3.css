@@ -1,0 +1,1371 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Homepage v3 — "the journey begins here".
+
+   Everything is scoped under .v3-*. Colours come from the existing Temple Night
+   / Angkor Gold tokens; no new hexes are introduced. Motion uses the named
+   easings and durations below and nothing else — improvised per-element
+   animation is what reads as cheap.
+
+   Reduced motion is a designed state, not a fallback: every reveal resolves to
+   its finished position, the globe never mounts, and the page is complete.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --ease-signature: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-flight: cubic-bezier(0.6, 0.02, 0.12, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --d-micro: 220ms;
+  --d-reveal: 800ms;
+  --d-chapter: 900ms;
+
+  /* Khmer needs more room: stacked vowels sit above and below the baseline and
+     1.6 clips them. */
+  --lh-en: 1.62;
+  --lh-km: 1.9;
+}
+
+/* ── Root & background ─────────────────────────────────────────────────── */
+
+.v3-root {
+  --v3-arrival: 0;
+  --v3-sky: #0b1c40;
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  color: #fff;
+  overflow-x: clip;
+}
+
+.v3-space {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(58% 30% at 50% 34%, rgba(230, 176, 90, 0.1) 0%, transparent 64%),
+    radial-gradient(120% 52% at 50% 40%, rgba(30, 64, 122, 0.5) 0%, transparent 62%),
+    linear-gradient(180deg, #050b2e 0%, #08163a 34%, #0a1a4a 62%, #0b1c40 100%);
+}
+
+/* The background travels with the camera: as the flight nears the ground, the
+   page itself becomes the destination's sky. */
+.v3-space::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--v3-sky);
+  opacity: var(--v3-arrival);
+  transition: background-color var(--d-chapter) var(--ease-smooth);
+}
+
+.v3-stars {
+  position: absolute;
+  inset: 0;
+  opacity: calc(0.5 * (1 - var(--v3-arrival)));
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 78% 12%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 34% 62%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 62% 78%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 90% 52%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 22% 88%, rgba(255, 255, 255, 0.5), transparent);
+}
+
+.v3-globe-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.v3-globe-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease-smooth);
+}
+.v3-globe-on .v3-globe-canvas {
+  opacity: 1;
+}
+/* Once we have landed, the planet is gone — you are on the ground. It fades
+   under the arrival bloom rather than cutting, and comes back when you fly
+   home. Without this the globe shows through every chapter, because the sky
+   overlay only reaches full opacity if an actual flight happened (a visitor
+   arriving straight at /destination/tokyo never flew). */
+.v3-root.is-landed .v3-globe-layer {
+  opacity: 0;
+  transition: opacity 420ms var(--ease-smooth);
+}
+.v3-globe-layer {
+  transition: opacity 700ms var(--ease-smooth);
+}
+
+/* ── Quieting the site chrome on the first screen ──────────────────────────
+   The brief for this screen is literal: the globe is the hero and the search
+   field is the only thing to do. So while we are in space, everything the
+   layout normally hangs around the edges steps back — nav links, the cart, the
+   copilot button — leaving the wordmark and the language toggle. It all returns
+   on landing, when a cart is something you might actually want. */
+
+/* The site header is a light bar. On the night canvas it reads as a strip of
+   daylight pasted over the sky, so both v3 states darken it — transparent while
+   we are in space, a smoked pane once we have landed and it has to hold
+   contrast over artwork. */
+body[data-v3] header {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+body[data-v3='landed'] header {
+  background: rgba(6, 14, 36, 0.94) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+body[data-v3] header :is(a, button) {
+  color: rgba(255, 255, 255, 0.82);
+}
+body[data-v3] header a[href='/'] :is(span, p, div) {
+  color: rgba(255, 255, 255, 0.92);
+}
+/* Everything in the header steps back except the wordmark and the language
+   toggle — the two things a visitor may legitimately need before they have
+   decided anything. */
+body[data-v3='first'] header nav > *:not(:first-child) > *:not(:has(> svg[aria-hidden='false'])) {
+  transition: opacity var(--d-reveal) var(--ease-smooth);
+}
+body[data-v3='first'] header :is(a[href='/cart'], a[href='/sign-in'], a[href='/sign-up']),
+body[data-v3='first'] header nav > div:nth-child(2),
+body[data-v3='first'] header nav > div:last-child > button:last-child {
+  opacity: 0;
+  pointer-events: none;
+}
+body[data-v3='first'] header a[href='/'] :is(span, p, div) {
+  color: rgba(255, 255, 255, 0.92);
+}
+body[data-v3='first'] header nav > div:last-child > button:first-child {
+  color: rgba(255, 255, 255, 0.7);
+}
+/* The copilot's gold FAB is a second accent CTA — it waits until we land. */
+body[data-v3='first'] button.fixed.bottom-5.right-5 {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-reveal) var(--ease-smooth);
+}
+
+/* ── First screen ──────────────────────────────────────────────────────── */
+
+/* The globe occupies the upper part of the frame (see IDLE_SCALE / IDLE_LIFT in
+   flightController). The copy sits underneath it rather than on top, so nothing
+   is ever read against a moving field of dots. */
+.v3-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 52svh 1.25rem clamp(2.5rem, 8vh, 5rem);
+  transition: opacity var(--d-reveal) var(--ease-signature),
+    transform var(--d-reveal) var(--ease-signature);
+}
+/* Once we have landed, the first screen leaves the flow entirely — otherwise it
+   would hold a full viewport of empty space above the journey. It only ever
+   gets this class when the flight is over, so nothing visible is displaced. */
+.v3-stage.is-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transform: translateY(-24px);
+  pointer-events: none;
+}
+
+.v3-first {
+  width: 100%;
+  max-width: 40rem;
+  text-align: center;
+  transition: transform var(--d-reveal) var(--ease-signature);
+}
+/* When the suggestion list opens, the whole block rises so the list is never
+   clipped by the fold on a phone. The globe stays where it is — only the copy
+   makes room, which reads as the page leaning in rather than jumping. */
+.v3-first:has(.v3-suggestions) {
+  transform: translateY(-9vh);
+}
+
+.v3-greeting {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e6cb8b;
+  min-height: 1.4em;
+}
+
+.v3-first-title {
+  margin: 1.25rem 0 0;
+  font-family: var(--font-display), serif;
+  font-size: clamp(2.125rem, 6.4vw, 4rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  color: #fff;
+}
+
+.v3-first-sub {
+  margin: 1rem auto 0;
+  max-width: 26rem;
+  font-size: clamp(0.95rem, 1.4vw, 1.0625rem);
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.66);
+}
+
+/* ── Search ────────────────────────────────────────────────────────────── */
+
+.v3-search {
+  position: relative;
+  margin: 2.25rem auto 0;
+  max-width: 32rem;
+  text-align: left;
+}
+
+.v3-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  min-height: 3.375rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 8px 32px rgba(5, 11, 46, 0.4);
+  transition: border-color var(--d-micro) var(--ease-smooth),
+    box-shadow var(--d-micro) var(--ease-smooth), background-color var(--d-micro) var(--ease-smooth);
+}
+.v3-search-field:focus-within {
+  border-color: rgba(143, 216, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 3px rgba(87, 200, 255, 0.28),
+    0 10px 36px rgba(5, 11, 46, 0.45);
+}
+.v3-search-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+.v3-search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #fff;
+  font-size: 1rem;
+  padding: 0.9rem 0;
+}
+.v3-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+.v3-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.v3-search-clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+.v3-search-clear:hover {
+  color: #fff;
+}
+
+.v3-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.625rem);
+  z-index: 20;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.375rem;
+  border-radius: 20px;
+  background: rgba(9, 20, 48, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 24px 60px rgba(3, 8, 30, 0.6);
+  animation: v3-drop var(--d-micro) var(--ease-signature) both;
+}
+@keyframes v3-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.v3-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  min-height: 3rem;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-smooth);
+}
+.v3-suggestion.is-active {
+  background: rgba(255, 255, 255, 0.09);
+}
+.v3-suggestion-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #e6cb8b;
+  box-shadow: 0 0 10px rgba(230, 203, 139, 0.8);
+}
+.v3-suggestion-body {
+  flex: 1;
+  min-width: 0;
+}
+.v3-suggestion-name {
+  display: block;
+  font-weight: 600;
+  color: #fff;
+}
+.v3-suggestion-country {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+}
+.v3-suggestion-meta {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.v3-suggestion-enter {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.4);
+}
+.v3-suggestion-price {
+  font-weight: 700;
+  color: #e6cb8b;
+}
+.v3-suggestion-express {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 14px 14px;
+}
+.v3-suggestion-empty {
+  padding: 1rem 0.875rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.v3-dot-sep::before {
+  content: '·';
+  margin: 0 0.4rem;
+}
+
+/* ── The returning-visitor line ────────────────────────────────────────── */
+
+.v3-resume-slot {
+  min-height: 2.75rem;
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.v3-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.62);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--d-reveal) var(--ease-signature),
+    transform var(--d-reveal) var(--ease-signature), color var(--d-micro) var(--ease-smooth);
+}
+.v3-resume.is-shown {
+  opacity: 1;
+  transform: none;
+}
+.v3-resume:hover {
+  color: #fff;
+}
+
+/* ── The landed journey ────────────────────────────────────────────────── */
+
+.v3-landed {
+  position: relative;
+  z-index: 2;
+  animation: v3-arrive var(--d-chapter) var(--ease-settle) both;
+}
+@keyframes v3-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The back control lives in the instrument strip rather than floating over it —
+   two stacked pills in the same corner read as a mistake. */
+.v3-back {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.v3-back:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+/* On a phone the label would push the live readouts off the row, so the arrow
+   carries it alone — with the accessible name still on the button. */
+.v3-back-label {
+  display: none;
+}
+@media (min-width: 560px) {
+  .v3-back-label {
+    display: inline;
+  }
+}
+.v3-back-floating {
+  position: fixed;
+  top: 5rem;
+  left: 1rem;
+  z-index: 30;
+}
+
+.v3-strip {
+  position: sticky;
+  top: 4rem;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(6, 14, 36, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.v3-strip-city {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e6cb8b;
+}
+.v3-strip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+
+.v3-hero {
+  position: relative;
+  min-height: 78svh;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.v3-hero-scene {
+  position: absolute;
+  inset: 0;
+}
+/* The drawing is a band anchored to the bottom of the sky, at its own aspect
+   ratio — never stretched to fill a portrait viewport. */
+.v3-scene-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  max-height: 82%;
+}
+.v3-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 11, 34, 0.35) 0%, transparent 40%, rgba(5, 11, 34, 0.9) 100%);
+}
+.v3-hero-copy {
+  position: relative;
+  width: 100%;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 3.5rem;
+}
+.v3-hero-title {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(2.75rem, 9vw, 5.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+}
+.v3-hero-country {
+  margin-top: 0.25rem;
+  font-size: 1.0625rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+.v3-hero-meta {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.25em;
+}
+.v3-hero-intro {
+  margin-top: 1.5rem;
+  max-width: 34rem;
+  font-size: 1.0625rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* ── Chapters ──────────────────────────────────────────────────────────── */
+
+.v3-chapter {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: clamp(4.5rem, 12vh, 8rem) 1.25rem;
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity var(--d-reveal) var(--ease-signature),
+    transform var(--d-reveal) var(--ease-signature);
+}
+.v3-chapter.is-in {
+  opacity: 1;
+  transform: none;
+}
+.v3-chapter-wide {
+  max-width: 56rem;
+}
+
+.v3-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #e6cb8b;
+}
+.v3-chapter-title {
+  margin: 0.75rem 0 2rem;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.v3-subhead {
+  margin: 3rem 0 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.v3-prose {
+  margin-top: 1rem;
+  font-size: 1rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.76);
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
+
+.v3-card {
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.v3-card-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.v3-card-value {
+  margin-top: 0.5rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #fff;
+}
+.v3-card-note {
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.v3-grid-3,
+.v3-grid-2 {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 700px) {
+  .v3-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .v3-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.v3-rates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+}
+.v3-rates strong {
+  color: #e6cb8b;
+}
+.v3-rates-note {
+  width: 100%;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.v3-buys {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.v3-buys ul {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.v3-buys li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+.v3-buys-price {
+  font-variant-numeric: tabular-nums;
+  color: #e6cb8b;
+  white-space: nowrap;
+}
+.v3-native {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Chapter 3: entry ──────────────────────────────────────────────────── */
+
+.v3-advisory {
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(177, 74, 52, 0.14);
+  border: 1px solid rgba(177, 74, 52, 0.5);
+  margin-bottom: 1.5rem;
+}
+.v3-advisory-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  color: #ffd9cd;
+}
+.v3-advisory-body {
+  margin-top: 0.625rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.v3-visa {
+  padding: 1.75rem;
+  border-radius: 20px;
+  background: linear-gradient(155deg, rgba(35, 64, 106, 0.5), rgba(14, 27, 48, 0.6));
+  border: 1px solid rgba(230, 203, 139, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 40px rgba(3, 8, 30, 0.4);
+}
+.v3-visa.is-volatile {
+  border-color: rgba(245, 158, 11, 0.55);
+}
+.v3-visa-kind {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #e6cb8b;
+}
+.v3-visa-summary {
+  margin-top: 0.875rem;
+  font-size: 1.0625rem;
+  line-height: var(--lh-en);
+  color: #fff;
+}
+.v3-visa-facts {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.v3-visa-facts span {
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.v3-reqs {
+  display: grid;
+  gap: 0.875rem;
+}
+.v3-req {
+  display: flex;
+  gap: 0.875rem;
+  padding: 1.125rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.v3-req-tag {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.08);
+}
+.v3-req-tag.is-required {
+  color: #0e1b30;
+  background: #e6cb8b;
+}
+.v3-req-body {
+  min-width: 0;
+}
+.v3-req-title {
+  font-weight: 700;
+  color: #fff;
+}
+.v3-req-detail {
+  margin-top: 0.375rem;
+  font-size: 0.9375rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.72);
+}
+.v3-req-window {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  color: #8fd8ff;
+}
+
+.v3-banned {
+  margin-top: 0.625rem;
+  display: grid;
+  gap: 0.375rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+.v3-banned li::before {
+  content: '—';
+  margin-right: 0.5rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.v3-emergency-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
+}
+.v3-emergency-number {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4.5rem;
+  padding: 0.75rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background-color var(--d-micro) var(--ease-smooth);
+}
+.v3-emergency-number:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.v3-emergency-number span {
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.v3-emergency-number strong {
+  font-size: 1.375rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.v3-mission {
+  margin-top: 0.875rem;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(31, 122, 102, 0.12);
+  border: 1px solid rgba(31, 122, 102, 0.42);
+}
+.v3-mission-line {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── Chapter 4 ─────────────────────────────────────────────────────────── */
+
+.v3-transfers {
+  display: grid;
+  gap: 0.625rem;
+}
+.v3-transfers li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.v3-transfer-mode {
+  font-weight: 600;
+  color: #fff;
+}
+.v3-transfer-figures {
+  text-align: right;
+  flex-shrink: 0;
+}
+.v3-transfer-time {
+  display: block;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+.v3-transfer-cost {
+  display: block;
+  font-weight: 700;
+  color: #e6cb8b;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v3-transfer-cost span {
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.v3-flag {
+  margin-top: 0.625rem;
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.v3-flag.is-yes {
+  color: #7ff0cf;
+  background: rgba(31, 122, 102, 0.28);
+}
+.v3-flag.is-no {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.v3-apps {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.v3-apps ul {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.625rem;
+}
+.v3-apps li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.v3-apps strong {
+  color: #fff;
+  min-width: 7rem;
+}
+
+/* ── Chapter 5 ─────────────────────────────────────────────────────────── */
+
+.v3-places {
+  display: grid;
+  gap: 0.875rem;
+}
+@media (min-width: 700px) {
+  .v3-places {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.v3-place {
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.v3-place-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.07);
+}
+.v3-place-kind.kind-hidden-gem {
+  color: #e6cb8b;
+  background: rgba(198, 151, 73, 0.18);
+}
+.v3-place-name {
+  margin-top: 0.75rem;
+  font-family: var(--font-display), serif;
+  font-size: 1.25rem;
+  color: #fff;
+}
+.v3-place-why {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.72);
+}
+.v3-place-meta {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+/* ── Chapter 6: the recommendation ─────────────────────────────────────── */
+
+.v3-rec {
+  padding: 1.75rem;
+  border-radius: 22px;
+  background: linear-gradient(158deg, rgba(35, 64, 106, 0.45), rgba(14, 27, 48, 0.66));
+  border: 1px solid rgba(230, 203, 139, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 16px 50px rgba(3, 8, 30, 0.45);
+}
+.v3-rec-kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #e6cb8b;
+}
+.v3-rec-head {
+  margin-top: 1rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.v3-rec-headline {
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: #fff;
+}
+.v3-rec-sub {
+  margin-top: 0.375rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.v3-rec-price {
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  color: #e6cb8b;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-rec-reasoning {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.v3-rec-reasoning-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.v3-rec-lines {
+  margin-top: 0.875rem;
+  display: grid;
+  gap: 0.25rem;
+}
+.v3-rec-line {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 10px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.45);
+  transition: color var(--d-micro) var(--ease-smooth),
+    background-color var(--d-micro) var(--ease-smooth);
+}
+.v3-rec-line:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.v3-rec-line.is-on {
+  color: rgba(255, 255, 255, 0.88);
+}
+.v3-rec-line-label {
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v3-rec-line-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.v3-rec-line-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c69749, #e6cb8b);
+  transition: width var(--d-reveal) var(--ease-signature);
+}
+.v3-rec-line-gb {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 3.5rem;
+}
+.v3-rec-total {
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.v3-rec-total-gb {
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.v3-rec-disclaimer {
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+.v3-rec-warning {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: #ffe3b0;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.v3-rec-actions {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.v3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0 1.75rem;
+  border-radius: 999px;
+  font-weight: 700;
+  transition: transform var(--d-micro) var(--ease-signature),
+    box-shadow var(--d-micro) var(--ease-smooth), filter var(--d-micro) var(--ease-smooth);
+}
+.v3-btn-primary {
+  color: #0e1b30;
+  background: linear-gradient(150deg, #f7eac0, #e6cb8b 55%, #c69749);
+  box-shadow: 0 10px 30px rgba(198, 151, 73, 0.28);
+}
+.v3-btn-primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.v3-rec-days {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+.v3-rec-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.v3-rec-stepper button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  font-size: 1.125rem;
+  color: #fff;
+  transition: background-color var(--d-micro) var(--ease-smooth);
+}
+.v3-rec-stepper button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.v3-rec-stepper output {
+  min-width: 4.5rem;
+  text-align: center;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.v3-rec-all {
+  display: inline-block;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.v3-rec-all:hover {
+  color: #fff;
+}
+
+/* ── Trust ─────────────────────────────────────────────────────────────── */
+
+.v3-trust {
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.v3-trust ul {
+  margin-top: 0.875rem;
+  display: grid;
+  gap: 0.625rem;
+}
+.v3-trust li {
+  padding-left: 1.125rem;
+  position: relative;
+  font-size: 0.9375rem;
+  line-height: var(--lh-en);
+  color: rgba(255, 255, 255, 0.76);
+}
+.v3-trust li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #e6cb8b;
+}
+
+/* ── Verification stamps & links ───────────────────────────────────────── */
+
+.v3-verified {
+  margin-top: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.45);
+}
+.v3-verified svg {
+  flex-shrink: 0;
+  margin-top: 0.2em;
+}
+.v3-verified a {
+  color: rgba(143, 216, 255, 0.9);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.v3-verified.is-volatile {
+  color: #f6c56b;
+}
+.v3-verified.is-volatile strong {
+  color: #ffd98a;
+}
+
+.v3-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #8fd8ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.v3-link:hover {
+  color: #cceaff;
+}
+
+/* ── Crawlable index ───────────────────────────────────────────────────── */
+
+.v3-index {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1.25rem;
+  padding: 3rem 1.25rem 4rem;
+  font-size: 0.8125rem;
+}
+.v3-index a {
+  color: rgba(255, 255, 255, 0.35);
+  transition: color var(--d-micro) var(--ease-smooth);
+}
+.v3-index a:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── Focus: visible everywhere, always ─────────────────────────────────── */
+
+.v3-root :is(a, button, [role='option']):focus-visible {
+  outline: 2px solid #8fd8ff;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+/* The search input's focus state is the whole glass pill lighting up
+   (:focus-within above) — a second ring around the bare input reads as a bug. */
+.v3-search-input:focus-visible {
+  outline: none;
+}
+
+/* ── Khmer typography ──────────────────────────────────────────────────────
+   Khmer runs taller and longer than Latin and has no spaces between words.
+   Give it the line-height it needs and never let a chip clip it. */
+
+body.lang-km .v3-root {
+  --lh-en: var(--lh-km);
+}
+body.lang-km :is(.v3-first-title, .v3-hero-title, .v3-chapter-title, .v3-rec-headline) {
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+body.lang-km :is(.v3-eyebrow, .v3-strip-city, .v3-card-label, .v3-visa-kind, .v3-rec-kicker) {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+body.lang-km :is(.v3-visa-facts span, .v3-req-tag, .v3-place-kind, .v3-flag) {
+  white-space: normal;
+  line-height: 1.7;
+}
+
+/* ── The static tier: no canvas, no motion, complete page ──────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-chapter,
+  .v3-landed,
+  .v3-resume {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .v3-stage {
+    transition: none;
+  }
+  .v3-suggestions {
+    animation: none;
+  }
+  .v3-globe-canvas {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .v3-emergency-numbers {
+    grid-template-columns: 1fr;
+  }
+  .v3-rec-line {
+    grid-template-columns: minmax(0, 1fr) 3.5rem auto;
+  }
+  .v3-rec-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .v3-btn {
+    width: 100%;
+  }
+  .v3-rec-days {
+    justify-content: space-between;
+  }
+}

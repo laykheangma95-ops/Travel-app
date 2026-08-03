@@ -1,10 +1,20 @@
 import type { Metadata } from 'next';
-import { HomeContent } from '@/components/home/HomeContent';
+import { HomepageV3 } from '@/components/home/v3/HomepageV3';
+import './v3.css';
 
 export const metadata: Metadata = {
-  title: 'Domer — Travel Confidently. Stay Connected.',
+  title: 'Domner — Where are you traveling next?',
+  description:
+    'Khmer-language travel guidance for Cambodian passport holders: entry requirements, money, transport and connectivity for the places Cambodians actually fly. Plus an eSIM, when you need one.',
+  openGraph: {
+    title: 'Domner — Where are you traveling next?',
+    description:
+      'Entry requirements for a Cambodian passport, in Khmer. Money, transport, and an eSIM at the end.',
+    type: 'website',
+    siteName: 'Domner',
+  },
 };
 
 export default function HomePage() {
-  return <HomeContent />;
+  return <HomepageV3 />;
 }

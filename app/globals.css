@@ -33,13 +33,25 @@
     @apply bg-surface-2 font-body text-ink;
   }
 
-  /* Khmer mode: prefer the Khmer face everywhere so script renders correctly */
+  /* Khmer mode: the Latin face stays *first* in the stack and the Khmer face
+     follows it. Because the two cover disjoint unicode ranges, the browser
+     resolves per glyph — Latin words and numerals inside Khmer copy keep
+     Manrope's design and metrics instead of falling into the Khmer face's
+     Latin, which is what used to happen. Sans pairs with sans, serif with
+     serif; see the comment in app/layout.tsx. */
   body.lang-km {
-    font-family: var(--font-khmer), var(--font-body), sans-serif;
+    font-family: var(--font-body), var(--font-khmer-sans), var(--font-khmer), sans-serif;
+    line-height: 1.9;
   }
 
   body.lang-km .font-display {
-    font-family: var(--font-khmer), var(--font-display), sans-serif;
+    font-family: var(--font-display), var(--font-khmer), sans-serif;
+  }
+
+  /* Khmer has no spaces between words, so it can only wrap between clusters.
+     Never let a fixed-width control clip it. */
+  body.lang-km :is(button, .badge, [class*='chip']) {
+    white-space: normal;
   }
 
   /* font-mono has no dedicated typeface (see layout.tsx) — tabular numerals

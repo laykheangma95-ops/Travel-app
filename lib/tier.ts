@@ -7,7 +7,7 @@
 // in the weakest of them.
 //
 //   full    — the camera descent, the day/night terminator, 20k land dots
-//   reduced — a shorter rotate-and-zoom, 8k dots, no starfield twinkle
+//   reduced — a shorter rotate-and-zoom, 6.5k dots, DPR capped at 1.25
 //   static  — no WebGL at all: a drawn poster, cross-fades only
 //
 // `static` is not a failure mode. It is what a visitor with prefers-reduced-
@@ -40,6 +40,12 @@ function webglAvailable(): boolean {
 export function detectTier(): Tier {
   if (typeof window === 'undefined') return 'static';
 
+  // QA override: ?tier=full|reduced|static. Without it there is no way to
+  // exercise a tier your own machine does not fall into, which is how designed
+  // fallbacks quietly rot. Never consulted unless explicitly present.
+  const forced = new URLSearchParams(window.location.search).get('tier');
+  if (forced === 'full' || forced === 'reduced' || forced === 'static') return forced;
+
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'static';
   if (!webglAvailable()) return 'static';
 
@@ -48,7 +54,13 @@ export function detectTier(): Tier {
   if (['slow-2g', '2g', '3g'].includes(nav.connection?.effectiveType ?? '')) return 'reduced';
   if ((nav.hardwareConcurrency ?? 8) <= 4) return 'reduced';
   if ((nav.deviceMemory ?? 8) <= 4) return 'reduced';
-  if (window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 420) return 'reduced';
+  // Any touch device gets the reduced tier, core count notwithstanding. A phone
+  // reporting eight cores is not a laptop: it is thermally limited, it is on
+  // battery, and it is pushing a high-density display. Measured on a
+  // 4x-throttled 390px viewport, `full` sustained 14.5 main-thread frames per
+  // second against `reduced`'s 39.9 — and our audience is on exactly these
+  // devices, so this is the branch that matters most.
+  if (window.matchMedia('(pointer: coarse)').matches) return 'reduced';
 
   return 'full';
 }
@@ -79,9 +91,12 @@ export const TIER_SETTINGS: Record<Tier, TierSettings> = {
     flightMs: 2600,
   },
   reduced: {
-    dotCount: 8000,
-    starCount: 320,
-    maxDpr: 1.5,
+    // Measured on a 4x-throttled 390px viewport: additive point sprites are
+    // fill-rate bound, so pixels cost more than points. Dropping DPR from 1.5
+    // to 1.25 bought more headroom than cutting the dot count did.
+    dotCount: 6500,
+    starCount: 260,
+    maxDpr: 1.25,
     targetFps: 30,
     descend: false,
     lodPatch: false,
