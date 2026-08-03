@@ -16,6 +16,7 @@
 // aria-activedescendant so a screen reader hears the highlighted option.
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { play } from '@/lib/sound';
 import { Search, X, CornerDownLeft } from 'lucide-react';
 import { searchDestinations, type SearchHit } from '@/content/destinations';
 import { useBi, useLang } from '@/lib/i18n';
@@ -36,11 +37,20 @@ function flightLabel(mins: number | null, t: (k: 'v3.direct' | 'v3.oneStop') => 
 
 export function DestinationSearch({
   onSelect,
+  onPreview,
   autoFocus = false,
   compact = false,
   expressPlan,
 }: {
   onSelect: (selection: SearchSelection) => void;
+  /**
+   * The globe answers while you type. As soon as what you have typed matches a
+   * city, that city lights up on the planet — before you have committed to
+   * anything, before you have pressed a key more. It is the cheapest way to
+   * make the world feel like it is listening, and it turns typing from data
+   * entry into a conversation.
+   */
+  onPreview?: (slug: string | null) => void;
   autoFocus?: boolean;
   compact?: boolean;
   /** Returning visitors only: their previous destination's plan, shown last. */
@@ -58,6 +68,16 @@ export function DestinationSearch({
   const rowCount = hits.length + (expressPlan && hits.length ? 1 : 0);
 
   useEffect(() => setCursor(0), [query]);
+
+  // Light whatever is currently under the cursor, and put it out when the list
+  // closes. Guides only — we cannot light a city we have not written up.
+  useEffect(() => {
+    if (!onPreview) return;
+    const hit = open && query.trim() ? hits[cursor] : undefined;
+    onPreview(hit && hit.kind === 'guide' ? hit.guide.slug : null);
+  }, [hits, cursor, open, query, onPreview]);
+
+  useEffect(() => () => onPreview?.(null), [onPreview]);
 
   // "/" focuses the field from anywhere, the way a search-first product should.
   useEffect(() => {
@@ -81,6 +101,7 @@ export function DestinationSearch({
     if (!hit) return;
     setOpen(false);
     setQuery('');
+    onPreview?.(null);
     if (hit.kind === 'guide') onSelect({ guide: hit.guide });
     else onSelect({ esimSlug: hit.slug, esimName: hit.name });
   };
@@ -89,10 +110,18 @@ export function DestinationSearch({
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
-      setCursor((c) => (rowCount ? (c + 1) % rowCount : 0));
+      setCursor((c) => {
+        const next = rowCount ? (c + 1) % rowCount : 0;
+        play('move', next);
+        return next;
+      });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setCursor((c) => (rowCount ? (c - 1 + rowCount) % rowCount : 0));
+      setCursor((c) => {
+        const next = rowCount ? (c - 1 + rowCount) % rowCount : 0;
+        play('move', next);
+        return next;
+      });
     } else if (e.key === 'Enter') {
       e.preventDefault();
       commit(cursor);
@@ -124,10 +153,14 @@ export function DestinationSearch({
           autoComplete="off"
           spellCheck={false}
           onChange={(e) => {
+            if (e.target.value.length > query.length) play('key');
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            play('focus');
+          }}
           onKeyDown={onKeyDown}
         />
         {query && (
@@ -151,7 +184,10 @@ export function DestinationSearch({
               role="option"
               aria-selected={i === cursor}
               className={`v3-suggestion ${i === cursor ? 'is-active' : ''}`}
-              onMouseEnter={() => setCursor(i)}
+              onMouseEnter={() => {
+                if (i !== cursor) play('move', i);
+                setCursor(i);
+              }}
               onMouseDown={(e) => {
                 e.preventDefault();
                 commit(i);

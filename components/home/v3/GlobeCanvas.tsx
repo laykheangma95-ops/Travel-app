@@ -27,6 +27,7 @@ export interface GlobeApi {
 export default function GlobeCanvas({
   tier,
   active,
+  preview,
   onReady,
   onPhase,
   onArrivalProgress,
@@ -35,6 +36,8 @@ export default function GlobeCanvas({
   tier: Exclude<Tier, 'static'>;
   /** False once we have landed: the globe is not just invisible, it stops. */
   active: boolean;
+  /** Slug to light while the visitor is still typing. */
+  preview?: string | null;
   /** A lit city was pressed. */
   onPinSelect?: (slug: string) => void;
   onReady?: (api: GlobeApi) => void;
@@ -46,10 +49,17 @@ export default function GlobeCanvas({
   const labelRef = useRef<HTMLDivElement>(null);
   const selectRef = useRef(onPinSelect);
   const activeRef = useRef(active);
+  const controllerRef = useRef<FlightController | null>(null);
 
   useEffect(() => {
     selectRef.current = onPinSelect;
   }, [onPinSelect]);
+
+  // The world listens while you type: whatever the search currently matches is
+  // already glowing on the planet before you commit to it.
+  useEffect(() => {
+    controllerRef.current?.setHover(preview ?? null);
+  }, [preview]);
   const syncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -95,6 +105,7 @@ export default function GlobeCanvas({
         onArrivalProgress,
       });
       flight = controller;
+      controllerRef.current = controller;
       controller.setPins(idlePins);
 
       const layout = () => {

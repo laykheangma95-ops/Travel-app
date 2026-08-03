@@ -17,6 +17,7 @@ import { Check, ShoppingBag } from 'lucide-react';
 import { getPlansForCountry } from '@/data/esimPlans';
 import { getDestination } from '@/data/destinations';
 import { useCart } from '@/hooks/useCart';
+import { play } from '@/lib/sound';
 import { useBi, useLang } from '@/lib/i18n';
 import { USAGE_LINES, DEFAULT_LINE_IDS, estimateUsage } from '@/content/usage-model';
 import type { DestinationGuide } from '@/content/schema';
@@ -69,6 +70,9 @@ export function Recommendation({ guide }: { guide: DestinationGuide }) {
       quantity: 1,
     });
     setAdded(true);
+    // Resolved downward, the opposite shape to the unlock cue: choosing a
+    // destination opens something, buying settles it.
+    play('confirm');
   };
 
   return (
@@ -105,7 +109,10 @@ export function Recommendation({ guide }: { guide: DestinationGuide }) {
                   type="button"
                   className={`v3-rec-line ${on ? 'is-on' : ''}`}
                   aria-pressed={on}
-                  onClick={() => toggle(line.id)}
+                  onClick={() => {
+                    toggle(line.id);
+                    play('move', USAGE_LINES.findIndex((l) => l.id === line.id));
+                  }}
                 >
                   <span className="v3-rec-line-label">{bi(line.label)}</span>
                   <span className="v3-rec-line-bar" aria-hidden="true">

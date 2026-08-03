@@ -29,6 +29,48 @@ import { easeFlight, easeSettle, lerp, lerpAngle, hexToRgb, tween, type TweenHan
 
 const DEG = Math.PI / 180;
 
+/** Phnom Penh. Every light path starts from home. */
+const HOME = { lat: 11.56, lon: 104.92 };
+
+// ── The light path ───────────────────────────────────────────────────────────
+//
+// When a destination is chosen, a filament of light runs from Phnom Penh across
+// the surface of the planet to where you are going, and the pin ignites when it
+// arrives. It exists only during the transition and then it is gone.
+//
+// This is deliberately NOT the glowing arc network every eSIM site ships. Those
+// arcs are permanent decoration that says "we have global coverage" — they are
+// wallpaper, and they are the same wallpaper on all three competitors. This is
+// one line, drawn once, from your city to your city, at the moment you decide.
+// It is a journey, not a network diagram, and you cannot see it until you have
+// asked for it.
+const PATH_VERT = /* glsl */ `
+  varying float vT;
+  void main() {
+    vT = uv.x;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const PATH_FRAG = /* glsl */ `
+  precision mediump float;
+  uniform float uProgress; // where the head of the light has reached, 0..1
+  uniform float uFade;     // overall presence
+  uniform vec3 uColor;
+  uniform vec3 uHead;
+  varying float vT;
+  void main() {
+    // Nothing exists ahead of the light. It is drawing itself as it travels.
+    if (vT > uProgress) discard;
+    float d = uProgress - vT;
+    float head = exp(-d * d * 700.0);  // the bright point doing the travelling
+    float tail = exp(-d * 2.4) * 0.5;  // what it leaves behind, briefly
+    float a = (head + tail) * uFade;
+    if (a < 0.02) discard;
+    gl_FragColor = vec4(mix(uColor, uHead, head), a);
+  }
+`;
+
 /** Framing at rest: the whole planet, comfortably inside the viewport. */
 export const IDLE_DISTANCE = 4.2;
 export const IDLE_FOV = 38;
@@ -323,6 +365,46 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     patchIdle = requestAnimationFrame(stepSlice);
   };
 
+  /* ── The light path ── */
+  const pathMat = new THREE.ShaderMaterial({
+    vertexShader: PATH_VERT,
+    fragmentShader: PATH_FRAG,
+    uniforms: {
+      uProgress: { value: 0 },
+      uFade: { value: 0 },
+      uColor: { value: new THREE.Color('#e6cb8b') },
+      uHead: { value: new THREE.Color('#ffffff') },
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  let pathMesh: ThreeNS.Mesh | null = null;
+
+  const clearPath = () => {
+    if (!pathMesh) return;
+    spinGroup.remove(pathMesh);
+    pathMesh.geometry.dispose();
+    pathMesh = null;
+  };
+
+  const buildPath = (lat: number, lon: number) => {
+    clearPath();
+    const a = new THREE.Vector3(...latLonToXYZ(HOME.lat, HOME.lon));
+    const b = new THREE.Vector3(...latLonToXYZ(lat, lon));
+    if (a.distanceTo(b) < 0.02) return; // you are already home
+    const angle = a.angleTo(b);
+    // Hugs the surface. Light travels over the ground here; a high arc would
+    // read as an aircraft route, which is the cliché we are avoiding.
+    const lift = 1 + 0.012 + 0.05 * (angle / Math.PI);
+    const c1 = a.clone().lerp(b, 0.28).normalize().multiplyScalar(lift);
+    const c2 = a.clone().lerp(b, 0.72).normalize().multiplyScalar(lift);
+    const curve = new THREE.CubicBezierCurve3(a, c1, c2, b);
+    const geo = new THREE.TubeGeometry(curve, 72, 0.0042, 6, false);
+    pathMesh = new THREE.Mesh(geo, pathMat);
+    spinGroup.add(pathMesh);
+  };
+
   /* ── Atmosphere colour ── */
   const atmoMesh = tiltGroup.children.find(
     (c): c is ThreeNS.Mesh =>
@@ -428,6 +510,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     const toFov = descend ? ARRIVAL_FOV : IDLE_FOV;
 
     if (lodPatch) buildPatch(next.lat, next.lon);
+    buildPath(next.lat, next.lon);
 
     // Place the pin now; it scales up from nothing part-way through the descent.
     const p = latLonToXYZ(next.lat, next.lon).map((v) => v * 1.004);
@@ -457,12 +540,23 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
         pose.lift = lerp(from.lift, 0, dolly);
         // The bloom is the last third — it is the wipe into the destination.
         pose.arrival = easeSettle(Math.max(0, (raw - 0.66) / 0.34));
-        if (raw > 0.55 && !pin.visible) pin.visible = true;
+
+        // The light runs ahead of the camera and arrives first, so you know
+        // where you are going before you get there. Then it dissolves, because
+        // a path you have already travelled is not information any more.
+        const lightT = Math.min(1, raw / 0.55);
+        pathMat.uniforms.uProgress.value = easeFlight(lightT);
+        pathMat.uniforms.uFade.value =
+          raw < 0.08 ? raw / 0.08 : raw > 0.62 ? Math.max(0, 1 - (raw - 0.62) / 0.28) : 1;
+
+        // The pin lights the instant the light reaches it, not on a timer.
+        if (lightT >= 1 && !pin.visible) pin.visible = true;
         applyPose();
       },
       onComplete: () => {
         phase = 'arrived';
         engine.setTargetFps(opts.idleFps);
+        clearPath();
         opts.onPhase?.('arrived', next.slug);
       },
     });
@@ -471,6 +565,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
   const returnToGlobe = () => {
     handle?.cancel();
     clearPatch();
+    clearPath();
     const from: Pose = { ...pose };
     phase = 'returning';
     engine.setTargetFps(opts.flightFps);
@@ -520,6 +615,8 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     dispose() {
       handle?.cancel();
       clearPatch();
+      clearPath();
+      pathMat.dispose();
       pinGeo.dispose();
       pinMat.dispose();
       patchMat.dispose();

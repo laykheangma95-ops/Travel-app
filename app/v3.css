@@ -453,6 +453,64 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   color: #fff;
 }
 
+/* ── The invitation to turn sound on ────────────────────────────────────────
+   Bottom corner, small, and it arrives late. Off by default: this audience
+   browses in tuk-tuks, offices and shared rooms, and a site that makes noise
+   uninvited is not luxurious. */
+.v3-sound {
+  position: fixed;
+  left: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--d-reveal) var(--ease-signature),
+    transform var(--d-reveal) var(--ease-signature), color var(--d-micro) var(--ease-smooth),
+    background-color var(--d-micro) var(--ease-smooth);
+}
+.v3-sound.is-shown {
+  opacity: 1;
+  transform: none;
+}
+.v3-sound:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.1);
+}
+.v3-sound.is-on {
+  color: #e6cb8b;
+  border-color: rgba(230, 203, 139, 0.35);
+}
+@media (max-width: 560px) {
+  .v3-sound-label {
+    display: none;
+  }
+  .v3-sound {
+    padding: 0;
+    width: 2.25rem;
+    justify-content: center;
+  }
+}
+/* Once you have landed, the control belongs with the page, not over it. */
+.v3-root.is-landed .v3-sound {
+  position: absolute;
+  bottom: auto;
+  top: 0;
+}
+
 /* ── The landed journey ────────────────────────────────────────────────── */
 
 .v3-landed {
@@ -536,7 +594,10 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
 
 .v3-hero {
   position: relative;
-  min-height: 78svh;
+  /* Tightened from 78svh: on a phone the drawing sits at its own aspect ratio
+     at the bottom, so a taller hero just adds flat gradient above it. The sky
+     should frame the city, not dwarf it. */
+  min-height: 64svh;
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -554,7 +615,7 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   bottom: 0;
   width: 100%;
   height: auto;
-  max-height: 82%;
+  max-height: 92%;
 }
 .v3-hero-scrim {
   position: absolute;

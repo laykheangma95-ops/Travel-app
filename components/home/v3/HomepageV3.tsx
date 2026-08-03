@@ -24,6 +24,7 @@ import { getPlansForCountry } from '@/data/esimPlans';
 import { useCart } from '@/hooks/useCart';
 import { useLang } from '@/lib/i18n';
 import { detectTier, TIER_SETTINGS, type Tier } from '@/lib/tier';
+import { play } from '@/lib/sound';
 import type { DestinationGuide } from '@/content/schema';
 import { FirstScreen } from './FirstScreen';
 import { DestinationJourney, UnwrittenDestination } from './DestinationJourney';
@@ -53,6 +54,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   });
   const [flying, setFlying] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
   const globeRef = useRef<GlobeApi | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -111,6 +113,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   const land = useCallback((guide: DestinationGuide) => {
     setView({ kind: 'guide', guide });
     setFlying(false);
+    play('arrive');
     try {
       localStorage.setItem(LAST_KEY, guide.slug);
     } catch {
@@ -127,6 +130,10 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         return;
       }
       setFlying(true);
+      // The unlock and the light path fire together; the flight bed runs under
+      // the camera for exactly as long as the camera is moving.
+      play('unlock');
+      play('flight', settings.flightMs);
       globeRef.current.flyTo({
         slug: guide.slug,
         lat: guide.geo.lat,
@@ -238,6 +245,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         <GlobeCanvas
           tier={tier}
           active={showGlobeScene}
+          preview={preview}
           onPinSelect={(slug) => {
             const g = getGuide(slug);
             if (g) goToGuide(g);
@@ -252,6 +260,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
       <div className={`v3-stage ${showGlobeScene ? '' : 'is-hidden'}`}>
         <FirstScreen
           onSelect={onSelect}
+          onPreview={setPreview}
           expressPlan={expressPlan}
           canExplore={globeReady && tier !== null && tier !== 'static'}
           resume={

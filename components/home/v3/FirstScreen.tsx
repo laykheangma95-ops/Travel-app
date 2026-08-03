@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useLang, type DictKey } from '@/lib/i18n';
 import { DestinationSearch, type SearchSelection } from './DestinationSearch';
+import { SoundToggle } from './SoundToggle';
 
 function greetingKeyFor(hour: number): DictKey {
   if (hour >= 5 && hour < 11) return 'v3.greet.morning';
@@ -33,11 +34,13 @@ export function cambodiaHour(now: Date = new Date()): number {
 
 export function FirstScreen({
   onSelect,
+  onPreview,
   resume,
   expressPlan,
   canExplore = false,
 }: {
   onSelect: (selection: SearchSelection) => void;
+  onPreview?: (slug: string | null) => void;
   /** True once the globe is up and its cities can be pressed. */
   canExplore?: boolean;
   /** Returning visitor's last destination, if we know one. */
@@ -66,9 +69,12 @@ export function FirstScreen({
         {t(greetKey)}
       </p>
       <h1 className="v3-first-title">{t('v3.title')}</h1>
-      <p className="v3-first-sub">{t('v3.sub')}</p>
 
-      <DestinationSearch onSelect={onSelect} expressPlan={expressPlan} />
+      {/* The subtitle is gone. It was a good line, and it was a third line —
+          on a screen whose whole argument is that there is one thing to do,
+          the quiet copy was still copy. What replaces it is not more text: it
+          is the globe answering while you type. */}
+      <DestinationSearch onSelect={onSelect} onPreview={onPreview} expressPlan={expressPlan} />
 
       <div className="v3-resume-slot">
         {/* Exploration before transaction: once the globe is live, say that the
@@ -89,6 +95,8 @@ export function FirstScreen({
           </button>
         )}
       </div>
+
+      <SoundToggle />
     </div>
   );
 }
