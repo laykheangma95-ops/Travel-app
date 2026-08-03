@@ -103,9 +103,15 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
   // Axial tilt is owned by the flight now, not by a decorative constant.
   tiltGroup.rotation.z = 0;
 
+  // Open on Phnom Penh's meridian. Two reasons, and neither is decoration: it
+  // puts all seven destination pins on the visible face instead of an empty
+  // Pacific, and at the hours this audience actually browses — Cambodian
+  // evening — the terminator falls right across the region, so the day/night
+  // line is legible in the very first frame rather than ninety seconds later.
+  const HOME_LON = 104.92;
   const pose: Pose = {
-    spinY: 1.96,
-    tiltX: -0.16,
+    spinY: -HOME_LON * DEG - Math.PI / 2,
+    tiltX: 0.2,
     distance: IDLE_DISTANCE,
     fov: IDLE_FOV,
     framing: IDLE_SCALE,
@@ -409,7 +415,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
         const e = easeFlight(raw);
         pose.distance = lerp(from.distance, IDLE_DISTANCE, e);
         pose.fov = lerp(from.fov, IDLE_FOV, e);
-        pose.tiltX = lerp(from.tiltX, -0.16, e);
+        pose.tiltX = lerp(from.tiltX, 0.2, e);
         pose.framing = lerp(from.framing, IDLE_SCALE, e);
         pose.lift = lerp(from.lift, IDLE_LIFT, e);
         pose.arrival = lerp(from.arrival, 0, Math.min(1, raw * 1.6));

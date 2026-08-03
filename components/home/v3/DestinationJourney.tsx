@@ -48,9 +48,12 @@ import { useLive, useLocalClock } from './useLive';
 /* ── Small shared pieces ───────────────────────────────────────────────── */
 
 function Verified({ date, source, volatile: isVolatile }: { date: string; source?: Source; volatile?: boolean }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const bi = useBi();
-  const pretty = new Date(date).toLocaleDateString('en-GB', {
+  // The verification date is a promise to the reader, so it is rendered in the
+  // reader's own script — a Khmer page full of Khmer months should not switch to
+  // English for the one field that says how much to trust the rest.
+  const pretty = new Date(date).toLocaleDateString(lang === 'km' ? 'km-KH' : 'en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
