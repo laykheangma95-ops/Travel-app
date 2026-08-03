@@ -50,11 +50,11 @@ export const metadata: Metadata = {
     template: '%s · Domner',
   },
   description:
-    "Cambodia's first Khmer-language travel super app. eSIM for 150+ countries, real-time flight alerts, and step-by-step airport guidance — all in Khmer.",
+    "Khmer-language travel guidance for Cambodian passport holders: entry requirements, money, transport and connectivity — plus an eSIM, real-time flight alerts and airport guidance.",
   openGraph: {
     title: 'Domner — Travel Confidently. Stay Connected.',
     description:
-      'eSIM for 150+ countries. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
+      'Entry requirements for a Cambodian passport, in Khmer. Plus eSIM, flight alerts and airport guidance.',
     type: 'website',
     siteName: 'Domner',
   },

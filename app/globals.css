@@ -33,6 +33,17 @@
     @apply bg-surface-2 font-body text-ink;
   }
 
+  /* The night pages paint their own dark canvas inside <main>, but the document
+     underneath stayed light — so the sticky header, which sits above that
+     canvas in the flow, was frosting a white page and rendering as a grey band
+     across the top of every dark screen on the site. Matching the document to
+     the surface fixes it everywhere at once, with no JavaScript and no flash of
+     the wrong colour on first paint. */
+  body:has(.night-canvas),
+  body:has(.v3-root) {
+    @apply bg-primary-deep;
+  }
+
   /* Khmer mode: the Latin face stays *first* in the stack and the Khmer face
      follows it. Because the two cover disjoint unicode ranges, the browser
      resolves per glyph — Latin words and numerals inside Khmer copy keep

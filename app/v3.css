@@ -82,6 +82,38 @@
   z-index: -1;
   pointer-events: none;
 }
+/* A lit city under the pointer is pressable, so say so. */
+.v3-globe-layer.is-pointing ~ *,
+body:has(.v3-globe-layer.is-pointing) {
+  cursor: pointer;
+}
+
+/* The city name, floating at the pin. Deliberately quiet: it names the thing
+   you are about to press and nothing more. */
+.v3-pin-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #eaf6ff;
+  background: rgba(10, 26, 60, 0.62);
+  border: 1px solid rgba(159, 228, 255, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 18px rgba(87, 200, 255, 0.25);
+  opacity: 0;
+  transition: opacity var(--d-micro) var(--ease-smooth);
+  pointer-events: none;
+}
+.v3-pin-label.is-on {
+  opacity: 1;
+}
 .v3-globe-canvas {
   width: 100%;
   height: 100%;
@@ -380,6 +412,19 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
 }
 
 /* ── The returning-visitor line ────────────────────────────────────────── */
+
+/* The invitation to explore. Plain text, not a button — the search field stays
+   the only control on this screen, and a second one would undo the point of it.
+   It only appears once the globe is actually up and pressable. */
+.v3-explore-hint {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.42);
+  opacity: 0;
+  transition: opacity var(--d-reveal) var(--ease-signature);
+}
+.v3-explore-hint.is-shown {
+  opacity: 1;
+}
 
 .v3-resume-slot {
   min-height: 2.75rem;

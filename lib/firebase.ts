@@ -89,41 +89,41 @@ export async function sendPushNotification(fcmToken: string, payload: PushPayloa
 export const notificationTemplates = {
   gateChange: (flight: string, oldGate: string, newGate: string) => ({
     km: {
-      title: '✈️ Domer — ការផ្លាស់ប្តូរទ្វារ!',
+      title: '✈️ Domner — ការផ្លាស់ប្តូរទ្វារ!',
       body: `ជើងហោះហើរ ${flight} ផ្លាស់ពីទ្វារ ${oldGate} ទៅ ${newGate}`,
     },
     en: {
-      title: '✈️ Domer — Gate change!',
+      title: '✈️ Domner — Gate change!',
       body: `Flight ${flight} moved from gate ${oldGate} to ${newGate}`,
     },
   }),
   delay: (flight: string, minutes: number, newTime: string) => ({
     km: {
-      title: '⏰ Domer — ជើងហោះហើរពន្យារពេល',
+      title: '⏰ Domner — ជើងហោះហើរពន្យារពេល',
       body: `ជើងហោះហើរ ${flight} ពន្យារ ${minutes} នាទី។ ម៉ោងចេញថ្មី៖ ${newTime}`,
     },
     en: {
-      title: '⏰ Domer — Flight delayed',
+      title: '⏰ Domner — Flight delayed',
       body: `Flight ${flight} delayed ${minutes} min. New departure: ${newTime}`,
     },
   }),
   boarding: (flight: string, gate: string) => ({
     km: {
-      title: '🛫 Domer — ចាប់ផ្តើមឡើងយន្តហោះ',
+      title: '🛫 Domner — ចាប់ផ្តើមឡើងយន្តហោះ',
       body: `ជើងហោះហើរ ${flight} កំពុងឡើង នៅទ្វារ ${gate}`,
     },
     en: {
-      title: '🛫 Domer — Boarding started',
+      title: '🛫 Domner — Boarding started',
       body: `Flight ${flight} is boarding at gate ${gate}`,
     },
   }),
   landed: (flight: string, city: string) => ({
     km: {
-      title: '🎉 Domer — បានចុះចតហើយ',
+      title: '🎉 Domner — បានចុះចតហើយ',
       body: `ជើងហោះហើរ ${flight} បានមកដល់ ${city} ដោយសុវត្ថិភាព`,
     },
     en: {
-      title: '🎉 Domer — Landed',
+      title: '🎉 Domner — Landed',
       body: `Flight ${flight} has arrived in ${city}`,
     },
   }),

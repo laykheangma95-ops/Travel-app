@@ -35,8 +35,11 @@ export function FirstScreen({
   onSelect,
   resume,
   expressPlan,
+  canExplore = false,
 }: {
   onSelect: (selection: SearchSelection) => void;
+  /** True once the globe is up and its cities can be pressed. */
+  canExplore?: boolean;
   /** Returning visitor's last destination, if we know one. */
   resume?: { label: string; onResume: () => void } | null;
   expressPlan?: { label: string; priceUsd: number; onBuy: () => void } | null;
@@ -52,10 +55,10 @@ export function FirstScreen({
   // The one affordance for someone who already knows what they want. It waits
   // for the first frame to settle so it never competes with it.
   useEffect(() => {
-    if (!resume) return;
+    if (!resume && !canExplore) return;
     const id = setTimeout(() => setResumeShown(true), 600);
     return () => clearTimeout(id);
-  }, [resume]);
+  }, [resume, canExplore]);
 
   return (
     <div className="v3-first">
@@ -68,6 +71,13 @@ export function FirstScreen({
       <DestinationSearch onSelect={onSelect} expressPlan={expressPlan} />
 
       <div className="v3-resume-slot">
+        {/* Exploration before transaction: once the globe is live, say that the
+            lit cities are pressable. Plain text, not a control — the search
+            field stays the only thing to operate on this screen. A returning
+            visitor's resume link takes priority; they already know. */}
+        {!resume && canExplore && (
+          <p className={`v3-explore-hint ${resumeShown ? 'is-shown' : ''}`}>{t('v3.explore')}</p>
+        )}
         {resume && (
           <button
             type="button"

@@ -34,7 +34,7 @@ export default function EsimStorePage() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Global data</p>
           <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">eSIM Store</h1>
           <p className="mt-3 text-white/70">
-            Instant data for 150+ countries. Buy now, scan the QR, and connect the moment you land.
+            Instant data for the places Cambodians fly. Buy now, scan the QR, and connect the moment you land.
           </p>
         </div>
 

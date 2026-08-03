@@ -238,6 +238,10 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         <GlobeCanvas
           tier={tier}
           active={showGlobeScene}
+          onPinSelect={(slug) => {
+            const g = getGuide(slug);
+            if (g) goToGuide(g);
+          }}
           onReady={(api) => {
             globeRef.current = api;
           }}
@@ -249,6 +253,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         <FirstScreen
           onSelect={onSelect}
           expressPlan={expressPlan}
+          canExplore={globeReady && tier !== null && tier !== 'static'}
           resume={
             lastGuide && view.kind === 'globe'
               ? { label: lastGuide.city.en, onResume: () => goToGuide(lastGuide) }

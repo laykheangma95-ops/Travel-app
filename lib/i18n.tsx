@@ -32,14 +32,14 @@ const dicts = {
     'hero.t2': ' Confidently',
     'hero.t3': 'Stay Connected.',
     'hero.sub':
-      'eSIM for 150+ countries. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
+      'eSIM for the routes Cambodians fly. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
     'hero.ctaEsim': 'Get Your eSIM',
     'hero.ctaFlight': 'Track My Flight',
-    'hero.stat1': '150+ Countries',
+    'hero.stat1': 'Khmer-first guidance',
     'hero.stat2': '24/7 Khmer Support',
     'hero.stat3': 'Instant Delivery',
     // Features
-    'features.eyebrow': 'Why Domer',
+    'features.eyebrow': 'Why Domner',
     'features.title': 'Everything a Cambodian traveler needs',
     'features.desc': 'Three tools that work together, from booking to landing.',
     'features.learnMore': 'Learn more',
@@ -64,11 +64,11 @@ const dicts = {
     'dest.from': 'From',
     'dest.viewPlans': 'View Plans',
     // Testimonials
-    'testi.eyebrow': 'Travelers trust Domer',
+    'testi.eyebrow': 'Travelers trust Domner',
     'testi.title': 'Stories from the road',
     // CTA
     'cta.title': 'Ready for your next trip?',
-    'cta.sub': 'Join thousands of Cambodian travelers who fly with confidence.',
+    'cta.sub': 'Everything you need before you fly, in Khmer.',
     'cta.checklist': 'Am I Ready? Checklist',
     // Footer
     'footer.tagline': "Cambodia's first travel super app. Travel confidently — stay connected, in Khmer.",
@@ -104,6 +104,7 @@ const dicts = {
     'v3.suggestions': 'Destination suggestions',
     'v3.continue': 'continue',
     'v3.clear': 'Clear search',
+    'v3.explore': 'Or press a lit city on the globe.',
     'v3.back': 'Back to the globe',
     'v3.direct': 'direct from Phnom Penh',
     'v3.oneStop': 'one stop from Phnom Penh',
@@ -209,14 +210,14 @@ const dicts = {
     'hero.t2': 'ដោយទំនុកចិត្ត',
     'hero.t3': 'រក្សាការតភ្ជាប់ជានិច្ច។',
     'hero.sub':
-      'eSIM សម្រាប់ជាង 150 ប្រទេស។ ការជូនដំណឹងជើងហោះហើរភ្លាមៗ។ ការណែនាំនៅអាកាសយានដ្ឋានជាជំហានៗ។ ទាំងអស់ជាភាសាខ្មែរ។',
+      'eSIM សម្រាប់ផ្លូវដែលខ្មែរធ្វើដំណើរ។ ការជូនដំណឹងជើងហោះហើរភ្លាមៗ។ ការណែនាំនៅអាកាសយានដ្ឋានជាជំហានៗ។ ទាំងអស់ជាភាសាខ្មែរ។',
     'hero.ctaEsim': 'ទិញ eSIM របស់អ្នក',
     'hero.ctaFlight': 'តាមដានជើងហោះហើរ',
-    'hero.stat1': '150+ ប្រទេស',
+    'hero.stat1': 'ការណែនាំជាភាសាខ្មែរ',
     'hero.stat2': 'ជំនួយភាសាខ្មែរ 24/7',
     'hero.stat3': 'ដឹកជញ្ជូនភ្លាមៗ',
     // Features
-    'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domer',
+    'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domner',
     'features.title': 'អ្វីៗគ្រប់យ៉ាងដែលអ្នកដំណើរខ្មែរត្រូវការ',
     'features.desc': 'ឧបករណ៍បីដែលធ្វើការជាមួយគ្នា ពីការកក់រហូតដល់ការចុះចត។',
     'features.learnMore': 'ស្វែងយល់បន្ថែម',
@@ -241,11 +242,11 @@ const dicts = {
     'dest.from': 'ចាប់ពី',
     'dest.viewPlans': 'មើលគម្រោង',
     // Testimonials
-    'testi.eyebrow': 'អ្នកដំណើរទុកចិត្ត Domer',
+    'testi.eyebrow': 'អ្នកដំណើរទុកចិត្ត Domner',
     'testi.title': 'រឿងរ៉ាវពីដំណើរ',
     // CTA
     'cta.title': 'ត្រៀមខ្លួនសម្រាប់ដំណើរបន្ទាប់ហើយឬនៅ?',
-    'cta.sub': 'ចូលរួមជាមួយអ្នកដំណើរខ្មែររាប់ពាន់នាក់ ដែលហោះហើរដោយទំនុកចិត្ត។',
+    'cta.sub': 'អ្វីៗគ្រប់យ៉ាងដែលអ្នកត្រូវការមុនហោះហើរ ជាភាសាខ្មែរ។',
     'cta.checklist': 'បញ្ជីត្រៀមធ្វើដំណើរ',
     // Footer
     'footer.tagline': 'កម្មវិធីធ្វើដំណើរដំបូងគេរបស់កម្ពុជា។ ធ្វើដំណើរដោយទំនុកចិត្ត — ជាភាសាខ្មែរ។',
@@ -281,6 +282,7 @@ const dicts = {
     'v3.suggestions': 'គោលដៅដែលស្នើ',
     'v3.continue': 'បន្តទៀត',
     'v3.clear': 'សម្អាតការស្វែងរក',
+    'v3.explore': 'ឬចុចលើទីក្រុងដែលភ្លឺនៅលើផែនដី។',
     'v3.back': 'ត្រឡប់ទៅផែនដី',
     'v3.direct': 'ហោះផ្ទាល់ពីភ្នំពេញ',
     'v3.oneStop': 'ឈប់ម្តងពីភ្នំពេញ',

@@ -30,17 +30,26 @@ export default function GlobeCanvas({
   onReady,
   onPhase,
   onArrivalProgress,
+  onPinSelect,
 }: {
   tier: Exclude<Tier, 'static'>;
   /** False once we have landed: the globe is not just invisible, it stops. */
   active: boolean;
+  /** A lit city was pressed. */
+  onPinSelect?: (slug: string) => void;
   onReady?: (api: GlobeApi) => void;
   onPhase?: (phase: FlightPhase, slug: string | null) => void;
   onArrivalProgress?: (arrival: number, skyColor: string | null) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const labelRef = useRef<HTMLDivElement>(null);
+  const selectRef = useRef(onPinSelect);
   const activeRef = useRef(active);
+
+  useEffect(() => {
+    selectRef.current = onPinSelect;
+  }, [onPinSelect]);
   const syncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -131,6 +140,50 @@ export default function GlobeCanvas({
       };
       document.addEventListener('visibilitychange', onVisibility);
 
+      /* ── The globe is pressable ────────────────────────────────────────────
+         The canvas sits behind the page at z-index -1, so it cannot receive
+         events itself. Instead we hit-test document-level pointer moves against
+         the projected pins and ignore anything aimed at the copy block, which
+         is the only interactive region that overlaps.                        */
+      const label = labelRef.current;
+      let hovered: string | null = null;
+
+      const overCopy = (e: PointerEvent | MouseEvent) =>
+        (e.target as HTMLElement | null)?.closest('.v3-first, header, nav, button, a, input') != null;
+
+      const onMove = (e: PointerEvent) => {
+        if (!activeRef.current || overCopy(e)) {
+          if (hovered) {
+            hovered = null;
+            controller.setHover(null);
+            label?.classList.remove('is-on');
+            wrap.classList.remove('is-pointing');
+          }
+          return;
+        }
+        const hit = controller.hitTest(e.clientX, e.clientY, wrap.clientWidth, wrap.clientHeight);
+        hovered = hit?.slug ?? null;
+        controller.setHover(hovered);
+        wrap.classList.toggle('is-pointing', Boolean(hit));
+        if (hit && label) {
+          const meta = idlePins.find((p) => p.slug === hit.slug);
+          label.textContent = meta?.label ?? '';
+          label.style.transform = `translate(${hit.x}px, ${hit.y}px) translate(-50%, -180%)`;
+          label.classList.add('is-on');
+        } else {
+          label?.classList.remove('is-on');
+        }
+      };
+
+      const onClick = (e: MouseEvent) => {
+        if (!activeRef.current || overCopy(e)) return;
+        const hit = controller.hitTest(e.clientX, e.clientY, wrap.clientWidth, wrap.clientHeight);
+        if (hit) selectRef.current?.(hit.slug);
+      };
+
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('click', onClick);
+
       created.start();
       wrap.classList.add('v3-globe-on');
       onReady?.({
@@ -142,6 +195,8 @@ export default function GlobeCanvas({
         ro.disconnect();
         io.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('click', onClick);
       };
     })().catch(() => {
       // WebGL or the dynamic import failed. The page is fully usable without
@@ -161,6 +216,7 @@ export default function GlobeCanvas({
   return (
     <div ref={wrapRef} className="v3-globe-layer" aria-hidden="true">
       <canvas ref={canvasRef} className="v3-globe-canvas" />
+      <div ref={labelRef} className="v3-pin-label" />
     </div>
   );
 }

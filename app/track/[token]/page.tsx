@@ -91,14 +91,14 @@ export default function PublicTrackPage() {
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-primary/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <p className="text-sm font-semibold text-white">Get Domer</p>
+            <p className="text-sm font-semibold text-white">Get Domner</p>
             <p className="text-xs text-white/60">eSIM + flight alerts + airport guide, in Khmer</p>
           </div>
           <Link
             href="/"
             className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
-            <Download size={15} /> Open Domer
+            <Download size={15} /> Open Domner
           </Link>
         </div>
       </div>

@@ -51,7 +51,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
     return (
       <GateMessage
         title="Sign in required"
-        body="The Domer control panel is only available to signed-in staff accounts."
+        body="The Domner control panel is only available to signed-in staff accounts."
         href="/sign-in?returnTo=/admin"
         cta="Sign in"
       />

@@ -55,7 +55,7 @@ export default function GenerateEsimPage() {
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html>
-<html><head><title>${form.orderNumber} — Domer eSIM</title>
+<html><head><title>${form.orderNumber} — Domner eSIM</title>
 <style>
   body { font-family: Arial, sans-serif; color: #0F172A; max-width: 640px; margin: 0 auto; padding: 32px; }
   .header { background: #14263F; border-radius: 16px; padding: 28px; text-align: center; }
@@ -71,7 +71,7 @@ export default function GenerateEsimPage() {
   .footer { margin-top: 32px; text-align: center; color: #475569; font-size: 13px; }
   .accent { color: #C69749; }
 </style></head><body>
-  <div class="header"><div class="logo"><span class="d">Domer</span></div></div>
+  <div class="header"><div class="logo"><span class="d">Domner</span></div></div>
   <h2>Your ${dest?.name ?? form.country} eSIM ${dest?.flag ?? ''}</h2>
   <table>
     <tr><td>Order number</td><td>${form.orderNumber}</td></tr>

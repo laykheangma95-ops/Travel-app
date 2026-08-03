@@ -84,6 +84,13 @@ export interface FlightControllerOptions {
   onArrivalProgress?: (arrival: number, skyColor: string | null) => void;
 }
 
+/** A destination pin found under the pointer, with where it is on screen. */
+export interface PinHit {
+  slug: string;
+  x: number;
+  y: number;
+}
+
 export interface FlightController {
   flyTo(target: FlightTarget): void;
   returnToGlobe(): void;
@@ -92,7 +99,16 @@ export interface FlightController {
   readonly phase: FlightPhase;
   readonly activeSlug: string | null;
   /** Pins shown while idle. */
-  setPins(pins: { slug: string; lat: number; lon: number }[]): void;
+  setPins(pins: { slug: string; lat: number; lon: number; label: string }[]): void;
+  /**
+   * Which pin is under this point, if any. This is what turns the globe from
+   * something you look at into something you travel with — the brief asked for
+   * a homepage that invites exploration rather than demanding a search, and a
+   * lit city you can actually press is the most direct answer to that.
+   */
+  hitTest(px: number, py: number, w: number, h: number): PinHit | null;
+  /** Light a pin under the pointer. Pass null to clear. */
+  setHover(slug: string | null): void;
   dispose(): void;
 }
 
@@ -152,6 +168,10 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
 
   /* ── Idle pins: the routes we have written guides for ── */
   let idlePinsObj: ThreeNS.Points | null = null;
+  let pinMeta: { slug: string; label: string }[] = [];
+  let pinLocal: number[] = [];
+  let pinHover = new Float32Array(0);
+  let hoverSlug: string | null = null;
   const idlePinMat = new THREE.ShaderMaterial({
     vertexShader: HUB_VERT,
     fragmentShader: HUB_FRAG,
@@ -169,7 +189,7 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
   engine.pointMats.push(idlePinMat);
   engine.timeMats.push(idlePinMat);
 
-  const setPins = (pins: { slug: string; lat: number; lon: number }[]) => {
+  const setPins = (pins: { slug: string; lat: number; lon: number; label: string }[]) => {
     if (idlePinsObj) {
       spinGroup.remove(idlePinsObj);
       idlePinsObj.geometry.dispose();
@@ -180,12 +200,47 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
       pos.push(...latLonToXYZ(p.lat, p.lon).map((v) => v * 1.005));
       phases.push(Math.random() * Math.PI * 2);
     }
+    pinMeta = pins.map((p) => ({ slug: p.slug, label: p.label }));
+    pinLocal = pos;
+    pinHover = new Float32Array(pins.length);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('aHover', new THREE.Float32BufferAttribute(new Float32Array(pins.length), 1));
+    geo.setAttribute('aHover', new THREE.BufferAttribute(pinHover, 1));
     geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
     idlePinsObj = new THREE.Points(geo, idlePinMat);
     spinGroup.add(idlePinsObj);
+  };
+
+  /* ── Pin hit-testing ── */
+  const hitV = new THREE.Vector3();
+  const camDir = new THREE.Vector3();
+  const hitTest = (px: number, py: number, w: number, h: number): PinHit | null => {
+    if (phase !== 'idle' || !pinMeta.length) return null;
+    camera.getWorldDirection(camDir);
+    let best: PinHit | null = null;
+    // A generous radius: these are 6px dots on a moving sphere, and a target you
+    // have to chase is not an invitation.
+    let bestD = 44;
+    for (let i = 0; i < pinMeta.length; i++) {
+      hitV.set(pinLocal[i * 3], pinLocal[i * 3 + 1], pinLocal[i * 3 + 2]);
+      spinGroup.localToWorld(hitV);
+      // Skip anything on the far side of the planet.
+      const toCam = hitV.clone().sub(tiltGroup.position).normalize();
+      if (toCam.dot(camDir) > -0.02) continue;
+      hitV.project(camera);
+      const sx = (hitV.x * 0.5 + 0.5) * w;
+      const sy = (-hitV.y * 0.5 + 0.5) * h;
+      const d = Math.hypot(sx - px, sy - py);
+      if (d < bestD) {
+        bestD = d;
+        best = { slug: pinMeta[i].slug, x: sx, y: sy };
+      }
+    }
+    return best;
+  };
+
+  const setHover = (slug: string | null) => {
+    hoverSlug = slug;
   };
 
   /* ── Local LOD patch ──────────────────────────────────────────────────────
@@ -329,6 +384,21 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
       engine.setSun(sunWorld, 1);
     }
 
+    // Hover glow eases in and out; a pin that snaps reads as a state change
+    // rather than as something noticing you.
+    if (pinMeta.length && idlePinsObj) {
+      let dirty = false;
+      for (let i = 0; i < pinMeta.length; i++) {
+        const target = pinMeta[i].slug === hoverSlug ? 1 : 0;
+        const next = pinHover[i] + (target - pinHover[i]) * Math.min(1, dt * 9);
+        if (Math.abs(next - pinHover[i]) > 0.001) {
+          pinHover[i] = next;
+          dirty = true;
+        }
+      }
+      if (dirty) idlePinsObj.geometry.getAttribute('aHover').needsUpdate = true;
+    }
+
     // Pin arrival: one 6% overshoot, then settle. Nothing bouncy.
     if (pin.visible && pinT < 1) {
       pinT = Math.min(1, pinT + dt / 0.6);
@@ -439,6 +509,8 @@ export function createFlightController(opts: FlightControllerOptions): FlightCon
     returnToGlobe,
     refresh: applyPose,
     setPins,
+    hitTest,
+    setHover,
     get phase() {
       return phase;
     },

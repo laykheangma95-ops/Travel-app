@@ -87,7 +87,10 @@ export function searchDestinations(query: string, limit = 6): SearchHit[] {
   return hits.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-/** What the globe shows before anyone types: the routes we know best. */
+/**
+ * What the globe shows before anyone types. These are not decoration — each one
+ * is pressable, and pressing it flies you there. Exploration before search.
+ */
 export const idlePins = guides
   .slice()
   .sort((a, b) => b.routeWeight - a.routeWeight)
