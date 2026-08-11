@@ -15,6 +15,8 @@ import { gohubCatalog } from '@/data/gohubCatalog';
 import { destinations, getDestination } from '@/data/destinations';
 import { describeAllowance, esimPlans, getPlansForCountry } from '@/data/esimPlans';
 import { skuFor } from '@/lib/providers/esim/skuMap';
+import { destinationNetworks } from '@/data/gohubNetworks';
+import { activationDeadline, policyFor, policyFromSpecs } from '@/data/planPolicy';
 
 const slugs = [...new Set(gohubCatalog.map((plan) => plan.countrySlug))];
 
@@ -145,5 +147,94 @@ describe('how a plan is described', () => {
       expect(popular, slug).toHaveLength(1);
       expect(popular[0]!.tier).toBe('standard');
     }
+  });
+});
+
+describe('the trust surface', () => {
+  it('has network facts for every destination', () => {
+    for (const slug of slugs) {
+      expect(destinationNetworks[slug], `no network data for ${slug}`).toBeDefined();
+    }
+  });
+
+  it('never lists a country with no carrier behind it', () => {
+    for (const [slug, network] of Object.entries(destinationNetworks)) {
+      for (const entry of network.coverage) {
+        expect(entry.carriers.length, `${slug} → ${entry.country}`).toBeGreaterThan(0);
+        // A country label that swallowed a carrier name ("China Telecom
+        // Hongkong") is the parser failing, and it would be shown to a customer.
+        expect(entry.country.length, `${slug} → ${entry.country}`).toBeLessThan(20);
+      }
+    }
+  });
+
+  it('names a real carrier for every destination', () => {
+    for (const slug of slugs) {
+      const network = destinationNetworks[slug]!;
+      const carriers =
+        network.coverage.length > 0
+          ? network.coverage.flatMap((c) => c.carriers)
+          : network.carriers;
+      expect(carriers.length, `${slug} has no carrier`).toBeGreaterThan(0);
+    }
+  });
+
+  it('claims voice only where the supplier confirms it on that SKU', () => {
+    for (const plan of gohubCatalog) {
+      expect(typeof plan.callSms, plan.id).toBe('boolean');
+      // Every SKU we currently sell is data-only. If this ever flips, the spec
+      // sheet must say "Data, calls and SMS" — and it should be a deliberate
+      // change, not a silent one.
+      expect(plan.callSms, `${plan.id} now claims voice — confirm with GoHub`).toBe(false);
+    }
+  });
+
+  it('states a speed for every plan', () => {
+    for (const plan of gohubCatalog) {
+      expect(plan.speed, plan.id).toBeTruthy();
+    }
+  });
+
+  it('treats unconfirmed policy as unknown rather than guessing', () => {
+    // The whole value of a spec sheet is that it can be trusted. A default of
+    // "Hotspot: Yes" would be a guess printed as a fact.
+    const policy = policyFor('thailand');
+    expect(policy.hotspot).toBeNull();
+    expect(policy.kycRequired).toBeNull();
+    expect(policy.topupAvailable).toBeNull();
+    expect(policy.activationWindowDays).toBeNull();
+  });
+
+  it('maps GoHub listing specs into a policy when they arrive', () => {
+    const policy = policyFromSpecs({
+      simType: 'eSIM',
+      dataType: 'Daily Data',
+      networkType: '4G',
+      hotspot: 'Yes',
+      kycNeeded: 'No',
+      kycLinks: null,
+      specialActivation: 'Dial *151*3*1#',
+      unsupportedApps: null,
+      localPhoneNumber: 'No',
+      apnNote: null,
+      apnLinks: null,
+      activationTime: null,
+      activationValidityDays: 30,
+    });
+
+    expect(policy.hotspot).toBe(true);
+    expect(policy.kycRequired).toBe(false);
+    expect(policy.activationWindowDays).toBe(30);
+    expect(policy.specialActivation).toBe('Dial *151*3*1#');
+  });
+
+  it('computes an activation deadline only when the window is known', () => {
+    expect(activationDeadline(policyFor('thailand'))).toBeNull();
+
+    const deadline = activationDeadline(
+      { ...policyFor('thailand'), activationWindowDays: 30 },
+      new Date('2026-08-11T00:00:00Z')
+    );
+    expect(deadline?.toISOString().slice(0, 10)).toBe('2026-09-10');
   });
 });

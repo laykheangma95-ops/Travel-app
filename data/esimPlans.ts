@@ -56,6 +56,8 @@ export const esimPlans: EsimPlan[] = gohubCatalog
       dataType: plan.dataType,
       dataGbDaily: plan.dataGbDaily,
       dataGbTotal: plan.dataGbTotal,
+      speed: plan.speed,
+      callSms: plan.callSms,
       priceUsd: plan.priceUsd,
       network: destination.networkTech,
       features: featuresFor(plan, plan.countrySlug),

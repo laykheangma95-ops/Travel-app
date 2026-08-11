@@ -54,6 +54,10 @@ export interface EsimPlan {
   dataGbDaily: number;
   /** Total data over the plan's life. The honest headline for a `fixed` plan. */
   dataGbTotal: number;
+  /** '4G/5G', or a capped rate like '10Mbps' on unlimited plans. From the supplier. */
+  speed: string;
+  /** True only where the supplier confirms voice and SMS on this exact SKU. */
+  callSms: boolean;
   priceUsd: number;
   network: NetworkTech;
   features: string[];

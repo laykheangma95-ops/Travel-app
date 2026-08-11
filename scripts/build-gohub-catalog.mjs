@@ -148,6 +148,104 @@ const DESTINATION_SOURCES = {
   'usa-mexico-canada': ['United States of America, Mexico, Canada'],
 };
 
+// ── Network facts ────────────────────────────────────────────────────────────
+
+/**
+ * Country labels used to split GoHub's `Network` column.
+ *
+ * The column is free text and inconsistent: sometimes newline-separated
+ * "Country: carriers", sometimes one long run where a carrier name is followed
+ * straight by the next country ("Vodafone Germany France: Free Mobile"). There
+ * is no way to split that without knowing which words are countries, so this
+ * list is the parser. A country missing from it is not lost — it just stays
+ * attached to the previous carrier, which is visible in the output.
+ */
+const COUNTRY_LABELS = [
+  'Czech Republic', 'New Zealand', 'South Korea', 'Vatican City', 'Hong Kong', 'HongKong',
+  'Hongkong', 'Macau',
+  'Liechtenstein', 'Luxembourg', 'Netherlands', 'Switzerland', 'Philippines', 'Bulgaria',
+  'Denmark', 'Slovakia', 'Portugal', 'Romania', 'Lithuania', 'Australia', 'Indonesia',
+  'Singapore', 'Cambodia', 'Germany', 'Hungary', 'Malaysia', 'Thailand', 'Vietnam', 'Belgium',
+  'Estonia', 'Finland', 'Ireland', 'Moldova', 'Austria', 'Norway', 'Poland', 'Russia', 'Sweden',
+  'Taiwan', 'Turkey', 'Canada', 'Mexico', 'France', 'Cyprus', 'Greece', 'Israel', 'Italy',
+  'Japan', 'Korea', 'Macao', 'Macau', 'Malta', 'Spain', 'China', 'India', 'Laos', 'Nepal',
+  'Qatar', 'UAE', 'USA', 'US', 'UK', 'Brunei', 'Myanmar', 'Egypt', 'Iceland', 'Latvia',
+  'Slovenia', 'Croatia', 'Serbia', 'Ukraine', 'Georgia', 'Armenia', 'Kazakhstan', 'Mongolia',
+  'Bangladesh', 'Sri Lanka', 'Pakistan',
+];
+
+const LABEL_RE = new RegExp(
+  `\\b(${COUNTRY_LABELS.slice()
+    .sort((a, b) => b.length - a.length)
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')})\\s*:`,
+  // Case-insensitive: the sheet spells the same place 'HongKong', 'Hongkong'
+  // and 'Hong Kong' in different rows, and a missed label silently glues a
+  // country onto the previous carrier's name.
+  'gi'
+);
+
+/** The sheet's spellings, normalised to what a customer should read. */
+const COUNTRY_DISPLAY = {
+  hongkong: 'Hong Kong',
+  'hong kong': 'Hong Kong',
+  macau: 'Macao',
+  us: 'United States',
+  usa: 'United States',
+  uk: 'United Kingdom',
+  korea: 'South Korea',
+};
+
+function displayCountry(name) {
+  return COUNTRY_DISPLAY[name.trim().toLowerCase()] ?? name.trim();
+}
+
+function parseCoverage(raw) {
+  const text = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!text || text === '0') return { coverage: [], carriers: [] };
+
+  const marks = [...text.matchAll(LABEL_RE)];
+  if (marks.length === 0) {
+    // A bare carrier list, e.g. Cambodia's "Metfone, Smart". The destination is
+    // the country, so there is nothing to break down.
+    return { coverage: [], carriers: split(text) };
+  }
+
+  const coverage = marks.map((mark, i) => ({
+    country: displayCountry(mark[1]),
+    carriers: split(text.slice(mark.index + mark[0].length, i + 1 < marks.length ? marks[i + 1].index : text.length)),
+  }));
+  return { coverage, carriers: [] };
+}
+
+function split(text) {
+  return text
+    .split(/[,/]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/** The most common value of a column, ignoring blanks and GoHub's "0" for null. */
+function mostCommon(rows, column) {
+  const counts = new Map();
+  for (const row of rows) {
+    const value = String(row[column] ?? '').trim();
+    if (!value || value === '0') continue;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+}
+
+/**
+ * Network facts for a destination, taken across all its rows rather than the
+ * first — the sheet has at least one row (Southeast Asia's 300MB/1-day) whose
+ * Network cell holds the European carrier list, and reading row one would put
+ * Vodafone Germany on the Bangkok product page.
+ */
+function networkFactsFor(rows) {
+  return parseCoverage(mostCommon(rows, 'Network'));
+}
+
 // ── Reading the sheet ────────────────────────────────────────────────────────
 
 /** openpyxl via a short inline script — no new npm dependency for a build tool. */
@@ -230,6 +328,11 @@ function collectPlans(rows) {
       days,
       cost,
       sku: row.SKU.trim(),
+      // Per-SKU, not per-country. A handful of rows in the sheet carry voice,
+      // and claiming "Call+SMS: Yes" on a data-only SKU because some sibling
+      // SKU has voice is exactly the kind of detail that costs trust.
+      speed: String(row.Speed ?? '').trim() || '4G/5G',
+      callSms: String(row['Call/sms'] ?? '').trim().toLowerCase() === 'yes',
       dataGbDaily: isDaily ? amount : Number(effectiveGbPerDay.toFixed(2)),
       dataGbTotal: isDaily ? Number((amount * days).toFixed(2)) : amount,
       effectiveGbPerDay,
@@ -330,6 +433,8 @@ function priceLadder(slug, ladder) {
     popular: tiers[i] === 'standard',
     durationDays: plan.days,
     dataType: plan.dataType,
+    speed: plan.speed,
+    callSms: plan.callSms,
     dataGbDaily: plan.dataGbDaily,
     dataGbTotal: plan.dataGbTotal,
     costUsd: Number(plan.cost.toFixed(2)),
@@ -390,6 +495,7 @@ function main() {
   }
 
   const catalog = [];
+  const networks = [];
   const skipped = [];
 
   for (const [slug, sources] of Object.entries(DESTINATION_SOURCES)) {
@@ -404,6 +510,7 @@ function main() {
       continue;
     }
     catalog.push(...plans);
+    networks.push({ slug, ...networkFactsFor(sourceRows) });
   }
 
   const generated = catalog
@@ -414,6 +521,8 @@ function main() {
     tier: '${p.tier}',
     durationDays: ${p.durationDays},
     dataType: '${p.dataType}',
+    speed: '${p.speed.replace(/'/g, "\\'")}',
+    callSms: ${p.callSms},
     dataGbDaily: ${p.dataGbDaily},
     dataGbTotal: ${p.dataGbTotal},
     priceUsd: ${p.priceUsd.toFixed(2)},
@@ -448,6 +557,10 @@ export interface GohubCatalogPlan {
   durationDays: number;
   /** \`daily\` refills every day at midnight; \`fixed\` is one pot for the trip. */
   dataType: 'daily' | 'fixed';
+  /** '4G/5G', or a capped rate like '10Mbps' on unlimited plans. */
+  speed: string;
+  /** True only where GoHub confirm voice and SMS on THIS SKU. */
+  callSms: boolean;
   /** For a fixed plan this is the effective average, not a real daily cap. */
   dataGbDaily: number;
   dataGbTotal: number;
@@ -468,6 +581,56 @@ ${generated}
 `;
 
   writeFileSync(join(repoRoot, 'data/gohubCatalog.ts'), file);
+
+  const networkEntries = networks
+    .map(
+      (n) => `  '${n.slug}': {
+    coverage: [${n.coverage
+      .map(
+        (c) =>
+          `\n      { country: '${c.country.replace(/'/g, "\\'")}', carriers: [${c.carriers
+            .map((carrier) => `'${carrier.replace(/'/g, "\\'")}'`)
+            .join(', ')}] },`
+      )
+      .join('')}${n.coverage.length ? '\n    ' : ''}],
+    carriers: [${n.carriers.map((c) => `'${c.replace(/'/g, "\\'")}'`).join(', ')}],
+  },`
+    )
+    .join('\n');
+
+  const networkFile = `// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED FILE — do not edit by hand.
+//
+//   node scripts/build-gohub-catalog.mjs <GOHUB_PRICE_US_SILVER*.xlsx>
+//
+// The network facts behind each destination, from the price list's Network,
+// Speed and Call/sms columns. These are the answers to the questions a customer
+// asks before paying: whose network is this, where does it work, how fast.
+//
+// Everything here is a supplier fact we can stand behind. Anything we do NOT
+// have — hotspot, KYC, top-up, activation window — is deliberately absent
+// rather than guessed; see data/planPolicy.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CoverageEntry {
+  country: string;
+  carriers: string[];
+}
+
+export interface DestinationNetwork {
+  /** Per-country carrier breakdown. Empty for single-country destinations. */
+  coverage: CoverageEntry[];
+  /** Carriers with no country breakdown — the destination is the country. */
+  carriers: string[];
+}
+
+export const destinationNetworks: Record<string, DestinationNetwork> = {
+${networkEntries}
+};
+`;
+
+  writeFileSync(join(repoRoot, 'data/gohubNetworks.ts'), networkFile);
+  console.log(`✔ data/gohubNetworks.ts — ${networks.length} destinations`);
 
   const destinations = new Set(catalog.map((p) => p.slug));
   console.log(`✔ data/gohubCatalog.ts — ${catalog.length} plans, ${destinations.size} destinations`);

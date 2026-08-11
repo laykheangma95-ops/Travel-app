@@ -5,6 +5,8 @@ import { destinations, getDestination } from '@/data/destinations';
 import { getPlansForCountry } from '@/data/esimPlans';
 import { getCustomsRule } from '@/data/customsRules';
 import { PlanCard } from '@/components/esim/PlanCard';
+import { PlanSpecs } from '@/components/esim/PlanSpecs';
+import { PlanTrustPanel } from '@/components/esim/PlanTrustPanel';
 import { WavyFlag } from '@/components/ui/WavyFlag';
 import { DeviceChecker } from '@/components/esim/DeviceChecker';
 import { Accordion, AccordionItem } from '@/components/ui/Accordion';
@@ -79,8 +81,14 @@ export default function CountryPlansPage({ params }: PageProps) {
           ))}
         </div>
 
+        {/* Everything a customer needs to know before paying — sourced facts
+            only, and the support promise that covers the rest. */}
+        <PlanSpecs countrySlug={dest.slug} countryName={dest.name} plans={plans} />
+
+        <PlanTrustPanel />
+
         {customs && (
-          <div className="mt-8 night-card p-6">
+          <div className="mt-12 night-card p-6">
             <div className="flex items-start gap-3">
               <Badge tone="warning">Entry info</Badge>
             </div>
