@@ -26,6 +26,8 @@ The short version of the invariants — the full list is in `docs/LOCKED.md`:
 npm run dev        # local dev server
 npm run build      # production build
 npm run typecheck  # tsc --noEmit
+npm run mock       # fake GoHub supplier API on :4000 (mock-gohub/)
+npm run test:contract  # GoHub contract suite; needs `npm run mock` running
 ```
 
 There is no test suite and ESLint is not configured; `npm run build` and
@@ -49,5 +51,7 @@ There is no test suite and ESLint is not configured; `npm run build` and
 | `docs/AUTH.md` | Sign-in methods, why phone verification is optional, anti-abuse |
 | `docs/DELIVERY.md` | eSIM QR delivery by email/Telegram, data protection |
 | `docs/LOCKED.md` | The locked file list, invariants, and unlock procedure |
+| `docs/GOHUB.md` | GoHub supplier client, normalization, webhooks, contract tests |
+| `mock-gohub/README.md` | The local GoHub mock: running it, failure cases, spec quirks |
 | `DEPLOY.md` | Deployment |
 | `STRATEGY.md` | Product strategy |

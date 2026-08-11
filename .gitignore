@@ -26,3 +26,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mock supplier state and API exchange logs
+mock-gohub/.state.json
+*.jsonl.log
+gohub-api-log.jsonl
