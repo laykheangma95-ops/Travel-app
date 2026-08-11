@@ -33,13 +33,27 @@ export interface Destination {
   popular: boolean;
 }
 
+/**
+ * How a plan's allowance behaves. This is not cosmetic — it changes what the
+ * customer can do on day one.
+ *
+ *   daily — refills every midnight. Cannot be exhausted early, but there is a
+ *           hard ceiling each day.
+ *   fixed — one pot for the whole trip. Can be spent in an afternoon.
+ */
+export type DataType = 'daily' | 'fixed';
+
 export interface EsimPlan {
   id: string;
   countrySlug: string;
   tier: 'basic' | 'standard' | 'premium';
   name: string;
   durationDays: number;
+  dataType: DataType;
+  /** Daily allowance. On a `fixed` plan this is the average, not a real cap. */
   dataGbDaily: number;
+  /** Total data over the plan's life. The honest headline for a `fixed` plan. */
+  dataGbTotal: number;
   priceUsd: number;
   network: NetworkTech;
   features: string[];
@@ -53,7 +67,9 @@ export interface CartItem {
   flag: string;
   planName: string;
   durationDays: number;
+  dataType: DataType;
   dataGbDaily: number;
+  dataGbTotal: number;
   priceUsd: number;
   quantity: number;
 }

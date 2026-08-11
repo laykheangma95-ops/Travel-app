@@ -94,7 +94,9 @@ interface TierSpec {
   tier: string;
   name: string;
   durationDays: number;
+  dataType: 'daily' | 'fixed';
   dataGbDaily: number;
+  dataGbTotal: number;
   popular: boolean;
   minPriceUsd: number;
   maxPriceUsd: number;
@@ -111,7 +113,9 @@ function tierSpecs(slug?: string | null): TierSpec[] {
         tier: p.tier,
         name: p.name,
         durationDays: p.durationDays,
+        dataType: p.dataType,
         dataGbDaily: p.dataGbDaily,
+        dataGbTotal: p.dataGbTotal,
         popular: p.popular,
         minPriceUsd: p.priceUsd,
         maxPriceUsd: p.priceUsd,
@@ -132,9 +136,19 @@ function tierLine(t: TierSpec, lang: Lang, exact: boolean): string {
       ? moneyIn(t.minPriceUsd, lang)
       : `${moneyIn(t.minPriceUsd, lang)}–${moneyIn(t.maxPriceUsd, lang)}`;
   const popular = t.popular ? (lang === 'km' ? ' — ពេញនិយម' : ' — most popular') : '';
+  // A fixed plan is one pot for the trip, not a daily cap. Saying "GB/day"
+  // about it would be a promise we cannot keep on day two.
+  const allowance =
+    lang === 'km'
+      ? t.dataType === 'daily'
+        ? `${khNum(t.dataGbDaily)}GB/ថ្ងៃ`
+        : `${khNum(t.dataGbTotal)}GB សរុប`
+      : t.dataType === 'daily'
+        ? `${t.dataGbDaily}GB/day`
+        : `${t.dataGbTotal}GB total`;
   return lang === 'km'
-    ? `${t.name} ${price} (${khNum(t.durationDays)}ថ្ងៃ, ${khNum(t.dataGbDaily)}GB/ថ្ងៃ)${popular}`
-    : `${t.name} ${price} (${t.durationDays} days, ${t.dataGbDaily}GB/day)${popular}`;
+    ? `${t.name} ${price} (${khNum(t.durationDays)}ថ្ងៃ, ${allowance})${popular}`
+    : `${t.name} ${price} (${t.durationDays} days, ${allowance})${popular}`;
 }
 
 /** Countries grouped by region, for coverage answers. */
@@ -207,10 +221,14 @@ const esim_data_amount: GroundedAnswer = ({ lang, country }) => {
   const tiers = tierSpecs(covered(country) ? country : null);
   const lines = tiers
     .map((t) => {
-      const total = t.dataGbDaily * t.durationDays;
+      if (t.dataType === 'fixed') {
+        return lang === 'km'
+          ? `• ${t.name}៖ ${khNum(t.dataGbTotal)}GB សរុប សម្រាប់ ${khNum(t.durationDays)}ថ្ងៃ`
+          : `• ${t.name}: ${t.dataGbTotal}GB total across ${t.durationDays} days`;
+      }
       return lang === 'km'
-        ? `• ${t.name}៖ ${khNum(t.dataGbDaily)}GB/ថ្ងៃ × ${khNum(t.durationDays)}ថ្ងៃ = ${khNum(total)}GB សរុប`
-        : `• ${t.name}: ${t.dataGbDaily}GB/day × ${t.durationDays} days = ${total}GB total`;
+        ? `• ${t.name}៖ ${khNum(t.dataGbDaily)}GB/ថ្ងៃ × ${khNum(t.durationDays)}ថ្ងៃ = ${khNum(t.dataGbTotal)}GB សរុប`
+        : `• ${t.name}: ${t.dataGbDaily}GB/day × ${t.durationDays} days = ${t.dataGbTotal}GB total`;
     })
     .join('\n');
   return lang === 'km'

@@ -3,6 +3,7 @@
 import { Check, ShoppingCart } from 'lucide-react';
 import type { Destination, EsimPlan } from '@/types';
 import { useCart } from '@/hooks/useCart';
+import { describeAllowance } from '@/data/esimPlans';
 import { cn, formatUsd } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -24,7 +25,9 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       flag: destination.flag,
       planName: plan.name,
       durationDays: plan.durationDays,
+      dataType: plan.dataType,
       dataGbDaily: plan.dataGbDaily,
+      dataGbTotal: plan.dataGbTotal,
       priceUsd: plan.priceUsd,
       quantity: 1,
     });
@@ -56,7 +59,7 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       <p className={cn('mt-4 font-display text-4xl font-extrabold', dark ? 'text-white' : 'text-ink')}>{formatUsd(plan.priceUsd)}</p>
       <div className={cn('mt-5 space-y-1 border-b pb-5', dark ? 'border-white/10' : 'border-line')}>
         <p className={cn('text-sm font-semibold', dark ? 'text-white' : 'text-ink')}>{plan.durationDays} days</p>
-        <p className={cn('text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>{plan.dataGbDaily}GB/day</p>
+        <p className={cn('text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>{describeAllowance(plan)}</p>
         <p className={cn('font-mono text-xs', dark ? 'text-white/50' : 'text-ink-muted')}>{plan.network}</p>
       </div>
       <ul className="mt-5 flex-1 space-y-2.5">

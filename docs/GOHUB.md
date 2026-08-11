@@ -35,6 +35,81 @@ nothing is baked in at build.
 
 ---
 
+## The catalog and how it is priced
+
+`data/gohubCatalog.ts` is **generated** from GoHub's dealer price list:
+
+```bash
+node scripts/build-gohub-catalog.mjs ~/Downloads/GOHUB_PRICE_US_SILVER1.xlsx
+```
+
+Re-run it whenever GoHub reissue the sheet, then read the diff. A changed
+`costUsd` against an unchanged `priceUsd` is a margin moving under you.
+
+The sheet holds ~3,900 SKUs. The script picks **three per destination** and
+prices them. Both decisions live at the top of the script:
+
+| Knob | Value | What it does |
+| --- | --- | --- |
+| `MARKUP` | 2.8 | headline retail multiple |
+| `TIER_MARKUP` | 3.0 / 2.8 / 2.45 | per-tier, so the bigger pack is visibly better value |
+| `PRICE_FLOOR_USD` | 2.99 | below this the payment fee eats the margin |
+| `FIXED_DATA_PREFERENCE` | 1.5 | how much cheaper fixed data must be to beat daily |
+| `MIN_EFFECTIVE_GB_PER_DAY` | 0.4 | thinner than this is not a usable travel plan |
+
+### The three tiers, and why
+
+Three options, not five. A third choice lifts conversion by giving the middle
+one something to be the middle *of*; a fourth mostly produces hesitation.
+
+- **Basic** — the entry anchor, so the page never looks expensive at a glance.
+- **Standard** — a full week, marked popular. The one we want sold.
+- **Premium** — twice the trip. Its real job is making standard look sensible.
+
+The tier markups descend on purpose. A traveller does not compare $7.99 to
+$13.99 — they divide by days. So the bigger pack takes deliberately less margin
+and shows a real saving:
+
+```
+Thailand   3d 1GB/day  $3.99   $1.33/day
+           7d 1GB/day  $7.99   $1.14/day   ← popular
+          15d 1GB/day  $13.99  $0.93/day
+```
+
+Average gross margin across the catalog is **65%**, minimum 54%. The floor
+matters: `MAX_DISCOUNT_PCT` caps stacked promos at 30%, and
+`tests/gohubCatalog.test.ts` fails the build if any plan's margin drops near it.
+
+### Daily vs fixed data
+
+Each destination commits to **one** allowance model. "1GB/day" next to
+"3GB total" is not a ladder a customer can read without doing arithmetic, and a
+customer doing arithmetic is not buying.
+
+Daily wins by default — it cannot be exhausted on day one. Fixed is chosen only
+where GoHub have priced daily out of the market. Never describe a fixed plan in
+GB/day; `describeAllowance()` in `data/esimPlans.ts` is the single place that
+decides the wording.
+
+### Destinations served by a regional SKU
+
+France, Germany, the UK and Europe all fulfil from GoHub's single Europe
+product, and Canada from the USA/Mexico/Canada one. The same `gohubSku` under
+several plan ids is correct. Within one destination it would be a bug, and the
+test suite enforces that distinction.
+
+### Where the money is
+
+`costUsd` never reaches the browser. `data/esimPlans.ts` deliberately does not
+re-export it or `gohubSku` — margin is not the customer's business and a SKU on
+a product page is a SKU in someone's scraper. Server code imports
+`data/gohubCatalog.ts` directly.
+
+`lib/providers/esim/skuMap.ts` derives GoHub's mapping from the same generated
+file, so a plan and its SKU cannot drift apart.
+
+---
+
 ## The client
 
 ```ts
