@@ -211,6 +211,9 @@ export interface GlobeEngine {
   starGroup: ThreeNS.Group;
   dotsMat: ThreeNS.ShaderMaterial;
   starMat: ThreeNS.ShaderMaterial;
+  /** Fresnel atmosphere rim. Exposed so callers can retint the sky — the home
+   *  globe shifts it to the focused destination's mood (see skyMoods.ts). */
+  atmoMat: ThreeNS.ShaderMaterial;
   /** Point-shader materials that need uScale/uGlobeScale kept in sync. */
   pointMats: ThreeNS.ShaderMaterial[];
   /** Materials that need uTime driven every frame. */
@@ -427,6 +430,7 @@ export async function createGlobeEngine(
     starGroup,
     dotsMat,
     starMat,
+    atmoMat,
     pointMats,
     timeMats,
     track,

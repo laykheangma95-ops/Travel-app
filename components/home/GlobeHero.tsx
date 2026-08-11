@@ -1,8 +1,21 @@
 'use client';
 
 /**
- * GlobeHero — cinematic 3D particle-globe hero section: the "home spine" mode
- * of the shared globe engine.
+ * GlobeHero — the emotional centrepiece. A cinematic 3D particle globe that is
+ * the *only* thing on the first screen besides a greeting and a search field.
+ *
+ * Two states, one continuous surface — never a page change:
+ *
+ *  • IDLE ("home spine") — the planet turns slowly at the seam between this
+ *    hero and the Cambodia showcase below, so a single sphere spans both
+ *    sections. Greeting, question, subtitle, search. Nothing else.
+ *
+ *  • FOCUSED ("approach") — a destination is chosen, and instead of navigating
+ *    the globe *flies*: it takes the shortest rotation to bring that latitude
+ *    and longitude to face the camera, drops its axial tilt, and grows until
+ *    the horizon curves away like a descent. A gold pin lights up on the
+ *    surface with slow sonar rings, the atmosphere rim retints to the
+ *    destination's sky mood, and the copy cross-fades in place.
  *
  * A standalone, drop-in <section>. Every style is scoped under the `dgh-`
  * (Domner Globe Hero) prefix so nothing leaks into the rest of the site.
@@ -15,17 +28,17 @@
  *    viewport. (The flight pages reuse the same engine in flight focus mode —
  *    see components/flights/FlightRouteGlobe.)
  *  - This component adds the home set dressing: hub nodes, travelling arc
- *    pulses, rising hub beams — and GSAP + ScrollTrigger for the entrance
- *    reveal and the scroll-linked scrub.
+ *    pulses, rising hub beams, the destination pin — and GSAP + ScrollTrigger
+ *    for the entrance reveal and the scroll-linked scrub.
  *
  * Interactivity: 3-layer mouse parallax (globe / stars / clouds), drag to
  * spin with inertia (desktop), hub hover -> pulse + city label, gyroscope
  * parallax on Android, scroll scrub. Honours prefers-reduced-motion by
- * rendering a single static frame with no animation.
+ * rendering a single static frame with no animation — including the fly-to,
+ * which becomes an instant cut to the destination.
  */
 
-import { useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type * as ThreeNS from 'three';
 import { useLang } from '@/lib/i18n';
 import {
@@ -68,16 +81,52 @@ const ARC_ROUTES: [number, number][] = [
   [10, 11], [11, 12], [6, 7],
 ];
 
+/** Where the globe should sit on screen, as a fraction of the stage height. */
+const IDLE_FACTOR = 0.44; // sphere diameter / viewport width, idle
+// The pin lands in the upper quarter, with the arrival copy settling below it —
+// so the destination marker and the destination's name never fight for the same
+// pixels the way a dead-centre pin does.
+const FOCUS_PIN_F = 0.24;
+const TILT_DEG = -17; // idle axial tilt
+
+/* ────────────────────────── Props ────────────────────────── */
+
+export interface GlobeFocus {
+  lat: number;
+  lon: number;
+  /** Atmosphere rim colour for this destination's sky mood. */
+  rim: string;
+  /** Pin colour. Large-format accent only — never used for text. */
+  accent: string;
+}
+
+interface GlobeHeroProps {
+  /** The destination the globe is flying to, or null for the idle home spine. */
+  focus: GlobeFocus | null;
+  /** The copy layer: greeting + search when idle, arrival card when focused. */
+  children: ReactNode;
+}
+
 /* ────────────────────────── Component ────────────────────────── */
 
-export function GlobeHero() {
+export function GlobeHero({ focus, children }: GlobeHeroProps) {
   const { t } = useLang();
   const sectionRef = useRef<HTMLElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
-  const chipsRef = useRef<HTMLDivElement>(null);
+
+  // The scene's imperative handle, published once WebGL is up. `latestFocus`
+  // carries whatever was chosen before that happened, so a very early search
+  // is never dropped.
+  const applyFocusRef = useRef<((f: GlobeFocus | null) => void) | null>(null);
+  const latestFocus = useRef<GlobeFocus | null>(focus);
+
+  useEffect(() => {
+    latestFocus.current = focus;
+    applyFocusRef.current?.(focus);
+  }, [focus]);
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -122,8 +171,11 @@ export function GlobeHero() {
       const { THREE, camera, tiltGroup, spinGroup, starGroup, track } = engine;
 
       // Axial tilt + starting orientation: East Asia's hubs (Tokyo/Seoul)
-      // rising over the horizon.
-      tiltGroup.rotation.z = THREE.MathUtils.degToRad(-17);
+      // rising over the horizon. Held in `orient` rather than written straight
+      // onto the group, because the fly-to eases these toward new targets while
+      // pointer parallax adds on top of them every frame.
+      const TILT_Z = THREE.MathUtils.degToRad(TILT_DEG);
+      const orient = { tiltX: 0, tiltZ: TILT_Z };
       spinGroup.rotation.y = 1.96;
 
       /* ── Hub nodes ── */
@@ -239,30 +291,128 @@ export function GlobeHero() {
         engine.timeMats.push(mat);
       }
 
-      /* ── Layout: one full sphere centred on the hero/showcase seam ──
-         The canvas spans the whole stage (hero + showcase). We place the
-         sphere's centre at the seam between the two sections, so the top
-         hemisphere lives in the hero and the bottom hemisphere sits behind the
-         Cambodia carousel — reading as a single planet across both.
-         FULL_FACTOR sets the sphere diameter as a fraction of viewport width;
-         it is tuned ~30% smaller than the old horizon globe. */
-      const FULL_FACTOR = 0.44;
+      /* ── Destination pin: a core light, a rising beam, and sonar rings ──
+         Parented to spinGroup so it rides the globe's rotation, and oriented so
+         its local +Y is the surface normal — the same trick the hub beams use.
+         Everything fades with `focusAmt`, so the pin only exists during an
+         approach and costs nothing on the idle home spine. */
+      const pinGroup = new THREE.Group();
+      pinGroup.visible = false;
+      spinGroup.add(pinGroup);
+
+      const pinCoreMat = track(
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color('#f7eac0'),
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      const pinCore = new THREE.Mesh(track(new THREE.SphereGeometry(0.011, 16, 12)), pinCoreMat);
+      pinGroup.add(pinCore);
+
+      const pinBeamGeo = track(new THREE.CylinderGeometry(0.007, 0.026, 0.26, 10, 1, true));
+      pinBeamGeo.translate(0, 0.13, 0);
+      const pinBeamMat = track(
+        new THREE.ShaderMaterial({
+          vertexShader: BEAM_VERT,
+          fragmentShader: BEAM_FRAG,
+          uniforms: {
+            uTime: { value: 0 },
+            uPhase: { value: 0 },
+            uColor: { value: new THREE.Color('#f7eac0') },
+          },
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      pinGroup.add(new THREE.Mesh(pinBeamGeo, pinBeamMat));
+      engine.timeMats.push(pinBeamMat);
+
+      // Three hairline rings expanding out of the pin on a staggered loop. Kept
+      // deliberately thin — at approach scale a fat band reads as a bullseye
+      // target rather than a soft ping.
+      const ringGeo = track(new THREE.RingGeometry(0.93, 1, 64));
+      const rings = [0, 0.34, 0.67].map((phase) => {
+        const mat = track(
+          new THREE.MeshBasicMaterial({
+            color: new THREE.Color('#f7eac0'),
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        const mesh = new THREE.Mesh(ringGeo, mat);
+        mesh.rotation.x = -Math.PI / 2; // ring normal -> local +Y (the surface normal)
+        mesh.position.y = 0.006; // float just clear of the occluder sphere
+        pinGroup.add(mesh);
+        return { mesh, mat, phase };
+      });
+
+      const setPinColor = (hex: string) => {
+        pinCoreMat.color.set(hex);
+        pinBeamMat.uniforms.uColor.value.set(hex);
+        for (const r of rings) r.mat.color.set(hex);
+      };
+
+      const movePin = (lat: number, lon: number) => {
+        const n = new THREE.Vector3(...latLonToXYZ(lat, lon));
+        pinGroup.position.copy(n);
+        pinGroup.quaternion.setFromUnitVectors(up, n.clone().normalize());
+      };
+
+      let ringT = 0;
+      const updatePin = (dt: number, amt: number) => {
+        pinGroup.visible = amt > 0.01;
+        if (!pinGroup.visible) return;
+        pinCoreMat.opacity = amt;
+        ringT = (ringT + dt * 0.36) % 1;
+        for (const r of rings) {
+          const p = (ringT + r.phase) % 1;
+          r.mesh.scale.setScalar(0.022 + p * 0.1);
+          // Ease in fast, then a squared fade so the ring dissolves into the
+          // surface rather than switching off at the end of its travel.
+          r.mat.opacity = Math.min(1, p / 0.08) * (1 - p) * (1 - p) * 0.7 * amt;
+        }
+      };
+
+      /* ── Layout: idle placement and approach placement, blended per frame ──
+         IDLE — one full sphere centred on the hero/showcase seam. The canvas
+         spans the whole stage, so the top hemisphere lives in the hero and the
+         bottom sits behind the Cambodia carousel: one planet, two sections.
+         FOCUS — the sphere grows until its horizon curves off screen and the
+         pin sits FOCUS_PIN_F down the viewport, which reads as a descent
+         rather than a zoom. */
+      const place = { idleScale: 1, idleY: 0, focusScale: 1, focusY: 0 };
       const layout = () => {
         const w = wrap.clientWidth;
         const h = wrap.clientHeight; // full stage height (hero + showcase)
+        if (!w || !h) return;
         engine.setViewport(w, h);
         const dist = camera.position.z;
-        const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
+        const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        const halfH = halfTan * dist;
         const halfW = halfH * camera.aspect;
+
         // Radius as a fraction of the viewport half-width, capped so a tall
         // stage never lets the sphere overflow its vertical room.
-        const scale = Math.min(halfH * 0.92, halfW * FULL_FACTOR);
+        place.idleScale = Math.min(halfH * 0.92, halfW * IDLE_FACTOR);
         // Screen fraction of the seam (bottom of the hero within the stage).
         const heroH = section!.offsetHeight || h * 0.5;
-        const fSeam = Math.min(0.985, (heroH - scale * 0.02) / h);
-        // World-Y that projects to that screen fraction on the z=0 plane.
-        engine.setGlobeScale(scale);
-        tiltGroup.position.y = halfH * (1 - 2 * fSeam);
+        const fSeam = Math.min(0.985, (heroH - place.idleScale * 0.02) / h);
+        place.idleY = halfH * (1 - 2 * fSeam);
+
+        // Approach: close enough that the horizon curves away, far enough that
+        // it still reads as a planet rather than a starfield — and never so
+        // close that the pin (which sits at z = scale) crowds the camera.
+        place.focusScale = Math.min(dist * 0.4, Math.max(halfH * 1.1, halfW * 0.8));
+        const halfHAtPin = halfTan * (dist - place.focusScale);
+        place.focusY = halfHAtPin * (1 - 2 * FOCUS_PIN_F);
       };
       layout();
       const ro = new ResizeObserver(layout);
@@ -276,6 +426,66 @@ export function GlobeHero() {
       let hoveredHub = -1;
       const mousePx = { x: -1e4, y: -1e4 };
       const BASE_SPIN = (Math.PI * 2) / 90; // one revolution / 90s
+
+      /* ── Fly-to state ──
+         `focusAmt` eases 0 -> 1 and drives scale, placement and pin alpha
+         together, so the whole approach is one value. `spinTargetY` is an
+         absolute (un-wrapped) angle: the shortest signed delta from wherever
+         the globe happens to be, so it never spins the long way round. */
+      let focusAmt = 0;
+      let focusTarget = 0;
+      // Seconds since the flight began. The descent is deliberately held back
+      // until the planet has turned: zooming and rotating at once flies you
+      // across the open Pacific at full magnification, where there is no land
+      // and no horizon, and the whole moment reads as a blank screen.
+      let flightClock = 0;
+      const ROTATE_SECONDS = 1.15;
+      let spinTargetY: number | null = null;
+      let targetTiltX = 0;
+      const rimColor = new THREE.Color('#57c8ff');
+      const rimTarget = new THREE.Color('#57c8ff');
+
+      const applyFocus = (f: GlobeFocus | null) => {
+        if (!f) {
+          focusTarget = 0;
+          flightClock = 0;
+          spinTargetY = null;
+          targetTiltX = 0;
+          rimTarget.set('#57c8ff');
+          return;
+        }
+        flightClock = 0;
+        // Bring (lat, lon) to face the camera.
+        //
+        // A point's azimuth in the XZ plane is (lon + 90°), and rotating
+        // spinGroup about Y *adds* to that azimuth — so the spin that swings it
+        // to the front is -(lon + 90°). Latitude is then cancelled by tilting
+        // about X by +lat (the group's Euler resolves to RX·RZ, so this only
+        // holds once the axial roll about Z is eased out — which is why tiltZ
+        // is targeted to 0 alongside it).
+        const lonRad = (f.lon * Math.PI) / 180;
+        const desired = -(lonRad + Math.PI / 2);
+        const cur = spinGroup.rotation.y;
+        const delta = ((((desired - cur) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        spinTargetY = cur + delta;
+        targetTiltX = (f.lat * Math.PI) / 180;
+        focusTarget = 1;
+        movePin(f.lat, f.lon);
+        setPinColor(f.accent);
+        rimTarget.set(f.rim);
+        if (reducedMotion) {
+          // No animation allowed: cut straight to the arrival frame.
+          focusAmt = 1;
+          flightClock = ROTATE_SECONDS + 1;
+          spinGroup.rotation.y = spinTargetY;
+          orient.tiltX = targetTiltX;
+          orient.tiltZ = 0;
+          rimColor.copy(rimTarget);
+          engine.atmoMat.uniforms.uColor.value.copy(rimColor);
+          settle();
+          engine.renderOnce();
+        }
+      };
 
       const onMouseMove = (e: MouseEvent) => {
         const rect = wrap.getBoundingClientRect();
@@ -302,6 +512,7 @@ export function GlobeHero() {
       };
       const onPointerDown = (e: PointerEvent) => {
         if (isMobile || e.pointerType === 'touch') return; // no drag on mobile
+        if (focusTarget === 1) return; // during an approach the camera is ours
         const target = e.target as HTMLElement;
         // Don't hijack links/buttons or the Cambodia carousel's own drag/controls.
         if (target.closest('a, button, input, [role="tablist"], .cam-stage')) return;
@@ -339,12 +550,21 @@ export function GlobeHero() {
         window.addEventListener('deviceorientation', onOrientation, { passive: true });
       }
 
-      /* ── Hub hover: nearest projected node -> pulse + label ── */
+      /* ── Hub hover: nearest projected node -> pulse + city label ── */
       const label = labelRef.current;
       const worldV = new THREE.Vector3();
       const camDir = new THREE.Vector3();
       const updateHover = () => {
         if (isMobile || !label) return;
+        // Hub labels are the idle globe's affordance; during an approach the
+        // destination has its own pin and they would only add noise.
+        if (focusAmt > 0.15) {
+          if (hoveredHub !== -1) {
+            hoveredHub = -1;
+            label.classList.remove('dgh-hublabel-on');
+          }
+          return;
+        }
         const w = wrap.clientWidth;
         const h = wrap.clientHeight;
         let best = -1;
@@ -390,22 +610,64 @@ export function GlobeHero() {
         if (dirty) hubGeo.getAttribute('aHover').needsUpdate = true;
       };
 
+      /* ── Write the blended placement + orientation onto the scene ── */
+      const settle = () => {
+        // Smoothstep so the approach decelerates into the destination instead
+        // of arriving at constant speed.
+        const e = focusAmt * focusAmt * (3 - 2 * focusAmt);
+        const scale = place.idleScale + (place.focusScale - place.idleScale) * e;
+        engine.setGlobeScale(scale);
+        // Pointer parallax is damped as we close in — at 60,000 feet the
+        // planet does not sway with your mouse.
+        const pf = 1 - e * 0.85;
+        tiltGroup.position.y = place.idleY + (place.focusY - place.idleY) * e;
+        tiltGroup.position.x = parallax.x * 0.02 * scale * pf;
+        tiltGroup.rotation.x = orient.tiltX + parallax.y * 0.05 * pf;
+        tiltGroup.rotation.z = orient.tiltZ;
+        starGroup.rotation.y = -parallax.x * 0.045 * pf;
+        starGroup.rotation.x = -parallax.y * 0.03 * pf;
+      };
+
       /* ── Per-frame home behaviour (engine drives uTime + render) ── */
       engine.onFrame((dt) => {
-        // Perpetual spin + user inertia decaying back to the base speed.
-        if (!dragging) {
-          spinGroup.rotation.y += (BASE_SPIN + spinVel) * dt;
-          spinVel *= Math.pow(0.12, dt); // smooth exponential decay
+        const k = Math.min(1, dt * 1.6); // shared orientation easing rate
+
+        // Two beats, not one: turn toward the destination, *then* descend.
+        if (focusTarget === 1) {
+          flightClock += dt;
+          const descend = flightClock > ROTATE_SECONDS ? 1 : 0;
+          focusAmt += (descend - focusAmt) * Math.min(1, dt * 1.6);
+        } else {
+          focusAmt += (0 - focusAmt) * Math.min(1, dt * 2.2);
+        }
+
+        if (focusTarget === 1 && spinTargetY !== null) {
+          spinGroup.rotation.y += (spinTargetY - spinGroup.rotation.y) * k;
+          // A whisper of residual drift so the arrived planet is never frozen.
+          spinTargetY += BASE_SPIN * 0.1 * dt;
+          orient.tiltX += (targetTiltX - orient.tiltX) * k;
+          orient.tiltZ += (0 - orient.tiltZ) * k;
+          spinVel = 0;
+        } else {
+          // Perpetual spin + user inertia decaying back to the base speed.
+          if (!dragging) {
+            spinGroup.rotation.y += (BASE_SPIN + spinVel) * dt;
+            spinVel *= Math.pow(0.12, dt); // smooth exponential decay
+          }
+          orient.tiltX += (0 - orient.tiltX) * k;
+          orient.tiltZ += (TILT_Z - orient.tiltZ) * k;
         }
 
         // 3-layer parallax: globe (1x), stars (counter, 0.35x).
         parallax.x += (parallax.tx - parallax.x) * Math.min(1, dt * 4);
         parallax.y += (parallax.ty - parallax.y) * Math.min(1, dt * 4);
-        tiltGroup.position.x = parallax.x * 0.08 * engine.getGlobeScale() * 0.25;
-        tiltGroup.rotation.x = parallax.y * 0.05;
-        starGroup.rotation.y = -parallax.x * 0.045;
-        starGroup.rotation.x = -parallax.y * 0.03;
 
+        // Retint the atmosphere toward the destination's sky mood.
+        rimColor.lerp(rimTarget, Math.min(1, dt * 1.2));
+        engine.atmoMat.uniforms.uColor.value.copy(rimColor);
+
+        settle();
+        updatePin(dt, focusAmt);
         updateArcs(dt);
         updateHover();
       });
@@ -440,12 +702,17 @@ export function GlobeHero() {
           arc.mat.uniforms.uAlpha.value = 0.8;
           arc.mat.uniforms.uPulse.value = 0.2 + (i / arcs.length) * 0.6;
         });
+        settle();
         engine.renderOnce();
         section!.classList.remove('dgh-anim');
       } else {
         engine.start();
         await initGsap();
       }
+
+      // Publish the handle and honour anything chosen while WebGL was booting.
+      applyFocusRef.current = applyFocus;
+      if (latestFocus.current) applyFocus(latestFocus.current);
 
       canvasWrapRef.current?.classList.add('dgh-canvas-on');
 
@@ -476,9 +743,7 @@ export function GlobeHero() {
         const scrub = gsap.timeline({
           scrollTrigger: { trigger: section!, start: 'top top', end: 'bottom top', scrub: 0.6 },
         });
-        scrub
-          .to(copyRef.current, { y: -70, opacity: 0, ease: 'none' }, 0)
-          .to(chipsRef.current, { y: -30, opacity: 0, ease: 'none' }, 0);
+        scrub.to(copyRef.current, { y: -70, opacity: 0, ease: 'none' }, 0);
 
         killGsap = () => {
           intro.kill();
@@ -489,6 +754,7 @@ export function GlobeHero() {
 
       /* ── Teardown ── */
       disposeScene = () => {
+        applyFocusRef.current = null;
         ro.disconnect();
         viewIO.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
@@ -509,18 +775,6 @@ export function GlobeHero() {
     };
   }, []);
 
-  /* Magnetic hover for the primary CTA (desktop only, tiny and cheap). */
-  const onCtaMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
-    const dx = e.clientX - (r.left + r.width / 2);
-    const dy = e.clientY - (r.top + r.height / 2);
-    el.style.transform = `translate(${dx * 0.14}px, ${dy * 0.22}px)`;
-  };
-  const onCtaLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.currentTarget.style.transform = '';
-  };
-
   return (
     <>
       {/* Shared globe canvas. It is positioned absolutely against .dgh-stage
@@ -532,70 +786,27 @@ export function GlobeHero() {
         <div ref={labelRef} className="dgh-hublabel" />
       </div>
 
-      <section ref={sectionRef} className="dgh-hero dgh-anim" aria-label={t('hero.badge')}>
-      {/* Drifting volumetric mist layers */}
-      <div className="dgh-clouds" aria-hidden="true">
-        <div className="dgh-cloud dgh-cloud-a" />
-        <div className="dgh-cloud dgh-cloud-b" />
-        <div className="dgh-cloud dgh-cloud-c" />
-      </div>
-
-      {/* Film grain */}
-      <div className="dgh-grain" aria-hidden="true" />
-
-      {/* Copy layer */}
-      <div ref={copyRef} className="dgh-copy">
-        <span className="dgh-badge dgh-reveal">{t('hero.badge')}</span>
-        <h1 className="dgh-title dgh-reveal">
-          {t('hero.t1')}
-          <span className="dgh-title-accent"> {t('hero.t2')}</span>
-          <br />
-          {t('hero.t3')}
-        </h1>
-        <p className="dgh-sub dgh-reveal">{t('hero.sub')}</p>
-        <div className="dgh-ctas dgh-reveal">
-          <Link
-            href="/esim"
-            className="dgh-cta"
-            onMouseMove={onCtaMove}
-            onMouseLeave={onCtaLeave}
-          >
-            {t('hero.ctaEsim')}
-          </Link>
-          <Link href="/flights" className="dgh-cta-ghost">
-            {t('hero.ctaFlight')}
-          </Link>
+      <section ref={sectionRef} className="dgh-hero dgh-anim" aria-label={t('home.ask')}>
+        {/* Drifting volumetric mist layers */}
+        <div className="dgh-clouds" aria-hidden="true">
+          <div className="dgh-cloud dgh-cloud-a" />
+          <div className="dgh-cloud dgh-cloud-b" />
+          <div className="dgh-cloud dgh-cloud-c" />
         </div>
-        {/* Interaction affordance: the globe is draggable but nothing said so.
-            A quiet glass pill with a sliding gold dot invites the first spin;
-            it fades once the visitor actually drags (dgh-interacted). Desktop
-            only — drag is disabled on touch. Decorative, so aria-hidden. */}
-        {/* The reveal class sits on a wrapper: GSAP leaves inline opacity on
-            .dgh-reveal elements, which would override the fade-on-drag rule
-            if it lived on the pill itself. */}
-        <div className="dgh-reveal">
-          <div className="dgh-hint" aria-hidden="true">
-            <span className="dgh-hint-track">
-              <i className="dgh-hint-dot" />
-            </span>
-            <span>
-              Drag to spin the globe
-              <span className="dgh-hint-km font-khmer"> · អូសបង្វិលផែនដី</span>
-            </span>
-          </div>
+
+        {/* Film grain */}
+        <div className="dgh-grain" aria-hidden="true" />
+
+        {/* Copy layer — the only interface on the first screen. Its contents
+            cross-fade between the idle greeting/search and the arrival card
+            (see HomeContent); the globe underneath never cuts. */}
+        <div ref={copyRef} className="dgh-copy">
+          {children}
         </div>
-      </div>
 
-      {/* Frosted feature chips floating above the horizon */}
-      <div ref={chipsRef} className="dgh-chips">
-        <span className="dgh-chip dgh-reveal">{t('hero.stat1')}</span>
-        <span className="dgh-chip dgh-reveal">{t('hero.stat2')}</span>
-        <span className="dgh-chip dgh-reveal">{t('hero.stat3')}</span>
-      </div>
-
-      {/* All styles scoped under the dgh- prefix — no global leakage. Injected
-          via innerHTML so SSR text escaping can't cause a hydration mismatch. */}
-      <style dangerouslySetInnerHTML={{ __html: CSS_TEXT }} />
+        {/* All styles scoped under the dgh- prefix — no global leakage. Injected
+            via innerHTML so SSR text escaping can't cause a hydration mismatch. */}
+        <style dangerouslySetInnerHTML={{ __html: CSS_TEXT }} />
       </section>
     </>
   );
@@ -610,14 +821,19 @@ const GRAIN_URI =
 const CSS_TEXT = `
 /* .dgh-stage wraps the hero AND the Cambodia showcase (see HomeContent). It
    owns the continuous deep-space gradient and hosts the shared globe layer, so
-   one planet spans both sections as a single "page". */
+   one planet spans both sections as a single "page".
+   --dgh-glow / --dgh-veil are set from the focused destination's sky mood
+   (components/home/skyMoods.ts) and default to the home sky. */
 .dgh-stage {
   position: relative;
   isolation: isolate;
+  --dgh-glow: rgba(230, 176, 90, 0.12);
+  --dgh-veil: rgba(30, 64, 122, 0.55);
   background:
-    radial-gradient(52% 26% at 50% 41%, rgba(230, 176, 90, 0.12) 0%, transparent 62%),
-    radial-gradient(120% 48% at 50% 39%, rgba(30, 64, 122, 0.55) 0%, transparent 60%),
+    radial-gradient(52% 26% at 50% 41%, var(--dgh-glow) 0%, transparent 62%),
+    radial-gradient(120% 48% at 50% 39%, var(--dgh-veil) 0%, transparent 60%),
     linear-gradient(180deg, #050b2e 0%, #08163a 28%, #0a1a4a 44%, #0b1c40 62%, #0e1b30 100%);
+  transition: background 1.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .dgh-stage.dgh-dragging { cursor: grabbing; }
 
@@ -627,6 +843,8 @@ const CSS_TEXT = `
 @media (pointer: fine) {
   .dgh-hero { cursor: grab; }
   .dgh-stage.dgh-dragging .dgh-hero { cursor: grabbing; }
+  /* Once a destination is chosen the globe is on rails — stop implying drag. */
+  .dgh-stage[data-focused='true'] .dgh-hero { cursor: default; }
 }
 
 /* Shared globe canvas layer — spans the full stage, sits behind section content. */
@@ -651,6 +869,19 @@ const CSS_TEXT = `
   justify-content: flex-start;
   color: #fff;
   background: transparent;
+}
+
+/* Nav scrim. The navbar is transparent over this hero, and once the globe
+   zooms in its dot field runs straight behind the menu — this keeps the bar
+   legible without giving it a surface of its own. */
+.dgh-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 4;
+  height: 9rem;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(5, 11, 46, 0.62) 0%, rgba(5, 11, 46, 0.28) 45%, transparent 100%);
 }
 
 /* ── Scene layers ── */
@@ -732,220 +963,130 @@ const CSS_TEXT = `
   animation: dgh-grain 0.9s steps(4) infinite;
 }
 
-/* ── Copy layer ── */
+/* ── Copy layer ──
+   One column, centred, with generous air above it. Everything the first screen
+   is allowed to show lives in here. */
 .dgh-copy {
   position: relative;
   z-index: 5;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  /* Copy sits in the upper-middle so the planet's limb owns the lower third.
+     The generous bottom padding is what keeps content clear of the scroll cue,
+     which is absolutely positioned against this same box. */
+  justify-content: flex-start;
   width: 100%;
-  max-width: 64rem;
+  max-width: 60rem;
   margin: 0 auto;
-  padding: clamp(6.5rem, 14vh, 9rem) 1rem 0;
+  padding: clamp(6rem, 14vh, 9rem) 1.25rem clamp(6.5rem, 12vh, 8.5rem);
   text-align: center;
 }
-.dgh-badge {
+
+/* On approach the copy drops to the lower half, leaving the pin clear sky. */
+.dgh-stage[data-focused='true'] .dgh-copy {
+  justify-content: flex-end;
+}
+
+/* Legibility scrim. The globe's dot field and starlight run straight under the
+   copy, and white-on-starfield is where contrast quietly fails — this pushes
+   the sky back under the text without reading as a panel. */
+.dgh-copy::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: -1;
+  width: min(130%, 72rem);
+  height: 100%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    58% 46% at 50% 44%,
+    rgba(5, 11, 46, 0.78) 0%,
+    rgba(5, 11, 46, 0.42) 52%,
+    transparent 76%
+  );
+  pointer-events: none;
+}
+
+/* Greeting. Reserves its own line height before the client clock resolves, so
+   the question below never jumps on hydration. No font-family here: the body
+   face is inherited, which is how Khmer mode swaps script automatically. */
+.dgh-greet {
+  min-height: 1.6em;
+  margin: 0;
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(230, 203, 139, 0.88);
+}
+
+.dgh-ask {
+  margin: 0.75rem 0 0;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6.2vw, 5rem);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  color: #fff;
+}
+
+.dgh-sub {
+  margin: 1.25rem auto 0;
+  max-width: 34rem;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.dgh-searchwrap {
+  width: 100%;
+  max-width: 40rem;
+  margin: clamp(2.25rem, 5vh, 3.25rem) auto 0;
+}
+
+/* Scroll cue — the only other mark on the first screen, and it earns its place
+   by being the one thing that says "there is more". */
+.dgh-cue {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(1rem, 3.5vh, 2.5rem);
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 24px rgba(87, 200, 255, 0.10);
-}
-.dgh-title {
-  margin: 2rem 0 0;
-  font-weight: 800;
-  font-size: clamp(2.9rem, 7.5vw, 6rem);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-}
-.dgh-title-accent {
-  background: linear-gradient(92deg, #f5dfa8 0%, #e6cb8b 45%, #8fd8ff 115%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.dgh-sub {
-  margin: 1.5rem auto 0;
-  max-width: 40rem;
-  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
-  line-height: 1.65;
-  color: rgba(255, 255, 255, 0.72);
-}
-.dgh-ctas {
-  margin-top: 2.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-}
-.dgh-cta, .dgh-cta-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 3.25rem;
-  padding: 0 2rem;
-  border-radius: 999px;
-  font-size: 1rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
-  will-change: transform;
-}
-/* Primary CTA: luxury Apple-style blue frosted glass — a translucent deep-blue
-   pane with backdrop blur, an inner sheen, and a glowing cyan gradient border. */
-.dgh-cta {
-  color: #eaf3ff;
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(160deg, rgba(58, 116, 210, 0.55) 0%, rgba(26, 62, 130, 0.62) 55%, rgba(14, 34, 84, 0.7) 100%) padding-box,
-    linear-gradient(120deg, rgba(143, 216, 255, 0.95), rgba(87, 200, 255, 0.6), rgba(120, 170, 255, 0.9)) border-box;
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
-    0 0 28px rgba(87, 200, 255, 0.32),
-    0 8px 26px rgba(5, 11, 46, 0.5);
-}
-.dgh-cta:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -10px 22px rgba(10, 24, 60, 0.4),
-    0 0 44px rgba(87, 200, 255, 0.5),
-    0 10px 30px rgba(5, 11, 46, 0.55);
-}
-.dgh-cta-ghost {
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-.dgh-cta-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 24px rgba(143, 216, 255, 0.22);
-}
-
-/* ── Drag hint: quiet glass pill + sliding gold dot ── */
-.dgh-hint {
-  margin-top: 1.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.5rem 1.15rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.62);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-.dgh-hint-km {
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.42);
-}
-/* Chevron rails + a gold dot gliding between them = "drag me" in miniature. */
-.dgh-hint-track {
-  position: relative;
-  width: 38px;
-  height: 12px;
-  flex-shrink: 0;
-}
-.dgh-hint-track::before,
-.dgh-hint-track::after {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-54%);
-  font-size: 0.85rem;
-  line-height: 1;
-  color: rgba(230, 203, 139, 0.75);
-}
-.dgh-hint-track::before { content: '‹'; left: 0; }
-.dgh-hint-track::after { content: '›'; right: 0; }
-.dgh-hint-dot {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  border-radius: 999px;
-  background: #e6cb8b;
-  box-shadow: 0 0 8px rgba(230, 203, 139, 0.85);
-  animation: dgh-hint-slide 1.7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-}
-@keyframes dgh-hint-slide {
-  from { transform: translateX(-9px); }
-  to { transform: translateX(9px); }
-}
-/* Job done: fade out after the first real drag. */
-.dgh-interacted .dgh-hint {
-  opacity: 0;
-  transform: translateY(6px);
-  pointer-events: none;
-}
-/* Drag is desktop-only, so the invitation is too. */
-@media (pointer: coarse) {
-  .dgh-hint { display: none; }
-}
-
-/* ── Frosted feature chips ── */
-.dgh-chips {
-  position: relative;
-  z-index: 5;
-  margin-top: auto;
-  padding: 3rem 1rem calc(5rem + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-}
-.dgh-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.65rem 1.35rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 20px rgba(87, 200, 255, 0.07);
-  animation: dgh-float 6s ease-in-out infinite alternate;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.38);
+  animation: dgh-cue-breathe 3.4s ease-in-out infinite;
 }
-.dgh-chip:nth-child(2) { animation-delay: -2s; }
-.dgh-chip:nth-child(3) { animation-delay: -4s; }
+@keyframes dgh-cue-breathe {
+  0%, 100% { transform: translate(-50%, 0); opacity: 0.55; }
+  50% { transform: translate(-50%, 6px); opacity: 1; }
+}
 
-/* ── Entrance state (removed once GSAP finishes or on reduced motion) ── */
+/* ── Entrance state (removed once GSAP finishes or on reduced motion) ──
+   The first screen is *only* this copy, so it must never be able to stay
+   blank: the keyframe is a failsafe that reveals it at 2.6s if GSAP never
+   arrives (chunk failure, blocked CDN, hostile network). CSS animations
+   outrank inline styles, but GSAP's intro lands at ~1.5s and removes
+   .dgh-anim with it, so in the normal path this never runs. */
 .dgh-anim .dgh-reveal {
   opacity: 0;
   transform: translateY(42px);
   filter: blur(12px);
+  animation: dgh-failsafe 0.8s ease 2.6s forwards;
+}
+@keyframes dgh-failsafe {
+  to { opacity: 1; transform: none; filter: blur(0); }
 }
 
 /* ── Keyframes ── */
-@keyframes dgh-float {
-  from { transform: translateY(0); }
-  to { transform: translateY(-9px); }
-}
 @keyframes dgh-drift-a {
   from { transform: translate3d(-4%, 1%, 0) scale(1); }
   to { transform: translate3d(6%, -3%, 0) scale(1.12); }
@@ -964,16 +1105,14 @@ const CSS_TEXT = `
 
 /* ── Reduced motion: static frame, everything visible, no animation ── */
 @media (prefers-reduced-motion: reduce) {
-  .dgh-anim .dgh-reveal { opacity: 1; transform: none; filter: none; }
-  .dgh-cloud, .dgh-grain, .dgh-chip, .dgh-hint-dot { animation: none; }
-  .dgh-hint { transition: none; }
+  .dgh-anim .dgh-reveal { opacity: 1; transform: none; filter: none; animation: none; }
+  .dgh-cloud, .dgh-grain, .dgh-cue { animation: none; }
   .dgh-clouds { transition: none; }
-  .dgh-cta, .dgh-cta-ghost { transition: none; }
+  .dgh-stage { transition: none; }
+  .dgh-cue { opacity: 0.7; }
 }
 
 @media (max-width: 640px) {
   .dgh-copy { padding-top: 5.5rem; }
-  .dgh-chips { gap: 0.5rem; }
-  .dgh-chip { padding: 0.55rem 1rem; font-size: 0.78rem; }
 }
 `;

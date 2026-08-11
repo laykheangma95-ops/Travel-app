@@ -1121,3 +1121,825 @@
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOMEPAGE JOURNEY — search, arrival, and the six-chapter destination reveal
+   ---------------------------------------------------------------------------
+   The homepage has two states and no page load between them (see
+   components/home/HomeContent). These styles cover everything that appears
+   *because a destination was chosen*: the glass search field on the first
+   screen, the arrival card that replaces it over the flying globe, and the
+   chapters that rise afterwards.
+
+   --jrny-accent is set per destination from its sky mood
+   (components/home/skyMoods.ts) and is used at large sizes only — never for
+   body copy, which stays white/70 on navy to hold WCAG AA.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.home-root {
+  --jrny-accent: #e6cb8b;
+  /* The navbar is sticky, so it occupies 4rem of flow above <main>. Pulling the
+     homepage up by exactly that much lets the night sky start at the very first
+     pixel and run *under* the (transparent) bar — otherwise the white body
+     shows through and the first screen opens on a pale band. */
+  margin-top: -4rem;
+}
+
+/* The Cambodia showcase steps aside as the globe pulls away from it. It stays
+   mounted through the fade so the canvas does not resize mid-flight. */
+.home-showcase {
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.home-showcase.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Search: the one interactive element on the first screen ─────────────── */
+
+.dsearch {
+  position: relative;
+  width: 100%;
+}
+
+.dsearch-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0 1.15rem;
+  min-height: 3.75rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 18px 48px rgba(2, 8, 23, 0.42);
+  transition:
+    border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Expands and warms when the visitor commits to it. */
+.dsearch-field:focus-within {
+  transform: translateY(-2px) scale(1.015);
+  border-color: rgba(230, 203, 139, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 4px rgba(230, 203, 139, 0.14),
+    0 22px 60px rgba(2, 8, 23, 0.5);
+}
+
+.dsearch-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.dsearch-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.9rem 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.0625rem;
+  outline: none;
+}
+.dsearch-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dsearch-clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.dsearch-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.dsearch-clear:focus-visible {
+  outline: 2px solid var(--color-gold-light);
+  outline-offset: 2px;
+}
+
+.dsearch-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.65rem);
+  z-index: 20;
+  overflow: hidden;
+  padding: 0.4rem;
+  border-radius: 20px;
+  text-align: left;
+  background: linear-gradient(165deg, rgba(20, 38, 63, 0.92) 0%, rgba(11, 22, 46, 0.95) 100%);
+  border: 1px solid rgba(230, 203, 139, 0.18);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 26px 64px rgba(2, 8, 23, 0.6);
+  animation: dsearch-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes dsearch-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.dsearch-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+.dsearch-opt-on {
+  background: rgba(230, 203, 139, 0.13);
+}
+.dsearch-flag {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.dsearch-name {
+  flex: 1;
+  font-weight: 600;
+  color: #fff;
+}
+.dsearch-meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+.dsearch-empty {
+  padding: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+/* Quiet openers under the field — destination names only. Nothing to buy. */
+.dsearch-openers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem 0.85rem;
+  margin: 1.35rem 0 0;
+  font-size: 0.85rem;
+}
+.dsearch-openers-label {
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.04em;
+}
+.dsearch-opener {
+  padding: 0.25rem 0.15rem;
+  color: rgba(255, 255, 255, 0.62);
+  border-bottom: 1px solid transparent;
+  transition: color 0.22s ease, border-color 0.22s ease;
+}
+.dsearch-opener:hover {
+  color: var(--color-gold-bright);
+  border-bottom-color: rgba(230, 203, 139, 0.5);
+}
+.dsearch-opener:focus-visible {
+  outline: 2px solid var(--color-gold-light);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Arrival: chapter one, over the globe mid-descent ────────────────────── */
+
+/* The delay is the point: the globe gets ~0.9s of clear sky to turn toward the
+   destination before its name arrives, so the copy lands *with* the descent
+   rather than announcing a place the planet has not reached yet. Keep it in
+   step with ROTATE_SECONDS in GlobeHero. */
+.arv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  animation: arv-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.9s both;
+}
+@keyframes arv-in {
+  from { opacity: 0; transform: translateY(26px); filter: blur(10px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+.arv-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  margin-bottom: 1.75rem;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.arv-back:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.arv-back:focus-visible {
+  outline: 2px solid var(--color-gold-light);
+  outline-offset: 3px;
+}
+
+.arv-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(230, 203, 139, 0.9);
+}
+.arv-flag {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.arv-name {
+  margin: 0.85rem 0 0;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(3rem, 9vw, 6.5rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  color: #fff;
+}
+body.lang-km .arv-name {
+  font-family: var(--font-khmer), var(--font-display), sans-serif;
+}
+
+/* The destination's other script, quietly. It is tagged with its own `lang`,
+   so the matching face has to be selected explicitly — the body font covers
+   only one of the two, and the wrong one renders as tofu boxes. */
+.arv-alt {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.42);
+}
+.arv-alt:lang(km) {
+  font-family: var(--font-khmer), sans-serif;
+  letter-spacing: normal;
+}
+.arv-alt:lang(en) {
+  font-family: var(--font-body), sans-serif;
+}
+
+.arv-essence {
+  margin: 1.15rem auto 0;
+  max-width: 36rem;
+  font-size: clamp(1rem, 1.5vw, 1.15rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+  text-wrap: balance;
+}
+
+/* Two live readouts. The clock ticks and the temperature is a real reading —
+   this is the moment the country stops being a name. */
+.arv-live {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 32rem;
+  margin: clamp(1.75rem, 4vh, 2.75rem) auto 0;
+}
+.arv-live-cell {
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.arv-live-cell dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.arv-live-cell dd {
+  margin: 0.4rem 0 0;
+}
+.arv-clock {
+  display: block;
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+}
+.arv-live-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 480px) {
+  .arv-live { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arv { animation: none; }
+  .dsearch-list { animation: none; }
+  .dsearch-field { transition: none; }
+  .home-showcase { transition: none; }
+}
+
+/* ── Chapters 2–6 ────────────────────────────────────────────────────────── */
+
+.jrny-chapter {
+  position: relative;
+  padding: clamp(4.5rem, 11vh, 8rem) 0;
+}
+.jrny-inner {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 0 1rem;
+}
+@media (min-width: 640px) {
+  .jrny-inner { padding: 0 1.5rem; }
+}
+
+.jrny-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-gold-light);
+}
+.jrny-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--color-gold-bright);
+  background: rgba(198, 151, 73, 0.12);
+  border: 1px solid rgba(230, 203, 139, 0.3);
+}
+
+.jrny-title {
+  margin: 1rem 0 clamp(2rem, 5vh, 3.25rem);
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(1.9rem, 4.2vw, 3.1rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  color: #fff;
+}
+body.lang-km .jrny-title {
+  font-family: var(--font-khmer), var(--font-display), sans-serif;
+}
+
+.jrny-grid-2,
+.jrny-grid-3,
+.jrny-grid-4 {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+.jrny-grid-gap { margin-top: 1.25rem; }
+@media (min-width: 640px) {
+  .jrny-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jrny-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .jrny-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .jrny-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* Reveal wraps each card in a div, so the stretch has to pass through it. */
+.jrny-grid-2 > .reveal,
+.jrny-grid-3 > .reveal,
+.jrny-grid-4 > .reveal { height: 100%; }
+.jrny-grid-2 > .reveal > *,
+.jrny-grid-3 > .reveal > *,
+.jrny-grid-4 > .reveal > * { height: 100%; }
+
+.jrny-fact {
+  display: flex;
+  flex-direction: column;
+  padding: 1.6rem;
+}
+.jrny-fact-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 1.1rem;
+}
+.jrny-fact-label {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.jrny-fact-value {
+  margin: 0.45rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+.jrny-fact-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.jrny-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+}
+.jrny-panel-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.jrny-headline {
+  margin: 0.9rem 0 0;
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-gold-bright);
+}
+.jrny-headline-unit {
+  font-size: 0.55em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+}
+.jrny-sublabel {
+  margin: 1.4rem 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.jrny-sublabel-lead {
+  margin: 0 0 1.1rem;
+  color: var(--color-gold-light);
+}
+/* A lead label that follows a card grid needs air above it, or the two groups
+   read as one. (`Reveal` wraps each in a div, hence the .reveal hop.) */
+.jrny-grid-2 + .reveal,
+.jrny-grid-3 + .reveal,
+.jrny-grid-4 + .reveal {
+  display: block;
+  margin-top: 2.5rem;
+}
+.jrny-body {
+  margin: 0.85rem 0 0;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.72);
+}
+.jrny-body-dim { color: rgba(255, 255, 255, 0.55); }
+.jrny-disclaimer {
+  margin: 1.1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.5);
+}
+.jrny-lede {
+  max-width: 44rem;
+  margin: -0.75rem 0 2rem;
+  font-size: clamp(1.05rem, 1.9vw, 1.3rem);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.78);
+  text-wrap: pretty;
+}
+
+.jrny-list {
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.7rem;
+}
+.jrny-list li {
+  position: relative;
+  padding-left: 1.15rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+}
+.jrny-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--jrny-accent);
+  opacity: 0.75;
+}
+.jrny-list strong { color: #fff; font-weight: 600; }
+
+.jrny-apps {
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+.jrny-apps li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.65rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.jrny-apps li:last-child { border-bottom: 0; padding-bottom: 0; }
+.jrny-apps strong { font-size: 0.95rem; font-weight: 700; color: #fff; }
+.jrny-apps span { font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); }
+
+.jrny-emergency {
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.15rem;
+}
+.jrny-emergency li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+.jrny-emergency li:last-child { border-bottom: 0; }
+.jrny-emergency a {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-gold-bright);
+  transition: color 0.2s ease;
+}
+.jrny-emergency a:hover { color: #fff; }
+.jrny-emergency a:focus-visible {
+  outline: 2px solid var(--color-gold-light);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Safety meter: ten dots, filled to the score. Decorative — the accessible
+   value is on the container's aria-label. */
+.jrny-meter {
+  display: flex;
+  gap: 5px;
+  margin-top: 0.9rem;
+}
+.jrny-meter-dot {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.jrny-meter-dot.is-on {
+  background: var(--jrny-accent);
+  box-shadow: 0 0 10px rgba(230, 203, 139, 0.35);
+}
+
+.jrny-quote {
+  height: 100%;
+  margin: 0;
+  padding: 1.75rem;
+  border-radius: 18px;
+  border-left: 2px solid var(--jrny-accent);
+  background: linear-gradient(160deg, rgba(198, 151, 73, 0.1) 0%, rgba(11, 22, 46, 0.3) 100%);
+}
+.jrny-quote > p:last-child {
+  margin: 0.9rem 0 0;
+  font-size: clamp(1rem, 1.7vw, 1.15rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.jrny-place {
+  padding: 1.6rem;
+}
+.jrny-place h3 {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: 1.3rem;
+  line-height: 1.25;
+  color: #fff;
+}
+body.lang-km .jrny-place h3 {
+  font-family: var(--font-khmer), var(--font-display), sans-serif;
+}
+.jrny-place p {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.66);
+}
+.jrny-place-gem {
+  border-color: rgba(230, 203, 139, 0.28);
+}
+
+.jrny-inspiration {
+  max-width: 46rem;
+  margin: clamp(2rem, 5vh, 3rem) auto 0;
+  padding: 0 0 0 1.5rem;
+  border-left: 2px solid var(--jrny-accent);
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.25rem, 2.6vw, 1.75rem);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  text-wrap: balance;
+}
+body.lang-km .jrny-inspiration {
+  font-family: var(--font-khmer), var(--font-display), sans-serif;
+}
+
+.jrny-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: clamp(1.75rem, 4vh, 2.5rem) 0 0;
+  padding: 1.1rem 1.35rem;
+  border-radius: 16px;
+  background: rgba(245, 158, 11, 0.09);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+.jrny-alert svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-warning);
+}
+.jrny-alert strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── The recommendation, and only now ────────────────────────────────────── */
+
+.jrny-esim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.75rem;
+  padding: clamp(1.75rem, 4vw, 2.5rem);
+}
+.jrny-esim-body { flex: 1 1 20rem; min-width: 0; }
+.jrny-esim-price {
+  margin: 0.85rem 0 0;
+  font-size: clamp(2rem, 4.5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+}
+.jrny-esim-unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.jrny-esim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The single accent CTA on this surface — dark ink on gold, never white. */
+.jrny-cta,
+.jrny-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0 1.75rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease,
+    background-color 0.28s ease;
+}
+.jrny-cta {
+  color: var(--color-primary-deep);
+  background: linear-gradient(
+    160deg,
+    rgba(230, 203, 139, 0.98) 0%,
+    rgba(198, 151, 73, 0.94) 45%,
+    rgba(138, 104, 32, 0.98) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 244, 0.65),
+    0 10px 32px rgba(198, 151, 73, 0.34);
+}
+.jrny-cta:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 244, 0.7),
+    0 16px 40px rgba(198, 151, 73, 0.45);
+}
+.jrny-cta-ghost {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.jrny-cta-ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.jrny-cta:focus-visible,
+.jrny-cta-ghost:focus-visible,
+.jrny-restart-btn:focus-visible {
+  outline: 2px solid var(--color-gold-light);
+  outline-offset: 3px;
+}
+
+.jrny-restart {
+  margin: clamp(2rem, 5vh, 3rem) 0 0;
+  text-align: center;
+}
+.jrny-restart-btn {
+  padding: 0.5rem 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  transition: color 0.22s ease, border-color 0.22s ease;
+}
+.jrny-restart-btn:hover {
+  color: var(--color-gold-bright);
+  border-bottom-color: rgba(230, 203, 139, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jrny-cta,
+  .jrny-cta-ghost { transition: none; }
+  .jrny-cta:hover { transform: none; }
+}
+
+/* ── Navbar over the homepage night hero ───────────────────────────────────
+   The bar ships light-surface Tailwind utilities everywhere. Rather than
+   branch every class, `.nav-night` repaints them for the first screen of the
+   homepage, where the surface underneath is deep space. Descendant selectors
+   outrank single-class utilities, so no !important is needed. Contrast is held
+   at white/80 or brighter on a #050b2e-#0a1a4a sky (>= 7:1). */
+.nav-night .text-ink-secondary { color: rgba(255, 255, 255, 0.82); }
+.nav-night .text-ink { color: #fff; }
+.nav-night .hover\:text-ink:hover { color: #fff; }
+.nav-night .hover\:bg-surface-3:hover,
+.nav-night .hover\:bg-surface-2:hover { background-color: rgba(255, 255, 255, 0.12); }
+/* Dropdown panels stay on their own opaque surface so their text is legible. */
+.nav-night .bg-white { background-color: rgba(14, 27, 48, 0.94); }
+.nav-night .bg-white .text-ink-secondary { color: rgba(255, 255, 255, 0.78); }
+.nav-night .border-line { border-color: rgba(255, 255, 255, 0.14); }

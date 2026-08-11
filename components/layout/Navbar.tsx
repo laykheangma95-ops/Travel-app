@@ -71,19 +71,36 @@ export function Navbar() {
   // The Apsara hero is a standalone full-screen page with its own nav.
   if (pathname === '/apsara-hero') return null;
 
+  // The homepage is one continuous night sky from the first pixel, so the bar
+  // wears it too: invisible over the globe, frosted navy once scrolled. A white
+  // bar there would be the exact "different product per screen" break the
+  // design system warns about. `.nav-night` repaints the light-surface
+  // utilities (see globals.css) instead of duplicating every class.
+  const nightNav = pathname === '/';
+
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 transition-all duration-300 ease-smooth backdrop-blur-xl',
-        scrolled
-          ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
-          : 'border-b border-transparent bg-white/60'
+        'sticky top-0 z-40 transition-all duration-300 ease-smooth',
+        nightNav
+          ? cn(
+              'nav-night',
+              scrolled
+                ? 'border-b border-white/10 bg-primary-deep/70 backdrop-blur-xl'
+                : 'border-b border-transparent bg-transparent'
+            )
+          : cn(
+              'backdrop-blur-xl',
+              scrolled
+                ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
+                : 'border-b border-transparent bg-white/60'
+            )
       )}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
         <Link href="/" aria-label="Domer home">
-          <DomerLogo surface="light" />
+          <DomerLogo surface={nightNav ? 'navy' : 'light'} />
         </Link>
 
         {/* Desktop nav */}
