@@ -1,7 +1,26 @@
 {
   "extends": ["next/core-web-vitals"],
   "rules": {
-    "@next/next/no-img-element": "warn"
+    "@next/next/no-img-element": "warn",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["mock-gohub", "mock-gohub/*", "@/mock-gohub", "@/mock-gohub/*", "**/mock-gohub/**"],
+            "message": "mock-gohub is a standalone fake supplier, not a library. Production code talks to it over HTTP by setting GOHUB_BASE_URL, exactly as it talks to the real API. Importing it would compile supplier fixtures into the app."
+          }
+        ]
+      }
+    ]
   },
+  "overrides": [
+    {
+      "files": ["mock-gohub/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
   "ignorePatterns": [".next/", "node_modules/", "public/sw.js"]
 }
