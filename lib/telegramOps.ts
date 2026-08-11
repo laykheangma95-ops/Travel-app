@@ -2,7 +2,7 @@ import { log } from './logger';
 import type { EsimOrder } from '@/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ops alerts to the Domer staff Telegram channel.
+// Ops alerts to the Domner staff Telegram channel.
 //
 // WHY THIS IS NOT IN lib/telegram.ts:
 //   `lib/telegram.ts` is locked (docs/LOCKED.md) because it owns *customer*
@@ -14,7 +14,7 @@ import type { EsimOrder } from '@/types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Admin notifications to the Domer ops Telegram channel.
+ * Admin notifications to the Domner ops Telegram channel.
  *
  * Money is coerced with Number() before formatting — PostgREST may return a
  * DECIMAL column as a string, and calling .toFixed() on it throws.

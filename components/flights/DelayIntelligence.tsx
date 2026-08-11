@@ -40,7 +40,7 @@ export function DelayIntelligence({ flightNumber, date }: { flightNumber: string
           )}
         </span>
         <div>
-          <p className="font-display text-sm font-bold text-white">Domer Intelligence</p>
+          <p className="font-display text-sm font-bold text-white">Domner Intelligence</p>
           <p className="text-[11px] text-white/40">
             {confidenceLabel} · inbound-aircraft rotation analysis
           </p>

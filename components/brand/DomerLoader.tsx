@@ -5,6 +5,7 @@
 // pulsing glow, "Preparing your journey" label. Keyframes live in globals.css.
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { WAYFINDER_PATH } from './DomerMark';
 
 const DUST = [
@@ -87,10 +88,18 @@ export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { 
 // Full-screen splash: shown once per session on first load, fades out after
 // the page has hydrated (min 900ms so the animation reads, max 4s safety).
 export function DomerSplash() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [hidden, setHidden] = useState(false);
 
+  // The journey pages choreograph their own reveal: the search field is already
+  // on screen in static HTML and the globe eases in behind it. A splash there
+  // would cover the LCP element for up to a second after `load` — measured at
+  // ~2.9s LCP with it, ~1.1s without — for a curtain nobody asked to see.
+  const skip = pathname === '/' || pathname.startsWith('/destination/');
+
   useEffect(() => {
+    if (skip) return;
     if (sessionStorage.getItem('domer-splash-shown')) return;
     sessionStorage.setItem('domer-splash-shown', '1');
     setVisible(true);
@@ -114,7 +123,7 @@ export function DomerSplash() {
       clearTimeout(safety);
       clearTimeout(dismissTimer);
     };
-  }, []);
+  }, [skip]);
 
   if (!visible) return null;
 

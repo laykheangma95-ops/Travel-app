@@ -71,19 +71,36 @@ export function Navbar() {
   // The Apsara hero is a standalone full-screen page with its own nav.
   if (pathname === '/apsara-hero') return null;
 
+  // The brand is Temple *Night*, so the header is dark by default and light
+  // only on the documented utility surfaces (§9.1 of the ui-ux skill: the
+  // concept has to survive the whole funnel). Previously it was light
+  // everywhere, which put a strip of daylight across the top of every night
+  // page on the site — the store, the plan pages, the cart, the checkout, the
+  // flight tracker. One inconsistent element repeated on every screen does more
+  // damage to a premium feeling than any single page can repair.
+  const lightSurfaces = ['/admin', '/dashboard', '/settings', '/my-esims', '/my-trips', '/privacy', '/terms', '/refunds'];
+  const onLight = lightSurfaces.some((r) => pathname.startsWith(r));
+  const inkClass = onLight
+    ? 'text-ink-secondary hover:bg-surface-3 hover:text-ink'
+    : 'text-white/75 hover:bg-white/10 hover:text-white';
+
   return (
     <header
       className={cn(
         'sticky top-0 z-40 transition-all duration-300 ease-smooth backdrop-blur-xl',
-        scrolled
-          ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
-          : 'border-b border-transparent bg-white/60'
+        onLight
+          ? scrolled
+            ? 'border-b border-line/80 bg-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.06)]'
+            : 'border-b border-transparent bg-white/60'
+          : scrolled
+            ? 'border-b border-white/10 bg-[#060e24]/85 shadow-[0_8px_24px_rgba(3,8,30,0.45)]'
+            : 'border-b border-transparent bg-[#060e24]/45'
       )}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6" aria-label="Main">
         {/* Logo */}
-        <Link href="/" aria-label="Domer home">
-          <DomerLogo surface="light" />
+        <Link href="/">
+          <DomerLogo surface={onLight ? 'light' : 'navy'} />
         </Link>
 
         {/* Desktop nav */}
@@ -98,7 +115,7 @@ export function Navbar() {
               >
                 <button
                   type="button"
-                  className="flex items-center gap-1 rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
+                  className={`flex items-center gap-1 rounded-btn px-3.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
                   aria-expanded={openDropdown === group.labelKey}
                 >
                   {t(group.labelKey)}
@@ -122,7 +139,7 @@ export function Navbar() {
               <Link
                 key={group.labelKey}
                 href={group.href!}
-                className="rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
+                className={`rounded-btn px-3.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
               >
                 {t(group.labelKey)}
               </Link>
@@ -135,8 +152,10 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-            className="flex items-center gap-2 rounded-btn px-2.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3"
-            aria-label={lang === 'en' ? 'ប្តូរទៅភាសាខ្មែរ' : 'Switch to English'}
+            className={`flex items-center gap-2 rounded-btn px-2.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
+            // WCAG 2.5.3 — the accessible name has to contain the visible text
+            // ("EN" / "KM"), or voice-control users cannot say what they see.
+            aria-label={lang === 'en' ? 'EN — ប្តូរទៅភាសាខ្មែរ' : 'KM — Switch to English'}
           >
             <WavyFlag
               flag={lang === 'en' ? '🇬🇧' : '🇰🇭'}
@@ -148,7 +167,7 @@ export function Navbar() {
 
           <Link
             href="/cart"
-            className="relative rounded-btn p-2.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
+            className={`relative rounded-btn p-2.5 transition-colors ${inkClass}`}
             aria-label={`Cart with ${cartCount} items`}
           >
             <ShoppingCart size={20} />
@@ -161,7 +180,7 @@ export function Navbar() {
 
           <Link
             href="/sign-in"
-            className="hidden rounded-btn px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink md:block"
+            className={`hidden rounded-btn px-3.5 py-2 text-sm font-medium transition-colors ${inkClass} md:block`}
           >
             {t('nav.signIn')}
           </Link>
@@ -174,7 +193,7 @@ export function Navbar() {
 
           <button
             type="button"
-            className="rounded-btn p-2.5 text-ink-secondary transition-colors hover:bg-surface-3 lg:hidden"
+            className={`rounded-btn p-2.5 transition-colors ${inkClass} lg:hidden`}
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
