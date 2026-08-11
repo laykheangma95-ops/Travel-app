@@ -100,7 +100,14 @@ export const IDLE_FOV = 38;
  * flight, so on arrival the destination genuinely fills the frame.
  */
 const IDLE_SCALE = 0.66;
-const IDLE_LIFT = 0.4;
+/**
+ * Lowered from 0.4: at 0.4 the sphere's crown sat ~6% of the viewport from the
+ * top edge, which on a real laptop window (browser chrome eats ~150px, so
+ * ~1440x720 of page) put it hard against the header and read as clipped. 0.3
+ * drops it by 5% of viewport height — clear sky above it, still well above the
+ * greeting and the search field.
+ */
+const IDLE_LIFT = 0.3;
 /** Framing on arrival, unless a destination overrides it. */
 export const ARRIVAL_FOV = 31;
 /** One revolution every 90 seconds, matching the previous hero. */

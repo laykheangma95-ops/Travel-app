@@ -58,7 +58,11 @@ export const DOTS_VERT = /* glsl */ `
     vDay = day;
     // City lights twinkle at night; daylight is steady.
     vAlpha = facing * mix(flicker, 1.0, day);
-    gl_PointSize = aSize * uGlobeScale * uScale / -mv.z;
+    // Clamped in device pixels: under ~1 a dot shimmers as it crosses the pixel
+    // grid, and past ~22 it stops reading as a city light and becomes a disc.
+    // The engine also feeds uGlobeScale a distance-compensated value, so dots
+    // grow sub-linearly as the camera descends instead of turning to porridge.
+    gl_PointSize = clamp(aSize * uGlobeScale * uScale / -mv.z, 1.0, 22.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -161,7 +165,8 @@ export const HUB_VERT = /* glsl */ `
     vHover = aHover;
     vAlpha = facing * breathe;
     float size = 0.030 * (1.0 + aHover * 0.9 + 0.10 * sin(uTime * 2.0 + aPhase));
-    gl_PointSize = size * uGlobeScale * uScale / -mv.z;
+    // Capped so a pin stays a bright node up close rather than a smeared blob.
+    gl_PointSize = min(size * uGlobeScale * uScale / -mv.z, 96.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -253,6 +258,13 @@ export interface GlobeEngine {
   /** Change the frame budget at runtime — the watchdog uses this to shed load
    *  on a device that cannot hold 60fps, instead of stuttering the whole page. */
   setTargetFps(fps: number): void;
+  /** Lower (or raise) the device-pixel-ratio ceiling at runtime. Prefer this
+   *  over renderer.setPixelRatio, which a later resize would overwrite. */
+  setMaxDpr(v: number): void;
+  /** Fired when the render resolution changes: browser zoom, page pinch-zoom,
+   *  or a move to a different-density display. The engine has already resized
+   *  its buffer by the time this runs — callers re-apply their own framing. */
+  onResolutionChange(fn: () => void): void;
   /** Scale the globe group and refresh dot-size uniforms. */
   setGlobeScale(s: number): void;
   getGlobeScale(): number;
@@ -277,11 +289,37 @@ export async function createGlobeEngine(
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
-    antialias: false,
+    // MSAA on the silhouette: the occluder limb, the atmosphere rim and the
+    // route tubes are hard edges that stairstep badly without it. Desktop only
+    // — on mobile the fill cost is not worth it.
+    antialias: !isMobile,
     powerPreference: 'high-performance',
   });
+
+  /* ── Render resolution, tracked live ──────────────────────────────────────
+     devicePixelRatio changes when the visitor zooms the browser or drags the
+     window to a different-density display; visualViewport.scale changes when
+     they pinch-zoom the page on a phone. Sampling either once at startup is
+     what makes the planet go soft the moment anyone zooms — the drawing buffer
+     keeps its old size and the browser upscales it.
+
+     The ceiling is a *pixel budget* rather than a fixed ratio, because what
+     costs GPU time is the buffer area (cssArea x ratio^2), not the ratio. A
+     browser zoom shrinks the CSS box by the same factor devicePixelRatio grows
+     by, so budgeting on area lets the ratio climb to exactly what the display
+     needs and the buffer comes out the size it already was: sharp at every zoom
+     level, for no extra cost. `maxDpr` from the device tier is still a hard
+     ceiling on top, and the frame watchdog can lower it at runtime.          */
+  let maxDpr = opts.maxDpr ?? (isMobile ? 2 : 2.5);
+  const budget = isMobile ? 3.5e6 : 16e6;
+  const currentRatio = (cssW: number, cssH: number) => {
+    const dpr = window.devicePixelRatio || 1;
+    const pageZoom = window.visualViewport?.scale ?? 1;
+    const area = Math.max(1, cssW * cssH);
+    return Math.max(1, Math.min(dpr * pageZoom, maxDpr, Math.sqrt(budget / area)));
+  };
   renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio || 1, opts.maxDpr ?? (isMobile ? 1.5 : 2)),
+    currentRatio(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight),
   );
 
   const scene = new THREE.Scene();
@@ -347,12 +385,15 @@ export async function createGlobeEngine(
   spinGroup.add(new THREE.Points(dotsGeo, dotsMat));
 
   /* ── Dark occluder sphere (hides far-side dots, gives the disc) ── */
-  const occGeo = track(new THREE.SphereGeometry(0.992, 48, 48));
+  // Segment counts drive the silhouette. At 48 the limb is a visible polygon
+  // as soon as the camera descends, which is most of why close-ups looked cheap.
+  const SPHERE_SEG = isMobile ? 96 : 160;
+  const occGeo = track(new THREE.SphereGeometry(0.992, SPHERE_SEG, SPHERE_SEG / 2));
   const occMat = track(new THREE.MeshBasicMaterial({ color: new THREE.Color('#060f2c') }));
   tiltGroup.add(new THREE.Mesh(occGeo, occMat));
 
   /* ── Cyan fresnel atmosphere rim ── */
-  const atmoGeo = track(new THREE.SphereGeometry(1.05, 48, 48));
+  const atmoGeo = track(new THREE.SphereGeometry(1.05, SPHERE_SEG, SPHERE_SEG / 2));
   const atmoMat = track(
     new THREE.ShaderMaterial({
       vertexShader: ATMO_VERT,
@@ -408,22 +449,67 @@ export async function createGlobeEngine(
   const timeMats: ThreeNS.ShaderMaterial[] = [];
   let globeScale = 1;
 
+  /**
+   * Dot size in pixels tracks 1/cameraDistance, so descending from the idle
+   * 4.2 to an arrival altitude would otherwise fatten every dot by the same
+   * factor the world grows — continents turn to porridge exactly when you are
+   * closest to them. Feeding uGlobeScale a compensated value makes them grow as
+   * distance^-0.4 instead, so they stay reading as points while the land they
+   * describe magnifies fully. The local LOD patch fills the gaps that opens.
+   */
+  const BASE_DISTANCE = camera.position.z;
+  const dotSizeScale = () =>
+    globeScale * Math.pow(Math.max(0.2, camera.position.z) / BASE_DISTANCE, 0.6);
+
   const applyDotUniforms = (pxScale: number) => {
+    const s = dotSizeScale();
     for (const m of [dotsMat, ...pointMats]) {
       m.uniforms.uScale.value = pxScale;
-      m.uniforms.uGlobeScale.value = globeScale;
+      m.uniforms.uGlobeScale.value = s;
     }
+    starMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
   };
 
+  let lastW = 1;
   let lastH = 1;
   const setViewport = (w: number, h: number) => {
+    lastW = w;
     lastH = h;
+    renderer.setPixelRatio(currentRatio(w, h));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     const pxScale =
       (h * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     applyDotUniforms(pxScale);
+  };
+
+  /* A DPR change fires no resize event of its own, so arm a media query at the
+     current ratio: it flips the moment the ratio moves, and we re-arm at the
+     new value. Page pinch-zoom comes through visualViewport instead. */
+  const resolutionFns: (() => void)[] = [];
+  const notifyResolution = () => {
+    setViewport(lastW, lastH);
+    for (const fn of resolutionFns) fn();
+  };
+  let ratioMql: MediaQueryList | null = null;
+  const onRatioChange = () => {
+    armRatioWatch();
+    notifyResolution();
+  };
+  const armRatioWatch = () => {
+    ratioMql?.removeEventListener('change', onRatioChange);
+    ratioMql = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    ratioMql.addEventListener('change', onRatioChange);
+  };
+  armRatioWatch();
+  window.visualViewport?.addEventListener('resize', notifyResolution);
+
+  /** The frame watchdog lowers this rather than poking the renderer directly,
+   *  so a later resize cannot silently restore a ratio the device can't hold. */
+  const setMaxDpr = (v: number) => {
+    maxDpr = v;
+    setViewport(lastW, lastH);
   };
 
   const refreshPxScale = () => {
@@ -512,6 +598,8 @@ export async function createGlobeEngine(
     setCamera,
     setSun,
     setTargetFps,
+    setMaxDpr,
+    onResolutionChange: (fn) => resolutionFns.push(fn),
     setGlobeScale,
     getGlobeScale: () => globeScale,
     onFrame: (fn) => frameFns.push(fn),
@@ -531,6 +619,8 @@ export async function createGlobeEngine(
       disposed = true;
       running = false;
       cancelAnimationFrame(raf);
+      ratioMql?.removeEventListener('change', onRatioChange);
+      window.visualViewport?.removeEventListener('resize', notifyResolution);
       for (const d of disposables) d.dispose();
       renderer.dispose();
     },

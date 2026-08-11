@@ -129,14 +129,20 @@ export default function GlobeCanvas({
       layout();
       const ro = new ResizeObserver(layout);
       ro.observe(wrap);
+      // Browser zoom, page pinch-zoom, or a move to a different-density
+      // display. The engine has already resized its buffer; re-apply the pose
+      // so framing follows, instead of leaving a stretched, soft planet.
+      created.onResolutionChange(() => controller.refresh());
 
       // If the device cannot hold the pace, drop the frame budget rather than
       // letting the whole page stutter. Measured, not guessed.
       if (tier === 'full') {
         const watchdog = createFrameWatchdog(() => {
           // Shed pixels first, then frames. Both are cheaper than a page that
-          // stutters while someone is trying to read it.
-          created.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+          // stutters while someone is trying to read it. Lower the ceiling
+          // rather than the renderer's ratio directly — the ratio is recomputed
+          // on every resize, so a direct poke would be undone by the next one.
+          created.setMaxDpr(1.5);
           created.setTargetFps(30);
           layout();
         });
