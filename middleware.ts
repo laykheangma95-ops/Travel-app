@@ -14,6 +14,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { demoModeAllowed } from '@/lib/env';
 
 const ADMIN_PREFIX = '/admin';
 const CUSTOMER_PREFIXES = ['/dashboard', '/my-esims', '/my-trips', '/settings'];
@@ -38,9 +39,34 @@ export async function middleware(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Without Supabase there are no sessions to refresh and no accounts to check.
-  // Development stays browsable; a production deploy that reaches here has
-  // bigger problems, and the API routes still refuse every admin action.
-  if (!url || !anonKey) return response;
+  //
+  // Development stays browsable, as it always has. Production does NOT: an
+  // outage must not present as an open door. Waving every request through here
+  // meant that a deploy missing the anon key served /dashboard, /my-esims,
+  // /my-trips and /settings to anyone with the URL — and left /admin ungated at
+  // the edge too, since this early return sat in front of the admin check. The
+  // API routes still refused every admin action, but the pages themselves
+  // rendered. Deny instead, and let the operator find it in the logs.
+  if (!url || !anonKey) {
+    if (demoModeAllowed) return response;
+
+    console.error(
+      '[middleware] Supabase is not configured on a production deploy. ' +
+        'Denying gated routes. Set NEXT_PUBLIC_SUPABASE_URL and ' +
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy.'
+    );
+
+    if (isAdminRoute) {
+      return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+    }
+    if (isCustomerRoute) {
+      const signIn = new URL('/sign-in', request.url);
+      signIn.searchParams.set('returnTo', pathname);
+      return NextResponse.redirect(signIn);
+    }
+    // The public site — storefront, destinations, checkout — is untouched.
+    return response;
+  }
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {
