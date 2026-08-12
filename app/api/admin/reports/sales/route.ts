@@ -15,7 +15,7 @@
 
 import { NextResponse } from 'next/server';
 import { ApiError, route } from '@/lib/http';
-import { requireAdmin } from '@/lib/serverAuth';
+import { requirePermission } from '@/lib/serverAuth';
 import { buildSalesReport, type ReportPeriod } from '@/lib/reports/sales';
 import { renderSalesWorkbook, workbookFilename } from '@/lib/reports/workbook';
 import { log } from '@/lib/logger';
@@ -36,7 +36,7 @@ function readDate(value: string | null, field: string): string | undefined {
 
 export const GET = route(
   async (request) => {
-    const admin = await requireAdmin(request);
+    const { user: admin } = await requirePermission(request, 'reports.export');
 
     const { searchParams } = new URL(request.url);
     const requested = searchParams.get('period') ?? 'monthly';

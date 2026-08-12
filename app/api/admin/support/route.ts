@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ApiError, ok, route } from '@/lib/http';
-import { requireAdmin } from '@/lib/serverAuth';
+import { requirePermission } from '@/lib/serverAuth';
 import { lookupOrders } from '@/lib/support';
 
 export const runtime = 'nodejs';
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 export const GET = route(
   async (request) => {
-    const admin = await requireAdmin(request);
+    const { user: admin } = await requirePermission(request, 'customers.lookup');
 
     const query = new URL(request.url).searchParams.get('q')?.trim() ?? '';
     if (!query) {

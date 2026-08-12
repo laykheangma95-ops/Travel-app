@@ -2,24 +2,55 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileSpreadsheet, Headphones, LayoutDashboard, Package, QrCode, Users, Server } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  Headphones,
+  LayoutDashboard,
+  Package,
+  QrCode,
+  Server,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { AdminGate } from '@/components/admin/AdminGate';
+import { useSession } from '@/hooks/useSession';
 import { cn } from '@/lib/utils';
 
+// Tabs are filtered by permission, not by role name. A tab appears because the
+// caller can actually use it — so re-cutting the roles never leaves a nav entry
+// pointing at a screen that 403s.
+//
+// This is presentation only. Every route behind these links re-checks the
+// permission server-side.
 const adminNav = [
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  // Support sits high in the list on purpose: when the phone rings, this is
-  // the screen staff need, and hunting for it costs the customer's patience.
-  { label: 'Support', href: '/admin/support', icon: Headphones },
-  { label: 'Orders', href: '/admin/orders', icon: Package },
-  { label: 'Reports', href: '/admin/reports', icon: FileSpreadsheet },
-  { label: 'Suppliers', href: '/admin/providers', icon: Server },
-  { label: 'Generate eSIM', href: '/admin/generate-esim', icon: QrCode },
-  { label: 'Affiliates', href: '/admin/affiliates', icon: Users },
+  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, permission: 'dashboard.view' },
+  // Support sits high on purpose: when the phone rings, this is the screen
+  // staff need, and hunting for it costs the customer's patience.
+  { label: 'Support', href: '/admin/support', icon: Headphones, permission: 'customers.lookup' },
+  { label: 'Orders', href: '/admin/orders', icon: Package, permission: 'orders.read' },
+  { label: 'Reports', href: '/admin/reports', icon: FileSpreadsheet, permission: 'reports.export' },
+  { label: 'Suppliers', href: '/admin/providers', icon: Server, permission: 'suppliers.manage' },
+  { label: 'Generate eSIM', href: '/admin/generate-esim', icon: QrCode, permission: 'orders.fulfil' },
+  { label: 'Affiliates', href: '/admin/affiliates', icon: Users, permission: 'affiliates.manage' },
+  { label: 'Staff', href: '/admin/staff', icon: ShieldCheck, permission: 'staff.manage' },
 ];
+
+const ROLE_LABEL: Record<string, string> = {
+  viewer: 'Viewer',
+  support: 'Call centre',
+  ops: 'Operations',
+  finance: 'Finance',
+  admin: 'Administrator',
+};
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { can, role, unconfigured } = useSession();
+
+  // With Supabase unconfigured there is no session to read a role from, so the
+  // panel shows every tab rather than an empty shell. The API routes still
+  // refuse every action.
+  const visible = adminNav.filter((item) => unconfigured || can(item.permission));
 
   return (
     <AdminGate>
@@ -29,11 +60,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             Admin <span className="text-accent">Panel</span>
           </h1>
           <span className="rounded-full bg-surface-3 px-3.5 py-1.5 text-xs font-medium text-ink-secondary">
-            Internal · Domner Ops
+            {role ? `${ROLE_LABEL[role] ?? role} · Domner Ops` : 'Internal · Domner Ops'}
           </span>
         </div>
         <div className="mb-8 flex flex-wrap gap-2">
-          {adminNav.map((item) => {
+          {visible.map((item) => {
             const active = pathname === item.href;
             return (
               <Link

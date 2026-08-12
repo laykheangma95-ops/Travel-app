@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 import { ApiError, ok, readJson, route } from '@/lib/http';
-import { requireAdmin } from '@/lib/serverAuth';
+import { requirePermission } from '@/lib/serverAuth';
 import { getOrderByNumber } from '@/lib/orders';
 import { fulfilOrder } from '@/lib/fulfilment';
 import { checkAllProviders, providerStatus } from '@/lib/providers/esim/registry';
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 export const GET = route(
   async (request) => {
-    await requireAdmin(request);
+    await requirePermission(request, 'suppliers.manage');
 
     const [health, status] = await Promise.all([checkAllProviders(), providerStatus()]);
 
@@ -45,7 +45,7 @@ const retrySchema = z.object({
 
 export const POST = route(
   async (request) => {
-    const admin = await requireAdmin(request);
+    const { user: admin } = await requirePermission(request, 'suppliers.manage');
     const parsed = retrySchema.safeParse(await readJson<unknown>(request));
 
     if (!parsed.success) {
