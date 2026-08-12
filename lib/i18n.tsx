@@ -26,6 +26,20 @@ const dicts = {
     'nav.support': 'Support',
     'nav.signIn': 'Sign In',
     'nav.getStarted': 'Get Started',
+    // Sign-in and sign-up failures. Each one names what the traveller should do
+    // next — an error they cannot act on is the same as no error at all.
+    'auth.error.providerUnavailable':
+      'This sign-in method is not available yet. Please use your email address instead.',
+    'auth.error.phoneUnavailable':
+      'Phone sign-in is not available yet. Please use your email address — it works even with no mobile signal.',
+    'auth.error.badCredentials': 'That email or password is not right. Please check and try again.',
+    'auth.error.emailNotConfirmed':
+      'Please confirm your email first. Check your inbox for the message we sent you.',
+    'auth.error.codeExpired': 'That code has expired. Ask for a new one and try again.',
+    'auth.error.codeInvalid': 'That code is not correct. Please check it and try again.',
+    'auth.error.tooMany': 'Too many attempts. Please wait a few minutes and try again.',
+    'auth.error.emailTaken':
+      'An account already exists with this email. Try signing in instead.',
     // Hero
     'hero.badge': "Cambodia's First Travel Super App 🇰🇭",
     'hero.t1': 'Travel',
@@ -206,6 +220,18 @@ const dicts = {
     'nav.support': 'ជំនួយ',
     'nav.signIn': 'ចូលគណនី',
     'nav.getStarted': 'ចាប់ផ្តើម',
+    // ការចូល និងការចុះឈ្មោះមិនបានសម្រេច
+    'auth.error.providerUnavailable':
+      'វិធីចូលនេះមិនទាន់មានទេ។ សូមប្រើអាសយដ្ឋានអ៊ីមែលរបស់អ្នកជំនួសវិញ។',
+    'auth.error.phoneUnavailable':
+      'ការចូលដោយលេខទូរស័ព្ទមិនទាន់មានទេ។ សូមប្រើអ៊ីមែល — វាដំណើរការទោះបីគ្មានសេវាទូរស័ព្ទក៏ដោយ។',
+    'auth.error.badCredentials': 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ។ សូមពិនិត្យ ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.emailNotConfirmed':
+      'សូមបញ្ជាក់អ៊ីមែលរបស់អ្នកជាមុនសិន។ សូមពិនិត្យប្រអប់សំបុត្ររបស់អ្នក។',
+    'auth.error.codeExpired': 'លេខកូដនេះផុតកំណត់ហើយ។ សូមស្នើសុំលេខកូដថ្មី។',
+    'auth.error.codeInvalid': 'លេខកូដមិនត្រឹមត្រូវទេ។ សូមពិនិត្យ ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.tooMany': 'ព្យាយាមច្រើនដងពេក។ សូមរង់ចាំពីរបីនាទី ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.emailTaken': 'មានគណនីរួចហើយជាមួយអ៊ីមែលនេះ។ សូមព្យាយាមចូលគណនីវិញ។',
     // Hero
     'hero.badge': 'កម្មវិធីធ្វើដំណើរដំបូងគេរបស់កម្ពុជា 🇰🇭',
     'hero.t1': 'ធ្វើដំណើរ',

@@ -46,5 +46,5 @@ export const GET = route(
       allowlistConfigured: adminConfigured(),
     });
   },
-  { rateLimit: 'auth', name: 'admin.session' }
+  { rateLimit: 'session', name: 'admin.session' }
 );

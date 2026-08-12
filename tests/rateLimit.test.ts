@@ -92,6 +92,38 @@ describe('checkRateLimit', () => {
   });
 });
 
+describe('the admin session bucket', () => {
+  // The regression: /api/admin/session sat in the `auth` bucket at 10 requests
+  // per 5 minutes. The browser calls it on every admin page load, and twice
+  // when onAuthStateChange fires after the initial getUser — so opening six
+  // pages threw the owner out of their own panel with "this account has no
+  // staff role". Sizing a per-page-load endpoint like a credential check is
+  // what broke it, so the shape of the limit is the thing worth asserting.
+
+  it('survives a realistic burst of admin navigation', () => {
+    const request = requestFrom('4.4.4.4');
+
+    // Twelve page loads, two session calls each — well past what the old
+    // 10-per-5-minutes `auth` bucket allowed.
+    for (let i = 0; i < 24; i += 1) {
+      expect(checkRateLimit(request, 'session').ok).toBe(true);
+    }
+  });
+
+  it('is far more generous than the credential-check bucket', () => {
+    expect(RATE_LIMITS.session.limit).toBeGreaterThan(RATE_LIMITS.auth.limit);
+  });
+
+  it('still has a ceiling, so a runaway client is bounded', () => {
+    const request = requestFrom('5.5.5.5');
+    const { limit } = RATE_LIMITS.session;
+
+    for (let i = 0; i < limit; i += 1) checkRateLimit(request, 'session');
+
+    expect(checkRateLimit(request, 'session').ok).toBe(false);
+  });
+});
+
 describe('clientKey', () => {
   it('takes the left-most x-forwarded-for entry', () => {
     const request = new Request('https://domnerapp.com/', {

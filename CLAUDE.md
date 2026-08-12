@@ -381,6 +381,7 @@ guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 | `docs/DELIVERY.md` | eSIM QR delivery by email/Telegram, data protection |
 | `docs/LOCKED.md` | The locked file list, invariants, and unlock procedure |
 | `docs/GOHUB.md` | GoHub supplier client, normalization, webhooks, contract tests |
+| `docs/SUPABASE-PROJECTS.md` | Creating a Supabase project (Singapore region), applying the schema, migration order |
 | `mock-gohub/README.md` | The local GoHub mock: running it, failure cases, spec quirks |
 | `DEPLOY.md` | Deployment |
 | `STRATEGY.md` | Product strategy |

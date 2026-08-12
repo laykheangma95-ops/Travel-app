@@ -132,3 +132,55 @@ describe('auth with Supabase unconfigured', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The regression this section exists for: a sign-in method that is wired in
+// code but not switched on in the Supabase dashboard answered with
+// "Unsupported provider: provider is not enabled" — and that string went
+// straight to the customer. A Khmer-speaking traveller mid-purchase saw a
+// developer's configuration note in English and read it as a broken website.
+//
+// Recognised failures become an i18n key so AuthError can render them in the
+// reader's language. Unrecognised ones must pass through untouched: inventing
+// friendly copy for an error we have not seen would hide real faults.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('friendlyAuthError', () => {
+  it('maps a disabled OAuth provider to guidance the customer can act on', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('Unsupported provider: provider is not enabled')).toBe(
+      'auth.error.providerUnavailable'
+    );
+  });
+
+  it('maps a missing SMS provider to the email path that always works', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('Error sending confirmation OTP to provider')).toBe(
+      'auth.error.phoneUnavailable'
+    );
+  });
+
+  it('keeps a wrong password distinct from an unavailable method', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    // These must never collapse into one message: one is the customer's
+    // mistake to correct, the other is ours and no retry will fix it.
+    expect(friendlyAuthError('Invalid login credentials')).toBe('auth.error.badCredentials');
+  });
+
+  it('passes an unrecognised error through unchanged', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    const odd = 'Database connection terminated unexpectedly';
+    expect(friendlyAuthError(odd)).toBe(odd);
+  });
+
+  it('returns null when there was no error', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError(null)).toBeNull();
+    expect(friendlyAuthError(undefined)).toBeNull();
+  });
+});

@@ -22,6 +22,63 @@ const UNAVAILABLE =
   'if it keeps happening, contact support and we will sort it out.';
 
 /**
+ * Turns a raw Supabase error into something a traveller can act on.
+ *
+ * WHY: Supabase answers a sign-in method that has not been switched on in the
+ * dashboard with "Unsupported provider: provider is not enabled". That string
+ * was going straight to the customer — a developer's configuration note, in
+ * English, shown to a Khmer-speaking traveller mid-purchase. It reads as a
+ * broken website, and it tells them nothing about what to do instead.
+ *
+ * Recognised errors are returned as an i18n KEY rather than a sentence, so
+ * `AuthError` can render them in the reader's language. Anything unrecognised
+ * passes through unchanged — inventing friendly copy for an error we have not
+ * seen would hide real failures behind a shrug.
+ *
+ * This maps presentation only. No method is enabled, disabled or bypassed
+ * here, and the locked invariants are untouched: phone stays optional, and the
+ * email paths that work with no cellular service are not involved.
+ */
+export function friendlyAuthError(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const text = raw.toLowerCase();
+
+  // Google or Apple is wired in code but not switched on in Supabase.
+  if (
+    text.includes('provider is not enabled') ||
+    text.includes('unsupported provider') ||
+    text.includes('oauth provider')
+  ) {
+    return 'auth.error.providerUnavailable';
+  }
+
+  // Phone sign-in with no SMS provider configured, or SMS that could not send.
+  if (
+    text.includes('sms') ||
+    text.includes('phone provider') ||
+    text.includes('error sending confirmation otp') ||
+    text.includes('unsupported phone')
+  ) {
+    return 'auth.error.phoneUnavailable';
+  }
+
+  if (text.includes('invalid login credentials')) return 'auth.error.badCredentials';
+  if (text.includes('email not confirmed')) return 'auth.error.emailNotConfirmed';
+  if (text.includes('token has expired') || text.includes('otp_expired')) {
+    return 'auth.error.codeExpired';
+  }
+  if (text.includes('invalid token') || text.includes('token is invalid')) {
+    return 'auth.error.codeInvalid';
+  }
+  if (text.includes('rate limit') || text.includes('too many')) return 'auth.error.tooMany';
+  if (text.includes('already registered') || text.includes('already been registered')) {
+    return 'auth.error.emailTaken';
+  }
+
+  return raw;
+}
+
+/**
  * What every function below returns when `getSupabase()` hands back null.
  *
  * WHY THIS IS NOT JUST `DEMO`:
@@ -76,14 +133,14 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<AuthR
     provider,
     options: { redirectTo: redirectUrl() },
   });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export interface SignUpProfile {
@@ -115,7 +172,7 @@ export async function signUpWithPassword(
       },
     },
   });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 /**
@@ -134,14 +191,14 @@ export async function sendEmailCode(email: string, createUser: boolean): Promise
     email,
     options: { shouldCreateUser: createUser, emailRedirectTo: redirectUrl() },
   });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export async function verifyEmailCode(email: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 /** SMS one-time code. Offered, never required — see docs/AUTH.md. */
@@ -152,14 +209,14 @@ export async function sendPhoneCode(phoneE164: string, createUser: boolean): Pro
     phone: phoneE164,
     options: { shouldCreateUser: createUser },
   });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export async function verifyPhoneCode(phoneE164: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ phone: phoneE164, token, type: 'sms' });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 /** Attach a phone to an already signed-in account (Settings → verify later). */
@@ -167,7 +224,7 @@ export async function startPhoneLink(phoneE164: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.updateUser({ phone: phoneE164 });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export async function confirmPhoneLink(phoneE164: string, token: string): Promise<AuthResult> {
@@ -201,7 +258,7 @@ export async function resetPassword(email: string): Promise<AuthResult> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: redirectUrl('/reset-password'),
   });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 export interface RecoveryLink extends AuthResult {
@@ -256,7 +313,7 @@ export async function verifyRecoveryCode(email: string, token: string): Promise<
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'recovery' });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }
 
 /** Sets a new password on the session established by the recovery step. */
@@ -264,5 +321,5 @@ export async function updatePassword(password: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
   const { error } = await supabase.auth.updateUser({ password });
-  return { error: error?.message ?? null };
+  return { error: friendlyAuthError(error?.message) };
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Crown,
   FileSpreadsheet,
   Headphones,
   LayoutDashboard,
@@ -45,23 +46,48 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { can, role, unconfigured } = useSession();
+  const { can, role, unconfigured, viaBootstrap } = useSession();
 
   // With Supabase unconfigured there is no session to read a role from, so the
   // panel shows every tab rather than an empty shell. The API routes still
   // refuse every action.
   const visible = adminNav.filter((item) => unconfigured || can(item.permission));
 
+  // The owner is the only role that gets the gold. Angkor Gold is the brand's
+  // scarce accent — spending it here, and nowhere else in the panel, makes
+  // "which authority am I holding right now" readable at a glance rather than
+  // something you infer from which tabs happen to be present. Every other role
+  // keeps the neutral chip.
+  const isOwner = role === 'admin';
+
   return (
     <AdminGate>
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-2xl font-bold text-ink">
             Admin <span className="text-accent">Panel</span>
           </h1>
-          <span className="rounded-full bg-surface-3 px-3.5 py-1.5 text-xs font-medium text-ink-secondary">
-            {role ? `${ROLE_LABEL[role] ?? role} · Domner Ops` : 'Internal · Domner Ops'}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Break-glass access is worth stating plainly. Getting in through
+                ADMIN_EMAIL rather than a staff row means the staff table is
+                empty or wrong — fine on day one, a problem to fix later, and
+                invisible unless we say so. */}
+            {viaBootstrap && (
+              <span className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-ink-secondary">
+                Break-glass access
+              </span>
+            )}
+            {isOwner ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-semibold text-primary-deep shadow-sm">
+                <Crown size={13} aria-hidden="true" />
+                Owner · Domner Ops
+              </span>
+            ) : (
+              <span className="rounded-full bg-surface-3 px-3.5 py-1.5 text-xs font-medium text-ink-secondary">
+                {role ? `${ROLE_LABEL[role] ?? role} · Domner Ops` : 'Internal · Domner Ops'}
+              </span>
+            )}
+          </div>
         </div>
         <div className="mb-8 flex flex-wrap gap-2">
           {visible.map((item) => {
