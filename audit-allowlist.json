@@ -19,6 +19,11 @@
       "acceptedUntilUpgrade": "next@16",
       "reviewed": "2026-08-02"
     },
+    "sharp": {
+      "reason": "Not a direct dependency — it arrives as an optionalDependency of next@15 in apps/web and apps/ops, which pins `sharp ^0.34.3`. The libvips CVEs are fixed in sharp@0.35, but 0.35 is outside that range: an npm override to 0.35 makes npm drop the optional dependency entirely, which silently disables next/image optimization in production. The first Next release that itself depends on sharp@>=0.35 is 16.3, so this is the same planned upgrade as the `next` and `postcss` entries above. Exposure today is nil — both apps are empty scaffolds that serve no images. Re-review before apps/web serves its first optimized image.",
+      "acceptedUntilUpgrade": "next@16",
+      "reviewed": "2026-08-12"
+    },
     "glob": {
       "reason": "devDependency only, reached through eslint-config-next. The advisory is command injection through the glob CLI's -c/--cmd flag; we never invoke the glob CLI, and this package is not shipped to production.",
       "acceptedUntilUpgrade": "eslint-config-next@16",

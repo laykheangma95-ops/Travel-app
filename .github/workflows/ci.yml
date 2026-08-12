@@ -39,6 +39,20 @@ jobs:
       - name: Test
         run: npm run test
 
+      # The platform monorepo (apps/*, packages/*) is not covered by the root
+      # gates above — the root tsconfig excludes it and `next lint` only walks
+      # the root app's directories. Without these three steps the supplier
+      # boundary rule would pass CI while being unenforced, which is worse than
+      # not having it: it reads as a guarantee and isn't one.
+      - name: Typecheck workspaces
+        run: npm run typecheck:workspaces
+
+      - name: Lint workspaces (supplier boundary)
+        run: npm run lint:workspaces
+
+      - name: Build workspaces
+        run: npm run build:workspaces
+
       - name: Build
         run: npm run build
         env:
