@@ -16,7 +16,6 @@
 //   • the settled amount is reconciled against the order before fulfilment
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { generateOrderNumber } from '@/lib/utils';
 import { ApiError } from '@/lib/http';
 import { getUser } from '@/lib/serverAuth';
 import { log, redactEmail } from '@/lib/logger';
@@ -32,6 +31,7 @@ import {
   createOrder,
   getOrderByNumber,
   ordersPersistenceAvailable,
+  reserveOrderNumber,
   transitionOrder,
 } from '@/lib/orders';
 import type { DeliveryChannel, EsimOrder, PaymentMethod } from '@/types';
@@ -104,7 +104,9 @@ export async function startPayment(
   }
 
   const user = await getUser(request);
-  const orderNumber = generateOrderNumber();
+  // Claimed from the database sequence, not generated randomly — a duplicate
+  // order number is a failed checkout. See reserveOrderNumber().
+  const orderNumber = await reserveOrderNumber();
 
   const session = await provider.createPayment({
     orderNumber,

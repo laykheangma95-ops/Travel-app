@@ -77,10 +77,11 @@ Apply to every task, without being asked.
     naming, styling approach and component patterns unless they violate rules
     1–10.
 
-**Known standing exception to rule 1:** `esim_orders` already exists and holds
-live orders. Rule 12 forbids dropping it. The path out is Step 1 — an additive
-rename plus typed line items — and it is not yet done. See §12 and
-`docs/INVENTORY.md`.
+**Rule 1, as resolved in Step 1:** the table is now `orders`, and a view named
+`esim_orders` keeps existing queries working until every read path has moved.
+`order_items` carries `product_type` and `fulfillment_status`, so an order can
+hold a tour beside an eSIM. Do not add code against the `esim_orders` view —
+it is a shim with a removal date, not an interface.
 
 ---
 
@@ -139,9 +140,15 @@ supplier_reference, fulfillment_payload jsonb) · `payments` · `refunds` ·
 Money in integer minor units, never floats. Store transaction and settlement
 currency separately.
 
-> The live database stores money as `DECIMAL(10,2)`, not integer minor units.
-> Changing that touches the live checkout, so it is a Step 1 decision, not a
-> drive-by fix.
+> **Money is `DECIMAL(10,2)`, by decision, not by accident** (owner, Step 1).
+> Postgres `DECIMAL` is exact — it is not floating point — so the rounding error
+> the "integer minor units" rule exists to prevent cannot occur. Converting
+> would rewrite every money column and every read path in the live checkout for
+> no correctness gain. New money columns match `DECIMAL(10,2)`.
+>
+> Transaction and settlement currency are stored separately, as this section
+> requires: see `payments.amount`/`currency` against
+> `payments.settlement_amount`/`settlement_currency`.
 
 ---
 
@@ -185,6 +192,15 @@ Produce a written report covering:
 *Done when:* the migration applies to a copy of production data without loss,
 existing orders still render correctly on the public site, and you have shown me
 the before/after table shapes.
+
+**Status: written — `supabase/migrations/005_schema_reconciliation.sql`. Not yet
+applied to any database.** Apply to dev, then staging, then production. Two
+things are deliberately *not* in it and are still Step 1 work: `orders.status`
+is still TEXT rather than the `order_status` enum (the value sets do not map
+one-to-one and converting touches checkout), and the catalogue and transaction
+tables are created empty rather than seeded (the public site still reads
+`data/*.ts`; two sources of truth would drift). Both are noted in the migration
+itself.
 
 **Step 2 — Audit log + RLS.** Audit triggers on orders, order_items, refunds,
 products, profiles. `current_user_role()` helper. Policies matching §3. A SQL
@@ -361,14 +377,16 @@ accident; import them by subpath.
 Four disagreements. Each needs an owner decision; none may be resolved by
 guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 
-| # | §1–§6 says | The repo does | Decision needed |
+| # | §1–§6 says | The repo does | Status |
 |---|---|---|---|
-| 1 | Never an `esim_orders` table (rule 1) | `esim_orders` exists with live rows; `order_items` hangs off it | Rename-and-backfill in Step 1, or accept the name |
-| 2 | Roles are owner/ops/support/finance/content/developer | Roles are viewer/support/ops/finance/admin | Add `content` + `developer`, rename `admin`→`owner`, or keep |
-| 3 | support can view orders and refund ≤ cap | support has neither `orders.read` nor any refund permission — deliberate, see `docs/STAFF-ROLES.md` | §3 widens support's access; that reverses a locked-area decision |
-| 4 | Money in integer minor units | `DECIMAL(10,2)` throughout the live schema | Convert in Step 1 (touches checkout) or keep decimals |
+| 1 | Never an `esim_orders` table (rule 1) | Renamed to `orders`; `esim_orders` is now a compatibility view | **Decided (Step 1)** — rename + view. Read paths migrate off the view in a later commit |
+| 2 | Roles are owner/ops/support/finance/content/developer | Roles are viewer/support/ops/finance/admin | **Open.** Add `content` + `developer`, rename `admin`→`owner`, or keep |
+| 3 | support can view orders and refund ≤ cap | support has neither `orders.read` nor any refund permission — deliberate, see `docs/STAFF-ROLES.md` | **Open.** §3 widens support's access; that reverses a locked-area decision |
+| 4 | Money in integer minor units | `DECIMAL(10,2)` throughout the live schema | **Decided (Step 1)** — keep decimals; §4 amended with the reasoning |
 
-**Rule for all four:** until the owner decides, the shipped behaviour stands.
+**Rule for the ones still open:** until the owner decides, the shipped
+behaviour stands. Conflicts 2 and 3 are both about the role matrix and should
+be decided together, before Step 2 writes RLS policies against it.
 
 ## 13. Documentation
 

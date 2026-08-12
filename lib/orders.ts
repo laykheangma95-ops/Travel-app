@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSupabaseAdmin } from './supabase';
+import { generateOrderNumber } from './utils';
 import { log, redactEmail } from './logger';
 import { ApiError } from './http';
 import type { PricedOrder } from './pricing';
@@ -72,6 +73,39 @@ function requireDb() {
 /** True when Supabase is configured. Callers use this to degrade gracefully in dev. */
 export function ordersPersistenceAvailable(): boolean {
   return getSupabaseAdmin() !== null;
+}
+
+/**
+ * Claims the next order number from the database sequence.
+ *
+ * WHY THIS IS NOT generateOrderNumber():
+ *   That helper returns `DN-2026-4821` — a random four-digit number. There are
+ *   9,000 of them per year and `order_number` is UNIQUE, so a repeat is not a
+ *   cosmetic clash: it is an INSERT that fails, in the middle of a checkout,
+ *   after the customer has already been sent to the payment gateway. At a few
+ *   hundred orders a year that is a matter of when, not whether.
+ *
+ *   `next_order_number()` (migration 005) takes from a sequence, so a duplicate
+ *   is impossible, and it emits the DMN-YYYY-NNNNN format §4 specifies.
+ *
+ * The fallback to the old generator is deliberate. If Supabase is unreachable
+ * the order cannot be persisted at all, so the number no longer has to be
+ * unique — and a numbering problem must never be the thing that fails a
+ * checkout. It also keeps the empty-`.env` demo flow working (see CLAUDE.md
+ * §11).
+ */
+export async function reserveOrderNumber(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return generateOrderNumber();
+
+  const { data, error } = await supabase.rpc('next_order_number');
+
+  if (error || typeof data !== 'string' || data.length === 0) {
+    log.warn('order.number_sequence_unavailable', { error });
+    return generateOrderNumber();
+  }
+
+  return data;
 }
 
 /**
