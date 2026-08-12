@@ -32,8 +32,17 @@ export const isProduction = process.env.NODE_ENV === 'production';
  * Escape hatch for staging/preview deploys that intentionally run without live
  * payment credentials. Must be set explicitly — it is never on by default, so
  * a forgotten variable can never silently enable it.
+ *
+ * Two variable names, one rule. `lib/auth.ts` runs in the BROWSER, and a
+ * browser bundle can only see variables prefixed `NEXT_PUBLIC_` — every other
+ * `process.env` read compiles to `undefined` there. Without the public twin,
+ * client-side auth would compute a different answer to "may I fake this?" than
+ * the server does, which is the exact kind of drift that let a missing key look
+ * like a successful sign-in. Staging sets both; production sets neither.
  */
-export const allowDemoInProduction = process.env.DOMNER_ALLOW_DEMO === 'true';
+export const allowDemoInProduction =
+  process.env.DOMNER_ALLOW_DEMO === 'true' ||
+  process.env.NEXT_PUBLIC_DOMNER_ALLOW_DEMO === 'true';
 
 /** Demo fallbacks are permitted only outside production, or with the explicit opt-in. */
 export const demoModeAllowed = !isProduction || allowDemoInProduction;

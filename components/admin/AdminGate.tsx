@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
  * on reload, so one line in devtools opened the whole panel.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const { user, isAdmin, loading, unconfigured, blockedReason } = useSession();
+  const { user, isAdmin, loading, unconfigured, blockedReason, checkFailed } = useSession();
 
   if (loading) {
     return (
@@ -79,6 +79,21 @@ export function AdminGate({ children }: { children: ReactNode }) {
         body="This staff account is no longer active. Ask an administrator to restore it."
         href="/dashboard"
         cta="Back to dashboard"
+      />
+    );
+  }
+
+  // The check itself did not complete, so we do not know what they hold. Saying
+  // "you have no staff role" here is a lie that sends an admin off to ask
+  // someone for access they already have — which is exactly what a throttled
+  // /api/admin/session used to do to the owner.
+  if (checkFailed) {
+    return (
+      <GateMessage
+        title="Could not verify access"
+        body="We could not confirm your permissions just now — that is usually a temporary network problem or too many requests in a short time. Wait a moment and reload; your access has not changed."
+        href="/admin"
+        cta="Try again"
       />
     );
   }

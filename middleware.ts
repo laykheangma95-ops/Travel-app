@@ -16,6 +16,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { classifySupabaseError, describeSupabaseError } from '@/lib/supabaseError';
 import { log } from '@/lib/logger';
+import { demoModeAllowed } from '@/lib/env';
 
 const ADMIN_PREFIX = '/admin';
 const CUSTOMER_PREFIXES = ['/dashboard', '/my-esims', '/my-trips', '/settings'];
@@ -41,6 +42,9 @@ export async function middleware(request: NextRequest) {
   const isCustomerRoute = CUSTOMER_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
+  // Only the dashboard root redirects staff onward. Deeper customer pages
+  // (/my-esims, /settings) are places staff may legitimately want to be.
+  const isCustomerDashboard = pathname === '/dashboard';
 
   let response = NextResponse.next({ request });
 
@@ -48,9 +52,34 @@ export async function middleware(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Without Supabase there are no sessions to refresh and no accounts to check.
-  // Development stays browsable; a production deploy that reaches here has
-  // bigger problems, and the API routes still refuse every admin action.
-  if (!url || !anonKey) return response;
+  //
+  // Development stays browsable, as it always has. Production does NOT: an
+  // outage must not present as an open door. Waving every request through here
+  // meant that a deploy missing the anon key served /dashboard, /my-esims,
+  // /my-trips and /settings to anyone with the URL — and left /admin ungated at
+  // the edge too, since this early return sat in front of the admin check. The
+  // API routes still refused every admin action, but the pages themselves
+  // rendered. Deny instead, and let the operator find it in the logs.
+  if (!url || !anonKey) {
+    if (demoModeAllowed) return response;
+
+    console.error(
+      '[middleware] Supabase is not configured on a production deploy. ' +
+        'Denying gated routes. Set NEXT_PUBLIC_SUPABASE_URL and ' +
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy.'
+    );
+
+    if (isAdminRoute) {
+      return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+    }
+    if (isCustomerRoute) {
+      const signIn = new URL('/sign-in', request.url);
+      signIn.searchParams.set('returnTo', pathname);
+      return NextResponse.redirect(signIn);
+    }
+    // The public site — storefront, destinations, checkout — is untouched.
+    return response;
+  }
 
   // An anonymous visitor carries no Supabase cookie, so there is no session to
   // refresh and nothing for `getUser()` to verify. Most storefront traffic is
@@ -63,8 +92,15 @@ export async function middleware(request: NextRequest) {
       signIn.searchParams.set('returnTo', pathname);
       return NextResponse.redirect(signIn);
     }
+    // No cookie means nobody is signed in, which is the same case the admin
+    // gate below answers with a sign-in redirect. It has to answer it the same
+    // way here: this early return sits in front of that check, so returning a
+    // 404 would quietly restore the behaviour that told staff arriving from a
+    // bookmark that the panel did not exist.
     if (isAdminRoute) {
-      return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+      const signIn = new URL('/sign-in', request.url);
+      signIn.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(signIn);
     }
     return response;
   }
@@ -148,10 +184,54 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!permitted) {
-      // Deliberately indistinguishable from a missing page: an anonymous
-      // visitor learns nothing about whether /admin exists. Rewriting to a
-      // path with no route renders app/not-found.tsx with a real 404 status.
+      // Two different refusals, because the people hitting them are different.
+      //
+      // NOT SIGNED IN — send them to sign in and bring them back. Staff arrive
+      // at /admin from a bookmark or a link with no session yet, and a 404 told
+      // them the panel was gone rather than that they needed to log in. The
+      // cost is that an anonymous visitor can now tell /admin exists. That is a
+      // deliberate trade the owner made: the path is guessable on any site, so
+      // hiding it bought little, while locking out staff cost real time.
+      if (user === null) {
+        const signIn = new URL('/sign-in', request.url);
+        signIn.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
+        return NextResponse.redirect(signIn);
+      }
+
+      // SIGNED IN, BUT NOT STAFF — still a 404, and this is the case worth
+      // keeping secret. A customer poking at /admin learns nothing, so the
+      // panel's existence is not advertised to the people most likely to try.
       return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+    }
+  }
+
+  // Staff land in the panel, not on the customer dashboard.
+  //
+  // Signing in drops everyone on /dashboard, which for the owner is the wrong
+  // room — their work is in /admin. Redirect here rather than in the sign-in
+  // page because that page is locked (docs/LOCKED.md) and this keeps the whole
+  // decision in one place that already knows who is staff.
+  //
+  // `?customer=1` opts out, so the owner can still see exactly what a traveller
+  // sees. Without an escape hatch this would make the customer dashboard
+  // unreachable for the one person most likely to need to inspect it.
+  if (isCustomerDashboard && user !== null && request.nextUrl.searchParams.get('customer') !== '1') {
+    const allowlist = adminEmails();
+    const email = (user.email ?? '').toLowerCase();
+    let isStaff = allowlist.length > 0 && allowlist.includes(email);
+
+    if (!isStaff) {
+      const { data: staffRow } = await supabase
+        .from('staff_users')
+        .select('is_active')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      isStaff = staffRow?.is_active === true;
+    }
+
+    if (isStaff) {
+      return NextResponse.redirect(new URL('/admin', request.url));
     }
   }
 

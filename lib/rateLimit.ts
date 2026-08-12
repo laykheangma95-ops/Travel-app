@@ -46,6 +46,17 @@ export const RATE_LIMITS = {
   publicWrite: { limit: 20, windowMs: 60_000 },
   /** Credential checks — slow enough to make guessing pointless. */
   auth: { limit: 10, windowMs: 300_000 },
+  /**
+   * "Who am I and what may I do?" — read-only, and called on every admin page
+   * load (twice, when onAuthStateChange fires after the initial getUser).
+   *
+   * Deliberately NOT the `auth` bucket. That one is sized for credential
+   * guessing, so at 10 per 5 minutes an admin who opened six pages was
+   * throttled out of their own panel and told they had no staff role. This
+   * endpoint reveals nothing a caller does not already hold, so the limit is
+   * only here to bound a runaway client.
+   */
+  session: { limit: 60, windowMs: 60_000 },
   /** The AI copilot: each call costs CPU and, on the paid tier, tokens. */
   chat: { limit: 20, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;

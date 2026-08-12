@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { DollarSign, Package, TrendingUp, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { OwnerBriefing } from '@/components/admin/OwnerBriefing';
+import { useSession } from '@/hooks/useSession';
 import { formatUsd } from '@/lib/utils';
 import type { OrderStatus } from '@/types';
 
@@ -37,6 +39,7 @@ const statusTone: Record<OrderStatus, 'warning' | 'info' | 'success' | 'danger' 
 };
 
 export default function AdminDashboardPage() {
+  const { role } = useSession();
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [recent, setRecent] = useState<RecentOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +110,17 @@ export default function AdminDashboardPage() {
         <div role="alert" className="rounded-card border border-red-200 bg-red-50 p-4 text-sm text-danger">
           {error}
         </div>
+      )}
+
+      {/* Owner only. The tiles below repeat these figures for every role, so
+          this is a summary and a set of shortcuts, not information anyone else
+          is being denied. */}
+      {role === 'admin' && (
+        <OwnerBriefing
+          awaitingFulfilment={awaitingFulfilment}
+          pendingPayment={stats?.byStatus.pending ?? 0}
+          loading={loading}
+        />
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

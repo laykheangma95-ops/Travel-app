@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { DomerLogo } from '@/components/brand/DomerMark';
 import { consumeReturnTo, signInWithProvider, type OAuthProvider } from '@/lib/auth';
+import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 interface AuthCardProps {
@@ -124,11 +125,24 @@ export function AuthTabs<T extends string>({ tabs, active, onChange }: AuthTabsP
   );
 }
 
+/**
+ * Every auth failure the customer sees passes through here.
+ *
+ * `friendlyAuthError()` hands back an i18n key ('auth.error.…') for the
+ * failures we recognise, so this renders them in the reader's language —
+ * Khmer first, as the rest of the customer UI is. An unrecognised failure
+ * arrives as its original text and is shown as-is: better a blunt English
+ * sentence than a soothing one that hides a real fault.
+ */
 export function AuthError({ message }: { message: string | null }) {
+  const { t } = useLang();
   if (!message) return null;
+
+  const translated = message.startsWith('auth.error.') ? t(message as DictKey) : message;
+
   return (
     <p role="alert" className="rounded-btn bg-red-50 p-3 text-sm text-danger">
-      {message}
+      {translated}
     </p>
   );
 }
