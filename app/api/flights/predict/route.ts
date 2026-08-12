@@ -1,5 +1,5 @@
 // GET /api/flights/predict?number=QH215&date=2026-07-08
-// Domer Intelligence inbound-aircraft delay prediction.
+// Domner Intelligence inbound-aircraft delay prediction.
 
 import { predictDelay } from '@/lib/delayPrediction';
 import { todayIso } from '@/lib/utils';

@@ -56,7 +56,7 @@ function generateChecklist(setup: Setup): GeneratedItem[] {
   if (setup.destination === 'singapore') add('important', 'Submit the SG Arrival Card online');
   if (setup.destination === 'malaysia') add('important', 'Complete the Malaysia Digital Arrival Card (MDAC)');
   if (setup.destination === 'japan') add('important', 'Complete Visit Japan Web for faster entry');
-  add('important', 'Check flight status on Domer');
+  add('important', 'Check flight status on Domner');
   if (customs) add('important', `Confirm: max cash $${customs.maxCashUsd.toLocaleString()} USD allowed into ${name}`);
   add('important', `Screenshot hotel address in the local language for the taxi driver`);
   add('important', 'Download offline maps of your destination city');
@@ -74,7 +74,7 @@ function generateChecklist(setup: Setup): GeneratedItem[] {
   add('day-of', `Arrive airport ${setup.flownBefore === 'yes' ? '2.5' : '3'} hours early`);
   add('day-of', 'Check in online');
   add('day-of', 'Activate eSIM only after landing');
-  if (setup.firstTimeAbroad === 'yes') add('day-of', 'Open the Domer Airport Guide when you arrive at the airport');
+  if (setup.firstTimeAbroad === 'yes') add('day-of', 'Open the Domner Airport Guide when you arrive at the airport');
 
   return items;
 }

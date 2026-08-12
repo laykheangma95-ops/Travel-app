@@ -73,7 +73,7 @@ export function ShareModal({ open, onClose, flight, date }: ShareModalProps) {
           {copied ? 'Copied!' : 'Copy Link'}
         </button>
         <a
-          href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Track flight ${flight.flightNumber} live on Domer`)}`}
+          href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Track flight ${flight.flightNumber} live on Domner`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-btn bg-[#229ED9] px-3 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"

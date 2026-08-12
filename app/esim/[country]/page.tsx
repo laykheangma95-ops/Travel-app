@@ -142,7 +142,7 @@ export default function CountryPlansPage({ params }: PageProps) {
               The validity period starts when the eSIM first connects to a local network.
             </AccordionItem>
             <AccordionItem title="Can I share data with my travel partner?">
-              Yes — all Domer plans include hotspot/tethering, so you can share your connection
+              Yes — all Domner plans include hotspot/tethering, so you can share your connection
               with family members&apos; phones.
             </AccordionItem>
             <AccordionItem title={`Which networks will I connect to in ${dest.name}?`}>
