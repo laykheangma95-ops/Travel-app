@@ -16,6 +16,14 @@ export interface SessionState {
   blockedReason: string | null;
   /** True when access came from ADMIN_EMAIL rather than a staff_users row. */
   viaBootstrap: boolean;
+  /**
+   * True when the authority check could not be completed — throttled, offline,
+   * or the endpoint errored. Distinct from "you hold nothing", which is a
+   * definitive answer. Both leave the panel closed; only this one is worth
+   * retrying, and telling them apart is the difference between "wait a moment"
+   * and "ask an administrator for access you already have".
+   */
+  checkFailed: boolean;
   loading: boolean;
   /** True when Supabase is not configured — development / demo mode. */
   unconfigured: boolean;
@@ -50,6 +58,7 @@ const NO_AUTHORITY: Authority = {
 export function useSession(): SessionState {
   const [user, setUser] = useState<User | null>(null);
   const [authority, setAuthority] = useState<Authority>(NO_AUTHORITY);
+  const [checkFailed, setCheckFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const supabase = getSupabase();
   const unconfigured = supabase === null;
@@ -64,13 +73,19 @@ export function useSession(): SessionState {
 
     const resolveAdmin = async (nextUser: User | null) => {
       if (!nextUser) {
-        if (active) setAuthority(NO_AUTHORITY);
+        if (active) {
+          setAuthority(NO_AUTHORITY);
+          setCheckFailed(false);
+        }
         return;
       }
       try {
         const res = await fetch('/api/admin/session', { credentials: 'include' });
         const data = (await res.json()) as Partial<Authority>;
         if (!active) return;
+        // Still fail closed — the panel stays shut either way. What changes is
+        // that we remember WHY, so the UI does not accuse someone of lacking a
+        // role when we simply never got an answer.
         setAuthority(
           res.ok
             ? {
@@ -82,9 +97,13 @@ export function useSession(): SessionState {
               }
             : NO_AUTHORITY
         );
+        setCheckFailed(!res.ok);
       } catch {
         // Fail closed: a failed check must never paint the panel.
-        if (active) setAuthority(NO_AUTHORITY);
+        if (active) {
+          setAuthority(NO_AUTHORITY);
+          setCheckFailed(true);
+        }
       }
     };
 
@@ -113,6 +132,7 @@ export function useSession(): SessionState {
     await supabase?.auth.signOut();
     setUser(null);
     setAuthority(NO_AUTHORITY);
+    setCheckFailed(false);
   }, [supabase]);
 
   const can = useCallback(
@@ -127,6 +147,7 @@ export function useSession(): SessionState {
     permissions: authority.permissions,
     blockedReason: authority.blockedReason,
     viaBootstrap: authority.viaBootstrap,
+    checkFailed,
     loading,
     unconfigured,
     can,
