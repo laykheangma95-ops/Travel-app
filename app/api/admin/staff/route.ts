@@ -61,12 +61,24 @@ function toRecord(row: StaffRow): StaffRecord {
   };
 }
 
+/**
+ * Roles that can administer the panel. `owner` is the current name and `admin`
+ * the deprecated one (lib/staff.ts) — the last-administrator guard has to count
+ * both, or renaming the role would quietly make it possible to remove the last
+ * person who can get back in.
+ */
+const OWNER_ROLES = ['owner', 'admin'] as const;
+
+function isOwnerRole(role: string | null | undefined): boolean {
+  return (OWNER_ROLES as readonly string[]).includes(role ?? '');
+}
+
 async function activeAdminCount(excludeEmail?: string): Promise<number> {
   const supabase = db();
   const { data } = await supabase
     .from('staff_users')
     .select('email')
-    .eq('role', 'admin')
+    .in('role', OWNER_ROLES)
     .eq('is_active', true);
 
   const admins = ((data ?? []) as Array<{ email: string }>).map((row) => row.email);
@@ -190,9 +202,9 @@ export const PATCH = route(
 
     const current = existing as StaffRow;
     const losingAdmin =
-      current.role === 'admin' &&
+      isOwnerRole(current.role) &&
       current.is_active &&
-      ((role !== undefined && role !== 'admin') || isActive === false);
+      ((role !== undefined && !isOwnerRole(role)) || isActive === false);
 
     if (losingAdmin && (await activeAdminCount(email)) === 0) {
       throw new ApiError(

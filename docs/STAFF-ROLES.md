@@ -16,9 +16,16 @@ Who can use `/admin`, and how much of it.
 | --- | --- | --- | --- |
 | **Viewer** | new hire | dashboard | everything else |
 | **Call centre** | phone support | look up **one** customer at a time | browse the customer list, export, refund |
-| **Operations** | fulfilment | call centre + order list, mark fulfilled, supplier config | refund, manage staff |
-| **Finance** | bookkeeping | dashboard, sales statement, Excel export | any customer contact data at all |
-| **Administrator** | owner | everything, including refunds and staff | — |
+| **Operations** | fulfilment | call centre + order list, mark fulfilled, supplier config, product prices, margin | create or retire products, refund, manage staff |
+| **Finance** | bookkeeping | dashboard, sales statement, Excel export, margin | any customer contact data at all |
+| **Content** | Khmer copywriting | destination content | orders, customers, money, suppliers |
+| **Developer** | engineers | nothing in production | all production data — dev and staging only |
+| **Owner** | founder | everything, including refunds, staff and the audit log | — |
+
+**"Administrator" is the old name for Owner.** Identical access. Existing
+accounts keep it and keep working; the dropdown offers Owner for new people.
+Renaming in place would have meant an UPDATE against live staff rows to fix a
+word, with a lockout as the failure mode.
 
 ### Why Call centre and Finance are not on one ladder
 
@@ -29,17 +36,30 @@ number, or a support login that can export revenue.
 
 So roles map to an explicit **permission set**, not a rank:
 
-| Permission | viewer | support | ops | finance | admin |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| `dashboard.view` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `customers.lookup` | | ✅ | ✅ | | ✅ |
-| `orders.read` | | | ✅ | | ✅ |
-| `orders.fulfil` | | | ✅ | | ✅ |
-| `suppliers.manage` | | | ✅ | | ✅ |
-| `reports.export` | | | | ✅ | ✅ |
-| `orders.refund` | | | | | ✅ |
-| `affiliates.manage` | | | | | ✅ |
-| `staff.manage` | | | | | ✅ |
+| Permission | viewer | support | ops | finance | content | developer | owner |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| `dashboard.view` | ✅ | ✅ | ✅ | ✅ | ✅ | | ✅ |
+| `customers.lookup` | | ✅ | ✅ | | | | ✅ |
+| `orders.read` | | | ✅ | | | | ✅ |
+| `orders.fulfil` | | | ✅ | | | | ✅ |
+| `suppliers.manage` | | | ✅ | | | | ✅ |
+| `cost.view` | | | ✅ | ✅ | | | ✅ |
+| `products.edit` | | | ✅ | | | | ✅ |
+| `reports.export` | | | | ✅ | | | ✅ |
+| `content.manage` | | | | | ✅ | | ✅ |
+| `products.manage` | | | | | | | ✅ |
+| `orders.refund` | | | | | | | ✅ |
+| `affiliates.manage` | | | | | | | ✅ |
+| `staff.manage` | | | | | | | ✅ |
+| `audit.read` | | | | | | | ✅ |
+
+`admin` is omitted from the table because it is `owner` under its old name —
+same column, exactly.
+
+**Developer holds nothing on purpose.** CLAUDE.md §3 says "no admin data
+access; dev/staging only, production read-only logs." An empty permission list
+is the honest encoding: a developer who signs in to production admin sees no
+data, rather than a role that quietly accumulates access over time.
 
 Routes ask for a **permission**, never a role — so re-cutting the roles later
 means editing one table in `lib/staff.ts` and touching no route files.

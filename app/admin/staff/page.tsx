@@ -12,24 +12,47 @@ import { cn } from '@/lib/utils';
 // Staff management. Every action here re-checks 'staff.manage' server-side;
 // this screen only decides what to paint.
 
-const ROLES = ['viewer', 'support', 'ops', 'finance', 'admin'] as const;
+// Mirrors lib/staff.ts. Duplicated rather than imported because that module
+// reaches for the service-role client, and this is a 'use client' component
+// (CLAUDE.md §11). The server is the authority either way — every action here
+// re-checks 'staff.manage'.
+const ROLES = [
+  'viewer',
+  'support',
+  'ops',
+  'finance',
+  'content',
+  'developer',
+  'owner',
+  'admin',
+] as const;
 type Role = (typeof ROLES)[number];
+
+// `admin` is the deprecated name for `owner`. Existing rows still carry it, so
+// it stays in ROLES to render, but it is never offered for a new grant.
+const ASSIGNABLE_ROLES = ROLES.filter((role) => role !== 'admin');
 
 const ROLE_LABEL: Record<Role, string> = {
   viewer: 'Viewer',
   support: 'Call centre',
   ops: 'Operations',
   finance: 'Finance',
-  admin: 'Administrator',
+  content: 'Content',
+  developer: 'Developer',
+  owner: 'Owner',
+  admin: 'Administrator (old name for Owner)',
 };
 
 const ROLE_BLURB: Record<Role, string> = {
   viewer: 'Read-only dashboard. A safe starting point for a new hire.',
   support:
     'Looks up one customer at a time from an order number, email or phone. Cannot browse the customer list or export anything.',
-  ops: 'Everything the call centre can do, plus the order list, marking orders fulfilled, and supplier configuration.',
+  ops: 'Everything the call centre can do, plus the order list, marking orders fulfilled, supplier configuration, and product prices.',
   finance: 'Sales statements and Excel exports. Sees revenue and margin, and no customer contact details.',
-  admin: 'Full access, including refunds and managing staff. Give this sparingly.',
+  content: 'Khmer destination content only. No orders, customers, money or suppliers.',
+  developer: 'No access to production data. For engineers working in dev and staging.',
+  owner: 'Full access, including refunds, staff and the audit log. Give this sparingly.',
+  admin: 'The old name for Owner. Same access. Pick Owner for new people.',
 };
 
 const ROLE_TONE: Record<Role, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
@@ -37,6 +60,9 @@ const ROLE_TONE: Record<Role, 'neutral' | 'info' | 'success' | 'warning' | 'dang
   support: 'info',
   ops: 'success',
   finance: 'info',
+  content: 'info',
+  developer: 'neutral',
+  owner: 'warning',
   admin: 'warning',
 };
 
@@ -194,7 +220,7 @@ export default function AdminStaffPage() {
           <fieldset>
             <legend className="text-xs font-medium text-ink-secondary">Access level</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {ROLES.map((option) => (
+              {ASSIGNABLE_ROLES.map((option) => (
                 <label
                   key={option}
                   className={cn(
@@ -301,7 +327,7 @@ export default function AdminStaffPage() {
                     onChange={(event) => void update(member, { role: event.target.value as Role })}
                     className="rounded-btn border border-line bg-white px-3 py-2 text-sm text-ink disabled:opacity-50"
                   >
-                    {ROLES.map((option) => (
+                    {ASSIGNABLE_ROLES.map((option) => (
                       <option key={option} value={option}>
                         {ROLE_LABEL[option]}
                       </option>

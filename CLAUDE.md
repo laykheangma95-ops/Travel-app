@@ -106,10 +106,16 @@ it is a shim with a removal date, not an interface.
 `developer` has no admin data access; dev/staging only, production read-only
 logs.
 
-**What is actually shipped today is a different, narrower matrix** — five roles
-(`viewer` `support` `ops` `finance` `admin`) over nine named permissions in
-`lib/staff.ts`, documented in `docs/STAFF-ROLES.md`. The two matrices conflict
-on three points, listed in §12. Do not quietly migrate one into the other.
+**Shipped as of Step 2:** all six roles above exist in `lib/staff.ts`, plus
+`viewer` (dashboard-only, for a new hire) and `admin` — the deprecated spelling
+of `owner`, kept because live staff rows carry it. Authority is expressed as
+fourteen named permissions, not role checks, so re-cutting the roles later is
+one table in `lib/staff.ts` and no route changes. See `docs/STAFF-ROLES.md`.
+
+**One row of the matrix above is deliberately not implemented.** `support` has
+neither `orders.read` nor any refund permission. That is a locked-area decision
+(`docs/LOCKED.md`), not an oversight — see §12 #3. Adopting §3 as written
+reverses it and needs the owner's sign-off on that specific change.
 
 ---
 
@@ -207,6 +213,20 @@ products, profiles. `current_user_role()` helper. Policies matching §3. A SQL
 test file asserting one permitted and one forbidden operation per role.
 *Done when:* all tests pass; support cannot read `cost_price`; nobody can modify
 `audit_log`.
+
+**Status: written — `supabase/migrations/006_audit_log_and_rls.sql`, tests in
+`supabase/tests/rls_policies_test.sql`. Not yet applied.** Two things worth
+knowing before you read it:
+
+- **`audit_log` is append-only by trigger, not by policy.** Every server write
+  in this codebase uses the service role, and the service role bypasses RLS
+  entirely — so a missing UPDATE policy would stop a signed-in user and nothing
+  else. A trigger cannot be bypassed. The absent policies are the second layer.
+- **RLS cannot hide `cost_price`.** Policies filter rows, not columns; anyone
+  who can read a product row can read every column of it. So "support cannot
+  see cost" is delivered by the `products_public` view (which has no such
+  column) plus `requirePermission(..., 'cost.view')` in the API layer, which is
+  where staff reads actually happen.
 
 **Step 3 — Admin shell.** Route group `app/(admin)/admin/`, separate from the
 public site. Middleware with server-side session check. `requireRole()` helper
@@ -380,7 +400,7 @@ guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 | # | §1–§6 says | The repo does | Status |
 |---|---|---|---|
 | 1 | Never an `esim_orders` table (rule 1) | Renamed to `orders`; `esim_orders` is now a compatibility view | **Decided (Step 1)** — rename + view. Read paths migrate off the view in a later commit |
-| 2 | Roles are owner/ops/support/finance/content/developer | Roles are viewer/support/ops/finance/admin | **Open.** Add `content` + `developer`, rename `admin`→`owner`, or keep |
+| 2 | Roles are owner/ops/support/finance/content/developer | All six now exist, plus `viewer`; `admin` kept as a deprecated alias of `owner` | **Decided (Step 2)** — added rather than renamed, so no live staff row had to be UPDATEd and nobody could be locked out |
 | 3 | support can view orders and refund ≤ cap | support has neither `orders.read` nor any refund permission — deliberate, see `docs/STAFF-ROLES.md` | **Open.** §3 widens support's access; that reverses a locked-area decision |
 | 4 | Money in integer minor units | `DECIMAL(10,2)` throughout the live schema | **Decided (Step 1)** — keep decimals; §4 amended with the reasoning |
 

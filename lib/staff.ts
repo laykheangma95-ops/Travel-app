@@ -21,7 +21,22 @@ import { getSupabaseAdmin } from './supabase';
 import { adminEmails } from './env';
 import { log } from './logger';
 
-export const STAFF_ROLES = ['viewer', 'support', 'ops', 'finance', 'admin'] as const;
+export const STAFF_ROLES = [
+  'viewer',
+  'support',
+  'ops',
+  'finance',
+  'content',
+  'developer',
+  'owner',
+  /**
+   * Deprecated alias of `owner`, kept because live rows carry it. Renaming in
+   * place would have meant an UPDATE against production staff rows to fix a
+   * word, with a lockout as the failure mode. `owner` is what new grants use;
+   * `admin` keeps working forever.
+   */
+  'admin',
+] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export const PERMISSIONS = [
@@ -43,6 +58,16 @@ export const PERMISSIONS = [
   'affiliates.manage',
   /** Invite staff and change their roles. */
   'staff.manage',
+  /** See cost_price and margin. The supplier's price, not the customer's. */
+  'cost.view',
+  /** Change a product's price or details. Not create or retire one. */
+  'products.edit',
+  /** Create, retire and restructure products. */
+  'products.manage',
+  /** Write Khmer destination content. No orders, no customers, no money. */
+  'content.manage',
+  /** Read the audit log. Owner only — it is the record of everyone else. */
+  'audit.read',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -54,9 +79,17 @@ export type Permission = (typeof PERMISSIONS)[number];
  * bookkeeper needs money and no customers. Ranking them would force one to
  * carry access it has no business having.
  */
+const OWNER_PERMISSIONS: readonly Permission[] = [...PERMISSIONS];
+
 export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
   viewer: ['dashboard.view'],
 
+  /**
+   * UNCHANGED, deliberately. CLAUDE.md §3 grants support `orders.read` and
+   * refunds; this codebase does not, and that gap is a locked-area decision
+   * (docs/LOCKED.md, docs/STAFF-ROLES.md) rather than an oversight. Widening it
+   * needs the owner's sign-off on that specific change — see CLAUDE.md §12 #3.
+   */
   support: ['dashboard.view', 'customers.lookup'],
 
   ops: [
@@ -65,11 +98,28 @@ export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     'orders.read',
     'orders.fulfil',
     'suppliers.manage',
+    // §3 gives ops the margin and "edit only" on products: change a price, but
+    // not create or retire a product.
+    'cost.view',
+    'products.edit',
   ],
 
-  finance: ['dashboard.view', 'reports.export'],
+  finance: ['dashboard.view', 'reports.export', 'cost.view'],
 
-  admin: [...PERMISSIONS],
+  /** §3: destination content and nothing else. No orders, customers or money. */
+  content: ['dashboard.view', 'content.manage'],
+
+  /**
+   * §3: "no admin data access; dev/staging only, production read-only logs."
+   * An empty list is the honest encoding of that — a developer signing in to
+   * production admin gets a dashboard tile and no data.
+   */
+  developer: [],
+
+  owner: OWNER_PERMISSIONS,
+
+  /** Deprecated alias of owner. Same authority, kept for existing rows. */
+  admin: OWNER_PERMISSIONS,
 };
 
 /** Shown in the staff screen so the person granting access sees the trade-off. */
@@ -77,11 +127,21 @@ export const ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
   viewer: 'Read-only dashboard. A safe starting point for a new hire.',
   support:
     'Call centre. Looks up one customer at a time from an order number, email or phone. Cannot browse the customer list or export anything.',
-  ops: 'Fulfilment. Everything support can do, plus the order list, marking orders fulfilled, and supplier configuration.',
+  ops: 'Fulfilment. Everything support can do, plus the order list, marking orders fulfilled, supplier configuration, product prices and margin.',
   finance:
     'Sales statements and Excel exports. Sees revenue and margin, and no customer contact details at all.',
-  admin: 'Full access, including refunds and managing staff. Give this sparingly.',
+  content:
+    'Khmer destination content. No access to orders, customers, money or suppliers.',
+  developer:
+    'No access to production data. For engineers who work in dev and staging.',
+  owner: 'Full access, including refunds, staff and the audit log. Give this sparingly.',
+  admin: 'Full access. Deprecated name for Owner — pick Owner for new people.',
 };
+
+/** Roles offered when granting access. `admin` is deprecated, so it is not listed. */
+export const ASSIGNABLE_ROLES: readonly StaffRole[] = STAFF_ROLES.filter(
+  (role) => role !== 'admin'
+);
 
 export function permissionsFor(role: StaffRole): readonly Permission[] {
   return ROLE_PERMISSIONS[role] ?? [];

@@ -104,15 +104,50 @@ describe('viewer', () => {
   });
 });
 
-describe('only admin manages staff', () => {
-  it('holds staff.manage for admin alone', () => {
+// `owner` and `admin` are one authority under two names — `admin` is the
+// deprecated spelling kept alive because live staff rows carry it. Both, and
+// only both, hold the dangerous permissions.
+const OWNER_ROLES = ['owner', 'admin'];
+
+describe('only the owner manages staff', () => {
+  it('holds staff.manage for the owner alone', () => {
     const holders = STAFF_ROLES.filter((role) => roleHas(role, 'staff.manage'));
-    expect(holders).toEqual(['admin']);
+    expect(holders).toEqual(OWNER_ROLES);
   });
 
-  it('holds orders.refund for admin alone', () => {
+  it('holds orders.refund for the owner alone', () => {
     const holders = STAFF_ROLES.filter((role) => roleHas(role, 'orders.refund'));
-    expect(holders).toEqual(['admin']);
+    expect(holders).toEqual(OWNER_ROLES);
+  });
+
+  it('holds audit.read for the owner alone', () => {
+    const holders = STAFF_ROLES.filter((role) => roleHas(role, 'audit.read'));
+    expect(holders).toEqual(OWNER_ROLES);
+  });
+});
+
+describe('the roles added for CLAUDE.md §3', () => {
+  it('gives content destination copy and nothing else', () => {
+    expect(permissionsFor('content')).toEqual(['dashboard.view', 'content.manage']);
+  });
+
+  it('gives developer no access to production data at all', () => {
+    expect(permissionsFor('developer')).toEqual([]);
+  });
+
+  it('keeps support out of orders and refunds', () => {
+    // The §12 #3 conflict, pinned. CLAUDE.md §3 would grant both; docs/LOCKED.md
+    // is why this codebase does not. Changing this test is the deliberate act
+    // that reverses that decision — it should never happen incidentally.
+    expect(roleHas('support', 'orders.read')).toBe(false);
+    expect(roleHas('support', 'orders.refund')).toBe(false);
+    expect(roleHas('support', 'cost.view')).toBe(false);
+  });
+
+  it('gives ops the margin and price edits, but not product creation', () => {
+    expect(roleHas('ops', 'cost.view')).toBe(true);
+    expect(roleHas('ops', 'products.edit')).toBe(true);
+    expect(roleHas('ops', 'products.manage')).toBe(false);
   });
 });
 
