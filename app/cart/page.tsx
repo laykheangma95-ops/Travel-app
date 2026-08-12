@@ -57,7 +57,10 @@ export default function CartPage() {
                       {item.countryName} — {item.planName}
                     </p>
                     <p className="text-sm text-white/65">
-                      {item.durationDays} days · {item.dataGbDaily}GB/day
+                      {item.durationDays} days ·{' '}
+                      {item.dataType === 'daily'
+                        ? `${item.dataGbDaily}GB/day`
+                        : `${item.dataGbTotal}GB total`}
                       {item.quantity > 1 && ` · ×${item.quantity}`}
                     </p>
                   </div>

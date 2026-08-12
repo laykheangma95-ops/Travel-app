@@ -52,7 +52,9 @@ export interface PricedLine {
   planName: string;
   tier: string;
   durationDays: number;
+  dataType: 'daily' | 'fixed';
   dataGbDaily: number;
+  dataGbTotal: number;
   /** Authoritative unit price from the catalog. */
   unitPriceUsd: number;
   quantity: number;
@@ -190,7 +192,9 @@ export function priceOrder(params: {
       planName: plan.name,
       tier: plan.tier,
       durationDays: plan.durationDays,
+      dataType: plan.dataType,
       dataGbDaily: plan.dataGbDaily,
+      dataGbTotal: plan.dataGbTotal,
       unitPriceUsd: plan.priceUsd,
       quantity: line.quantity,
       lineTotalUsd: roundCents(plan.priceUsd * line.quantity),

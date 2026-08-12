@@ -46,7 +46,7 @@ export function Recommendation({
   const plan = useMemo(() => {
     if (!plans.length) return null;
     const sized = plans
-      .map((p) => ({ p, totalGb: p.dataGbDaily * p.durationDays }))
+      .map((p) => ({ p, totalGb: p.dataGbTotal }))
       .sort((a, b) => a.p.priceUsd - b.p.priceUsd);
     return (
       sized.find((s) => s.totalGb >= estimate.withHeadroomGb && s.p.durationDays >= days)?.p ??
@@ -56,7 +56,7 @@ export function Recommendation({
 
   if (!plan || !destination) return null;
 
-  const planTotalGb = plan.dataGbDaily * plan.durationDays;
+  const planTotalGb = plan.dataGbTotal;
   const covers = planTotalGb >= estimate.withHeadroomGb && plan.durationDays >= days;
   const maxLine = Math.max(...estimate.lines.map((l) => l.gb), 0.1);
 
@@ -71,7 +71,9 @@ export function Recommendation({
       flag: destination.flag,
       planName: plan.name,
       durationDays: plan.durationDays,
+      dataType: plan.dataType,
       dataGbDaily: plan.dataGbDaily,
+      dataGbTotal: plan.dataGbTotal,
       priceUsd: plan.priceUsd,
       quantity: 1,
     });

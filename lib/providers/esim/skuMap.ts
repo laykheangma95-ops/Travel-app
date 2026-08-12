@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { log } from '@/lib/logger';
+import { gohubCatalog } from '@/data/gohubCatalog';
 
 /** providerId → (our planId → their SKU). */
 export type SkuMap = Record<string, Record<string, string>>;
@@ -37,6 +38,11 @@ export type SkuMap = Record<string, Record<string, string>>;
  * empty rather than guessed, because a wrong SKU sells the wrong plan.
  */
 const BUILT_IN: SkuMap = {
+  // GoHub's mapping is not typed out here — it is derived from the same
+  // generated catalog the prices come from, so a plan and its SKU can never
+  // drift apart. Regenerating data/gohubCatalog.ts remaps the supplier too.
+  gohub: Object.fromEntries(gohubCatalog.map((plan) => [plan.id, plan.gohubSku])),
+
   // Real suppliers: fill in when the contract is signed and SKUs are confirmed.
   // Leaving these empty means `supports()` is false and the registry skips them,
   // which is the correct behavior for an unconfigured supplier.

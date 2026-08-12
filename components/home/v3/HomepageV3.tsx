@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { getGuide, guides } from '@/content/destinations';
 import { getDestination } from '@/data/destinations';
-import { getPlansForCountry } from '@/data/esimPlans';
+import { describeAllowance, getPlansForCountry } from '@/data/esimPlans';
 import { useCart } from '@/hooks/useCart';
 import { useLang } from '@/lib/i18n';
 import { detectTier, TIER_SETTINGS, type Tier } from '@/lib/tier';
@@ -236,7 +236,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
     const plan = getPlansForCountry(lastGuide.esimCountrySlug).find((p) => p.popular);
     if (!dest || !plan) return null;
     return {
-      label: `${dest.name} eSIM · ${plan.durationDays} days, ${plan.dataGbDaily * plan.durationDays}GB`,
+      label: `${dest.name} eSIM · ${plan.durationDays} days, ${describeAllowance(plan)}`,
       priceUsd: plan.priceUsd,
       onBuy: () => {
         addItem({
@@ -246,7 +246,9 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
           flag: dest.flag,
           planName: plan.name,
           durationDays: plan.durationDays,
+          dataType: plan.dataType,
           dataGbDaily: plan.dataGbDaily,
+          dataGbTotal: plan.dataGbTotal,
           priceUsd: plan.priceUsd,
           quantity: 1,
         });
