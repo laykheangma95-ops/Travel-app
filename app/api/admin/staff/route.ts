@@ -21,6 +21,7 @@ import { requirePermission } from '@/lib/serverAuth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { STAFF_ROLES, recordStaffEvent, type StaffRecord, type StaffRole } from '@/lib/staff';
 import { log } from '@/lib/logger';
+import { logSupabaseError } from '@/lib/supabaseError';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,11 +64,22 @@ function toRecord(row: StaffRow): StaffRecord {
 
 async function activeAdminCount(excludeEmail?: string): Promise<number> {
   const supabase = db();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('staff_users')
     .select('email')
     .eq('role', 'admin')
     .eq('is_active', true);
+
+  // This count guards the last-admin lockout. A failed read used to return 0,
+  // which still refused the change — safe, but it told the owner "this is the
+  // last active admin" when the truth was "we could not ask the database".
+  if (error) {
+    logSupabaseError('staff.admin_count_failed', error);
+    throw new ApiError(
+      'SERVICE_UNAVAILABLE',
+      'We could not verify how many admins remain, so this change was not applied. Please try again.'
+    );
+  }
 
   const admins = ((data ?? []) as Array<{ email: string }>).map((row) => row.email);
   return admins.filter((email) => email !== excludeEmail?.toLowerCase()).length;
@@ -83,7 +95,7 @@ export const GET = route(
       .order('created_at', { ascending: true });
 
     if (error) {
-      log.error('staff.list_failed', { error });
+      logSupabaseError('staff.list_failed', error);
       throw new ApiError('INTERNAL', 'Could not load the staff list.');
     }
 
@@ -130,7 +142,7 @@ export const POST = route(
       .single();
 
     if (error || !data) {
-      log.error('staff.invite_failed', { error });
+      logSupabaseError('staff.invite_failed', error);
       throw new ApiError('INTERNAL', 'Could not add that staff member.');
     }
 
@@ -178,11 +190,19 @@ export const PATCH = route(
       );
     }
 
-    const { data: existing } = await db()
+    const { data: existing, error: existingError } = await db()
       .from('staff_users')
       .select('*')
       .eq('email', email)
       .maybeSingle();
+
+    // "The read failed" and "there is no such person" are different answers, and
+    // reporting the first as 404 sends an admin hunting for a typo that is not
+    // there.
+    if (existingError) {
+      logSupabaseError('staff.read_failed', existingError);
+      throw new ApiError('SERVICE_UNAVAILABLE', 'We could not load that staff member. Please try again.');
+    }
 
     if (!existing) {
       throw new ApiError('NOT_FOUND', 'No staff member with that email address.');
@@ -213,7 +233,7 @@ export const PATCH = route(
       .single();
 
     if (error || !data) {
-      log.error('staff.update_failed', { error });
+      logSupabaseError('staff.update_failed', error);
       throw new ApiError('INTERNAL', 'Could not update that staff member.');
     }
 

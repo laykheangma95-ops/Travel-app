@@ -28,6 +28,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { ApiError } from '@/lib/http';
 import { log } from '@/lib/logger';
+import { logSupabaseError } from '@/lib/supabaseError';
 import type { OrderStatus } from '@/types';
 
 export type ReportPeriod = 'weekly' | 'monthly' | 'all';
@@ -327,7 +328,7 @@ export async function buildSalesReport(params: SalesReportParams): Promise<Sales
     const { data, error } = await query;
 
     if (error) {
-      log.error('report.sales_read_failed', { error, offset });
+      logSupabaseError('report.sales_read_failed', error, { offset });
       throw new ApiError('INTERNAL', 'Could not read orders for the report.');
     }
 
