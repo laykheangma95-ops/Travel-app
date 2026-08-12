@@ -4,14 +4,14 @@
 //   GET   /api/admin/orders           — list real orders (filter, search, page)
 //   PATCH /api/admin/orders           — fulfil an order (attach eSIM details)
 //
-// Every handler calls requireAdmin() itself. There is no shared "the layout
+// Every handler names the permission it needs itself. There is no shared "the layout
 // already checked" assumption, because the layout runs in the browser and the
 // browser is not a security boundary.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { z } from 'zod';
 import { ApiError, ok, readJson, route } from '@/lib/http';
-import { requireAdmin } from '@/lib/serverAuth';
+import { requirePermission } from '@/lib/serverAuth';
 import { announceEsimReady } from '@/lib/orderNotifications';
 import { listOrders, orderStats, transitionOrder } from '@/lib/orders';
 import { log } from '@/lib/logger';
@@ -31,7 +31,7 @@ const STATUSES: Array<OrderStatus | 'all'> = [
 
 export const GET = route(
   async (request) => {
-    await requireAdmin(request);
+    await requirePermission(request, 'orders.read');
 
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status') ?? 'all';
@@ -68,7 +68,7 @@ const fulfilSchema = z.object({
 
 export const PATCH = route(
   async (request) => {
-    const admin = await requireAdmin(request);
+    const { user: admin } = await requirePermission(request, 'orders.fulfil');
     const body = await readJson<unknown>(request);
 
     const parsed = fulfilSchema.safeParse(body);

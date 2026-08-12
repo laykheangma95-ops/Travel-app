@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { ApiError, ok, readJson, route } from '@/lib/http';
-import { requireAdmin } from '@/lib/serverAuth';
+import { requirePermission } from '@/lib/serverAuth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 
@@ -23,7 +23,7 @@ function db() {
 
 export const GET = route(
   async (request) => {
-    await requireAdmin(request);
+    await requirePermission(request, 'affiliates.manage');
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -57,7 +57,7 @@ const decisionSchema = z.object({
 
 export const PATCH = route(
   async (request) => {
-    const admin = await requireAdmin(request);
+    const { user: admin } = await requirePermission(request, 'affiliates.manage');
     const parsed = decisionSchema.safeParse(await readJson<unknown>(request));
 
     if (!parsed.success) {

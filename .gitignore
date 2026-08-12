@@ -1,11 +1,17 @@
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.js
 
 # next.js
 /.next/
 /out/
+.next/
+out/
+
+# compiled worker output
+dist/
 
 # production
 /build
@@ -19,9 +25,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# env files
-.env
-.env*.local
+# env files — everything except the checked-in templates
+.env*
+!.env.example
+!.env*.example
 
 # typescript
 *.tsbuildinfo

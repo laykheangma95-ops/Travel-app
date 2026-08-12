@@ -24,9 +24,17 @@
 
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { adminConfigured, adminEmails, isConfigured } from './env';
+import { adminConfigured, isConfigured } from './env';
 import { ApiError } from './http';
 import { log, redactEmail } from './logger';
+import {
+  isBootstrapAdmin,
+  mfaRequired,
+  resolveStaff,
+  roleHas,
+  type Permission,
+  type StaffIdentity,
+} from './staff';
 
 /** Cookie header → name/value pairs, for the Supabase SSR cookie adapter. */
 function parseCookies(header: string | null): Array<{ name: string; value: string }> {
@@ -111,32 +119,112 @@ export async function requireUser(request: Request): Promise<User> {
   return user;
 }
 
-/** True when the email is on the ADMIN_EMAIL allowlist. */
+/**
+ * True when the email is on the ADMIN_EMAIL break-glass allowlist.
+ *
+ * This is no longer the whole authorization story — staff authority lives in
+ * `staff_users` — but it remains the owner's way back in when that table is
+ * empty or wrong. An empty allowlist means nobody, so a fresh deploy has no
+ * wide-open control panel.
+ */
 export function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  // No allowlist configured means nobody is an admin. Failing closed here is
-  // what stops a fresh deploy from having a wide-open control panel.
-  if (!adminConfigured()) return false;
-  return adminEmails().includes(email.trim().toLowerCase());
+  return isBootstrapAdmin(email);
+}
+
+export interface StaffSession {
+  user: User;
+  staff: StaffIdentity;
 }
 
 /**
- * Requires a signed-in user who is on the admin allowlist.
- * Every admin API route calls this — there is no shared "already checked" flag.
+ * Resolves the caller to their staff authority, or throws.
+ *
+ * Three ways to be refused, and they are deliberately different errors: not
+ * signed in (401, go and sign in), no staff row or deactivated (403, ask an
+ * admin), and MFA required but not enrolled (403, go and enrol). A single
+ * "access denied" would leave a locked-out agent with nothing to act on.
  */
-export async function requireAdmin(request: Request): Promise<User> {
+export async function requireStaff(request: Request): Promise<StaffSession> {
   const user = await requireUser(request);
+  const staff = await resolveStaff(user.id, user.email);
 
-  if (!isAdminEmail(user.email)) {
-    log.warn('auth.admin_denied', {
+  if (!staff) {
+    log.warn('auth.staff_denied', {
       userId: user.id,
       email: redactEmail(user.email),
+      reason: 'no_staff_record',
       allowlistConfigured: adminConfigured(),
     });
-    throw new ApiError('FORBIDDEN', 'This account does not have admin access.');
+    throw new ApiError('FORBIDDEN', 'This account does not have staff access.');
   }
 
-  log.info('auth.admin_granted', { userId: user.id, email: redactEmail(user.email) });
+  if (!staff.isActive) {
+    log.warn('auth.staff_denied', {
+      userId: user.id,
+      email: redactEmail(user.email),
+      reason: 'deactivated',
+    });
+    throw new ApiError('FORBIDDEN', 'This staff account has been deactivated.');
+  }
+
+  if (mfaRequired() && !staff.mfaEnrolled) {
+    log.warn('auth.staff_denied', {
+      userId: user.id,
+      email: redactEmail(user.email),
+      reason: 'mfa_not_enrolled',
+    });
+    throw new ApiError(
+      'FORBIDDEN',
+      'Two-factor authentication is required for staff accounts. Enrol a second factor and sign in again.'
+    );
+  }
+
+  return { user, staff };
+}
+
+/**
+ * Requires a specific permission.
+ *
+ * Routes name the capability they need rather than the role that happens to
+ * have it today, so re-cutting the roles never means editing route files.
+ */
+export async function requirePermission(
+  request: Request,
+  permission: Permission
+): Promise<StaffSession> {
+  const session = await requireStaff(request);
+
+  if (!roleHas(session.staff.role, permission)) {
+    log.warn('auth.permission_denied', {
+      userId: session.user.id,
+      email: redactEmail(session.user.email),
+      role: session.staff.role,
+      permission,
+    });
+    throw new ApiError(
+      'FORBIDDEN',
+      `Your role (${session.staff.role}) does not allow this. Ask an admin if you need it.`
+    );
+  }
+
+  log.info('auth.permission_granted', {
+    userId: session.user.id,
+    role: session.staff.role,
+    permission,
+    viaBootstrap: session.staff.viaBootstrap,
+  });
+
+  return session;
+}
+
+/**
+ * Requires the admin role specifically.
+ *
+ * Kept as its own function because "manage staff" is the one capability that
+ * must not be delegable through the permission matrix by accident.
+ */
+export async function requireAdmin(request: Request): Promise<User> {
+  const { user } = await requirePermission(request, 'staff.manage');
   return user;
 }
 

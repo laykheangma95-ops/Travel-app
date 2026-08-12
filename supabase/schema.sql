@@ -31,6 +31,42 @@ CREATE TABLE profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── Staff ────────────────────────────────────────────────────────────────────
+--
+-- Who may use /admin and with what authority. No row means no access.
+-- ADMIN_EMAIL remains a break-glass override for the owner. See migration
+-- 004_staff_roles.sql for the full reasoning and the role definitions.
+
+CREATE TABLE staff_users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL UNIQUE,
+  full_name TEXT,
+  role TEXT NOT NULL DEFAULT 'viewer'
+    CHECK (role IN ('viewer', 'support', 'ops', 'finance', 'admin')),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  mfa_enrolled BOOLEAN NOT NULL DEFAULT FALSE,
+  invited_by TEXT,
+  last_seen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE staff_events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  staff_email TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  from_role TEXT,
+  to_role TEXT,
+  actor TEXT NOT NULL,
+  detail JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_staff_email        ON staff_users(LOWER(email));
+CREATE INDEX idx_staff_user         ON staff_users(user_id);
+CREATE INDEX idx_staff_events_email ON staff_events(staff_email, created_at DESC);
+
 -- ── Orders ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE esim_orders (
@@ -48,6 +84,9 @@ CREATE TABLE esim_orders (
   subtotal_usd DECIMAL(10, 2) NOT NULL DEFAULT 0,
   discount_usd DECIMAL(10, 2) NOT NULL DEFAULT 0,
   price_usd DECIMAL(10, 2) NOT NULL,
+  -- What the supplier charged us. NULL means unknown — the sales report counts
+  -- those orders separately rather than inventing a margin for them.
+  cost_usd DECIMAL(10, 2) CHECK (cost_usd IS NULL OR cost_usd >= 0),
   currency TEXT NOT NULL DEFAULT 'USD',
   discount_code TEXT,
   referral_code TEXT,
@@ -328,6 +367,8 @@ CREATE TRIGGER on_auth_user_created
 -- bypasses RLS entirely, so these policies govern the browser only.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+ALTER TABLE staff_users           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE esim_orders           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items           ENABLE ROW LEVEL SECURITY;
@@ -341,6 +382,12 @@ ALTER TABLE push_subscriptions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliates            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliate_events      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE support_tickets       ENABLE ROW LEVEL SECURITY;
+
+-- Staff: a signed-in user may read THEIR OWN row and nothing else, which is
+-- what lets middleware.ts gate /admin using only the caller's session. Listing
+-- all staff and every write stay service-role only. staff_events has RLS on
+-- and no policy at all.
+CREATE POLICY "staff_read_own" ON staff_users FOR SELECT USING (auth.uid() = user_id);
 
 -- Profiles
 CREATE POLICY "profiles_select_own"   ON profiles FOR SELECT USING (auth.uid() = id OR public.is_admin());
@@ -423,6 +470,9 @@ CREATE POLICY "tickets_admin"     ON support_tickets FOR SELECT USING (public.is
 
 CREATE INDEX idx_orders_status         ON esim_orders(status);
 CREATE INDEX idx_orders_created        ON esim_orders(created_at DESC);
+CREATE INDEX idx_orders_paid_at        ON esim_orders(paid_at DESC) WHERE paid_at IS NOT NULL;
+CREATE INDEX idx_orders_status_paid_at ON esim_orders(status, paid_at DESC);
+CREATE INDEX idx_orders_phone          ON esim_orders(customer_phone);
 CREATE INDEX idx_orders_user           ON esim_orders(user_id);
 CREATE INDEX idx_orders_email          ON esim_orders(LOWER(customer_email));
 CREATE INDEX idx_orders_stripe_payment ON esim_orders(stripe_payment_id);

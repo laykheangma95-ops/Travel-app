@@ -20,7 +20,49 @@
       "rules": {
         "no-restricted-imports": "off"
       }
+    },
+    {
+      "files": ["apps/web/**/*.{ts,tsx}", "apps/ops/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@domner/supplier",
+                  "@domner/supplier/*",
+                  "**/packages/supplier/**",
+                  "**/gohub/client*",
+                  "../../../packages/supplier/**"
+                ],
+                "message": "apps/web and apps/ops must never import @domner/supplier. GoHub authorises by IP whitelist and the credentials live only on the worker VM; bundling the supplier client into a Vercel app puts a spendable prepaid balance behind a leakable environment variable. Enqueue work by writing to Postgres and let the worker pick it up."
+              },
+              {
+                "group": ["mock-gohub", "mock-gohub/*", "@/mock-gohub", "@/mock-gohub/*", "**/mock-gohub/**"],
+                "message": "mock-gohub is a standalone fake supplier, not a library. Talk to it over HTTP via GOHUB_BASE_URL."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/core/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@domner/supplier", "@domner/supplier/*", "**/apps/**"],
+                "message": "packages/core is shared by all three apps. It must not import from any app, nor from @domner/supplier."
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
-  "ignorePatterns": [".next/", "node_modules/", "public/sw.js"]
+  "ignorePatterns": [".next/", "node_modules/", "public/sw.js", "apps/*/.next/", "apps/worker/dist/"]
 }

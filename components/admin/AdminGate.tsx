@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
  * on reload, so one line in devtools opened the whole panel.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const { user, isAdmin, loading, unconfigured } = useSession();
+  const { user, isAdmin, loading, unconfigured, blockedReason } = useSession();
 
   if (loading) {
     return (
@@ -58,11 +58,36 @@ export function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
+  // Signed in as staff, but currently held back. Saying which is the difference
+  // between someone enrolling a second factor in two minutes and someone
+  // messaging the founder on a Sunday.
+  if (blockedReason === 'mfa_required') {
+    return (
+      <GateMessage
+        title="Two-factor required"
+        body="Staff accounts must have a second factor enrolled. Add one in your account settings, then sign in again."
+        href="/settings"
+        cta="Account settings"
+      />
+    );
+  }
+
+  if (blockedReason === 'deactivated') {
+    return (
+      <GateMessage
+        title="Account deactivated"
+        body="This staff account is no longer active. Ask an administrator to restore it."
+        href="/dashboard"
+        cta="Back to dashboard"
+      />
+    );
+  }
+
   if (!isAdmin) {
     return (
       <GateMessage
-        title="No admin access"
-        body={`${user.email ?? 'This account'} is not on the admin allowlist. Ask an existing admin to add you.`}
+        title="No staff access"
+        body={`${user.email ?? 'This account'} has no staff role. Ask an administrator to add you and choose the access you need.`}
         href="/dashboard"
         cta="Back to dashboard"
       />

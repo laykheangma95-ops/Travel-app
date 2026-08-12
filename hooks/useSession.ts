@@ -8,9 +8,18 @@ export interface SessionState {
   user: User | null;
   /** Server-verified. Never derived from the email in the browser. */
   isAdmin: boolean;
+  /** Server-verified staff role, or null when the caller holds no authority. */
+  role: string | null;
+  /** Capabilities the caller holds. Drives which nav tabs and buttons render. */
+  permissions: string[];
+  /** Set when signed in as staff but currently held back — 'deactivated' | 'mfa_required'. */
+  blockedReason: string | null;
+  /** True when access came from ADMIN_EMAIL rather than a staff_users row. */
+  viaBootstrap: boolean;
   loading: boolean;
   /** True when Supabase is not configured — development / demo mode. */
   unconfigured: boolean;
+  can: (permission: string) => boolean;
   signOut: () => Promise<void>;
 }
 
@@ -22,9 +31,25 @@ export interface SessionState {
  * and every admin endpoint re-checks anyway. This hook only decides what UI to
  * paint.
  */
+interface Authority {
+  admin: boolean;
+  role: string | null;
+  permissions: string[];
+  blockedReason: string | null;
+  viaBootstrap: boolean;
+}
+
+const NO_AUTHORITY: Authority = {
+  admin: false,
+  role: null,
+  permissions: [],
+  blockedReason: null,
+  viaBootstrap: false,
+};
+
 export function useSession(): SessionState {
   const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [authority, setAuthority] = useState<Authority>(NO_AUTHORITY);
   const [loading, setLoading] = useState(true);
   const supabase = getSupabase();
   const unconfigured = supabase === null;
@@ -39,15 +64,27 @@ export function useSession(): SessionState {
 
     const resolveAdmin = async (nextUser: User | null) => {
       if (!nextUser) {
-        if (active) setIsAdmin(false);
+        if (active) setAuthority(NO_AUTHORITY);
         return;
       }
       try {
         const res = await fetch('/api/admin/session', { credentials: 'include' });
-        const data = (await res.json()) as { admin?: boolean };
-        if (active) setIsAdmin(res.ok && data.admin === true);
+        const data = (await res.json()) as Partial<Authority>;
+        if (!active) return;
+        setAuthority(
+          res.ok
+            ? {
+                admin: data.admin === true,
+                role: data.role ?? null,
+                permissions: data.permissions ?? [],
+                blockedReason: data.blockedReason ?? null,
+                viaBootstrap: data.viaBootstrap === true,
+              }
+            : NO_AUTHORITY
+        );
       } catch {
-        if (active) setIsAdmin(false);
+        // Fail closed: a failed check must never paint the panel.
+        if (active) setAuthority(NO_AUTHORITY);
       }
     };
 
@@ -75,8 +112,24 @@ export function useSession(): SessionState {
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut();
     setUser(null);
-    setIsAdmin(false);
+    setAuthority(NO_AUTHORITY);
   }, [supabase]);
 
-  return { user, isAdmin, loading, unconfigured, signOut };
+  const can = useCallback(
+    (permission: string) => authority.permissions.includes(permission),
+    [authority.permissions]
+  );
+
+  return {
+    user,
+    isAdmin: authority.admin,
+    role: authority.role,
+    permissions: authority.permissions,
+    blockedReason: authority.blockedReason,
+    viaBootstrap: authority.viaBootstrap,
+    loading,
+    unconfigured,
+    can,
+    signOut,
+  };
 }

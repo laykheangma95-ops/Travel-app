@@ -61,9 +61,31 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (isAdminRoute) {
+    // Two ways in, checked in this order:
+    //
+    //   1. ADMIN_EMAIL — the owner's break-glass access, which works even when
+    //      the staff table is empty or wrong.
+    //   2. An active row in staff_users.
+    //
+    // The staff read uses the caller's OWN session against the anon key, which
+    // RLS restricts to their own row (see migration 004). No service key is
+    // ever present at the edge, so a middleware bug cannot enumerate staff.
+    //
+    // This is still only defence in depth — each /api/admin/* route re-checks
+    // the specific permission it needs.
     const allowlist = adminEmails();
-    const permitted =
-      user !== null && allowlist.length > 0 && allowlist.includes((user.email ?? '').toLowerCase());
+    const email = (user?.email ?? '').toLowerCase();
+    let permitted = user !== null && allowlist.length > 0 && allowlist.includes(email);
+
+    if (!permitted && user !== null) {
+      const { data: staffRow } = await supabase
+        .from('staff_users')
+        .select('is_active')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      permitted = staffRow?.is_active === true;
+    }
 
     if (!permitted) {
       // Deliberately indistinguishable from a missing page: an anonymous
