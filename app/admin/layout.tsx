@@ -2,13 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, QrCode, Users, Server } from 'lucide-react';
+import { FileSpreadsheet, Headphones, LayoutDashboard, Package, QrCode, Users, Server } from 'lucide-react';
 import { AdminGate } from '@/components/admin/AdminGate';
 import { cn } from '@/lib/utils';
 
 const adminNav = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  // Support sits high in the list on purpose: when the phone rings, this is
+  // the screen staff need, and hunting for it costs the customer's patience.
+  { label: 'Support', href: '/admin/support', icon: Headphones },
   { label: 'Orders', href: '/admin/orders', icon: Package },
+  { label: 'Reports', href: '/admin/reports', icon: FileSpreadsheet },
   { label: 'Suppliers', href: '/admin/providers', icon: Server },
   { label: 'Generate eSIM', href: '/admin/generate-esim', icon: QrCode },
   { label: 'Affiliates', href: '/admin/affiliates', icon: Users },

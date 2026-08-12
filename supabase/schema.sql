@@ -48,6 +48,9 @@ CREATE TABLE esim_orders (
   subtotal_usd DECIMAL(10, 2) NOT NULL DEFAULT 0,
   discount_usd DECIMAL(10, 2) NOT NULL DEFAULT 0,
   price_usd DECIMAL(10, 2) NOT NULL,
+  -- What the supplier charged us. NULL means unknown — the sales report counts
+  -- those orders separately rather than inventing a margin for them.
+  cost_usd DECIMAL(10, 2) CHECK (cost_usd IS NULL OR cost_usd >= 0),
   currency TEXT NOT NULL DEFAULT 'USD',
   discount_code TEXT,
   referral_code TEXT,
@@ -423,6 +426,9 @@ CREATE POLICY "tickets_admin"     ON support_tickets FOR SELECT USING (public.is
 
 CREATE INDEX idx_orders_status         ON esim_orders(status);
 CREATE INDEX idx_orders_created        ON esim_orders(created_at DESC);
+CREATE INDEX idx_orders_paid_at        ON esim_orders(paid_at DESC) WHERE paid_at IS NOT NULL;
+CREATE INDEX idx_orders_status_paid_at ON esim_orders(status, paid_at DESC);
+CREATE INDEX idx_orders_phone          ON esim_orders(customer_phone);
 CREATE INDEX idx_orders_user           ON esim_orders(user_id);
 CREATE INDEX idx_orders_email          ON esim_orders(LOWER(customer_email));
 CREATE INDEX idx_orders_stripe_payment ON esim_orders(stripe_payment_id);

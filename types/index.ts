@@ -94,6 +94,8 @@ export interface EsimOrder {
   subtotal_usd: number;
   discount_usd: number;
   price_usd: number;
+  /** Supplier cost. null means unknown — never treat it as zero when reporting margin. */
+  cost_usd: number | null;
   currency: string;
   discount_code: string | null;
   referral_code: string | null;

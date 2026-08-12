@@ -94,6 +94,7 @@ by accident; import them by subpath.
 
 | Doc | Contents |
 | --- | --- |
+| `docs/OPS-CONSOLE.md` | Staff support lookup and the Excel sales statement |
 | `docs/AUTH.md` | Sign-in methods, why phone verification is optional, anti-abuse |
 | `docs/DELIVERY.md` | eSIM QR delivery by email/Telegram, data protection |
 | `docs/LOCKED.md` | The locked file list, invariants, and unlock procedure |
