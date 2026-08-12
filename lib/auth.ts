@@ -152,11 +152,74 @@ export async function confirmPhoneLink(phoneE164: string, token: string): Promis
   return { error: null };
 }
 
+/**
+ * Sends the reset mail. The link lands on /reset-password, which is the only
+ * page that can actually set a new one — /auth/callback just forwards a signed
+ * in user onward, so pointing recovery at it silently dropped the reset.
+ */
 export async function resetPassword(email: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return DEMO;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectUrl(),
+    redirectTo: redirectUrl('/reset-password'),
   });
+  return { error: error?.message ?? null };
+}
+
+export interface RecoveryLink extends AuthResult {
+  /** True when a recovery session exists and a new password can be set now. */
+  ready: boolean;
+}
+
+/**
+ * Turns whatever the reset mail put in the URL into a usable session.
+ *
+ * Supabase can deliver recovery three different ways depending on the project's
+ * flow setting and email template, so all three are handled: `?token_hash=` is
+ * verified explicitly, while `?code=` (PKCE) and the `#access_token=` fragment
+ * are picked up by detectSessionInUrl before getSession() resolves.
+ *
+ * A false `ready` is not a failure — it means the link is missing, spent, or
+ * was opened in a different browser than the one that asked for it, and the
+ * caller should fall back to the emailed code.
+ */
+export async function consumeRecoveryLink(): Promise<RecoveryLink> {
+  const supabase = getSupabase();
+  if (!supabase) return { ...DEMO, ready: true };
+  if (typeof window === 'undefined') return { error: null, ready: false };
+
+  const query = new URLSearchParams(window.location.search);
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const linkError = query.get('error_description') ?? fragment.get('error_description');
+  if (linkError) return { error: linkError, ready: false };
+
+  const tokenHash = query.get('token_hash');
+  if (tokenHash && query.get('type') === 'recovery') {
+    const { error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
+    if (error) return { error: error.message, ready: false };
+  }
+
+  const { data } = await supabase.auth.getSession();
+  return { error: null, ready: Boolean(data.session) };
+}
+
+/**
+ * The typed-code path into a reset, for when the link itself cannot work: mail
+ * apps open links in their own in-app browser, which is a different session
+ * than the tab that requested the reset. Same reasoning as sendEmailCode, and
+ * it needs {{ .Token }} in the Supabase "Reset Password" template.
+ */
+export async function verifyRecoveryCode(email: string, token: string): Promise<AuthResult> {
+  const supabase = getSupabase();
+  if (!supabase) return DEMO;
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'recovery' });
+  return { error: error?.message ?? null };
+}
+
+/** Sets a new password on the session established by the recovery step. */
+export async function updatePassword(password: string): Promise<AuthResult> {
+  const supabase = getSupabase();
+  if (!supabase) return DEMO;
+  const { error } = await supabase.auth.updateUser({ password });
   return { error: error?.message ?? null };
 }

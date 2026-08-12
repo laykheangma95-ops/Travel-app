@@ -117,6 +117,36 @@ read-only actions like "show me my QR code".
 
 ---
 
+## Password reset
+
+`/forgot-password` sends the mail; **`/reset-password` is the only page that can
+set a new password.** Recovery links must point at it — they previously pointed
+at `/auth/callback`, which only forwards an already-signed-in user onward, so
+the reset silently did nothing and the customer landed on the dashboard with
+their old password still in force.
+
+The page accepts recovery three ways, because which one arrives depends on the
+project's flow setting and the email template:
+
+| Arrives as | Handled by |
+| --- | --- |
+| `?token_hash=…&type=recovery` | `verifyOtp({ type: 'recovery' })` |
+| `?code=…` (PKCE) | `detectSessionInUrl` before `getSession()` resolves |
+| `#access_token=…` (implicit) | same |
+
+If none of them yields a session — spent link, expired link, or a link opened in
+a different browser than the one that requested it — the page falls back to
+asking for the email and a **6-digit code**, exactly as sign-in does. Same
+reasoning as the magic-link decision above: the mail app opens links in its own
+in-app browser, and a code can be read in one app and typed into another.
+
+**That fallback needs `{{ .Token }}` added to the Supabase "Reset Password"
+email template**, the same edit already required on the magic-link template. The
+link path works without it; only the typed code depends on it.
+
+The recovery token is stripped from the address bar with `replaceState` as soon
+as it is consumed, so it never reaches history or a `Referer` header.
+
 ## Where verification *is* worth requiring
 
 Phone verification earns its place on risk, not at the front door:

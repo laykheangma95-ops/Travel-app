@@ -46,6 +46,12 @@ export default function ForgotPasswordPage() {
             If an account exists for <strong className="text-ink">{email}</strong>, a reset link is
             on its way.
           </p>
+          <Link
+            href={`/reset-password?email=${encodeURIComponent(email)}`}
+            className="mt-4 text-sm font-semibold text-secondary hover:text-accent"
+          >
+            Enter the code instead
+          </Link>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">

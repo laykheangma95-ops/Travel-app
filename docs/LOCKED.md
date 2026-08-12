@@ -23,6 +23,7 @@ components/ui/CountryPicker.tsx
 app/(auth)/sign-in/page.tsx
 app/(auth)/sign-up/page.tsx
 app/(auth)/forgot-password/page.tsx
+app/(auth)/reset-password/page.tsx
 app/auth/callback/page.tsx
 supabase/migrations/001_auth_methods.sql
 ```
