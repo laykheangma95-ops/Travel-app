@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { WavyFlag } from '@/components/ui/WavyFlag';
 import { formatKhr, formatUsd } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 export default function CartPage() {
+  const { t } = useLang();
   const cart = useCart();
   const [mounted, setMounted] = useState(false);
   const [code, setCode] = useState('');
@@ -25,7 +27,7 @@ export default function CartPage() {
   const applyCode = () => {
     setCodeError(null);
     if (!cart.applyDiscount(code)) {
-      setCodeError('This code is not valid or has expired.');
+      setCodeError(t('cart.codeInvalid'));
     }
   };
 
@@ -34,14 +36,14 @@ export default function CartPage() {
     <div className="night-canvas min-h-screen">
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <h1 className="mb-8 font-display text-3xl font-bold text-white">Your Cart</h1>
+        <h1 className="mb-8 font-display text-3xl font-bold text-white">{t('cart.title')}</h1>
 
         {cart.items.length === 0 ? (
           <EmptyState
             icon={ShoppingCart}
-            title="Your cart is empty"
-            description="Browse our eSIM store and add a plan for your next destination."
-            ctaLabel="Browse eSIM plans"
+            title={t('cart.empty.title')}
+            description={t('cart.empty.desc')}
+            ctaLabel={t('cart.empty.cta')}
             ctaHref="/esim"
             dark
           />
@@ -57,10 +59,10 @@ export default function CartPage() {
                       {item.countryName} — {item.planName}
                     </p>
                     <p className="text-sm text-white/65">
-                      {item.durationDays} days ·{' '}
+                      {t('cart.days', { days: item.durationDays })} ·{' '}
                       {item.dataType === 'daily'
-                        ? `${item.dataGbDaily}GB/day`
-                        : `${item.dataGbTotal}GB total`}
+                        ? t('cart.perDay', { gb: item.dataGbDaily })
+                        : t('cart.totalData', { gb: item.dataGbTotal })}
                       {item.quantity > 1 && ` · ×${item.quantity}`}
                     </p>
                   </div>
@@ -70,7 +72,10 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() => cart.removeItem(item.planId)}
-                    aria-label={`Remove ${item.countryName} ${item.planName} from cart`}
+                    aria-label={t('cart.remove', {
+                      country: item.countryName,
+                      plan: item.planName,
+                    })}
                     className="rounded-btn p-2 text-white/50 transition-colors hover:bg-danger/15 hover:text-red-300"
                   >
                     <Trash2 size={18} />
@@ -82,17 +87,18 @@ export default function CartPage() {
             {/* Summary */}
             <div className="lg:col-span-2">
               <div className="night-card sticky top-24 p-6">
-                <h2 className="font-display text-lg font-bold text-white">Order Summary</h2>
+                <h2 className="font-display text-lg font-bold text-white">{t('cart.summary')}</h2>
 
                 <div className="mt-5 space-y-3 border-b border-white/10 pb-5 text-sm">
                   <div className="flex justify-between text-white/70">
-                    <span>Subtotal</span>
+                    <span>{t('cart.subtotal')}</span>
                     <span className="font-mono">{formatUsd(subtotal)}</span>
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between font-medium text-emerald-300">
                       <span>
-                        Discount {cart.discountCode ?? (cart.referralCode ? `(ref: ${cart.referralCode})` : '')}
+                        {t('cart.discount')}{' '}
+                        {cart.discountCode ?? (cart.referralCode ? `(ref: ${cart.referralCode})` : '')}
                       </span>
                       <span className="font-mono">-{formatUsd(discount)}</span>
                     </div>
@@ -102,7 +108,7 @@ export default function CartPage() {
                 {/* Discount code */}
                 <div className="mt-5">
                   <label htmlFor="discount" className="text-sm font-medium text-white/80">
-                    Discount code
+                    {t('cart.discountCode')}
                   </label>
                   <div className="mt-1.5 flex gap-2">
                     <input
@@ -114,27 +120,27 @@ export default function CartPage() {
                       className="min-h-[2.75rem] flex-1 rounded-btn border border-gold-light/20 bg-white/5 px-3.5 py-2.5 text-sm uppercase text-white placeholder:text-white/40 backdrop-blur-md focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25"
                     />
                     <Button variant="outline-light" size="md" onClick={applyCode}>
-                      <Tag size={14} /> Apply
+                      <Tag size={14} /> {t('cart.apply')}
                     </Button>
                   </div>
                   {codeError && <p className="mt-1.5 text-xs text-red-300" role="alert">{codeError}</p>}
                   {cart.referralCode && (
                     <p className="mt-1.5 text-xs text-emerald-300">
-                      Referral code {cart.referralCode} applied automatically.
+                      {t('cart.referralApplied', { code: cart.referralCode })}
                     </p>
                   )}
                 </div>
 
                 <div className="mt-6 space-y-1 border-t border-white/10 pt-5">
                   <div className="flex justify-between font-display text-xl font-bold text-white">
-                    <span>Total</span>
+                    <span>{t('cart.total')}</span>
                     <span className="font-mono">{formatUsd(total)}</span>
                   </div>
                   <p className="text-right text-xs text-white/50">≈ {formatKhr(total)} KHR</p>
                 </div>
 
                 <Button href="/esim/checkout" variant="liquid-accent" size="lg" className="mt-6 w-full">
-                  Proceed to Checkout
+                  {t('cart.checkout')}
                 </Button>
               </div>
             </div>

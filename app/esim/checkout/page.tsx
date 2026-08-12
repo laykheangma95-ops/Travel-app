@@ -13,28 +13,33 @@ import { PhoneField } from '@/components/auth/PhoneField';
 import { DeliveryOptions } from '@/components/esim/DeliveryOptions';
 import { toE164, validatePhone } from '@/lib/phone';
 import { cn, formatKhr, formatUsd } from '@/lib/utils';
+import { useLang, type DictKey } from '@/lib/i18n';
 
-const checkoutSchema = z
-  .object({
-    fullName: z.string().min(2, 'Please enter your full name'),
-    email: z.string().email('Please enter a valid email address'),
-    phoneCountry: z.string().min(2),
-    phone: z.string(),
-    deliveryChannel: z.enum(['email', 'telegram', 'both']),
-    deviceType: z.enum(['iphone', 'android', 'not-sure']),
-    notes: z.string().optional(),
-  })
-  // A number is only required when the customer asked for Telegram delivery —
-  // an email-only buyer should never be blocked on a field they do not need.
-  .superRefine((data, ctx) => {
-    if (data.deliveryChannel === 'email' && !data.phone.trim()) return;
-    const invalid = validatePhone(data.phoneCountry, data.phone);
-    if (invalid) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['phone'], message: invalid });
-    }
-  });
+// Built per render rather than at module scope, so the validation messages come
+// out in the language the traveller is actually reading. The rules themselves
+// are unchanged.
+const buildCheckoutSchema = (t: (key: DictKey) => string) =>
+  z
+    .object({
+      fullName: z.string().min(2, t('checkout.err.name')),
+      email: z.string().email(t('checkout.err.email')),
+      phoneCountry: z.string().min(2),
+      phone: z.string(),
+      deliveryChannel: z.enum(['email', 'telegram', 'both']),
+      deviceType: z.enum(['iphone', 'android', 'not-sure']),
+      notes: z.string().optional(),
+    })
+    // A number is only required when the customer asked for Telegram delivery —
+    // an email-only buyer should never be blocked on a field they do not need.
+    .superRefine((data, ctx) => {
+      if (data.deliveryChannel === 'email' && !data.phone.trim()) return;
+      const invalid = validatePhone(data.phoneCountry, data.phone);
+      if (invalid) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['phone'], message: invalid });
+      }
+    });
 
-type CheckoutForm = z.infer<typeof checkoutSchema>;
+type CheckoutForm = z.infer<ReturnType<typeof buildCheckoutSchema>>;
 
 type PayMethod = 'stripe' | 'aba';
 
@@ -58,6 +63,7 @@ function postToGateway(url: string, fields: Record<string, string>): void {
 }
 
 export default function CheckoutPage() {
+  const { t } = useLang();
   const cart = useCart();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -77,7 +83,7 @@ export default function CheckoutPage() {
     watch,
     formState: { errors },
   } = useForm<CheckoutForm>({
-    resolver: zodResolver(checkoutSchema),
+    resolver: zodResolver(buildCheckoutSchema(t)),
     defaultValues: {
       deliveryChannel: 'both',
       deviceType: 'iphone',
@@ -100,9 +106,9 @@ export default function CheckoutPage() {
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
           <EmptyState
             icon={ShoppingCart}
-            title="Nothing to check out"
-            description="Add an eSIM plan to your cart first."
-            ctaLabel="Browse eSIM plans"
+            title={t('checkout.empty.title')}
+            description={t('checkout.empty.desc')}
+            ctaLabel={t('cart.empty.cta')}
             ctaHref="/esim"
             dark
           />
@@ -157,7 +163,7 @@ export default function CheckoutPage() {
 
       if (!res.ok || !data?.orderNumber) {
         throw new Error(
-          data?.error?.message ?? 'Payment could not be started. Please try again.'
+          data?.error?.message ?? t('checkout.err.payStart')
         );
       }
 
@@ -185,7 +191,7 @@ export default function CheckoutPage() {
 
       router.push(`/order-confirmation/${data.orderNumber}?method=${payMethod}`);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : 'Something went wrong');
+      setPayError(e instanceof Error ? e.message : t('checkout.err.generic'));
       setProcessing(false);
     }
   };
@@ -196,27 +202,29 @@ export default function CheckoutPage() {
     <div className="night-canvas min-h-screen">
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Almost there</p>
-        <h1 className="mb-8 font-display text-3xl font-bold text-white">Checkout</h1>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">
+          {t('checkout.eyebrow')}
+        </p>
+        <h1 className="mb-8 font-display text-3xl font-bold text-white">{t('checkout.title')}</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-8 lg:grid-cols-5">
           {/* Customer form */}
           <div className="space-y-5 lg:col-span-3">
             <div className="night-card p-7">
-              <h2 className="mb-5 font-display text-lg font-bold text-white">Your details</h2>
+              <h2 className="mb-5 font-display text-lg font-bold text-white">{t('checkout.details')}</h2>
               <div className="space-y-4">
                 <Input
                   id="fullName"
-                  label="Full Name"
+                  label={t('checkout.fullName')}
                   required
                   dark
-                  placeholder="e.g. Sokha Prak"
+                  placeholder={t('checkout.fullNamePlaceholder')}
                   error={errors.fullName?.message}
                   {...register('fullName')}
                 />
                 <Input
                   id="email"
-                  label="Email Address"
+                  label={t('checkout.email')}
                   type="email"
                   required
                   dark
@@ -229,39 +237,39 @@ export default function CheckoutPage() {
                     canvas from globals.css without touching the locked files. */}
                 <div className="night-locked-surface">
                   <PhoneField
-                    label={
-                      deliveryChannel === 'email' ? 'Phone number (optional)' : 'Phone number'
-                    }
+                    label={t(
+                      deliveryChannel === 'email' ? 'checkout.phoneOptional' : 'checkout.phone'
+                    )}
                     required={deliveryChannel !== 'email'}
                     country={phoneCountry}
                     onCountryChange={(code) => setValue('phoneCountry', code)}
                     number={phone}
                     onNumberChange={(value) => setValue('phone', value, { shouldValidate: true })}
                     error={errors.phone?.message}
-                    hint={
+                    hint={t(
                       deliveryChannel === 'email'
-                        ? 'Only used if we need to reach you about this order.'
-                        : 'Used to confirm your Telegram chat belongs to you.'
-                    }
+                        ? 'checkout.phoneHintEmail'
+                        : 'checkout.phoneHintTelegram'
+                    )}
                   />
                 </div>
-                <Select id="deviceType" label="Device Type" dark {...register('deviceType')}>
+                <Select id="deviceType" label={t('checkout.deviceType')} dark {...register('deviceType')}>
                   <option value="iphone">iPhone</option>
                   <option value="android">Android</option>
-                  <option value="not-sure">Not sure</option>
+                  <option value="not-sure">{t('checkout.deviceNotSure')}</option>
                 </Select>
                 <Textarea
                   id="notes"
-                  label="Special Notes (optional)"
+                  label={t('checkout.notes')}
                   dark
-                  placeholder="Anything we should know?"
+                  placeholder={t('checkout.notesPlaceholder')}
                   {...register('notes')}
                 />
               </div>
             </div>
 
             <div className="night-card night-locked-surface p-7">
-              <h2 className="mb-5 font-display text-lg font-bold text-white">QR code delivery</h2>
+              <h2 className="mb-5 font-display text-lg font-bold text-white">{t('checkout.delivery')}</h2>
               <DeliveryOptions
                 value={deliveryChannel}
                 onChange={(value) => setValue('deliveryChannel', value, { shouldValidate: true })}
@@ -273,7 +281,7 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2">
             <div className="sticky top-24 space-y-5">
               <div className="night-card p-6">
-                <h2 className="font-display text-lg font-bold text-white">Order summary</h2>
+                <h2 className="font-display text-lg font-bold text-white">{t('checkout.summary')}</h2>
                 <ul className="mt-4 space-y-2 border-b border-white/10 pb-4 text-sm text-white/70">
                   {cart.items.map((i) => (
                     <li key={i.planId} className="flex justify-between">
@@ -286,14 +294,14 @@ export default function CheckoutPage() {
                   ))}
                 </ul>
                 <div className="mt-4 flex justify-between font-display text-lg font-bold text-white">
-                  <span>Total</span>
+                  <span>{t('checkout.total')}</span>
                   <span className="font-mono">{formatUsd(total)}</span>
                 </div>
                 <p className="text-right text-xs text-white/50">≈ {formatKhr(total)} KHR</p>
               </div>
 
               <div className="night-card p-6">
-                <h2 className="mb-4 font-display text-lg font-bold text-white">Payment method</h2>
+                <h2 className="mb-4 font-display text-lg font-bold text-white">{t('checkout.payMethod')}</h2>
 
                 <div className="space-y-3">
                   <button
@@ -309,8 +317,8 @@ export default function CheckoutPage() {
                   >
                     <CreditCard size={22} className="shrink-0 text-gold-light" aria-hidden="true" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">International Cards</p>
-                      <p className="text-xs text-white/55">Visa · Mastercard · Amex — via Stripe</p>
+                      <p className="text-sm font-semibold text-white">{t('checkout.cards')}</p>
+                      <p className="text-xs text-white/55">{t('checkout.cardsDesc')}</p>
                     </div>
                   </button>
 
@@ -327,8 +335,8 @@ export default function CheckoutPage() {
                   >
                     <Landmark size={22} className="shrink-0 text-gold-light" aria-hidden="true" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">ABA PayWay (Cambodia)</p>
-                      <p className="text-xs text-white/55">KHQR · ABA Mobile · local cards</p>
+                      <p className="text-sm font-semibold text-white">{t('checkout.aba')}</p>
+                      <p className="text-xs text-white/55">{t('checkout.abaDesc')}</p>
                     </div>
                   </button>
                 </div>
@@ -346,17 +354,15 @@ export default function CheckoutPage() {
                 >
                   {processing ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" /> Processing…
+                      <Loader2 size={16} className="animate-spin" /> {t('checkout.processing')}
                     </>
                   ) : payMethod === 'stripe' ? (
-                    'Pay with Card'
+                    t('checkout.payCard')
                   ) : (
-                    'Pay with ABA / KHQR'
+                    t('checkout.payAba')
                   )}
                 </button>
-                <p className="mt-3 text-center text-xs text-white/50">
-                  Secure payment · QR delivered within 15 minutes
-                </p>
+                <p className="mt-3 text-center text-xs text-white/50">{t('checkout.secure')}</p>
               </div>
             </div>
           </div>

@@ -7,11 +7,24 @@ import { DestinationCard } from '@/components/esim/DestinationCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLang, type DictKey } from '@/lib/i18n';
 
-const FILTERS = ['All', 'Asia', 'East Asia', 'Southeast Asia', 'Europe', 'Americas', 'Middle East'] as const;
-type Filter = (typeof FILTERS)[number];
+// The region string is the filter VALUE — it matches `destination.region` in
+// data/ — so it stays English. Only the label beside it is translated.
+const FILTERS = [
+  { value: 'All', key: 'store.filter.All' },
+  { value: 'Asia', key: 'store.filter.Asia' },
+  { value: 'East Asia', key: 'store.filter.EastAsia' },
+  { value: 'Southeast Asia', key: 'store.filter.SoutheastAsia' },
+  { value: 'Europe', key: 'store.filter.Europe' },
+  { value: 'Americas', key: 'store.filter.Americas' },
+  { value: 'Middle East', key: 'store.filter.MiddleEast' },
+] as const satisfies ReadonlyArray<{ value: string; key: DictKey }>;
+
+type Filter = (typeof FILTERS)[number]['value'];
 
 export default function EsimStorePage() {
+  const { t } = useLang();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
 
@@ -31,11 +44,11 @@ export default function EsimStorePage() {
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Global data</p>
-          <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">eSIM Store</h1>
-          <p className="mt-3 text-white/70">
-            Instant data for the places Cambodians fly. Buy now, scan the QR, and connect the moment you land.
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">
+            {t('store.eyebrow')}
           </p>
+          <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">{t('store.title')}</h1>
+          <p className="mt-3 text-white/70">{t('store.sub')}</p>
         </div>
 
         {/* Search */}
@@ -43,7 +56,7 @@ export default function EsimStorePage() {
           className="mb-6 flex max-w-xl gap-2"
           onSubmit={(e) => e.preventDefault()}
           role="search"
-          aria-label="Search destinations"
+          aria-label={t('store.searchRegion')}
         >
           <div className="relative flex-1">
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden="true" />
@@ -51,37 +64,37 @@ export default function EsimStorePage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search destination..."
-              aria-label="Search destination"
+              placeholder={t('store.searchPlaceholder')}
+              aria-label={t('store.searchRegion')}
               className="w-full rounded-btn border border-gold-light/20 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/40 backdrop-blur-md transition-all focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25"
             />
           </div>
           <button
             type="submit"
             className="liquid-glass-accent liquid-press rounded-btn px-5 py-3 text-sm font-semibold text-primary-deep transition-all hover:brightness-110"
-            aria-label="Search"
+            aria-label={t('store.search')}
           >
             <Search size={18} />
           </button>
         </form>
 
         {/* Filter tabs */}
-        <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label="Filter by region">
+        <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label={t('store.filterLabel')}>
           {FILTERS.map((f) => (
             <button
-              key={f}
+              key={f.value}
               type="button"
               role="tab"
-              aria-selected={filter === f}
-              onClick={() => setFilter(f)}
+              aria-selected={filter === f.value}
+              onClick={() => setFilter(f.value)}
               className={cn(
                 'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-smooth',
-                filter === f
+                filter === f.value
                   ? 'border border-gold-light/50 bg-gold-light/15 text-gold-light shadow-sm'
                   : 'border border-white/10 bg-white/5 text-white/70 hover:border-gold-light/40 hover:text-white'
               )}
             >
-              {f}
+              {t(f.key)}
             </button>
           ))}
         </div>
@@ -96,9 +109,9 @@ export default function EsimStorePage() {
         ) : (
           <EmptyState
             icon={Globe}
-            title="No destinations found"
-            description={`We couldn't find "${query}". Try another country name or clear your filters.`}
-            ctaLabel="Clear search"
+            title={t('store.empty.title')}
+            description={t('store.empty.desc', { query })}
+            ctaLabel={t('store.empty.cta')}
             ctaHref="/esim"
             dark
           />

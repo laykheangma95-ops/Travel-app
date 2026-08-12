@@ -42,8 +42,10 @@ const dicts = {
       'An account already exists with this email. Try signing in instead.',
     // Hero
     'hero.badge': "Cambodia's First Travel Super App 🇰🇭",
+    // GlobeHero renders t2 with its own leading space — no space here, or the
+    // English headline gets a double gap that Khmer never shows.
     'hero.t1': 'Travel',
-    'hero.t2': ' Confidently',
+    'hero.t2': 'Confidently',
     'hero.t3': 'Stay Connected.',
     'hero.sub':
       'eSIM for the routes Cambodians fly. Real-time flight alerts. Step-by-step airport guidance. All in Khmer.',
@@ -199,6 +201,168 @@ const dicts = {
     'v3.trust.pay': 'Pay in USD by card, or with ABA PayWay and KHQR.',
     'v3.trust.noContract': 'No contract, no subscription, no auto-renewal.',
     'v3.trust.policy': 'Read the refund policy',
+
+    // ── eSIM store (/esim) ──
+    'store.eyebrow': 'Global data',
+    'store.title': 'eSIM Store',
+    'store.sub':
+      'Instant data for the places Cambodians fly. Buy now, scan the QR, and connect the moment you land.',
+    'store.searchRegion': 'Search destinations',
+    'store.searchPlaceholder': 'Search destination…',
+    'store.search': 'Search',
+    'store.filterLabel': 'Filter by region',
+    'store.filter.All': 'All',
+    'store.filter.Asia': 'Asia',
+    'store.filter.EastAsia': 'East Asia',
+    'store.filter.SoutheastAsia': 'Southeast Asia',
+    'store.filter.Europe': 'Europe',
+    'store.filter.Americas': 'Americas',
+    'store.filter.MiddleEast': 'Middle East',
+    'store.empty.title': 'No destinations found',
+    'store.empty.desc': 'We couldn’t find "{query}". Try another country name or clear your filters.',
+    'store.empty.cta': 'Clear search',
+
+    // ── Country plans (/esim/[country]) ──
+    'country.title': '{country} eSIM Plans',
+    'country.poweredBy': 'Powered by {networks} network',
+    'country.coverage': 'Nationwide coverage',
+    'country.quality': '{tech} · {quality} quality',
+    'country.entryInfo': 'Entry info',
+    'country.installTitle': 'Installation guide',
+    'country.install.iphone': '📱 iPhone installation steps',
+    'country.install.iphone1': 'Open <b>Settings → Cellular → Add eSIM</b>',
+    'country.install.iphone2': 'Tap <b>Use QR Code</b> and scan the QR we send you',
+    'country.install.iphone3': 'Label the new plan “{country} Trip”',
+    'country.install.iphone4': 'Keep the eSIM <b>OFF</b> until you land in {country}',
+    'country.install.iphone5':
+      'After landing: turn the eSIM on and enable <b>Data Roaming</b> for it',
+    'country.install.android': '🤖 Android installation steps',
+    'country.install.android1':
+      'Open <b>Settings → Connections → SIM Manager → Add eSIM</b>',
+    'country.install.android2': 'Choose <b>Scan QR code</b> and scan the QR we send you',
+    'country.install.android3': 'Confirm the download and name it “{country} Trip”',
+    'country.install.android4': 'Keep mobile data on your Cambodian SIM until departure',
+    'country.install.android5':
+      'After landing: switch mobile data to the new eSIM and enable roaming',
+    'country.faqTitle': '{country} eSIM — frequently asked questions',
+    'country.faq.q1': 'When should I activate my {country} eSIM?',
+    'country.faq.a1':
+      'Install the eSIM before you fly, but only turn it on after you land in {country}. The validity period starts when the eSIM first connects to a local network.',
+    'country.faq.q2': 'Can I share data with my travel partner?',
+    'country.faq.a2':
+      'Yes — all Domner plans include hotspot/tethering, so you can share your connection with family members’ phones.',
+    'country.faq.q3': 'Which networks will I connect to in {country}?',
+    'country.faq.a3':
+      'Your eSIM automatically connects to {networks} — whichever has the strongest signal where you are. Expect {tech} speeds in cities.',
+    'country.faq.q4': 'What if I run out of data?',
+    'country.faq.a4':
+      'Message our 24/7 Khmer support on Telegram and we’ll top you up in minutes — no need to buy a new eSIM.',
+    'country.faq.q5': 'Does my number change?',
+    'country.faq.a5':
+      'Your Cambodian number stays active for calls/SMS (roaming charges may apply if you answer). The eSIM is data-only, and apps like Telegram keep working with your normal number over data.',
+
+    // ── Cart (/cart) ──
+    'cart.title': 'Your Cart',
+    'cart.empty.title': 'Your cart is empty',
+    'cart.empty.desc': 'Browse our eSIM store and add a plan for your next destination.',
+    'cart.empty.cta': 'Browse eSIM plans',
+    'cart.days': '{days} days',
+    'cart.perDay': '{gb}GB/day',
+    'cart.totalData': '{gb}GB total',
+    'cart.remove': 'Remove {country} {plan} from cart',
+    'cart.summary': 'Order Summary',
+    'cart.subtotal': 'Subtotal',
+    'cart.discount': 'Discount',
+    'cart.discountCode': 'Discount code',
+    'cart.apply': 'Apply',
+    'cart.codeInvalid': 'This code is not valid or has expired.',
+    'cart.referralApplied': 'Referral code {code} applied automatically.',
+    'cart.total': 'Total',
+    'cart.checkout': 'Proceed to Checkout',
+
+    // ── Checkout (/esim/checkout) ──
+    'checkout.eyebrow': 'Almost there',
+    'checkout.title': 'Checkout',
+    'checkout.empty.title': 'Nothing to check out',
+    'checkout.empty.desc': 'Add an eSIM plan to your cart first.',
+    'checkout.details': 'Your details',
+    'checkout.fullName': 'Full Name',
+    'checkout.fullNamePlaceholder': 'e.g. Sokha Prak',
+    'checkout.email': 'Email Address',
+    'checkout.phoneOptional': 'Phone number (optional)',
+    'checkout.phone': 'Phone number',
+    'checkout.phoneHintEmail': 'Only used if we need to reach you about this order.',
+    'checkout.phoneHintTelegram': 'Used to confirm your Telegram chat belongs to you.',
+    'checkout.deviceType': 'Device Type',
+    'checkout.deviceNotSure': 'Not sure',
+    'checkout.notes': 'Special Notes (optional)',
+    'checkout.notesPlaceholder': 'Anything we should know?',
+    'checkout.delivery': 'QR code delivery',
+    'checkout.summary': 'Order summary',
+    'checkout.total': 'Total',
+    'checkout.payMethod': 'Payment method',
+    'checkout.cards': 'International Cards',
+    'checkout.cardsDesc': 'Visa · Mastercard · Amex — via Stripe',
+    'checkout.aba': 'ABA PayWay (Cambodia)',
+    'checkout.abaDesc': 'KHQR · ABA Mobile · local cards',
+    'checkout.processing': 'Processing…',
+    'checkout.payCard': 'Pay with Card',
+    'checkout.payAba': 'Pay with ABA / KHQR',
+    'checkout.secure': 'Secure payment · QR delivered within 15 minutes',
+    'checkout.err.name': 'Please enter your full name',
+    'checkout.err.email': 'Please enter a valid email address',
+    'checkout.err.payStart': 'Payment could not be started. Please try again.',
+    'checkout.err.generic': 'Something went wrong',
+
+    // ── Order confirmation ──
+    'confirm.title': 'Your eSIM is Being Prepared!',
+    'confirm.orderNumber': 'Order number:',
+    'confirm.eta': 'We will send your QR code within {minutes} minutes.',
+    'confirm.next': 'What happens next',
+    'confirm.step1.title': 'We prepare your eSIM',
+    'confirm.step1.desc': 'Our team generates your QR code — usually within 15 minutes.',
+    'confirm.step2.title': 'You receive the QR code',
+    'confirm.step2.desc': 'By email, and on Telegram too if you connected it below.',
+    'confirm.step3.title': 'Install before you fly',
+    'confirm.step3.desc': 'Scan the QR to install, then turn the eSIM on when you land.',
+    'confirm.addTrip': 'Add to your Trip',
+    'confirm.trackFlight': 'Track another flight',
+    'confirm.support': 'Contact support',
+
+    // ── Dashboard shell ──
+    'dash.nav.dashboard': 'Dashboard',
+    'dash.nav.trips': 'My Trips',
+    'dash.nav.esims': 'My eSIMs',
+    'dash.nav.alerts': 'Flight Alerts',
+    'dash.nav.memories': 'Memories',
+    'dash.nav.settings': 'Settings',
+    'dash.navLabel': 'Dashboard navigation',
+
+    // ── My eSIMs ──
+    'esims.title': 'My eSIMs',
+    'esims.sub': 'Your data plans, QR codes, and order history in one place.',
+    'esims.loading': 'Loading your eSIMs…',
+    'esims.signInPrompt': 'Please sign in to see your eSIMs.',
+    'esims.loadFailed': 'Could not load your eSIMs.',
+    'esims.signIn': 'Sign in',
+    'esims.empty.title': 'No eSIMs yet',
+    'esims.empty.desc': 'Buy your first eSIM and it will appear here with its QR code.',
+    'esims.empty.cta': 'Browse eSIM plans',
+    'esims.status.pending': 'Awaiting payment',
+    'esims.status.paid': 'Preparing your eSIM',
+    'esims.status.fulfilled': 'Ready to install',
+    'esims.status.cancelled': 'Cancelled',
+    'esims.status.refunded': 'Refunded',
+    'esims.planLine': '{plan} · {days} days · {gb}GB/day',
+    'esims.paidNote':
+      'Payment received. Your QR code is being prepared and will be emailed within 15 minutes.',
+    'esims.viewQr': 'View QR code',
+    'esims.support': 'Get support',
+    'esims.buyAgain': 'Buy again',
+    'esims.modalTitle': '{country} eSIM',
+    'esims.qrAlt': 'eSIM QR code for order {order}',
+    'esims.manualCode': 'Manual activation code',
+    'esims.installNote': 'Install over Wi-Fi before you fly. This QR code can only be scanned once.',
   },
   km: {
     // Brand
@@ -236,14 +400,15 @@ const dicts = {
     'hero.badge': 'កម្មវិធីធ្វើដំណើរដំបូងគេរបស់កម្ពុជា 🇰🇭',
     'hero.t1': 'ធ្វើដំណើរ',
     'hero.t2': 'ដោយទំនុកចិត្ត',
-    'hero.t3': 'រក្សាការតភ្ជាប់ជានិច្ច។',
+    'hero.t3': 'ភ្ជាប់អ៊ីនធឺណិតគ្រប់ពេល។',
     'hero.sub':
       'eSIM សម្រាប់ផ្លូវដែលខ្មែរធ្វើដំណើរ។ ការជូនដំណឹងជើងហោះហើរភ្លាមៗ។ ការណែនាំនៅអាកាសយានដ្ឋានជាជំហានៗ។ ទាំងអស់ជាភាសាខ្មែរ។',
     'hero.ctaEsim': 'ទិញ eSIM របស់អ្នក',
     'hero.ctaFlight': 'តាមដានជើងហោះហើរ',
     'hero.stat1': 'ការណែនាំជាភាសាខ្មែរ',
     'hero.stat2': 'ជំនួយភាសាខ្មែរ 24/7',
-    'hero.stat3': 'ដឹកជញ្ជូនភ្លាមៗ',
+    // ដឹកជញ្ជូន is freight — wrong verb for a QR code that arrives by email.
+    'hero.stat3': 'ទទួលបានភ្លាមៗ',
     // Features
     'features.eyebrow': 'ហេតុអ្វីជ្រើសរើស Domner',
     'features.title': 'អ្វីៗគ្រប់យ៉ាងដែលអ្នកដំណើរខ្មែរត្រូវការ',
@@ -265,7 +430,7 @@ const dicts = {
     // Destinations
     'dest.eyebrow': 'គោលដៅពេញនិយម',
     'dest.title': 'តើអ្នកហោះទៅណាបន្ទាប់?',
-    'dest.desc': 'eSIM ដឹកជញ្ជូនភ្លាមៗ សម្រាប់ផ្លូវដែលប្រជាជនខ្មែរធ្វើដំណើរច្រើនបំផុត។',
+    'dest.desc': 'ទទួល eSIM ភ្លាមៗ សម្រាប់ផ្លូវដែលបងប្អូនខ្មែរធ្វើដំណើរច្រើនជាងគេ។',
     'dest.viewAll': 'មើលគោលដៅទាំងអស់',
     'dest.from': 'ចាប់ពី',
     'dest.viewPlans': 'មើលគម្រោង',
@@ -291,29 +456,31 @@ const dicts = {
     'footer.support': 'ជំនួយ',
     'footer.khmerSupport': 'ជំនួយភាសាខ្មែរ 24/7',
     'footer.contact': 'ទំនាក់ទំនង',
-    'footer.affiliate': 'កម្មវិធីសម្ព័ន្ធ',
+    'footer.affiliate': 'កម្មវិធីដៃគូណែនាំ',
     'footer.about': 'អំពីយើង',
     'footer.privacy': 'គោលការណ៍ឯកជនភាព',
     'footer.terms': 'លក្ខខណ្ឌ',
     'footer.refunds': 'ការសងប្រាក់វិញ',
-    'footer.prices': 'គ្រប់តម្លៃជាដុល្លារអាមេរិក',
+    'footer.prices': 'តម្លៃទាំងអស់គិតជាដុល្លារអាមេរិក',
 
     // ── Homepage v3 — the journey ──
+    // អរុណសួស្តី is everyday Khmer; ទិវាសួស្តី/សាយណ្ហសួស្តី are literary forms
+    // nobody greets a friend with. Keep the register the same across all four.
     'v3.greet.morning': 'អរុណសួស្តី',
-    'v3.greet.afternoon': 'ទិវាសួស្តី',
-    'v3.greet.evening': 'សាយណ្ហសួស្តី',
-    'v3.greet.night': 'នៅភ្ញាក់ដឹងខ្លួន',
+    'v3.greet.afternoon': 'សួស្តីពេលរសៀល',
+    'v3.greet.evening': 'សួស្តីពេលល្ងាច',
+    'v3.greet.night': 'នៅមិនទាន់គេងទេ',
     'v3.title': 'តើអ្នកនឹងធ្វើដំណើរទៅណាបន្ទាប់?',
     'v3.sub': 'រាល់ដំណើរចាប់ផ្តើមពីឈ្មោះមួយ។',
     'v3.searchPlaceholder': 'ស្វែងរកប្រទេស ទីក្រុង ឬគោលដៅ…',
     'v3.searchLabel': 'ស្វែងរកគោលដៅ',
-    'v3.suggestions': 'គោលដៅដែលស្នើ',
+    'v3.suggestions': 'គោលដៅណែនាំ',
     'v3.continue': 'បន្តទៀត',
-    'v3.clear': 'សម្អាតការស្វែងរក',
-    'v3.explore': 'ឬចុចលើទីក្រុងដែលភ្លឺនៅលើផែនដី។',
+    'v3.clear': 'លុបពាក្យស្វែងរក',
+    'v3.explore': 'ឬចុចលើទីក្រុងដែលភ្លឺនៅលើផែនដីមូល។',
     'v3.soundOn': 'បើកសំឡេង',
     'v3.soundOff': 'បិទសំឡេង',
-    'v3.back': 'ត្រឡប់ទៅផែនដី',
+    'v3.back': 'ត្រឡប់ទៅផែនដីមូលវិញ',
     'v3.direct': 'ហោះផ្ទាល់ពីភ្នំពេញ',
     'v3.oneStop': 'ឈប់ម្តងពីភ្នំពេញ',
     'v3.guideReady': 'មគ្គុទ្ទេសក៍ពេញលេញ',
@@ -333,13 +500,13 @@ const dicts = {
     'v3.ch4.eyebrow': 'ការធ្វើដំណើរ',
     'v3.ch4.title': 'ពីអាកាសយានដ្ឋាន និងបន្ទាប់មក',
     'v3.ch5.eyebrow': 'ហេតុអ្វីត្រូវទៅ',
-    'v3.ch5.title': 'សមនឹងជើងហោះហើរ',
+    'v3.ch5.title': 'សមនឹងការហោះទៅ',
     'v3.ch6.eyebrow': 'រឿងចុងក្រោយ',
-    'v3.ch6.title': 'ការតភ្ជាប់',
+    'v3.ch6.title': 'ការភ្ជាប់អ៊ីនធឺណិត',
     // Field labels
     'v3.currency': 'រូបិយប័ណ្ណ',
     'v3.power': 'ចរន្តអគ្គិសនី',
-    'v3.network': 'បណ្តាញ',
+    'v3.network': 'បណ្តាញទូរស័ព្ទ',
     'v3.buys': 'ដប់ដុល្លារទិញបាន',
     'v3.language': 'ភាសា',
     'v3.updatedDaily': 'ធ្វើបច្ចុប្បន្នភាពប្រចាំថ្ងៃ',
@@ -352,10 +519,10 @@ const dicts = {
     'v3.recommended': 'គួរធ្វើ',
     'v3.ifWrong': 'ប្រសិនបើមានបញ្ហា',
     'v3.police': 'ប៉ូលិស',
-    'v3.ambulance': 'រថពេទ្យ',
+    'v3.ambulance': 'ឡានពេទ្យ',
     'v3.fire': 'ពន្លត់អគ្គិភ័យ',
     'v3.passport': 'សុពលភាពលិខិតឆ្លងដែន',
-    'v3.customs': 'កុំយកទៅ',
+    'v3.customs': 'របស់ហាមយកចូល',
     'v3.declareCash': 'ត្រូវប្រកាសសាច់ប្រាក់លើសពី',
     'v3.fromAirport': 'ពីអាកាសយានដ្ឋាន',
     'v3.transitCard': 'ការធ្វើដំណើរក្នុងទីក្រុង',
@@ -391,21 +558,197 @@ const dicts = {
     'v3.trust.pay': 'ទូទាត់ជាដុល្លារដោយកាត ឬតាម ABA PayWay និង KHQR។',
     'v3.trust.noContract': 'គ្មានកិច្ចសន្យា គ្មានការជាវ គ្មានការបន្តដោយស្វ័យប្រវត្តិ។',
     'v3.trust.policy': 'អានគោលការណ៍សងប្រាក់វិញ',
+
+    // ── ហាង eSIM (/esim) ──
+    'store.eyebrow': 'អ៊ីនធឺណិតទូទាំងពិភពលោក',
+    'store.title': 'ហាង eSIM',
+    'store.sub':
+      'អ៊ីនធឺណិតភ្លាមៗ សម្រាប់ប្រទេសដែលបងប្អូនខ្មែរតែងតែទៅ។ ទិញឥឡូវ ស្កេន QR រួចភ្ជាប់បានតែម្តង ពេលចុះដល់។',
+    'store.searchRegion': 'ស្វែងរកគោលដៅ',
+    'store.searchPlaceholder': 'ស្វែងរកគោលដៅ…',
+    'store.search': 'ស្វែងរក',
+    'store.filterLabel': 'ត្រងតាមតំបន់',
+    'store.filter.All': 'ទាំងអស់',
+    'store.filter.Asia': 'អាស៊ី',
+    'store.filter.EastAsia': 'អាស៊ីខាងកើត',
+    'store.filter.SoutheastAsia': 'អាស៊ីអាគ្នេយ៍',
+    'store.filter.Europe': 'អឺរ៉ុប',
+    'store.filter.Americas': 'អាមេរិក',
+    'store.filter.MiddleEast': 'មជ្ឈិមបូព៌ា',
+    'store.empty.title': 'រកមិនឃើញគោលដៅទេ',
+    'store.empty.desc': 'យើងរកមិនឃើញ "{query}" ទេ។ សូមសាកឈ្មោះប្រទេសផ្សេង ឬលុបតម្រងចេញ។',
+    'store.empty.cta': 'លុបពាក្យស្វែងរក',
+
+    // ── គម្រោងតាមប្រទេស (/esim/[country]) ──
+    'country.title': 'គម្រោង eSIM {country}',
+    'country.poweredBy': 'ដំណើរការលើបណ្តាញ {networks}',
+    'country.coverage': 'គ្របដណ្តប់ទូទាំងប្រទេស',
+    'country.quality': '{tech} · គុណភាព {quality}',
+    'country.entryInfo': 'ព័ត៌មានចូលប្រទេស',
+    'country.installTitle': 'របៀបដំឡើង',
+    'country.install.iphone': '📱 ជំហានដំឡើងលើ iPhone',
+    'country.install.iphone1': 'បើក <b>Settings → Cellular → Add eSIM</b>',
+    'country.install.iphone2': 'ចុច <b>Use QR Code</b> រួចស្កេន QR ដែលយើងផ្ញើជូន',
+    'country.install.iphone3': 'ដាក់ឈ្មោះគម្រោងថ្មីថា “ដំណើរ {country}”',
+    'country.install.iphone4': 'ទុក eSIM ឲ្យ<b>បិទ</b>សិន រហូតដល់អ្នកចុះដល់ {country}',
+    'country.install.iphone5':
+      'ពេលចុះដល់ហើយ៖ បើក eSIM រួចបើក <b>Data Roaming</b> សម្រាប់វា',
+    'country.install.android': '🤖 ជំហានដំឡើងលើ Android',
+    'country.install.android1':
+      'បើក <b>Settings → Connections → SIM Manager → Add eSIM</b>',
+    'country.install.android2': 'ជ្រើស <b>Scan QR code</b> រួចស្កេន QR ដែលយើងផ្ញើជូន',
+    'country.install.android3': 'បញ្ជាក់ការទាញយក រួចដាក់ឈ្មោះថា “ដំណើរ {country}”',
+    'country.install.android4': 'ទុកអ៊ីនធឺណិតលើស៊ីមកម្ពុជារបស់អ្នកសិន រហូតដល់ថ្ងៃចេញដំណើរ',
+    'country.install.android5':
+      'ពេលចុះដល់ហើយ៖ ប្តូរអ៊ីនធឺណិតទៅ eSIM ថ្មី រួចបើក roaming',
+    'country.faqTitle': 'eSIM {country} — សំណួរញឹកញាប់',
+    'country.faq.q1': 'តើខ្ញុំគួរបើក eSIM {country} នៅពេលណា?',
+    'country.faq.a1':
+      'ដំឡើង eSIM មុនពេលហោះ តែបើកវាតែក្រោយពេលអ្នកចុះដល់ {country} ប៉ុណ្ណោះ។ រយៈពេលប្រើប្រាស់ចាប់ផ្តើមរាប់ ពេល eSIM ភ្ជាប់បណ្តាញក្នុងស្រុកលើកដំបូង។',
+    'country.faq.q2': 'តើខ្ញុំអាចចែកអ៊ីនធឺណិតឲ្យមិត្តរួមដំណើរបានទេ?',
+    'country.faq.a2':
+      'បាន — គ្រប់គម្រោងរបស់ Domner អាចបើក hotspot បាន ដូច្នេះអ្នកអាចចែកអ៊ីនធឺណិតឲ្យទូរស័ព្ទសមាជិកគ្រួសារបាន។',
+    'country.faq.q3': 'តើខ្ញុំនឹងភ្ជាប់បណ្តាញណាខ្លះនៅ {country}?',
+    'country.faq.a3':
+      'eSIM របស់អ្នកភ្ជាប់ទៅ {networks} ដោយស្វ័យប្រវត្តិ — មួយណាដែលមានសញ្ញាខ្លាំងជាងគេនៅកន្លែងអ្នក។ ក្នុងទីក្រុង អ្នកនឹងទទួលបានល្បឿន {tech}។',
+    'country.faq.q4': 'បើអស់អ៊ីនធឺណិត ត្រូវធ្វើដូចម្តេច?',
+    'country.faq.a4':
+      'សរសេរមកក្រុមជំនួយភាសាខ្មែររបស់យើងតាម Telegram ២៤ម៉ោង យើងបញ្ចូលបន្ថែមឲ្យក្នុងរយៈពេលពីរបីនាទី — មិនចាំបាច់ទិញ eSIM ថ្មីទេ។',
+    'country.faq.q5': 'តើលេខទូរស័ព្ទរបស់ខ្ញុំប្តូរទេ?',
+    'country.faq.a5':
+      'លេខកម្ពុជារបស់អ្នកនៅដំណើរការធម្មតាសម្រាប់ការហៅ និង SMS (អាចមានថ្លៃ roaming បើអ្នកទទួល)។ eSIM នេះប្រើសម្រាប់អ៊ីនធឺណិតតែប៉ុណ្ណោះ ហើយកម្មវិធីដូចជា Telegram នៅតែដំណើរការជាមួយលេខធម្មតារបស់អ្នកតាមអ៊ីនធឺណិត។',
+
+    // ── កន្ត្រក (/cart) ──
+    'cart.title': 'កន្ត្រករបស់អ្នក',
+    'cart.empty.title': 'កន្ត្រករបស់អ្នកទទេ',
+    'cart.empty.desc': 'សូមមើលហាង eSIM របស់យើង ហើយបន្ថែមគម្រោងសម្រាប់គោលដៅបន្ទាប់របស់អ្នក។',
+    'cart.empty.cta': 'មើលគម្រោង eSIM',
+    'cart.days': '{days} ថ្ងៃ',
+    'cart.perDay': '{gb}GB ក្នុងមួយថ្ងៃ',
+    'cart.totalData': '{gb}GB សរុប',
+    'cart.remove': 'ដកគម្រោង {plan} របស់ {country} ចេញពីកន្ត្រក',
+    'cart.summary': 'សេចក្តីសង្ខេបការបញ្ជាទិញ',
+    'cart.subtotal': 'សរុបរង',
+    'cart.discount': 'បញ្ចុះតម្លៃ',
+    'cart.discountCode': 'កូដបញ្ចុះតម្លៃ',
+    'cart.apply': 'ប្រើកូដ',
+    'cart.codeInvalid': 'កូដនេះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។',
+    'cart.referralApplied': 'កូដណែនាំ {code} ត្រូវបានប្រើដោយស្វ័យប្រវត្តិ។',
+    'cart.total': 'សរុប',
+    'cart.checkout': 'បន្តទៅការទូទាត់',
+
+    // ── ការទូទាត់ (/esim/checkout) ──
+    'checkout.eyebrow': 'ជិតរួចរាល់ហើយ',
+    'checkout.title': 'ការទូទាត់',
+    'checkout.empty.title': 'គ្មានអ្វីត្រូវទូទាត់ទេ',
+    'checkout.empty.desc': 'សូមបន្ថែមគម្រោង eSIM ទៅក្នុងកន្ត្រកជាមុនសិន។',
+    'checkout.details': 'ព័ត៌មានរបស់អ្នក',
+    'checkout.fullName': 'ឈ្មោះពេញ',
+    'checkout.fullNamePlaceholder': 'ឧ. ប្រាក់ សុខា',
+    'checkout.email': 'អាសយដ្ឋានអ៊ីមែល',
+    'checkout.phoneOptional': 'លេខទូរស័ព្ទ (មិនចាំបាច់)',
+    'checkout.phone': 'លេខទូរស័ព្ទ',
+    'checkout.phoneHintEmail': 'ប្រើតែក្នុងករណីយើងត្រូវទាក់ទងអ្នកអំពីការបញ្ជាទិញនេះ។',
+    'checkout.phoneHintTelegram': 'ប្រើដើម្បីបញ្ជាក់ថា Telegram នោះជារបស់អ្នក។',
+    'checkout.deviceType': 'ប្រភេទទូរស័ព្ទ',
+    'checkout.deviceNotSure': 'មិនច្បាស់',
+    'checkout.notes': 'កំណត់សម្គាល់បន្ថែម (មិនចាំបាច់)',
+    'checkout.notesPlaceholder': 'មានអ្វីចង់ប្រាប់យើងទេ?',
+    'checkout.delivery': 'ការផ្ញើកូដ QR',
+    'checkout.summary': 'សេចក្តីសង្ខេបការបញ្ជាទិញ',
+    'checkout.total': 'សរុប',
+    'checkout.payMethod': 'វិធីទូទាត់',
+    'checkout.cards': 'កាតអន្តរជាតិ',
+    'checkout.cardsDesc': 'Visa · Mastercard · Amex — តាម Stripe',
+    'checkout.aba': 'ABA PayWay (កម្ពុជា)',
+    'checkout.abaDesc': 'KHQR · ABA Mobile · កាតក្នុងស្រុក',
+    'checkout.processing': 'កំពុងដំណើរការ…',
+    'checkout.payCard': 'ទូទាត់ដោយកាត',
+    'checkout.payAba': 'ទូទាត់តាម ABA / KHQR',
+    'checkout.secure': 'ការទូទាត់មានសុវត្ថិភាព · ផ្ញើ QR ក្នុងរយៈពេល ១៥ នាទី',
+    'checkout.err.name': 'សូមបញ្ចូលឈ្មោះពេញរបស់អ្នក',
+    'checkout.err.email': 'សូមបញ្ចូលអាសយដ្ឋានអ៊ីមែលឲ្យបានត្រឹមត្រូវ',
+    'checkout.err.payStart': 'មិនអាចចាប់ផ្តើមការទូទាត់បានទេ។ សូមព្យាយាមម្តងទៀត។',
+    'checkout.err.generic': 'មានបញ្ហាកើតឡើង',
+
+    // ── បញ្ជាក់ការបញ្ជាទិញ ──
+    'confirm.title': 'eSIM របស់អ្នកកំពុងរៀបចំហើយ!',
+    'confirm.orderNumber': 'លេខបញ្ជាទិញ៖',
+    'confirm.eta': 'យើងនឹងផ្ញើកូដ QR ជូនអ្នកក្នុងរយៈពេល {minutes} នាទី។',
+    'confirm.next': 'ជំហានបន្ទាប់',
+    'confirm.step1.title': 'យើងរៀបចំ eSIM របស់អ្នក',
+    'confirm.step1.desc': 'ក្រុមការងាររបស់យើងបង្កើតកូដ QR — ជាធម្មតាក្នុងរយៈពេល ១៥ នាទី។',
+    'confirm.step2.title': 'អ្នកទទួលបានកូដ QR',
+    'confirm.step2.desc': 'តាមអ៊ីមែល និងតាម Telegram ផងដែរ បើអ្នកបានភ្ជាប់វាខាងក្រោម។',
+    'confirm.step3.title': 'ដំឡើងមុនពេលហោះ',
+    'confirm.step3.desc': 'ស្កេន QR ដើម្បីដំឡើង រួចបើក eSIM ពេលអ្នកចុះដល់។',
+    'confirm.addTrip': 'បន្ថែមទៅដំណើររបស់អ្នក',
+    'confirm.trackFlight': 'តាមដានជើងហោះហើរផ្សេង',
+    'confirm.support': 'ទាក់ទងក្រុមជំនួយ',
+
+    // ── ផ្ទាំងគ្រប់គ្រង ──
+    'dash.nav.dashboard': 'ផ្ទាំងគ្រប់គ្រង',
+    'dash.nav.trips': 'ដំណើររបស់ខ្ញុំ',
+    'dash.nav.esims': 'eSIM របស់ខ្ញុំ',
+    'dash.nav.alerts': 'ជូនដំណឹងជើងហោះហើរ',
+    'dash.nav.memories': 'ការចងចាំ',
+    'dash.nav.settings': 'ការកំណត់',
+    'dash.navLabel': 'ម៉ឺនុយផ្ទាំងគ្រប់គ្រង',
+
+    // ── eSIM របស់ខ្ញុំ ──
+    'esims.title': 'eSIM របស់ខ្ញុំ',
+    'esims.sub': 'គម្រោងអ៊ីនធឺណិត កូដ QR និងប្រវត្តិបញ្ជាទិញរបស់អ្នក នៅកន្លែងតែមួយ។',
+    'esims.loading': 'កំពុងផ្ទុក eSIM របស់អ្នក…',
+    'esims.signInPrompt': 'សូមចូលគណនីដើម្បីមើល eSIM របស់អ្នក។',
+    'esims.loadFailed': 'មិនអាចផ្ទុក eSIM របស់អ្នកបានទេ។',
+    'esims.signIn': 'ចូលគណនី',
+    'esims.empty.title': 'មិនទាន់មាន eSIM ទេ',
+    'esims.empty.desc': 'ទិញ eSIM ដំបូងរបស់អ្នក រួចវានឹងបង្ហាញនៅទីនេះជាមួយកូដ QR។',
+    'esims.empty.cta': 'មើលគម្រោង eSIM',
+    'esims.status.pending': 'រង់ចាំការទូទាត់',
+    'esims.status.paid': 'កំពុងរៀបចំ eSIM',
+    'esims.status.fulfilled': 'អាចដំឡើងបានហើយ',
+    'esims.status.cancelled': 'បានលុបចោល',
+    'esims.status.refunded': 'បានសងប្រាក់វិញ',
+    'esims.planLine': '{plan} · {days} ថ្ងៃ · {gb}GB ក្នុងមួយថ្ងៃ',
+    'esims.paidNote':
+      'បានទទួលការទូទាត់។ កូដ QR របស់អ្នកកំពុងរៀបចំ ហើយនឹងផ្ញើតាមអ៊ីមែលក្នុងរយៈពេល ១៥ នាទី។',
+    'esims.viewQr': 'មើលកូដ QR',
+    'esims.support': 'សុំជំនួយ',
+    'esims.buyAgain': 'ទិញម្តងទៀត',
+    'esims.modalTitle': 'eSIM {country}',
+    'esims.qrAlt': 'កូដ QR eSIM សម្រាប់ការបញ្ជាទិញ {order}',
+    'esims.manualCode': 'កូដបើកដំណើរការដោយដៃ',
+    'esims.installNote': 'ដំឡើងតាម Wi-Fi មុនពេលហោះ។ កូដ QR នេះស្កេនបានតែម្តងគត់។',
   },
 } as const;
 
 export type DictKey = keyof typeof dicts.en;
 
+/**
+ * Values spliced into a string at `{name}`. Khmer and English put the same
+ * facts in a different order — a country name leads the English sentence and
+ * trails the Khmer one — so the placeholder has to be named, never positional.
+ */
+export type TVars = Record<string, string | number>;
+
+function interpolate(template: string, vars?: TVars): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in vars ? String(vars[name]) : match
+  );
+}
+
 interface LangContextValue {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: (key: DictKey) => string;
+  t: (key: DictKey, vars?: TVars) => string;
 }
 
 const LangContext = createContext<LangContextValue>({
   lang: 'en',
   setLang: () => undefined,
-  t: (key) => dicts.en[key],
+  t: (key, vars) => interpolate(dicts.en[key], vars),
 });
 
 /** Shared with the server layout, which reads this cookie to set <html lang>. */
@@ -459,7 +802,8 @@ export function LanguageProvider({
     persistLang(l);
   };
 
-  const t = (key: DictKey) => dicts[lang][key] ?? dicts.en[key];
+  const t = (key: DictKey, vars?: TVars) =>
+    interpolate(dicts[lang][key] ?? dicts.en[key], vars);
 
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 }

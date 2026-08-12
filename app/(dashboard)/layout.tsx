@@ -11,23 +11,25 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLang, type DictKey } from '@/lib/i18n';
 
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'My Trips', href: '/my-trips', icon: Map },
-  { label: 'My eSIMs', href: '/my-esims', icon: Smartphone },
-  { label: 'Flight Alerts', href: '/flights', icon: BellRing },
-  { label: 'Memories', href: '/trips', icon: Camera },
-  { label: 'Settings', href: '/settings', icon: Settings },
-];
+  { label: 'dash.nav.dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'dash.nav.trips', href: '/my-trips', icon: Map },
+  { label: 'dash.nav.esims', href: '/my-esims', icon: Smartphone },
+  { label: 'dash.nav.alerts', href: '/flights', icon: BellRing },
+  { label: 'dash.nav.memories', href: '/trips', icon: Camera },
+  { label: 'dash.nav.settings', href: '/settings', icon: Settings },
+] as const satisfies ReadonlyArray<{ label: DictKey; href: string; icon: unknown }>;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useLang();
   const pathname = usePathname();
 
   return (
     <div className="mx-auto flex max-w-7xl gap-8 px-4 py-10 sm:px-6">
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 lg:block" aria-label="Dashboard navigation">
+      <aside className="hidden w-56 shrink-0 lg:block" aria-label={t('dash.navLabel')}>
         <nav className="sticky top-24 space-y-1">
           {navItems.map((item) => {
             const active = pathname === item.href;
@@ -44,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 aria-current={active ? 'page' : undefined}
               >
                 <item.icon size={17} aria-hidden="true" />
-                {item.label}
+                {t(item.label)}
               </Link>
             );
           })}
@@ -56,7 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile bottom tabs */}
       <nav
         className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 backdrop-blur-lg lg:hidden"
-        aria-label="Dashboard navigation"
+        aria-label={t('dash.navLabel')}
       >
         {navItems.slice(0, 5).map((item) => {
           const active = pathname === item.href;
@@ -71,7 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               aria-current={active ? 'page' : undefined}
             >
               <item.icon size={19} aria-hidden="true" />
-              {item.label}
+              {t(item.label)}
             </Link>
           );
         })}
