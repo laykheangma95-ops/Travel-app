@@ -1,0 +1,23 @@
+{
+  "name": "@domner/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Domner fulfilment worker. Runs on a VM with a static IP, not on Vercel.",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@domner/core": "*",
+    "@domner/supplier": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "tsx": "^4.23.12",
+    "typescript": "^5.6.3"
+  }
+}

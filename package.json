@@ -4,12 +4,21 @@
   "private": true,
   "type": "module",
   "description": "Domner App — Cambodia's first Khmer-language travel super app",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "build:workspaces": "npm run build --workspaces --if-present",
+    "typecheck:workspaces": "npm run typecheck --workspaces --if-present",
+    "lint:workspaces": "eslint \"apps/**/*.{ts,tsx}\" \"packages/**/*.ts\"",
+    "dev:ops": "npm run dev --workspace @domner/ops",
+    "dev:worker": "npm run dev --workspace @domner/worker",
     "intents:gap": "node scripts/intent-gap.mjs",
     "intents:seed": "node scripts/seed-data.mjs",
     "intents:generate": "node scripts/generate-questions.mjs",
