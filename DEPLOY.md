@@ -67,6 +67,30 @@ NEXT_PUBLIC_APP_URL    # your final domain, e.g. https://domnerapp.com
 - After adding keys, **redeploy** (Deployments → ⋯ → Redeploy) so they take effect.
 - Run `supabase/schema.sql` in the Supabase SQL editor (creates tables + RLS).
 
+### The two Supabase keys are not optional
+
+Without `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, **accounts
+do not exist**. There is nowhere to store a customer, nothing to check a password
+against, and no session to issue.
+
+A production deploy missing them now **says so** — sign-in and sign-up show an
+error, and `/dashboard`, `/my-esims`, `/my-trips`, `/settings` and `/admin` are
+refused. That is deliberate. It used to fall through to demo mode instead: the
+click "succeeded", no account was created, and the visitor landed on a dashboard
+of fake data that looked exactly like being logged in. An outage must not look
+like a working login.
+
+The public storefront and checkout are unaffected either way.
+
+**Check it in one click:** open `https://<your-domain>/api/health` and look at
+`services.supabase` and `services.supabaseAdmin`. `true` on both means accounts
+work. The endpoint returns HTTP 503 while anything critical is missing, so an
+uptime monitor pointed at it will catch this before a customer does.
+
+> `DOMNER_ALLOW_DEMO=true` (plus `NEXT_PUBLIC_DOMNER_ALLOW_DEMO=true` for the
+> browser half) forces demo mode back on for a staging deploy that runs without
+> real credentials on purpose. **Never set either on production.**
+
 ## Step 6 — Custom domain
 
 1. Buy `domnerapp.com` from any registrar (~$12–15/yr).

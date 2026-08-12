@@ -1,5 +1,6 @@
 // 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { getSupabase } from '@/lib/supabase';
+import { demoModeAllowed } from '@/lib/env';
 
 export type OAuthProvider = 'google' | 'apple';
 
@@ -10,6 +11,43 @@ export interface AuthResult {
 }
 
 const DEMO: AuthResult = { error: null, demo: true };
+
+/**
+ * Shown when Supabase is missing on a real deployment. Deliberately vague about
+ * the cause — a visitor cannot act on "the anon key is unset", and naming the
+ * broken component to the public buys us nothing.
+ */
+const UNAVAILABLE =
+  'Sign-in is temporarily unavailable. Please try again in a few minutes — ' +
+  'if it keeps happening, contact support and we will sort it out.';
+
+/**
+ * What every function below returns when `getSupabase()` hands back null.
+ *
+ * WHY THIS IS NOT JUST `DEMO`:
+ *   It used to be. Every caller reads `demo` as "success, skip ahead", so a
+ *   production deploy that was missing NEXT_PUBLIC_SUPABASE_ANON_KEY answered
+ *   every sign-in and sign-up with `{ error: null, demo: true }` — no account
+ *   created, no password checked, no session issued — and the pages happily
+ *   pushed the visitor to /dashboard. A missing key presented as a working
+ *   login. `lib/env.ts` already had the rule ("in production a missing key is
+ *   an outage, never a discount"); auth was the one trust-critical path that
+ *   never adopted it. This adopts it.
+ *
+ * Development keeps the demo fallback, so the app still runs with an empty
+ * `.env` exactly as CLAUDE.md §11 requires.
+ */
+function unconfigured(): AuthResult {
+  if (demoModeAllowed) return DEMO;
+  // Surfaces in the browser console and in Vercel's function logs, so the cause
+  // is one click away instead of a mystery.
+  console.error(
+    '[auth] Supabase is not configured on a production deploy. ' +
+      'Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy. ' +
+      'Refusing to fall through to demo mode.'
+  );
+  return { error: UNAVAILABLE, demo: false };
+}
 
 function redirectUrl(path = '/auth/callback'): string | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -33,7 +71,7 @@ export function setReturnTo(path: string): void {
 
 export async function signInWithProvider(provider: OAuthProvider): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: redirectUrl() },
@@ -43,7 +81,7 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<AuthR
 
 export async function signInWithPassword(email: string, password: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   return { error: error?.message ?? null };
 }
@@ -61,7 +99,7 @@ export async function signUpWithPassword(
   profile: SignUpProfile
 ): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -91,7 +129,7 @@ export async function signUpWithPassword(
  */
 export async function sendEmailCode(email: string, createUser: boolean): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: createUser, emailRedirectTo: redirectUrl() },
@@ -101,7 +139,7 @@ export async function sendEmailCode(email: string, createUser: boolean): Promise
 
 export async function verifyEmailCode(email: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
   return { error: error?.message ?? null };
 }
@@ -109,7 +147,7 @@ export async function verifyEmailCode(email: string, token: string): Promise<Aut
 /** SMS one-time code. Offered, never required — see docs/AUTH.md. */
 export async function sendPhoneCode(phoneE164: string, createUser: boolean): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.signInWithOtp({
     phone: phoneE164,
     options: { shouldCreateUser: createUser },
@@ -119,7 +157,7 @@ export async function sendPhoneCode(phoneE164: string, createUser: boolean): Pro
 
 export async function verifyPhoneCode(phoneE164: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ phone: phoneE164, token, type: 'sms' });
   return { error: error?.message ?? null };
 }
@@ -127,14 +165,14 @@ export async function verifyPhoneCode(phoneE164: string, token: string): Promise
 /** Attach a phone to an already signed-in account (Settings → verify later). */
 export async function startPhoneLink(phoneE164: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.updateUser({ phone: phoneE164 });
   return { error: error?.message ?? null };
 }
 
 export async function confirmPhoneLink(phoneE164: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({
     phone: phoneE164,
     token,
@@ -159,7 +197,7 @@ export async function confirmPhoneLink(phoneE164: string, token: string): Promis
  */
 export async function resetPassword(email: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: redirectUrl('/reset-password'),
   });
@@ -185,7 +223,12 @@ export interface RecoveryLink extends AuthResult {
  */
 export async function consumeRecoveryLink(): Promise<RecoveryLink> {
   const supabase = getSupabase();
-  if (!supabase) return { ...DEMO, ready: true };
+  if (!supabase) {
+    // `ready: true` would hand the visitor a new-password form we have no
+    // authority to submit, so it stays tied to whether demo mode is permitted.
+    const fallback = unconfigured();
+    return { ...fallback, ready: fallback.demo === true };
+  }
   if (typeof window === 'undefined') return { error: null, ready: false };
 
   const query = new URLSearchParams(window.location.search);
@@ -211,7 +254,7 @@ export async function consumeRecoveryLink(): Promise<RecoveryLink> {
  */
 export async function verifyRecoveryCode(email: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'recovery' });
   return { error: error?.message ?? null };
 }
@@ -219,7 +262,7 @@ export async function verifyRecoveryCode(email: string, token: string): Promise<
 /** Sets a new password on the session established by the recovery step. */
 export async function updatePassword(password: string): Promise<AuthResult> {
   const supabase = getSupabase();
-  if (!supabase) return DEMO;
+  if (!supabase) return unconfigured();
   const { error } = await supabase.auth.updateUser({ password });
   return { error: error?.message ?? null };
 }
