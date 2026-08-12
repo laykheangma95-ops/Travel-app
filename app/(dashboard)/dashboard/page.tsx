@@ -1,9 +1,14 @@
+// Client-side because the copy has to follow the language toggle. The page
+// renders demo constants only — nothing here was reading from the server.
+'use client';
+
 import Link from 'next/link';
 import { Plane, Smartphone, Map, PlusCircle, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { WavyFlag } from '@/components/ui/WavyFlag';
+import { useLang } from '@/lib/i18n';
 
 // Demo dashboard data — replaced by Supabase queries once the project is
 // connected (see saved_flights, esim_orders, trip_plans tables).
@@ -18,11 +23,13 @@ const activeEsims = [
 const upcomingTrips = [{ title: 'Bangkok Weekend', dates: '12–15 Jul 2026', destination: 'Thailand 🇹🇭' }];
 
 export default function DashboardPage() {
+  const { t } = useLang();
+
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">សួស្តី! Welcome back</h1>
-        <p className="mt-1.5 text-sm text-ink-secondary">Here&apos;s everything for your upcoming travel.</p>
+        <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">{t('dash.welcome')}</h1>
+        <p className="mt-1.5 text-sm text-ink-secondary">{t('dash.sub')}</p>
       </div>
 
       {/* Quick actions */}
@@ -32,21 +39,21 @@ export default function DashboardPage() {
           className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <Plane size={22} className="text-accent" aria-hidden="true" />
-          <span className="text-xs font-semibold text-ink sm:text-sm">Track Flight</span>
+          <span className="text-xs font-semibold text-ink sm:text-sm">{t('dash.quick.flight')}</span>
         </Link>
         <Link
           href="/esim"
           className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <Smartphone size={22} className="text-accent" aria-hidden="true" />
-          <span className="text-xs font-semibold text-ink sm:text-sm">Buy eSIM</span>
+          <span className="text-xs font-semibold text-ink sm:text-sm">{t('dash.quick.esim')}</span>
         </Link>
         <Link
           href="/checklist"
           className="flex flex-col items-center gap-2 rounded-card border border-line/60 bg-white p-5 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-hover"
         >
           <PlusCircle size={22} className="text-accent" aria-hidden="true" />
-          <span className="text-xs font-semibold text-ink sm:text-sm">New Trip</span>
+          <span className="text-xs font-semibold text-ink sm:text-sm">{t('dash.quick.trip')}</span>
         </Link>
       </div>
 
@@ -54,10 +61,10 @@ export default function DashboardPage() {
       <section aria-labelledby="flights-heading">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="flights-heading" className="font-display text-lg font-bold text-ink">
-            Upcoming flights
+            {t('dash.flights')}
           </h2>
           <Link href="/flights" className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-accent">
-            Track new <ArrowRight size={14} />
+            {t('dash.trackNew')} <ArrowRight size={14} />
           </Link>
         </div>
         <div className="space-y-3">
@@ -84,10 +91,10 @@ export default function DashboardPage() {
       <section aria-labelledby="esims-heading">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="esims-heading" className="font-display text-lg font-bold text-ink">
-            Active eSIMs
+            {t('dash.esims')}
           </h2>
           <Link href="/my-esims" className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-accent">
-            View all <ArrowRight size={14} />
+            {t('dash.viewAll')} <ArrowRight size={14} />
           </Link>
         </div>
         <div className="space-y-3">
@@ -100,15 +107,15 @@ export default function DashboardPage() {
                     <p className="font-semibold text-ink">
                       {e.country} — {e.plan}
                     </p>
-                    <p className="text-sm text-ink-secondary">{e.daysLeft} days remaining</p>
+                    <p className="text-sm text-ink-secondary">{t('dash.daysLeft', { days: e.daysLeft })}</p>
                   </div>
                 </div>
-                <Badge tone="success">Active</Badge>
+                <Badge tone="success">{t('dash.active')}</Badge>
               </div>
               <ProgressBar
                 value={e.dataUsedPct}
                 tone="secondary"
-                label={`${e.dataUsedPct}% of today's data used`}
+                label={t('dash.dataUsed', { pct: e.dataUsedPct })}
                 className="mt-4"
               />
             </Card>
@@ -120,23 +127,24 @@ export default function DashboardPage() {
       <section aria-labelledby="trips-heading">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="trips-heading" className="font-display text-lg font-bold text-ink">
-            Upcoming trips
+            {t('dash.trips')}
           </h2>
           <Link href="/my-trips" className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-accent">
-            View all <ArrowRight size={14} />
+            {t('dash.viewAll')} <ArrowRight size={14} />
           </Link>
         </div>
         <div className="space-y-3">
-          {upcomingTrips.map((t) => (
-            <Card key={t.title} className="flex items-center justify-between p-5">
+          {/* Named `trip`, not `t` — the translator is called inside this block. */}
+          {upcomingTrips.map((trip) => (
+            <Card key={trip.title} className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
                 <span className="flex h-11 w-11 items-center justify-center rounded-card bg-[#F5EEDC]">
                   <Map size={20} className="text-accent" aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="font-semibold text-ink">{t.title}</p>
+                  <p className="font-semibold text-ink">{trip.title}</p>
                   <p className="text-sm text-ink-secondary">
-                    {t.destination} · {t.dates}
+                    {trip.destination} · {trip.dates}
                   </p>
                 </div>
               </div>
@@ -144,7 +152,7 @@ export default function DashboardPage() {
                 href="/my-trips"
                 className="text-sm font-semibold text-secondary transition-colors hover:text-accent"
               >
-                Open →
+                {t('dash.open')} →
               </Link>
             </Card>
           ))}

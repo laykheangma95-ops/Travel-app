@@ -363,6 +363,39 @@ const dicts = {
     'esims.qrAlt': 'eSIM QR code for order {order}',
     'esims.manualCode': 'Manual activation code',
     'esims.installNote': 'Install over Wi-Fi before you fly. This QR code can only be scanned once.',
+
+    // ── Dashboard home ──
+    // The Khmer greeting in front of the English is deliberate — it was in the
+    // heading before this key existed, and it is the one word every visitor reads.
+    'dash.welcome': 'សួស្តី! Welcome back',
+    'dash.sub': 'Here’s everything for your upcoming travel.',
+    'dash.quick.flight': 'Track Flight',
+    'dash.quick.esim': 'Buy eSIM',
+    'dash.quick.trip': 'New Trip',
+    'dash.flights': 'Upcoming flights',
+    'dash.trackNew': 'Track new',
+    'dash.esims': 'Active eSIMs',
+    'dash.viewAll': 'View all',
+    'dash.daysLeft': '{days} days remaining',
+    'dash.active': 'Active',
+    'dash.dataUsed': '{pct}% of today’s data used',
+    'dash.trips': 'Upcoming trips',
+    'dash.open': 'Open',
+
+    // ── Settings ──
+    'settings.title': 'Settings',
+    'settings.sub': 'Your profile and preferences.',
+    'settings.fullName': 'Full name',
+    'settings.telegram': 'Telegram username',
+    'settings.passportCountry': 'Passport country',
+    'settings.language': 'Preferred language',
+    'settings.save': 'Save changes',
+    'settings.saved': 'Saved',
+    'settings.notifications': 'Notifications',
+    'settings.notify.flights': 'Flight alerts',
+    'settings.notify.esim': 'eSIM delivery updates',
+    'settings.notify.checklist': 'Checklist reminders',
+    'settings.notify.tips': 'Travel tips at destination',
   },
   km: {
     // Brand
@@ -720,6 +753,37 @@ const dicts = {
     'esims.qrAlt': 'កូដ QR eSIM សម្រាប់ការបញ្ជាទិញ {order}',
     'esims.manualCode': 'កូដបើកដំណើរការដោយដៃ',
     'esims.installNote': 'ដំឡើងតាម Wi-Fi មុនពេលហោះ។ កូដ QR នេះស្កេនបានតែម្តងគត់។',
+
+    // ── ទំព័រដើមផ្ទាំងគ្រប់គ្រង ──
+    'dash.welcome': 'សួស្តី! សូមស្វាគមន៍ការត្រឡប់មកវិញ',
+    'dash.sub': 'នេះជាព័ត៌មានទាំងអស់សម្រាប់ដំណើររបស់អ្នកដែលជិតមកដល់។',
+    'dash.quick.flight': 'តាមដានជើងហោះហើរ',
+    'dash.quick.esim': 'ទិញ eSIM',
+    'dash.quick.trip': 'ដំណើរថ្មី',
+    'dash.flights': 'ជើងហោះហើរជិតមកដល់',
+    'dash.trackNew': 'តាមដានថ្មី',
+    'dash.esims': 'eSIM កំពុងប្រើ',
+    'dash.viewAll': 'មើលទាំងអស់',
+    'dash.daysLeft': 'នៅសល់ {days} ថ្ងៃ',
+    'dash.active': 'កំពុងប្រើ',
+    'dash.dataUsed': 'ប្រើអស់ {pct}% នៃទិន្នន័យថ្ងៃនេះ',
+    'dash.trips': 'ដំណើរជិតមកដល់',
+    'dash.open': 'បើក',
+
+    // ── ការកំណត់ ──
+    'settings.title': 'ការកំណត់',
+    'settings.sub': 'ប្រវត្តិរូប និងចំណូលចិត្តរបស់អ្នក។',
+    'settings.fullName': 'ឈ្មោះពេញ',
+    'settings.telegram': 'ឈ្មោះអ្នកប្រើ Telegram',
+    'settings.passportCountry': 'ប្រទេសនៃលិខិតឆ្លងដែន',
+    'settings.language': 'ភាសាដែលចូលចិត្ត',
+    'settings.save': 'រក្សាទុកការផ្លាស់ប្តូរ',
+    'settings.saved': 'បានរក្សាទុក',
+    'settings.notifications': 'ការជូនដំណឹង',
+    'settings.notify.flights': 'ជូនដំណឹងជើងហោះហើរ',
+    'settings.notify.esim': 'ព័ត៌មានអំពីការផ្ញើ eSIM',
+    'settings.notify.checklist': 'រំលឹកបញ្ជីត្រៀម',
+    'settings.notify.tips': 'គន្លឹះធ្វើដំណើរនៅគោលដៅ',
   },
 } as const;
 
@@ -810,6 +874,28 @@ export function LanguageProvider({
 
 export function useLang(): LangContextValue {
   return useContext(LangContext);
+}
+
+/**
+ * Renders a dictionary string that contains `<b>…</b>`, and nothing else.
+ *
+ * Install instructions need the device menu path in bold — "Open **Settings →
+ * Cellular → Add eSIM**" — and the bold run sits in a different place in Khmer
+ * than in English, so it has to travel inside the string rather than being
+ * bolted on around it. Only `<b>` is understood: anything else is printed as
+ * literal text, so this can never become an HTML injection the way
+ * dangerouslySetInnerHTML would.
+ */
+export function RichText({ text }: { text: string }): ReactNode {
+  const parts = text.split(/(<b>.*?<\/b>)/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const bold = part.match(/^<b>(.*?)<\/b>$/);
+        return bold ? <strong key={i}>{bold[1]}</strong> : <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 /**
