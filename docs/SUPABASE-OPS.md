@@ -130,16 +130,15 @@ and the admin panel is used in Cambodia all day. Travellers already in Japan are
 a minority of requests, and once the eSIM is delivered they mostly stop making
 them.
 
-### Check this first — it may matter more than the region
+### The Vercel side mattered more, and is now fixed
 
-There is no region set for the Vercel functions anywhere in this repo. Vercel's
-default is **Washington DC (`iad1`)**. If that is still the setting, every
-database query is crossing the Pacific twice — around 200 ms per query — and the
-Tokyo-versus-Singapore difference is a rounding error next to it.
+The live deployment was running its functions in **Washington DC (`iad1`)** —
+Vercel's default, because no region was set anywhere in this repo. Every
+database query was going Cambodia → USA → Tokyo and back, around 200 ms of
+transit per query, which dwarfed the Tokyo-versus-Singapore difference.
 
-In the Vercel project settings, check the **Function Region**. Setting it to
-Singapore (`sin1`) puts the server code next to where the database should be.
-That change is a redeploy, not a migration, and it is reversible.
+`vercel.json` now pins the functions to Singapore (`sin1`). It applies on the
+next deploy, and it is reversible by editing that one file.
 
 ### What moving the database would actually cost
 
@@ -148,12 +147,14 @@ new project in Singapore, moving the data, and repointing everything at it:
 
 - a database dump and restore, during which orders must not be taken;
 - new keys in the Vercel environment variables;
-- new auth redirect URLs, including for Google and Apple sign-in;
-- new webhook URLs at Stripe and ABA;
+- new auth redirect URLs, including at Google and Apple;
+- every signed-in customer being signed out, because the JWT secret changes;
 - a period where a mistake means a customer pays and receives nothing.
 
-**This touches the live checkout, so it needs your explicit go-ahead** — it is
-not a change to make in passing. The honest summary: worth doing, cheapest to do
-now while order volume is low, and best done as its own piece of work with a
-rehearsal on a copy first. Do the Vercel region check and the backups before
-this, since both are quick and neither risks the purchase flow.
+Stripe and ABA webhook URLs do **not** change — they point at the Vercel app,
+not at Supabase.
+
+The full runbook, including the parts only the account owner can do, is in
+[`docs/SUPABASE-REGION-MOVE.md`](SUPABASE-REGION-MOVE.md). Take the backup in
+Step 1 today regardless of what you decide about the region — it is read-only
+and this project currently has none.

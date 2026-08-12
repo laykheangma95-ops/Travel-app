@@ -30,6 +30,10 @@ yarn-error.log*
 !.env.example
 !.env*.example
 
+# Database dumps from scripts/supabase-move.sh. These hold every customer
+# record in the business — see docs/LOCKED.md. Never in git, ever.
+.supabase-dumps/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

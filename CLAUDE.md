@@ -382,6 +382,7 @@ guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 | `docs/LOCKED.md` | The locked file list, invariants, and unlock procedure |
 | `docs/GOHUB.md` | GoHub supplier client, normalization, webhooks, contract tests |
 | `docs/SUPABASE-OPS.md` | Reading Supabase failures in the log, the schema check, database region |
+| `docs/SUPABASE-REGION-MOVE.md` | Runbook for moving the database Tokyo → Singapore |
 | `mock-gohub/README.md` | The local GoHub mock: running it, failure cases, spec quirks |
 | `DEPLOY.md` | Deployment |
 | `STRATEGY.md` | Product strategy |
