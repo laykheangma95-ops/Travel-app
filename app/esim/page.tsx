@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Search, Sparkles } from 'lucide-react';
 import { destinations } from '@/data/destinations';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -37,6 +38,35 @@ export default function EsimStorePage() {
             Instant data for the places Cambodians fly. Buy now, scan the QR, and connect the moment you land.
           </p>
         </div>
+
+        {/* The guided route in.
+            Placed above the search because "which country" is the easy question
+            and "how many gigabytes" is the one that stalls people — someone who
+            already knows their destination still may not know their plan. */}
+        <Link
+          href="/esim/finder"
+          className="group mb-6 flex items-center gap-4 rounded-card border border-gold-light/30 bg-gradient-to-br from-gold-light/12 to-white/5 p-4 backdrop-blur-md transition-all duration-200 ease-smooth hover:border-gold-light/60 sm:p-5"
+        >
+          <span
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gold-light/20 text-gold-light"
+            aria-hidden="true"
+          >
+            <Sparkles size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-base font-bold text-white">
+              Not sure how much data you need?
+            </span>
+            <span className="mt-0.5 block text-sm text-white/65">
+              Answer three quick questions and we&rsquo;ll pick a plan for you.
+            </span>
+          </span>
+          <ArrowRight
+            size={18}
+            className="shrink-0 text-gold-light transition-transform duration-200 group-hover:translate-x-1"
+            aria-hidden="true"
+          />
+        </Link>
 
         {/* Search */}
         <form
