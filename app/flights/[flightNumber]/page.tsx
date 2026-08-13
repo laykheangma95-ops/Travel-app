@@ -66,7 +66,10 @@ export default function FlightDetailPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#1C3355_100%)]">
+    // night-canvas, not a bespoke gradient: it is the class body:has() looks for
+    // to darken the document, without which the sticky header frosts a white
+    // strip across the top of the page. See app/globals.css.
+    <div className="night-canvas has-tabbar relative min-h-screen overflow-hidden">
       <div className="stars" aria-hidden="true" />
       <div className="stars-far" aria-hidden="true" />
 

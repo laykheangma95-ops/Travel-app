@@ -49,18 +49,25 @@ export default function FlightTrackerPage() {
   };
 
   return (
-    <div className="relative min-h-[80vh] overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_45%,#23406A_100%)]">
+    // `night-canvas` is the site's shared dark-page ground, and it is what tells
+    // the document underneath to go dark too (see body:has() in globals.css).
+    // Without it the page painted its own gradient but the document stayed
+    // #F8FAFC, so the transparent sticky header frosted a white strip across the
+    // top of the screen. `min-h-fold` then makes the hero end exactly at the
+    // fold instead of 80vh, and `has-tabbar` keeps the popular-route chips clear
+    // of the fixed bottom bar on a phone.
+    <div className="night-canvas has-tabbar min-h-fold relative flex flex-col justify-center overflow-hidden">
       <div className="stars" aria-hidden="true" />
       <div className="stars-far" aria-hidden="true" />
-      <div className="relative mx-auto max-w-3xl px-4 py-20 sm:px-6">
+      <div className="relative mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="text-center">
           {/* Glowing orb — the Flight Guardian "eye" */}
           <div
-            className="mx-auto mb-8 h-16 w-16 animate-orb-pulse rounded-full bg-[radial-gradient(circle_at_32%_28%,#DBEAFE_0%,#60A5FA_38%,#1D4ED8_75%,#0F2A6B_100%)]"
+            className="mx-auto mb-6 h-14 w-14 animate-orb-pulse sm:mb-8 sm:h-16 sm:w-16 rounded-full bg-[radial-gradient(circle_at_32%_28%,#DBEAFE_0%,#60A5FA_38%,#1D4ED8_75%,#0F2A6B_100%)]"
             aria-hidden="true"
           />
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">Flight Guardian</p>
-          <h1 className="mt-3 font-display text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
+          <h1 className="mt-3 font-display text-[2rem] leading-tight font-extrabold tracking-tight text-white sm:text-6xl">
             Track any flight, live.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-white/70">
@@ -74,7 +81,7 @@ export default function FlightTrackerPage() {
             e.preventDefault();
             track(flightNumber);
           }}
-          className="glass-panel mt-10 flex flex-col gap-3 rounded-card p-5 sm:flex-row"
+          className="glass-panel mt-8 flex flex-col gap-3 rounded-card p-5 sm:flex-row"
         >
           <div className="relative flex-1">
             <input
@@ -159,7 +166,7 @@ export default function FlightTrackerPage() {
         )}
 
         {/* Popular flights hint */}
-        <div className="mt-14 text-center">
+        <div className="mt-10 text-center sm:mt-14">
           <p className="text-xs uppercase tracking-widest text-white/40">Popular routes from Cambodia</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {['QH215', 'K6720', 'PG934', 'VN841', 'SQ157'].map((f) => (

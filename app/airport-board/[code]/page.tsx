@@ -80,7 +80,9 @@ export default function AirportBoardPage() {
   const isDemo = flights?.some((f) => f.demo);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#1C3355_100%)]">
+    // See app/flights/[flightNumber]/page.tsx — night-canvas is what darkens the
+    // document behind the transparent sticky header.
+    <div className="night-canvas has-tabbar relative min-h-screen overflow-hidden">
       <div className="stars" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">

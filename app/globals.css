@@ -20,6 +20,25 @@
   --color-text-primary: #0F172A;
   --color-text-secondary: #475569;
   --color-text-muted: #94A3B8;
+
+  /* The height the sticky header takes out of the first screen: its top padding
+     plus the 64px glass pill. A "full screen" section is 100svh MINUS this —
+     without it, `min-height: 100svh` on a section that starts below the header
+     always overflows the fold by exactly the header, which is what made Home
+     and the flight tracker scroll a little when there was nothing to scroll to.
+     Use the `.min-h-fold` utility below rather than hardcoding the number. */
+  --chrome-top: 4.75rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --chrome-top: 5rem;
+  }
+}
+
+/* A section that fills the first screen exactly, header accounted for. */
+.min-h-fold {
+  min-height: calc(100svh - var(--chrome-top));
 }
 
 @layer base {

@@ -48,9 +48,13 @@ export function Footer() {
 
   return (
     <footer className="bg-primary text-white">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-4">
-          <div>
+      {/* has-tabbar: the fixed phone bar sits over the last row otherwise.
+          Two columns on a phone rather than four stacked blocks — stacked, this
+          footer ran 1080px on a 390px screen, so every page on the site ended
+          with more than a full screen of link list to scroll past. */}
+      <div className="has-tabbar mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-9 md:grid-cols-4 md:gap-10">
+          <div className="col-span-2 md:col-span-1">
             <DomerLogo surface="navy" />
             <p className="mt-2 font-display text-[11px] uppercase tracking-[0.28em] text-white/40">
               The Art of the Journey
@@ -83,10 +87,10 @@ export function Footer() {
 
           {columns.map((col) => (
             <div key={col.titleKey}>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-white/50">
+              <h3 className="mb-3 text-sm font-semibold sm:mb-4 uppercase tracking-widest text-white/50">
                 {t(col.titleKey)}
               </h3>
-              <ul className="space-y-2.5">
+              <ul className="space-y-2 sm:space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.labelKey}>
                     <Link
@@ -102,7 +106,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-xs text-white/50 sm:flex-row">
+        <div className="mt-10 flex flex-col sm:mt-14 items-center justify-between gap-4 border-t border-white/10 pt-6 text-xs sm:pt-8 text-white/50 sm:flex-row">
           <p>© {new Date().getFullYear()} Domner</p>
           <div className="flex flex-wrap items-center justify-center gap-6">
             <Link href="/privacy" className="transition-colors hover:text-white">
