@@ -5,6 +5,7 @@ import type { Destination, EsimPlan } from '@/types';
 import { useCart } from '@/hooks/useCart';
 import { describeAllowance } from '@/data/esimPlans';
 import { cn, formatUsd } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 import { useState } from 'react';
 
 interface PlanCardProps {
@@ -14,6 +15,7 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
+  const { t } = useLang();
   const addItem = useCart((s) => s.addItem);
   const [added, setAdded] = useState(false);
 
@@ -50,7 +52,7 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
     >
       {plan.popular && (
         <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full liquid-glass-accent px-4 py-1 text-xs font-bold uppercase tracking-wide text-primary-deep shadow-md">
-          ⭐ Most Popular
+          {t('plan.popular')}
         </span>
       )}
       <h3 className={cn('font-display text-lg font-bold uppercase tracking-wide', dark ? 'text-gold-light' : 'text-ink-secondary')}>
@@ -58,7 +60,7 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       </h3>
       <p className={cn('mt-4 font-display text-4xl font-extrabold', dark ? 'text-white' : 'text-ink')}>{formatUsd(plan.priceUsd)}</p>
       <div className={cn('mt-5 space-y-1 border-b pb-5', dark ? 'border-white/10' : 'border-line')}>
-        <p className={cn('text-sm font-semibold', dark ? 'text-white' : 'text-ink')}>{plan.durationDays} days</p>
+        <p className={cn('text-sm font-semibold', dark ? 'text-white' : 'text-ink')}>{t('plan.days', { days: plan.durationDays })}</p>
         <p className={cn('text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>{describeAllowance(plan)}</p>
         <p className={cn('font-mono text-xs', dark ? 'text-white/50' : 'text-ink-muted')}>{plan.network}</p>
       </div>
@@ -86,11 +88,11 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       >
         {added ? (
           <>
-            <Check size={16} /> Added to Cart
+            <Check size={16} /> {t('plan.added')}
           </>
         ) : (
           <>
-            <ShoppingCart size={16} /> Add to Cart
+            <ShoppingCart size={16} /> {t('plan.add')}
           </>
         )}
       </button>

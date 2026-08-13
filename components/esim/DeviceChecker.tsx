@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, XCircle, HelpCircle, Search } from 'lucide-react';
+import { useLang } from '@/lib/i18n';
 
 // Common eSIM-capable device families. Matched loosely against user input.
 const ESIM_SUPPORTED = [
@@ -21,6 +22,7 @@ const ESIM_UNSUPPORTED = [
 type Result = 'supported' | 'unsupported' | 'unknown' | null;
 
 export function DeviceChecker({ dark = false }: { dark?: boolean }) {
+  const { t } = useLang();
   const [model, setModel] = useState('');
   const [result, setResult] = useState<Result>(null);
 
@@ -35,10 +37,10 @@ export function DeviceChecker({ dark = false }: { dark?: boolean }) {
   return (
     <div className={dark ? 'night-card p-8' : 'rounded-card border border-line/60 bg-white p-8 shadow-card'}>
       <h3 className={dark ? 'font-display text-lg font-bold text-white' : 'font-display text-lg font-bold text-ink'}>
-        Is my phone eSIM compatible?
+        {t('device.title')}
       </h3>
       <p className={dark ? 'mt-1.5 text-sm text-white/70' : 'mt-1.5 text-sm text-ink-secondary'}>
-        Type your phone model and we&apos;ll check for you.
+        {t('device.sub')}
       </p>
       <form
         className="mt-5 flex gap-2"
@@ -54,8 +56,8 @@ export function DeviceChecker({ dark = false }: { dark?: boolean }) {
             setModel(e.target.value);
             setResult(null);
           }}
-          placeholder="e.g. iPhone 14 Pro, Galaxy S23"
-          aria-label="Phone model"
+          placeholder={t('device.placeholder')}
+          aria-label={t('device.label')}
           className={
             dark
               ? 'min-h-[2.75rem] flex-1 rounded-btn border border-gold-light/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/40 backdrop-blur-md focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25'
@@ -70,23 +72,23 @@ export function DeviceChecker({ dark = false }: { dark?: boolean }) {
               : 'inline-flex min-h-[2.75rem] items-center gap-2 rounded-btn bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-secondary-high'
           }
         >
-          <Search size={16} /> Check
+          <Search size={16} /> {t('device.check')}
         </button>
       </form>
 
       {result === 'supported' && (
         <p className="mt-4 flex items-center gap-2 rounded-btn bg-emerald-50 p-3.5 text-sm font-medium text-success animate-fade-up">
-          <CheckCircle2 size={18} /> Great news — your phone supports eSIM!
+          <CheckCircle2 size={18} /> {t('device.supported')}
         </p>
       )}
       {result === 'unsupported' && (
         <p className="mt-4 flex items-center gap-2 rounded-btn bg-red-50 p-3.5 text-sm font-medium text-danger animate-fade-up">
-          <XCircle size={18} /> Sorry, this model doesn&apos;t support eSIM. You&apos;ll need a physical SIM.
+          <XCircle size={18} /> {t('device.unsupported')}
         </p>
       )}
       {result === 'unknown' && (
         <p className="mt-4 flex items-center gap-2 rounded-btn bg-amber-50 p-3.5 text-sm font-medium text-warning animate-fade-up">
-          <HelpCircle size={18} /> We&apos;re not sure about this model — message our Khmer support on Telegram and we&apos;ll check.
+          <HelpCircle size={18} /> {t('device.unknown')}
         </p>
       )}
     </div>

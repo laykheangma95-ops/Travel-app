@@ -1,4 +1,7 @@
+'use client';
+
 import { LifeBuoy, QrCode, ShieldCheck, Wifi } from 'lucide-react';
+import { useLang, type DictKey } from '@/lib/i18n';
 
 /**
  * The replacement promise.
@@ -22,28 +25,18 @@ export const REPLACEMENT_PROMISE: { hours: number } | null = { hours: 1 };
  * and no way to fix it.
  */
 const INSTALL_STEPS = [
-  {
-    icon: QrCode,
-    title: 'Install before you fly',
-    body: 'Scan the QR and add the plan in your phone settings while you still have Wi-Fi. Installing needs internet — doing it after you land is the most common way to get stuck.',
-  },
-  {
-    icon: Wifi,
-    title: 'Switch it on after you arrive',
-    body: 'Installed is not activated. Your days only start counting when the eSIM first connects to a network abroad, so nothing is wasted while you are still home.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Keep a copy of the QR',
-    body: 'We email it, and it stays in My eSIMs. Save a screenshot or print it — a phone that resets mid-trip cannot open its own email.',
-  },
-];
+  { icon: QrCode, title: 'trust.step1.title', body: 'trust.step1.body' },
+  { icon: Wifi, title: 'trust.step2.title', body: 'trust.step2.body' },
+  { icon: ShieldCheck, title: 'trust.step3.title', body: 'trust.step3.body' },
+] as const satisfies ReadonlyArray<{ icon: unknown; title: DictKey; body: DictKey }>;
 
 export function PlanTrustPanel() {
+  const { t } = useLang();
+
   return (
     <section aria-labelledby="plan-trust-heading" className="mt-12">
       <h2 id="plan-trust-heading" className="sr-only">
-        Support and installation
+        {t('trust.heading')}
       </h2>
 
       {REPLACEMENT_PROMISE && (
@@ -56,11 +49,10 @@ export function PlanTrustPanel() {
           </span>
           <div>
             <p className="font-display text-lg font-bold text-white">
-              {REPLACEMENT_PROMISE.hours}-hour eSIM replacement
+              {t('trust.replaceTitle', { hours: REPLACEMENT_PROMISE.hours })}
             </p>
             <p className="mt-1 text-sm text-white/70">
-              If your eSIM will not install or will not connect, message us and we will issue a new
-              one within {REPLACEMENT_PROMISE.hours} hour — in Khmer, at no extra cost.
+              {t('trust.replaceBody', { hours: REPLACEMENT_PROMISE.hours })}
             </p>
           </div>
         </div>
@@ -70,8 +62,8 @@ export function PlanTrustPanel() {
         {INSTALL_STEPS.map((step) => (
           <div key={step.title} className="night-card p-6">
             <step.icon size={20} aria-hidden="true" className="text-gold-light" />
-            <p className="mt-3 font-display text-base font-bold text-white">{step.title}</p>
-            <p className="mt-1.5 text-sm text-white/65">{step.body}</p>
+            <p className="mt-3 font-display text-base font-bold text-white">{t(step.title)}</p>
+            <p className="mt-1.5 text-sm text-white/65">{t(step.body)}</p>
           </div>
         ))}
       </div>

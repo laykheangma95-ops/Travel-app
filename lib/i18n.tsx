@@ -536,6 +536,38 @@ const dicts = {
     'trips.travelers': '{count} travelers',
     'trips.checklist': 'Checklist: {done}/{total} done',
     'trips.memories': 'Memories →',
+
+    // ── Plan card ──
+    'plan.popular': '⭐ Most Popular',
+    'plan.days': '{days} days',
+    'plan.add': 'Add to Cart',
+    'plan.added': 'Added to Cart',
+
+    // ── Plan trust panel ──
+    'trust.heading': 'Support and installation',
+    'trust.replaceTitle': '{hours}-hour eSIM replacement',
+    'trust.replaceBody':
+      'If your eSIM will not install or will not connect, message us and we will issue a new one within {hours} hour — in Khmer, at no extra cost.',
+    'trust.step1.title': 'Install before you fly',
+    'trust.step1.body':
+      'Scan the QR and add the plan in your phone settings while you still have Wi-Fi. Installing needs internet — doing it after you land is the most common way to get stuck.',
+    'trust.step2.title': 'Switch it on after you arrive',
+    'trust.step2.body':
+      'Installed is not activated. Your days only start counting when the eSIM first connects to a network abroad, so nothing is wasted while you are still home.',
+    'trust.step3.title': 'Keep a copy of the QR',
+    'trust.step3.body':
+      'We email it, and it stays in My eSIMs. Save a screenshot or print it — a phone that resets mid-trip cannot open its own email.',
+
+    // ── Device compatibility checker ──
+    'device.title': 'Is my phone eSIM compatible?',
+    'device.sub': 'Type your phone model and we’ll check for you.',
+    'device.placeholder': 'e.g. iPhone 14 Pro, Galaxy S23',
+    'device.label': 'Phone model',
+    'device.check': 'Check',
+    'device.supported': 'Great news — your phone supports eSIM!',
+    'device.unsupported': 'Sorry, this model doesn’t support eSIM. You’ll need a physical SIM.',
+    'device.unknown':
+      'We’re not sure about this model — message our Khmer support on Telegram and we’ll check.',
   },
   km: {
     // Brand
@@ -1067,6 +1099,38 @@ const dicts = {
     'trips.travelers': 'អ្នកដំណើរ {count} នាក់',
     'trips.checklist': 'បញ្ជីត្រៀម៖ រួច {done}/{total}',
     'trips.memories': 'ការចងចាំ →',
+
+    // ── កាតគម្រោង ──
+    'plan.popular': '⭐ ពេញនិយមជាងគេ',
+    'plan.days': '{days} ថ្ងៃ',
+    'plan.add': 'ដាក់ចូលកន្ត្រក',
+    'plan.added': 'បានដាក់ចូលកន្ត្រក',
+
+    // ── ការធានា និងការដំឡើង ──
+    'trust.heading': 'ជំនួយ និងការដំឡើង',
+    'trust.replaceTitle': 'ប្តូរ eSIM ថ្មីក្នុង {hours} ម៉ោង',
+    'trust.replaceBody':
+      'ប្រសិនបើ eSIM របស់អ្នកដំឡើងមិនចូល ឬភ្ជាប់មិនបាន សូមផ្ញើសារមកយើង យើងនឹងចេញ eSIM ថ្មីជូនក្នុងរយៈពេល {hours} ម៉ោង — ជាភាសាខ្មែរ ដោយឥតគិតថ្លៃបន្ថែម។',
+    'trust.step1.title': 'ដំឡើងមុនពេលហោះ',
+    'trust.step1.body':
+      'ស្កេន QR ហើយបញ្ចូលគម្រោងក្នុងការកំណត់ទូរស័ព្ទ ខណៈអ្នកនៅមាន Wi-Fi។ ការដំឡើងត្រូវការអ៊ីនធឺណិត — ការទុករហូតដល់ចុះយន្តហោះហើយទើបធ្វើ គឺជាមូលហេតុដែលធ្វើឲ្យគេជាប់គាំងញឹកញាប់បំផុត។',
+    'trust.step2.title': 'បើកវាក្រោយពេលទៅដល់',
+    'trust.step2.body':
+      'ដំឡើងរួច មិនមែនមានន័យថាបានបើកដំណើរការទេ។ ចំនួនថ្ងៃចាប់ផ្តើមរាប់តែពេល eSIM ភ្ជាប់បណ្តាញនៅបរទេសលើកដំបូងប៉ុណ្ណោះ ដូច្នេះគ្មានអ្វីខាតបង់ទេ ខណៈអ្នកនៅផ្ទះ។',
+    'trust.step3.title': 'រក្សាទុកច្បាប់ចម្លងនៃ QR',
+    'trust.step3.body':
+      'យើងផ្ញើតាមអ៊ីមែល ហើយវានៅក្នុង “eSIM របស់ខ្ញុំ” ដែរ។ សូមថតអេក្រង់ទុក ឬបោះពុម្ពវា — ទូរស័ព្ទដែលកំណត់ឡើងវិញពាក់កណ្តាលដំណើរ មិនអាចបើកអ៊ីមែលខ្លួនឯងបានទេ។',
+
+    // ── ពិនិត្យភាពត្រូវគ្នានៃទូរស័ព្ទ ──
+    'device.title': 'តើទូរស័ព្ទរបស់ខ្ញុំប្រើ eSIM បានទេ?',
+    'device.sub': 'វាយបញ្ចូលម៉ូដែលទូរស័ព្ទរបស់អ្នក យើងនឹងពិនិត្យជូន។',
+    'device.placeholder': 'ឧ. iPhone 14 Pro, Galaxy S23',
+    'device.label': 'ម៉ូដែលទូរស័ព្ទ',
+    'device.check': 'ពិនិត្យ',
+    'device.supported': 'ដំណឹងល្អ — ទូរស័ព្ទរបស់អ្នកប្រើ eSIM បាន!',
+    'device.unsupported': 'សូមអភ័យទោស ម៉ូដែលនេះប្រើ eSIM មិនបានទេ។ អ្នកត្រូវការស៊ីមកាតធម្មតា។',
+    'device.unknown':
+      'យើងមិនច្បាស់អំពីម៉ូដែលនេះទេ — សូមផ្ញើសារទៅក្រុមជំនួយភាសាខ្មែររបស់យើងតាម Telegram យើងនឹងពិនិត្យជូន។',
   },
 } as const;
 
