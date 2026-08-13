@@ -20,6 +20,7 @@
 import { getSupabaseAdmin } from './supabase';
 import { adminEmails } from './env';
 import { log } from './logger';
+import { logSupabaseError } from './supabaseError';
 
 export const STAFF_ROLES = ['viewer', 'support', 'ops', 'finance', 'admin'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -168,7 +169,7 @@ export async function resolveStaff(
 
   if (error) {
     // Fail closed. An unreadable staff table must not mean "everyone is admin".
-    log.error('staff.resolve_failed', { userId, error });
+    logSupabaseError('staff.resolve_failed', error, { userId });
     return null;
   }
 
@@ -229,5 +230,5 @@ export async function recordStaffEvent(event: {
     detail: event.detail ?? null,
   });
 
-  if (error) log.warn('staff.event_write_failed', { error });
+  if (error) logSupabaseError('staff.event_write_failed', error);
 }

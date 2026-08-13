@@ -20,6 +20,7 @@ import { generateOrderNumber } from '@/lib/utils';
 import { ApiError } from '@/lib/http';
 import { getUser } from '@/lib/serverAuth';
 import { log, redactEmail } from '@/lib/logger';
+import { logSupabaseError } from '@/lib/supabaseError';
 import { appUrl, demoModeAllowed } from '@/lib/env';
 import { detectPriceMismatch, normalizeLines, priceOrder, toCents } from '@/lib/pricing';
 import { parseCheckoutBody } from '@/lib/checkout';
@@ -293,5 +294,5 @@ async function attachPatch(orderNumber: string, patch: Record<string, unknown>):
     .update(patch)
     .eq('order_number', orderNumber);
 
-  if (error) log.warn('order.attach_payment_id_failed', { orderNumber, error });
+  if (error) logSupabaseError('order.attach_payment_id_failed', error, { orderNumber });
 }

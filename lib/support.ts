@@ -27,6 +27,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { ApiError } from '@/lib/http';
 import { log, redactEmail } from '@/lib/logger';
+import { logSupabaseError } from '@/lib/supabaseError';
 import type { EsimOrder, OrderStatus } from '@/types';
 
 export type LookupKind = 'order_number' | 'email' | 'phone';
@@ -284,7 +285,7 @@ export async function lookupOrders(rawQuery: string, actor: string): Promise<Sup
     .limit(20);
 
   if (error) {
-    log.error('support.lookup_failed', { kind: classified.kind, error });
+    logSupabaseError('support.lookup_failed', error, { kind: classified.kind });
     throw new ApiError('INTERNAL', 'Could not look that up. Please try again.');
   }
 

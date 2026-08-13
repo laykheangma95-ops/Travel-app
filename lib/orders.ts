@@ -14,6 +14,7 @@
 
 import { getSupabaseAdmin } from './supabase';
 import { log, redactEmail } from './logger';
+import { logSupabaseError } from './supabaseError';
 import { ApiError } from './http';
 import type { PricedOrder } from './pricing';
 import type { DeliveryChannel, EsimOrder, OrderStatus, PaymentMethod } from '@/types';
@@ -129,7 +130,7 @@ export async function createOrder(input: CreateOrderInput): Promise<EsimOrder> {
     .single();
 
   if (error || !data) {
-    log.error('order.create_failed', { orderNumber: input.orderNumber, error });
+    logSupabaseError('order.create_failed', error, { orderNumber: input.orderNumber });
     throw new ApiError('INTERNAL', 'We could not start your order. Please try again.');
   }
 
@@ -153,9 +154,8 @@ export async function createOrder(input: CreateOrderInput): Promise<EsimOrder> {
   if (itemsResult.error) {
     // The order exists but its breakdown does not — loud, because support and
     // the supplier handover both depend on the line items.
-    log.error('order.items_insert_failed', {
+    logSupabaseError('order.items_insert_failed', itemsResult.error, {
       orderNumber: order.order_number,
-      error: itemsResult.error,
     });
   }
 
@@ -206,11 +206,19 @@ export async function transitionOrder(
 ): Promise<TransitionResult> {
   const supabase = requireDb();
 
-  const { data: current } = await supabase
+  const { data: current, error: readError } = await supabase
     .from('esim_orders')
     .select('*')
     .eq('order_number', orderNumber)
     .maybeSingle();
+
+  // A failed read and a genuinely absent order both arrive here as `!current`.
+  // Reporting the first as "not found" tells a webhook the order never existed —
+  // so it stops retrying, and a paid order stays pending forever.
+  if (readError) {
+    logSupabaseError('order.transition_read_failed', readError, { orderNumber, to });
+    throw new ApiError('INTERNAL', 'We could not read the order. Please try again.');
+  }
 
   if (!current) {
     throw new ApiError('NOT_FOUND', `Order ${orderNumber} was not found.`);
@@ -244,7 +252,7 @@ export async function transitionOrder(
     .maybeSingle();
 
   if (error) {
-    log.error('order.transition_failed', { orderNumber, from, to, error });
+    logSupabaseError('order.transition_failed', error, { orderNumber, from, to });
     throw new ApiError('INTERNAL', 'We could not update the order. Please try again.');
   }
 
@@ -288,18 +296,22 @@ async function recordEvent(
   });
 
   // The audit trail must never break the customer's checkout.
-  if (error) log.warn('order.event_write_failed', { orderId, error });
+  if (error) logSupabaseError('order.event_write_failed', error, { orderId });
 }
 
 export async function getOrderByNumber(orderNumber: string): Promise<EsimOrder | null> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('esim_orders')
     .select('*')
     .eq('order_number', orderNumber)
     .maybeSingle();
+
+  // Callers read this as "no such order". Keep that contract, but leave a trail
+  // when the null came from a broken query instead of an empty table.
+  if (error) logSupabaseError('order.read_failed', error, { orderNumber });
 
   return (data as EsimOrder | null) ?? null;
 }
@@ -321,11 +333,13 @@ export async function getOrderWithItems(orderNumber: string): Promise<OrderWithI
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('esim_orders')
     .select('*, items:order_items(*)')
     .eq('order_number', orderNumber)
     .maybeSingle();
+
+  if (error) logSupabaseError('order.read_with_items_failed', error, { orderNumber });
 
   return (data as OrderWithItems | null) ?? null;
 }
@@ -367,7 +381,7 @@ export async function listOrders(
   const { data, error, count } = await query;
 
   if (error) {
-    log.error('order.list_failed', { error });
+    logSupabaseError('order.list_failed', error);
     throw new ApiError('INTERNAL', 'Could not load orders.');
   }
 
@@ -392,7 +406,7 @@ export async function listOrdersForUser(
     .limit(100);
 
   if (error) {
-    log.error('order.list_user_failed', { userId, error });
+    logSupabaseError('order.list_user_failed', error, { userId });
     throw new ApiError('INTERNAL', 'Could not load your orders.');
   }
 
@@ -414,7 +428,7 @@ export async function orderStats(): Promise<{
     .limit(10_000);
 
   if (error) {
-    log.error('order.stats_failed', { error });
+    logSupabaseError('order.stats_failed', error);
     throw new ApiError('INTERNAL', 'Could not load order statistics.');
   }
 

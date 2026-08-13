@@ -21,6 +21,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { clientKey } from '@/lib/rateLimit';
 import { log, redactEmail } from '@/lib/logger';
+import { logSupabaseError } from '@/lib/supabaseError';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,15 +73,18 @@ export const POST = route(
     const event = parsed.data;
 
     if (event.type === 'affiliate.click') {
-      const { data: affiliate } = await supabase
+      const { data: affiliate, error: affiliateError } = await supabase
         .from('affiliates')
         .select('id')
         .eq('referral_code', event.referralCode.toUpperCase())
         .eq('status', 'approved')
         .maybeSingle();
 
-      // Silent on an unknown code: a 404 here would let anyone enumerate which
-      // referral codes are live.
+      // Stays silent to the caller either way — a 404 here would let anyone
+      // enumerate which referral codes are live — but a failed lookup is now
+      // distinguishable from an unknown code in the log, instead of both
+      // vanishing as "no affiliate".
+      if (affiliateError) logSupabaseError('affiliate.lookup_failed', affiliateError);
       if (!affiliate) return ok({ ok: true });
 
       const ipHash = hashIp(request);
@@ -88,7 +92,7 @@ export const POST = route(
       // One counted click per IP per code per day. Without this, a refresh loop
       // inflates the affiliate's stats and, downstream, their commission.
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { count } = await supabase
+      const { count, error: dedupeError } = await supabase
         .from('affiliate_events')
         .select('id', { count: 'exact', head: true })
         .eq('affiliate_id', affiliate.id)
@@ -96,30 +100,40 @@ export const POST = route(
         .eq('ip_hash', ipHash)
         .gte('created_at', since);
 
+      // A failed dedupe read reads as `count = 0`, i.e. "not seen today", which
+      // would let a refresh loop inflate commission. Skip the increment instead.
+      if (dedupeError) {
+        logSupabaseError('affiliate.dedupe_failed', dedupeError);
+        return ok({ ok: true, deduplicated: false, counted: false });
+      }
+
       if ((count ?? 0) > 0) return ok({ ok: true, deduplicated: true });
 
-      await supabase.from('affiliate_events').insert({
+      const { error: eventError } = await supabase.from('affiliate_events').insert({
         affiliate_id: affiliate.id,
         event_type: 'click',
         ip_hash: ipHash,
       });
+      if (eventError) logSupabaseError('affiliate.click_event_failed', eventError);
 
       // Atomic increment in the database. The previous read-then-write lost
       // counts whenever two clicks overlapped.
       const { error } = await supabase.rpc('increment_affiliate_clicks', {
         affiliate_id: affiliate.id,
       });
-      if (error) log.warn('affiliate.click_increment_failed', { error });
+      if (error) logSupabaseError('affiliate.click_increment_failed', error);
 
       return ok({ ok: true });
     }
 
     // affiliate.apply
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('affiliates')
       .select('id')
       .eq('email', event.email)
       .maybeSingle();
+
+    if (existingError) logSupabaseError('affiliate.apply_lookup_failed', existingError);
 
     if (existing) {
       // Idempotent: re-applying is not an error, and confirming the address is
