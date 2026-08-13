@@ -1,26 +1,30 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The destination journey — six chapters, revealed in sequence.
+// The destination journey — an arrival, the eSIM, and four folds.
 //
-// The order is the argument: you learn about the place first and are offered a
-// product last, after you have already been given something worth having. The
-// eSIM is the final helpful recommendation, not the toll gate.
+// You land, you see the place, and the next thing you see is the one thing you
+// came here to decide: can we get you online there, and for how much. The rest
+// of what we know about the destination — money, entry rules, the airport,
+// where to go — is written to the same standard as ever, but it is folded away
+// behind an icon and a short phrase, and it opens when you ask for it. Nothing
+// was cut; the page simply stops asking you to read six chapters to reach a
+// price.
 //
-// Chapter 3 gets the most design care because it is the one thing no competitor
-// does: entry requirements for a *Cambodian* passport specifically. Every fact
-// in it carries its verification date and, where one exists, a link to the
-// official source — on the face of the card, not in a footnote. A fact marked
-// `volatile` renders a confirm-before-you-book prompt instead of a confident
-// number, because being visibly unsure about a genuinely unsettled rule is more
-// useful than being confidently wrong.
+// The entry fold gets the most design care because it is the one thing no
+// competitor does: entry requirements for a *Cambodian* passport specifically.
+// Every fact in it carries its verification date and, where one exists, a link
+// to the official source — on the face of the card, not in a footnote. A fact
+// marked `volatile` renders a confirm-before-you-book prompt instead of a
+// confident number, because being visibly unsure about a genuinely unsettled
+// rule is more useful than being confidently wrong.
 //
 // This component is shared by the homepage (after the flight) and by the
 // server-rendered /destination/[slug] route, so the content is identical
 // whether you flew here or arrived from a search engine.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -29,12 +33,14 @@ import {
   BadgeCheck,
   Banknote,
   Building2,
+  ChevronDown,
   CircleAlert,
   Clock,
   Phone,
   Plug,
   Signal,
   Sparkles,
+  Stamp,
   Ticket,
   TramFront,
 } from 'lucide-react';
@@ -122,6 +128,57 @@ function Chapter({
   );
 }
 
+/* ── A fold ────────────────────────────────────────────────────────────────
+   Everything that is not the eSIM is folded away behind a symbol and a short
+   phrase. Closed, a fold is one line: an icon, what is inside it, and the word
+   that opens it. Open, it is the same chapter it always was.
+
+   The panel is rendered into the HTML whether it is open or not — the
+   /destination/[slug] route is server-rendered and has to stay crawlable, and a
+   fact you cannot find in the page source is a fact we did not publish. `hidden`
+   takes it out of the accessibility tree and the tab order while it is closed,
+   which is what an accordion is supposed to do. */
+function Fold({
+  id,
+  icon,
+  label,
+  children,
+  open,
+  onToggle,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useLang();
+  return (
+    <section id={id} className={`v3-fold ${open ? 'is-open' : ''}`}>
+      <h2 className="v3-fold-heading">
+        <button
+          type="button"
+          className="v3-fold-head"
+          aria-expanded={open}
+          aria-controls={`${id}-panel`}
+          onClick={onToggle}
+        >
+          <span className="v3-fold-icon" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="v3-fold-label">{label}</span>
+          <span className="v3-fold-action">{open ? t('v3.fold.hide') : t('v3.fold.show')}</span>
+          <ChevronDown className="v3-fold-chev" size={16} aria-hidden="true" />
+        </button>
+      </h2>
+      <div id={`${id}-panel`} className="v3-fold-panel" hidden={!open}>
+        <div className="v3-fold-body">{children}</div>
+      </div>
+    </section>
+  );
+}
+
 /* ── The journey ───────────────────────────────────────────────────────── */
 
 export function DestinationJourney({
@@ -139,6 +196,16 @@ export function DestinationJourney({
   const live = useLive(guide.slug);
   const clock = useLocalClock(guide.geo.timezone);
   const { entry, basics, around, places } = guide;
+
+  // Which folds are open. All closed on arrival — landing on a destination
+  // should answer one question (can I get online here, and for how much) and
+  // offer the rest, rather than dropping six chapters on someone who came to
+  // buy an eSIM. Folds open independently; opening one does not shut another,
+  // because comparing the visa rule against the airport transfer is a real
+  // thing people do.
+  const [openFolds, setOpenFolds] = useState<Record<string, boolean>>({});
+  const toggleFold = (id: string) =>
+    setOpenFolds((current) => ({ ...current, [id]: !current[id] }));
 
   const kindLabel = (k: string) =>
     k === 'hidden-gem' ? t('v3.hiddenGem') : k === 'landmark' ? t('v3.landmark') : t('v3.popularKh');
@@ -190,8 +257,43 @@ export function DestinationJourney({
         </div>
       </header>
 
-      {/* ── Chapter 2 · The basics ── */}
-      <Chapter id="basics" eyebrow={t('v3.ch2.eyebrow')} title={t('v3.ch2.title')}>
+      {/* ── The eSIM, first ──
+          This used to be the last chapter, on the argument that you should be
+          given something worth having before you are offered a product. The
+          argument still holds for the writing — but not for the layout on a
+          page someone reached by naming a city they are flying to. What they
+          need first is whether we can get them online there and what it costs.
+          Everything else is still here, one tap away, in the folds below. */}
+      <Chapter id="esim" eyebrow={t('v3.esim.eyebrow')} title={t('v3.ch6.title')}>
+        <Recommendation guide={guide} onBought={onTravelled} />
+
+        <div className="v3-trust">
+          <p className="v3-card-label">{t('v3.trust.title')}</p>
+          <ul>
+            <li>{t('v3.trust.refund')}</li>
+            <li>{t('v3.trust.khmer')}</li>
+            <li>{t('v3.trust.pay')}</li>
+            <li>{t('v3.trust.noContract')}</li>
+          </ul>
+          <Link href="/refunds" className="v3-link">
+            {t('v3.trust.policy')}
+          </Link>
+        </div>
+      </Chapter>
+
+      {/* ── Everything else, folded ── */}
+      <div className="v3-folds">
+        <p className="v3-eyebrow">{t('v3.more.eyebrow')}</p>
+        <h2 className="v3-folds-title">{t('v3.more.title')}</h2>
+        <p className="v3-folds-hint">{t('v3.more.hint')}</p>
+
+      <Fold
+        id="basics"
+        icon={<Banknote size={18} />}
+        label={t('v3.fold.basics')}
+        open={!!openFolds.basics}
+        onToggle={() => toggleFold('basics')}
+      >
         {live?.rates && (
           <div className="v3-rates">
             <span>
@@ -258,10 +360,17 @@ export function DestinationJourney({
         </div>
 
         <Verified date={basics.lastVerified} source={basics.source} volatile={basics.volatile} />
-      </Chapter>
+      </Fold>
 
-      {/* ── Chapter 3 · Getting in ── the reason this page exists ── */}
-      <Chapter id="entry" eyebrow={t('v3.ch3.eyebrow')} title={t('v3.ch3.title')} wide>
+      {/* Getting in — the reason this page exists, and so the one fold that
+          says what it will tell you before you open it. */}
+      <Fold
+        id="entry"
+        icon={<Stamp size={18} />}
+        label={t('v3.fold.entry')}
+        open={!!openFolds.entry}
+        onToggle={() => toggleFold('entry')}
+      >
         {entry.advisory && (
           <div className="v3-advisory" role="note">
             <p className="v3-advisory-title">
@@ -424,10 +533,15 @@ export function DestinationJourney({
           )}
         </div>
         <Verified date={entry.emergency.lastVerified} source={entry.emergency.source} />
-      </Chapter>
+      </Fold>
 
-      {/* ── Chapter 4 · Getting around ── */}
-      <Chapter id="around" eyebrow={t('v3.ch4.eyebrow')} title={t('v3.ch4.title')}>
+      <Fold
+        id="around"
+        icon={<TramFront size={18} />}
+        label={t('v3.fold.around')}
+        open={!!openFolds.around}
+        onToggle={() => toggleFold('around')}
+      >
         <ul className="v3-transfers">
           {around.fromAirport.map((f) => (
             <li key={f.mode.en}>
@@ -491,10 +605,15 @@ export function DestinationJourney({
           <strong>{t('v3.tipping')}:</strong> {bi(around.money.tipping)}
         </p>
         <Verified date={around.lastVerified} source={around.source} volatile={around.volatile} />
-      </Chapter>
+      </Fold>
 
-      {/* ── Chapter 5 · Why you go ── */}
-      <Chapter id="places" eyebrow={t('v3.ch5.eyebrow')} title={t('v3.ch5.title')}>
+      <Fold
+        id="places"
+        icon={<Sparkles size={18} />}
+        label={t('v3.fold.places')}
+        open={!!openFolds.places}
+        onToggle={() => toggleFold('places')}
+      >
         <ul className="v3-places">
           {places.list.map((p) => (
             <li key={p.name.en} className="v3-place">
@@ -514,25 +633,9 @@ export function DestinationJourney({
           ))}
         </ul>
         <Verified date={places.lastVerified} source={places.source} volatile={places.volatile} />
-      </Chapter>
+      </Fold>
+      </div>
 
-      {/* ── Chapter 6 · And only now, the eSIM ── */}
-      <Chapter id="esim" eyebrow={t('v3.ch6.eyebrow')} title={t('v3.ch6.title')}>
-        <Recommendation guide={guide} onBought={onTravelled} />
-
-        <div className="v3-trust">
-          <p className="v3-card-label">{t('v3.trust.title')}</p>
-          <ul>
-            <li>{t('v3.trust.refund')}</li>
-            <li>{t('v3.trust.khmer')}</li>
-            <li>{t('v3.trust.pay')}</li>
-            <li>{t('v3.trust.noContract')}</li>
-          </ul>
-          <Link href="/refunds" className="v3-link">
-            {t('v3.trust.policy')}
-          </Link>
-        </div>
-      </Chapter>
     </div>
   );
 }
