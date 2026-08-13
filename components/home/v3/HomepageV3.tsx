@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { getGuide, guides } from '@/content/destinations';
 import { getDestination } from '@/data/destinations';
-import { describeAllowance, getPlansForCountry } from '@/data/esimPlans';
+import { getPlansForCountry, useAllowanceLabel } from '@/data/esimPlans';
 import { useCart } from '@/hooks/useCart';
 import { useLang } from '@/lib/i18n';
 import { detectTier, TIER_SETTINGS, type Tier } from '@/lib/tier';
@@ -48,6 +48,7 @@ type View =
 
 export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   const { t } = useLang();
+  const allowanceLabel = useAllowanceLabel();
   const [tier, setTier] = useState<Tier | null>(null);
   const [view, setView] = useState<View>(() => {
     const g = initialSlug ? getGuide(initialSlug) : undefined;
@@ -236,7 +237,11 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
     const plan = getPlansForCountry(lastGuide.esimCountrySlug).find((p) => p.popular);
     if (!dest || !plan) return null;
     return {
-      label: `${dest.name} eSIM · ${plan.durationDays} days, ${describeAllowance(plan)}`,
+      label: t('express.label', {
+        country: dest.name,
+        days: plan.durationDays,
+        allowance: allowanceLabel(plan),
+      }),
       priceUsd: plan.priceUsd,
       onBuy: () => {
         addItem({

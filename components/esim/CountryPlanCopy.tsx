@@ -32,12 +32,15 @@ export function CountryHeading({ country, networks }: { country: string; network
 
 export function CoverageBadge({ tech, quality }: { tech: string; quality: string }) {
   const { t } = useLang();
+  // The catalogue stores quality as an English word, so it needs translating
+  // rather than passing straight through.
+  const qualityLabel = t(quality === 'Excellent' ? 'quality.Excellent' : 'quality.Good');
   return (
     <div className="liquid-glass hidden items-center gap-3 rounded-card px-6 py-4 md:flex">
       <MapPin size={20} className="text-accent" aria-hidden="true" />
       <div>
         <p className="text-sm font-semibold text-white">{t('country.coverage')}</p>
-        <p className="text-xs text-white/60">{t('country.quality', { tech, quality })}</p>
+        <p className="text-xs text-white/60">{t('country.quality', { tech, quality: qualityLabel })}</p>
       </div>
     </div>
   );

@@ -60,8 +60,19 @@ export interface EsimPlan {
   callSms: boolean;
   priceUsd: number;
   network: NetworkTech;
-  features: string[];
+  /**
+   * Feature bullets as dictionary keys plus their values, not finished
+   * sentences. The catalogue is built at module load, long before a language
+   * is known, so it must not bake English in.
+   */
+  features: PlanFeature[];
   popular: boolean;
+}
+
+export interface PlanFeature {
+  /** A key in the i18n dictionary — typed there as DictKey. */
+  key: string;
+  vars?: Record<string, string | number>;
 }
 
 export interface CartItem {

@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { WAYFINDER_PATH } from './DomerMark';
+import { useLang } from '@/lib/i18n';
 
 const DUST = [
   { top: '4%', left: '50%', size: 4, delay: '0s' },
@@ -19,7 +20,10 @@ const DUST = [
   { top: '18%', left: '16%', size: 3, delay: '.4s' },
 ];
 
-export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { size?: number; label?: string }) {
+export function DomerLoader({ size = 260, label }: { size?: number; label?: string }) {
+  const { t } = useLang();
+  // An explicit label still wins; the default now follows the language.
+  const text = label ?? t('brand.loading');
   const starSize = Math.round(size * (120 / 260));
   return (
     <div className="flex flex-col items-center gap-7">
@@ -27,7 +31,7 @@ export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { 
         className="relative flex items-center justify-center"
         style={{ width: size, height: size, perspective: '800px' }}
         role="status"
-        aria-label={label}
+        aria-label={text}
       >
         <div className="domer-glow" aria-hidden="true" />
         <div className="domer-dust" aria-hidden="true">
@@ -76,7 +80,7 @@ export function DomerLoader({ size = 260, label = 'Preparing your journey' }: { 
         </div>
       </div>
       <div className="domer-label">
-        <b>{label}</b>
+        <b>{text}</b>
         <span>.</span>
         <span>.</span>
         <span>.</span>

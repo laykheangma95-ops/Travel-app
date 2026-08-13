@@ -7,7 +7,12 @@ import { WavyFlag } from '@/components/ui/WavyFlag';
 import { useLang } from '@/lib/i18n';
 
 export function DestinationCard({ destination, dark = false }: { destination: Destination; dark?: boolean }) {
-  const { t } = useLang();
+  const { lang, t } = useLang();
+  // The country name the visitor reads leads the card; the other stays under it,
+  // because the English spelling is what appears on a boarding pass.
+  const km = lang === 'km';
+  const primary = km ? destination.nameKm : destination.name;
+  const secondary = km ? destination.name : t('dest.visit', { country: destination.nameKm });
 
   return (
     <Link
@@ -24,14 +29,20 @@ export function DestinationCard({ destination, dark = false }: { destination: De
         size={60}
         className="origin-bottom-left transition-transform duration-300 ease-smooth group-hover:scale-110 group-hover:-rotate-3"
       />
-      <h3 className={`mt-4 font-display text-lg font-bold ${dark ? 'text-white' : 'text-ink'}`}>{destination.name}</h3>
-      <p className={`font-khmer text-sm ${dark ? 'text-white/60' : 'text-ink-secondary'}`}>ចូលទស្សនា{destination.nameKm}</p>
+      <h3
+        className={`mt-4 font-display text-lg font-bold ${km ? 'font-khmer' : ''} ${dark ? 'text-white' : 'text-ink'}`}
+      >
+        {primary}
+      </h3>
+      <p className={`text-sm ${km ? '' : 'font-khmer'} ${dark ? 'text-white/60' : 'text-ink-secondary'}`}>
+        {secondary}
+      </p>
       <div className="mt-4 flex items-center justify-between">
         <p className={`text-sm font-bold ${dark ? 'text-gold-light' : 'text-accent'}`}>
           {t('dest.from')} ${destination.fromPriceUsd.toFixed(2)}
         </p>
         <Badge tone={destination.networkQuality === 'Excellent' ? 'success' : 'info'}>
-          {destination.networkQuality}
+          {t(destination.networkQuality === 'Excellent' ? 'quality.Excellent' : 'quality.Good')}
         </Badge>
       </div>
       <span

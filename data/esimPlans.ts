@@ -11,9 +11,10 @@
 // them imports gohubCatalog directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { EsimPlan } from '@/types';
+import type { EsimPlan, PlanFeature } from '@/types';
 import { destinations } from './destinations';
 import { gohubCatalog } from './gohubCatalog';
+import { useLang } from '@/lib/i18n';
 
 const TIER_NAMES: Record<EsimPlan['tier'], string> = {
   basic: 'Basic',
@@ -23,22 +24,23 @@ const TIER_NAMES: Record<EsimPlan['tier'], string> = {
 
 const destinationBySlug = new Map(destinations.map((d) => [d.slug, d]));
 
-function featuresFor(plan: (typeof gohubCatalog)[number], countrySlug: string): string[] {
-  const features = ['Hotspot / tethering included'];
+// Keys, not sentences: this runs at module load, before any language is known.
+function featuresFor(plan: (typeof gohubCatalog)[number], countrySlug: string): PlanFeature[] {
+  const features: PlanFeature[] = [{ key: 'planFeature.hotspot' }];
 
   // A daily plan cannot be burned through on the first afternoon, which is the
   // single most common complaint about fixed-data travel eSIMs. Say so.
   features.push(
     plan.dataType === 'daily'
-      ? `${plan.dataGbDaily}GB every day, resets at midnight`
-      : `${plan.dataGbTotal}GB for the whole trip`
+      ? { key: 'planFeature.dailyReset', vars: { gb: plan.dataGbDaily } }
+      : { key: 'planFeature.totalData', vars: { gb: plan.dataGbTotal } }
   );
 
   if (countrySlug === 'china' || countrySlug === 'china-hong-kong-macao') {
-    features.push('No VPN needed for China');
+    features.push({ key: 'planFeature.noVpn' });
   }
 
-  features.push('Instant QR delivery', '24/7 Khmer support');
+  features.push({ key: 'planFeature.instantQr' }, { key: 'planFeature.khmerSupport' });
   return features;
 }
 
@@ -79,6 +81,20 @@ export function getPlan(id: string): EsimPlan | undefined {
  */
 export function describeAllowance(plan: EsimPlan): string {
   return plan.dataType === 'daily' ? `${plan.dataGbDaily}GB/day` : `${plan.dataGbTotal}GB total`;
+}
+
+/**
+ * The same allowance, in the language the visitor is reading.
+ *
+ * `describeAllowance` above stays for server and non-React callers (emails,
+ * the ops console) where there is no language context to read.
+ */
+export function useAllowanceLabel(): (plan: EsimPlan) => string {
+  const { t } = useLang();
+  return (plan) =>
+    plan.dataType === 'daily'
+      ? t('planFeature.perDay', { gb: plan.dataGbDaily })
+      : t('planFeature.total', { gb: plan.dataGbTotal });
 }
 
 /** Price per day, which is the comparison a traveller actually makes. */

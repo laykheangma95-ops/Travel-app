@@ -3,9 +3,9 @@
 import { Check, ShoppingCart } from 'lucide-react';
 import type { Destination, EsimPlan } from '@/types';
 import { useCart } from '@/hooks/useCart';
-import { describeAllowance } from '@/data/esimPlans';
+import { useAllowanceLabel } from '@/data/esimPlans';
 import { cn, formatUsd } from '@/lib/utils';
-import { useLang } from '@/lib/i18n';
+import { useLang, type DictKey } from '@/lib/i18n';
 import { useState } from 'react';
 
 interface PlanCardProps {
@@ -16,6 +16,7 @@ interface PlanCardProps {
 
 export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
   const { t } = useLang();
+  const allowanceLabel = useAllowanceLabel();
   const addItem = useCart((s) => s.addItem);
   const [added, setAdded] = useState(false);
 
@@ -61,14 +62,17 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       <p className={cn('mt-4 font-display text-4xl font-extrabold', dark ? 'text-white' : 'text-ink')}>{formatUsd(plan.priceUsd)}</p>
       <div className={cn('mt-5 space-y-1 border-b pb-5', dark ? 'border-white/10' : 'border-line')}>
         <p className={cn('text-sm font-semibold', dark ? 'text-white' : 'text-ink')}>{t('plan.days', { days: plan.durationDays })}</p>
-        <p className={cn('text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>{describeAllowance(plan)}</p>
+        <p className={cn('text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>{allowanceLabel(plan)}</p>
         <p className={cn('font-mono text-xs', dark ? 'text-white/50' : 'text-ink-muted')}>{plan.network}</p>
       </div>
       <ul className="mt-5 flex-1 space-y-2.5">
         {plan.features.map((f) => (
-          <li key={f} className={cn('flex items-start gap-2 text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}>
+          <li
+            key={f.key}
+            className={cn('flex items-start gap-2 text-sm', dark ? 'text-white/70' : 'text-ink-secondary')}
+          >
             <Check size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
-            {f}
+            {t(f.key as DictKey, f.vars)}
           </li>
         ))}
       </ul>

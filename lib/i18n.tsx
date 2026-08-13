@@ -10,6 +10,9 @@ const dicts = {
     // Brand
     'brand.word': 'Domner',
     'brand.kicker': 'TRAVEL',
+    // The splash is the very first thing a visitor sees, so it is also the
+    // first chance to be in the wrong language.
+    'brand.loading': 'Preparing your journey',
     // Navbar
     'nav.esim': 'eSIM',
     'nav.buyEsim': 'Buy eSIM',
@@ -218,6 +221,10 @@ const dicts = {
     'store.filter.Europe': 'Europe',
     'store.filter.Americas': 'Americas',
     'store.filter.MiddleEast': 'Middle East',
+    // Network quality is stored in the catalogue as an English word.
+    'quality.Excellent': 'Excellent',
+    'quality.Good': 'Good',
+    'dest.visit': 'Visit {country}',
     'store.empty.title': 'No destinations found',
     'store.empty.desc': 'We couldn’t find "{query}". Try another country name or clear your filters.',
     'store.empty.cta': 'Clear search',
@@ -494,7 +501,11 @@ const dicts = {
     'guide.arrivingAt': 'Arriving at {city} ({code})',
     'guide.mapOpen': 'Open the digital terminal map for {airport}',
     'guide.map': 'Digital Map',
+    // The catalogue stores one of these two English labels per airport. The
+    // distinction matters — "official" means the airport's own map, not a
+    // third party's — so it is translated rather than flattened to one string.
     'guide.mapDefault': 'Interactive terminal map',
+    'guide.mapOfficial': 'Official interactive map',
     'guide.stepAria': 'Step {n}: {title}',
     'guide.step': 'Step {n}',
     'guide.phrases': 'Useful phrases',
@@ -568,11 +579,60 @@ const dicts = {
     'device.unsupported': 'Sorry, this model doesn’t support eSIM. You’ll need a physical SIM.',
     'device.unknown':
       'We’re not sure about this model — message our Khmer support on Telegram and we’ll check.',
+
+    // ── Plan spec sheet ──
+    'specs.eyebrow': 'Before you buy',
+    'specs.title': 'What you get, in full',
+    'specs.yes': 'Yes',
+    'specs.no': 'No',
+    'specs.type': 'eSIM type',
+    'specs.typeDataOnly': 'Data only',
+    'specs.typeDataCalls': 'Data, calls and SMS',
+    'specs.callSms': 'Call + SMS',
+    'specs.speed': 'Speed',
+    'specs.speedNoteDaily': 'Once the day’s allowance is used, speed is reduced until it resets.',
+    'specs.speedNoteTotal': 'Once the allowance is used, data stops until you buy again.',
+    'specs.carrier': 'Network provider',
+    'specs.carrierNote': 'In {country} you connect to a local carrier — not roaming.',
+    'specs.data': 'Data',
+    'specs.dataEntry': '{allowance} · {days} days',
+    'specs.reset': 'Daily reset',
+    'specs.resetValue': 'Every 24 hours',
+    'specs.resetNote': 'A slow day does not use up the rest of your trip.',
+    'specs.hotspot': 'Hotspot',
+    'specs.kyc': 'KYC required',
+    'specs.kycYes': 'Yes — passport registration',
+    'specs.kycNote': 'Register at {url}',
+    'specs.topup': 'Top-up',
+    'specs.activationStep': 'Activation step',
+    'specs.restrictions': 'Restrictions',
+    'specs.worksIn': 'Works in {count} country',
+    'specs.worksInPlural': 'Works in {count} countries',
+    'specs.activateWithin': 'Activate within {days} days',
+    'specs.activateNoteBefore': 'Buy today and the QR stays valid until',
+    'specs.activateNoteAfter': '. Your plan only starts counting when you connect abroad.',
+    'specs.keepNumber': 'Keep your Cambodian number',
+    'specs.keepNumberNote':
+      'The eSIM sits alongside your normal SIM. Calls and SMS on your Khmer number keep working — you choose which line uses data.',
+    'specs.source':
+      'Network and coverage details come directly from our supplier’s current price list. If anything here turns out to be wrong for your trip, that is on us — see the replacement promise below.',
+
+    // ── Plan feature bullets (data/esimPlans.ts) ──
+    'planFeature.hotspot': 'Hotspot / tethering included',
+    'planFeature.dailyReset': '{gb}GB every day, resets at midnight',
+    'planFeature.totalData': '{gb}GB of data for the whole trip',
+    'planFeature.noVpn': 'No VPN needed for China',
+    'planFeature.instantQr': 'Instant QR delivery',
+    'planFeature.khmerSupport': '24/7 Khmer support',
+    'express.label': '{country} eSIM · {days} days, {allowance}',
+    'planFeature.perDay': '{gb}GB/day',
+    'planFeature.total': '{gb}GB total',
   },
   km: {
     // Brand
     'brand.word': 'ដំណើរ',
     'brand.kicker': 'DOMNER',
+    'brand.loading': 'កំពុងរៀបចំដំណើររបស់អ្នក',
     // Navbar
     'nav.esim': 'eSIM',
     'nav.buyEsim': 'ទិញ eSIM',
@@ -780,6 +840,9 @@ const dicts = {
     'store.filter.Europe': 'អឺរ៉ុប',
     'store.filter.Americas': 'អាមេរិក',
     'store.filter.MiddleEast': 'មជ្ឈិមបូព៌ា',
+    'quality.Excellent': 'ល្អឥតខ្ចោះ',
+    'quality.Good': 'ល្អ',
+    'dest.visit': 'ចូលទស្សនា{country}',
     'store.empty.title': 'រកមិនឃើញគោលដៅទេ',
     'store.empty.desc': 'យើងរកមិនឃើញ "{query}" ទេ។ សូមសាកឈ្មោះប្រទេសផ្សេង ឬលុបតម្រងចេញ។',
     'store.empty.cta': 'លុបពាក្យស្វែងរក',
@@ -1057,6 +1120,7 @@ const dicts = {
     'guide.mapOpen': 'បើកផែនទីអាកាសយានដ្ឋានឌីជីថលសម្រាប់ {airport}',
     'guide.map': 'ផែនទីឌីជីថល',
     'guide.mapDefault': 'ផែនទីអាកាសយានដ្ឋានអន្តរកម្ម',
+    'guide.mapOfficial': 'ផែនទីអន្តរកម្មផ្លូវការ',
     'guide.stepAria': 'ជំហានទី {n}៖ {title}',
     'guide.step': 'ជំហានទី {n}',
     'guide.phrases': 'ឃ្លាមានប្រយោជន៍',
@@ -1131,6 +1195,55 @@ const dicts = {
     'device.unsupported': 'សូមអភ័យទោស ម៉ូដែលនេះប្រើ eSIM មិនបានទេ។ អ្នកត្រូវការស៊ីមកាតធម្មតា។',
     'device.unknown':
       'យើងមិនច្បាស់អំពីម៉ូដែលនេះទេ — សូមផ្ញើសារទៅក្រុមជំនួយភាសាខ្មែររបស់យើងតាម Telegram យើងនឹងពិនិត្យជូន។',
+
+    // ── តារាងលក្ខណៈគម្រោង ──
+    'specs.eyebrow': 'មុនពេលអ្នកទិញ',
+    'specs.title': 'អ្វីដែលអ្នកទទួលបាន ទាំងស្រុង',
+    'specs.yes': 'មាន',
+    'specs.no': 'គ្មាន',
+    'specs.type': 'ប្រភេទ eSIM',
+    'specs.typeDataOnly': 'អ៊ីនធឺណិតតែប៉ុណ្ណោះ',
+    'specs.typeDataCalls': 'អ៊ីនធឺណិត ការហៅ និង SMS',
+    'specs.callSms': 'ការហៅ + SMS',
+    'specs.speed': 'ល្បឿន',
+    'specs.speedNoteDaily': 'ពេលប្រើអស់កូតាប្រចាំថ្ងៃ ល្បឿននឹងថយចុះ រហូតដល់វាកំណត់ឡើងវិញ។',
+    'specs.speedNoteTotal': 'ពេលប្រើអស់កូតា អ៊ីនធឺណិតនឹងឈប់ រហូតដល់អ្នកទិញម្តងទៀត។',
+    'specs.carrier': 'ក្រុមហ៊ុនបណ្តាញ',
+    'specs.carrierNote': 'នៅ{country} អ្នកភ្ជាប់បណ្តាញក្នុងស្រុក — មិនមែន roaming ទេ។',
+    'specs.data': 'អ៊ីនធឺណិត',
+    'specs.dataEntry': '{allowance} · {days} ថ្ងៃ',
+    'specs.reset': 'កំណត់ឡើងវិញប្រចាំថ្ងៃ',
+    'specs.resetValue': 'រៀងរាល់ ២៤ ម៉ោង',
+    'specs.resetNote': 'ថ្ងៃណាប្រើតិច មិនធ្វើឲ្យខាតកូតាថ្ងៃក្រោយទេ។',
+    'specs.hotspot': 'Hotspot',
+    'specs.kyc': 'ត្រូវការចុះឈ្មោះ (KYC)',
+    'specs.kycYes': 'ត្រូវការ — ចុះឈ្មោះដោយប្រើលិខិតឆ្លងដែន',
+    'specs.kycNote': 'ចុះឈ្មោះនៅ {url}',
+    'specs.topup': 'បញ្ចូលបន្ថែម',
+    'specs.activationStep': 'ជំហានបើកដំណើរការ',
+    'specs.restrictions': 'ការរឹតបន្តឹង',
+    // Khmer does not inflect for number, so both counts read the same.
+    'specs.worksIn': 'ប្រើបាននៅ {count} ប្រទេស',
+    'specs.worksInPlural': 'ប្រើបាននៅ {count} ប្រទេស',
+    'specs.activateWithin': 'ត្រូវបើកដំណើរការក្នុងរយៈពេល {days} ថ្ងៃ',
+    'specs.activateNoteBefore': 'ទិញថ្ងៃនេះ កូដ QR នៅមានសុពលភាពរហូតដល់',
+    'specs.activateNoteAfter': '។ គម្រោងរបស់អ្នកចាប់ផ្តើមរាប់តែពេលអ្នកភ្ជាប់បណ្តាញនៅបរទេសប៉ុណ្ណោះ។',
+    'specs.keepNumber': 'រក្សាលេខទូរស័ព្ទកម្ពុជារបស់អ្នក',
+    'specs.keepNumberNote':
+      'eSIM ដំណើរការទន្ទឹមនឹងស៊ីមធម្មតារបស់អ្នក។ ការហៅ និង SMS លើលេខខ្មែររបស់អ្នកនៅដំណើរការដដែល — អ្នកជ្រើសរើសថាលេខណាប្រើអ៊ីនធឺណិត។',
+    'specs.source':
+      'ព័ត៌មានអំពីបណ្តាញ និងតំបន់គ្របដណ្តប់ យកមកពីតារាងតម្លៃបច្ចុប្បន្នរបស់អ្នកផ្គត់ផ្គង់យើងដោយផ្ទាល់។ ប្រសិនបើមានអ្វីមិនត្រឹមត្រូវសម្រាប់ដំណើររបស់អ្នក នោះជាកំហុសរបស់យើង — សូមមើលការធានាប្តូរ eSIM ខាងក្រោម។',
+
+    // ── ចំណុចសំខាន់ៗនៃគម្រោង (data/esimPlans.ts) ──
+    'planFeature.hotspot': 'អាចបើក Hotspot ចែកអ៊ីនធឺណិតបាន',
+    'planFeature.dailyReset': '{gb}GB រៀងរាល់ថ្ងៃ កំណត់ឡើងវិញពេលអធ្រាត្រ',
+    'planFeature.totalData': '{gb}GB សម្រាប់ដំណើរទាំងមូល',
+    'planFeature.noVpn': 'មិនចាំបាច់ប្រើ VPN នៅប្រទេសចិនទេ',
+    'planFeature.instantQr': 'ផ្ញើកូដ QR ភ្លាមៗ',
+    'planFeature.khmerSupport': 'ជំនួយភាសាខ្មែរ ២៤/៧',
+    'express.label': 'eSIM {country} · {days} ថ្ងៃ, {allowance}',
+    'planFeature.perDay': '{gb}GB ក្នុងមួយថ្ងៃ',
+    'planFeature.total': '{gb}GB សរុប',
   },
 } as const;
 

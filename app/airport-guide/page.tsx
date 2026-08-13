@@ -136,7 +136,12 @@ function AirportGuideContent() {
               >
                 <Map size={16} /> {t('guide.map')}
                 <span className="hidden items-center gap-1 text-xs font-normal text-white/80 sm:inline-flex">
-                  · {selected.digitalMapLabel ?? t('guide.mapDefault')}
+                  ·{' '}
+                  {t(
+                    selected.digitalMapLabel === 'Official interactive map'
+                      ? 'guide.mapOfficial'
+                      : 'guide.mapDefault'
+                  )}
                   <ExternalLink size={12} />
                 </span>
               </a>
