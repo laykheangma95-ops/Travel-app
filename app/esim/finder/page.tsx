@@ -26,15 +26,8 @@ export default function EsimFinderPage({
     <div className="night-canvas min-h-screen">
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-8 text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent">
-            Find my eSIM
-          </p>
-          <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">
-            Three questions. One plan that fits.
-          </h1>
-        </div>
-
+        {/* The heading is inside PlanFinder so it can read useLang() — this
+            route is a server component and the customer UI is Khmer-first. */}
         <PlanFinder initialCountry={initialCountry} />
       </div>
     </div>

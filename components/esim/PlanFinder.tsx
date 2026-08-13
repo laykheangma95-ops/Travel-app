@@ -46,6 +46,14 @@ const STEPS: StepId[] = ['country', 'days', 'usage', 'result'];
 const TYPING_MS = 520;
 
 const COPY = {
+  // The page heading lives here rather than in the route so it can be
+  // bilingual — the customer UI is Khmer-first, and a server component has no
+  // useLang(). See CLAUDE.md §1.
+  kicker: { en: 'Find my eSIM', km: 'រកកញ្ចប់ eSIM' },
+  heading: {
+    en: 'Three questions. One plan that fits.',
+    km: 'សំណួរបីយ៉ាង។ កញ្ចប់មួយដែលសម។',
+  },
   greeting: {
     en: "Hi! I'll find you the right eSIM in about 30 seconds. 👋",
     km: 'សួស្ដី! ខ្ញុំនឹងជួយរកកញ្ចប់ eSIM ដែលសមនឹងអ្នកក្នុងរយៈពេល ៣០ វិនាទី។ 👋',
@@ -146,6 +154,15 @@ export function PlanFinder({ initialCountry }: { initialCountry?: string }) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 pb-8">
+      <header className="mb-4 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent">
+          {COPY.kicker[lang]}
+        </p>
+        <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">
+          {COPY.heading[lang]}
+        </h1>
+      </header>
+
       {/* ── Domner's greeting ── */}
       <Bubble from="domner" delay={0}>
         {COPY.greeting[lang]}
