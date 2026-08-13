@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   Headphones,
   LayoutDashboard,
+  LogOut,
   Package,
   QrCode,
   Server,
@@ -46,7 +47,16 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { can, role, unconfigured, viaBootstrap } = useSession();
+  const { can, role, unconfigured, viaBootstrap, user, signOut } = useSession();
+
+  // Staff work this panel on a shared phone at the counter as often as on their
+  // own laptop, so leaving it has to be one visible tap. There was no way out
+  // at all before this — the only way to stop being signed in as staff was to
+  // clear the browser.
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.href = '/';
+  };
 
   // With Supabase unconfigured there is no session to read a role from, so the
   // panel shows every tab rather than an empty shell. The API routes still
@@ -87,6 +97,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {role ? `${ROLE_LABEL[role] ?? role} · Domner Ops` : 'Internal · Domner Ops'}
               </span>
             )}
+
+            {/* Which account is holding this authority, not just which role.
+                On a shared machine that difference is the whole question. */}
+            {user?.email && (
+              <span className="hidden max-w-[16rem] truncate text-xs text-ink-secondary sm:inline">
+                {user.email}
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-secondary hover:text-secondary"
+            >
+              <LogOut size={13} aria-hidden="true" />
+              Sign out
+            </button>
           </div>
         </div>
         <div className="mb-8 flex flex-wrap gap-2">

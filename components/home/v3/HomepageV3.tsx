@@ -252,7 +252,10 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
           priceUsd: plan.priceUsd,
           quantity: 1,
         });
-        window.location.href = '/cart';
+        // Straight to payment. This is the express lane for someone who has
+        // already been here and picked this exact plan before — routing it via
+        // the cart made it neither express nor a lane.
+        window.location.href = '/esim/checkout';
       },
     };
   })();

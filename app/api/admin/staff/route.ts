@@ -5,6 +5,11 @@
 //   POST  /api/admin/staff   — invite someone by email, with a role
 //   PATCH /api/admin/staff   — change a role, or activate/deactivate
 //
+// POST does two things, and the second one used to be missing: it records the
+// authority AND provisions the account that authority attaches to. Writing the
+// row alone left the invited person with an address that could not sign in —
+// see lib/staffInvite.ts for the full account of that failure.
+//
 // Two guards worth naming, because both are ways an admin panel quietly loses
 // its last administrator:
 //
@@ -20,6 +25,7 @@ import { ApiError, ok, readJson, route } from '@/lib/http';
 import { requirePermission } from '@/lib/serverAuth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { STAFF_ROLES, recordStaffEvent, type StaffRecord, type StaffRole } from '@/lib/staff';
+import { provisionStaffAccount } from '@/lib/staffInvite';
 import { log } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -134,14 +140,32 @@ export const POST = route(
       throw new ApiError('INTERNAL', 'Could not add that staff member.');
     }
 
+    const row = data as StaffRow;
+
+    // The row is safe now. Provisioning runs after it and never throws, so a
+    // mail server having a bad day cannot cost us the authority record — it
+    // just comes back as a warning the admin can act on.
+    const invite = await provisionStaffAccount(email, {
+      alreadyLinked: row.user_id !== null,
+    });
+
     await recordStaffEvent({
       staffEmail: email,
       eventType: 'staff.invited',
       toRole: parsed.data.role,
       actor: actor.email,
+      detail: { invite: invite.status },
     });
 
-    return ok({ staff: toRecord(data as StaffRow) });
+    // Re-read: provisioning may have attached a user_id, and the screen shows
+    // "not signed up yet" off that field.
+    const { data: fresh } = await db()
+      .from('staff_users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    return ok({ staff: toRecord((fresh ?? row) as StaffRow), invite });
   },
   { rateLimit: 'auth', name: 'admin.staff.invite' }
 );

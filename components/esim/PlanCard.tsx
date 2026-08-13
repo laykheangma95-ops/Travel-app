@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, ShoppingCart } from 'lucide-react';
+import { ArrowRight, Check, ShoppingCart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { Destination, EsimPlan } from '@/types';
 import { useCart } from '@/hooks/useCart';
 import { describeAllowance } from '@/data/esimPlans';
@@ -14,23 +15,43 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
+  const router = useRouter();
   const addItem = useCart((s) => s.addItem);
   const [added, setAdded] = useState(false);
 
+  const line = () => ({
+    planId: plan.id,
+    countrySlug: destination.slug,
+    countryName: destination.name,
+    flag: destination.flag,
+    planName: plan.name,
+    durationDays: plan.durationDays,
+    dataType: plan.dataType,
+    dataGbDaily: plan.dataGbDaily,
+    dataGbTotal: plan.dataGbTotal,
+    priceUsd: plan.priceUsd,
+    quantity: 1,
+  });
+
+  // The card's main action now finishes the choice instead of parking it.
+  //
+  // WHY: picking a plan used to drop it in the cart and leave you exactly where
+  // you were, on a page full of plans, with a small "Added to Cart" flash as
+  // the only sign anything happened. Choosing is the decision — the customer
+  // has said yes to this plan at this price. Making them then find the cart
+  // icon and press checkout is two steps of nothing, and the common reading of
+  // a page that does not move is that the button did not work.
+  //
+  // Almost everyone buys one eSIM for one trip, so "Buy now" is the primary
+  // path. "Add to cart" stays as the secondary action for the traveller doing
+  // two countries in one trip — that case is real, it is just not the default.
+  const handleBuyNow = () => {
+    addItem(line());
+    router.push('/esim/checkout');
+  };
+
   const handleAdd = () => {
-    addItem({
-      planId: plan.id,
-      countrySlug: destination.slug,
-      countryName: destination.name,
-      flag: destination.flag,
-      planName: plan.name,
-      durationDays: plan.durationDays,
-      dataType: plan.dataType,
-      dataGbDaily: plan.dataGbDaily,
-      dataGbTotal: plan.dataGbTotal,
-      priceUsd: plan.priceUsd,
-      quantity: 1,
-    });
+    addItem(line());
     setAdded(true);
     setTimeout(() => setAdded(false), 1600);
   };
@@ -72,25 +93,44 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       </ul>
       <button
         type="button"
-        onClick={handleAdd}
+        onClick={handleBuyNow}
         className={cn(
           'mt-7 inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-btn px-5 py-3 text-sm font-semibold transition-all duration-200 ease-smooth active:scale-[0.98]',
-          added
-            ? 'bg-success text-white'
-            : plan.popular
-              ? 'liquid-glass-accent liquid-sheen text-primary-deep hover:brightness-110'
-              : dark
-                ? 'liquid-glass liquid-sheen text-white hover:brightness-110'
-                : 'bg-secondary text-white hover:bg-secondary-high'
+          plan.popular
+            ? 'liquid-glass-accent liquid-sheen text-primary-deep hover:brightness-110'
+            : dark
+              ? 'liquid-glass liquid-sheen text-white hover:brightness-110'
+              : 'bg-secondary text-white hover:bg-secondary-high'
         )}
+      >
+        Buy now
+        <ArrowRight size={16} aria-hidden="true" />
+      </button>
+
+      {/* Quiet on purpose. It must be findable by the person buying two
+          countries, and must not compete with the decision above it. */}
+      <button
+        type="button"
+        onClick={handleAdd}
+        className={cn(
+          'mt-2.5 inline-flex min-h-[2.5rem] w-full items-center justify-center gap-2 rounded-btn px-5 py-2 text-sm font-medium transition-colors duration-200',
+          added
+            ? 'text-success'
+            : dark
+              ? 'text-white/70 hover:bg-white/10 hover:text-white'
+              : 'text-ink-secondary hover:bg-surface-2 hover:text-ink'
+        )}
+        // Says what happened without moving the page, for anyone using a screen
+        // reader — the colour flash alone is invisible to them.
+        aria-live="polite"
       >
         {added ? (
           <>
-            <Check size={16} /> Added to Cart
+            <Check size={16} aria-hidden="true" /> Added to cart
           </>
         ) : (
           <>
-            <ShoppingCart size={16} /> Add to Cart
+            <ShoppingCart size={16} aria-hidden="true" /> Add to cart
           </>
         )}
       </button>
