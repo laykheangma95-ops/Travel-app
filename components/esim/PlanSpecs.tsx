@@ -10,6 +10,7 @@ import { useLang } from '@/lib/i18n';
 interface PlanSpecsProps {
   countrySlug: string;
   countryName: string;
+  countryNameKm?: string;
   plans: EsimPlan[];
 }
 
@@ -35,9 +36,10 @@ interface SpecRow {
  *   Anything GoHub have not told us — hotspot, KYC, top-up, activation window —
  *   is simply absent, never guessed. See data/planPolicy.ts for why.
  */
-export function PlanSpecs({ countrySlug, countryName, plans }: PlanSpecsProps) {
-  const { t } = useLang();
+export function PlanSpecs({ countrySlug, countryName, countryNameKm, plans }: PlanSpecsProps) {
+  const { lang, t } = useLang();
   const allowanceLabel = useAllowanceLabel();
+  const localCountry = lang === 'km' && countryNameKm ? countryNameKm : countryName;
 
   if (plans.length === 0) return null;
 
@@ -77,7 +79,7 @@ export function PlanSpecs({ countrySlug, countryName, plans }: PlanSpecsProps) {
     rows.push({
       label: t('specs.carrier'),
       value: [...new Set(carriers)].join(', '),
-      note: t('specs.carrierNote', { country: countryName }),
+      note: t('specs.carrierNote', { country: localCountry }),
     });
   }
 

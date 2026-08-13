@@ -10,17 +10,33 @@ import { RichText, useLang, type DictKey } from '@/lib/i18n';
 
 interface CountryFacts {
   name: string;
+  nameKm: string;
   networks: string[];
   networkTech: string;
   networkQuality: string;
 }
 
-export function CountryHeading({ country, networks }: { country: string; networks: string[] }) {
+/** The country name as the visitor reads it. */
+function useCountryName(): (name: string, nameKm: string) => string {
+  const { lang } = useLang();
+  return (name, nameKm) => (lang === 'km' && nameKm ? nameKm : name);
+}
+
+export function CountryHeading({
+  country,
+  countryKm,
+  networks,
+}: {
+  country: string;
+  countryKm: string;
+  networks: string[];
+}) {
   const { t } = useLang();
+  const localName = useCountryName()(country, countryKm);
   return (
     <div>
       <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">
-        {t('country.title', { country })}
+        {t('country.title', { country: localName })}
       </h1>
       <p className="mt-1.5 flex items-center gap-2 text-sm text-white/70">
         <Signal size={15} aria-hidden="true" />
@@ -67,8 +83,15 @@ const androidSteps = [
   'country.install.android5',
 ] as const satisfies ReadonlyArray<DictKey>;
 
-export function InstallGuide({ country }: { country: string }) {
+export function InstallGuide({ country, countryKm }: { country: string; countryKm: string }) {
   const { t } = useLang();
+  const localName = useCountryName()(country, countryKm);
+  // Step 3 tells the traveller what to name the plan in their phone settings.
+  // That menu is in English on the handset, so the label stays English even in
+  // Khmer — a Khmer label there would not match what they see on screen.
+  const vars = (key: DictKey) => ({
+    country: key === 'country.install.iphone3' || key === 'country.install.android3' ? country : localName,
+  });
   return (
     <>
       <h2 className="mb-6 font-display text-2xl font-bold text-white">{t('country.installTitle')}</h2>
@@ -77,7 +100,7 @@ export function InstallGuide({ country }: { country: string }) {
           <ol className="list-inside list-decimal space-y-2">
             {iphoneSteps.map((key) => (
               <li key={key}>
-                <RichText text={t(key, { country })} />
+                <RichText text={t(key, vars(key))} />
               </li>
             ))}
           </ol>
@@ -86,7 +109,7 @@ export function InstallGuide({ country }: { country: string }) {
           <ol className="list-inside list-decimal space-y-2">
             {androidSteps.map((key) => (
               <li key={key}>
-                <RichText text={t(key, { country })} />
+                <RichText text={t(key, vars(key))} />
               </li>
             ))}
           </ol>
@@ -98,9 +121,10 @@ export function InstallGuide({ country }: { country: string }) {
 
 export function CountryFaq({ dest }: { dest: CountryFacts }) {
   const { t } = useLang();
+  const localName = useCountryName()(dest.name, dest.nameKm);
   // q3/a3 want the networks joined with "or" rather than the "&" the hero uses.
   const vars = {
-    country: dest.name,
+    country: localName,
     networks: dest.networks.join(' / '),
     tech: dest.networkTech,
   };
@@ -116,7 +140,7 @@ export function CountryFaq({ dest }: { dest: CountryFacts }) {
   return (
     <>
       <h2 className="mb-6 font-display text-2xl font-bold text-white">
-        {t('country.faqTitle', { country: dest.name })}
+        {t('country.faqTitle', { country: localName })}
       </h2>
       <Accordion dark>
         {faqs.map(([q, a]) => (

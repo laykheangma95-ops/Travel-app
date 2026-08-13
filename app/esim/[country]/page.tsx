@@ -53,7 +53,7 @@ export default function CountryPlansPage({ params }: PageProps) {
             <div>
               <div className="flex items-center gap-4">
                 <WavyFlag flag={dest.flag} label={`${dest.name} flag`} size={92} />
-                <CountryHeading country={dest.name} networks={dest.networks} />
+                <CountryHeading country={dest.name} countryKm={dest.nameKm} networks={dest.networks} />
               </div>
             </div>
             {/* Coverage map placeholder */}
@@ -72,7 +72,12 @@ export default function CountryPlansPage({ params }: PageProps) {
 
         {/* Everything a customer needs to know before paying — sourced facts
             only, and the support promise that covers the rest. */}
-        <PlanSpecs countrySlug={dest.slug} countryName={dest.name} plans={plans} />
+        <PlanSpecs
+          countrySlug={dest.slug}
+          countryName={dest.name}
+          countryNameKm={dest.nameKm}
+          plans={plans}
+        />
 
         <PlanTrustPanel />
 
@@ -99,7 +104,7 @@ export default function CountryPlansPage({ params }: PageProps) {
 
         {/* Installation guide */}
         <div className="mt-14" id="install">
-          <InstallGuide country={dest.name} />
+          <InstallGuide country={dest.name} countryKm={dest.nameKm} />
         </div>
 
         {/* FAQ */}
