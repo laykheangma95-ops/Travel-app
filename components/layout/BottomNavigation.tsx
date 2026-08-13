@@ -1,0 +1,160 @@
+'use client';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom navigation — the primary way around Domner on a phone.
+//
+// FIVE DESTINATIONS. Not seven, not ten. Each one is a phase of a journey
+// rather than a feature of the product:
+//
+//   HOME     where you are in your journey right now
+//   EXPLORE  where you might go
+//   TRIPS    what you are planning
+//   FLIGHT   what is happening today
+//   YOU      everything that is yours
+//
+// Two rules it enforces, both from the brief:
+//
+//   1. NO SIGN-IN GATE. A guest sees the same five tabs and can use four of
+//      them fully. Authentication happens when a feature needs to persist
+//      something, not to draw the navigation (§3, §26).
+//   2. IT GETS OUT OF THE WAY. During checkout, payment, authentication, the
+//      admin panel and the full-screen hero, the bar hides — those are focused
+//      flows where a tab bar is an invitation to abandon a purchase.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Compass, Home, Map, Plane, User } from 'lucide-react';
+import { useLang } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
+
+interface Tab {
+  href: string;
+  /** Extra prefixes that should also light this tab up. */
+  matches?: string[];
+  icon: typeof Home;
+  label: { en: string; km: string };
+}
+
+const TABS: Tab[] = [
+  { href: '/', icon: Home, label: { en: 'Home', km: 'ដំបូង' } },
+  {
+    href: '/explore',
+    matches: ['/destination', '/airport-guide'],
+    icon: Compass,
+    label: { en: 'Explore', km: 'ស្វែងរក' },
+  },
+  {
+    href: '/trips',
+    matches: ['/my-trips', '/checklist'],
+    icon: Map,
+    label: { en: 'Trips', km: 'ដំណើរ' },
+  },
+  {
+    href: '/flights',
+    matches: ['/airport-board', '/arrival', '/track'],
+    icon: Plane,
+    label: { en: 'Flight', km: 'ជើងហោះហើរ' },
+  },
+  {
+    href: '/you',
+    matches: ['/my-esims', '/settings', '/dashboard', '/updates'],
+    icon: User,
+    label: { en: 'You', km: 'អ្នក' },
+  },
+];
+
+/**
+ * Focused flows. A prefix match is enough — /esim/checkout hides the bar, and so
+ * does anything under it.
+ *
+ * Note /esim itself is NOT here: the store is browsing, and browsing keeps its
+ * navigation. Only the checkout inside it is focused.
+ */
+const HIDDEN_ON = [
+  '/esim/checkout',
+  '/cart',
+  '/order-confirmation',
+  '/sign-in',
+  '/sign-up',
+  '/forgot-password',
+  '/reset-password',
+  '/auth/callback',
+  '/admin',
+  '/apsara-hero',
+];
+
+export function BottomNavigation() {
+  const pathname = usePathname() ?? '/';
+  const { lang } = useLang();
+  const [unread, setUnread] = useState(0);
+
+  const hidden = HIDDEN_ON.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
+  // The unread count is the one number worth carrying in the chrome. Fetched
+  // once per mount, not polled: a badge that updates every ten seconds costs
+  // battery on a phone that is already someone's only connection abroad.
+  useEffect(() => {
+    if (hidden) return;
+    let cancelled = false;
+    fetch('/api/notifications/inbox', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { unread?: number } | null) => {
+        if (!cancelled && typeof body?.unread === 'number') setUnread(body.unread);
+      })
+      // Signed out, offline, or unconfigured — all mean "no badge", which is
+      // the correct rendering and not worth reporting.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [hidden, pathname]);
+
+  if (hidden) return null;
+
+  return (
+    <nav
+      className="tabbar lg:hidden"
+      aria-label={lang === 'km' ? 'ការនាំផ្លូវសំខាន់' : 'Primary'}
+    >
+      <ul className="flex">
+        {TABS.map((tab) => {
+          const active =
+            tab.href === '/'
+              ? pathname === '/'
+              : pathname === tab.href ||
+                pathname.startsWith(`${tab.href}/`) ||
+                (tab.matches ?? []).some(
+                  (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+                );
+
+          const showBadge = tab.href === '/you' && unread > 0;
+
+          return (
+            <li key={tab.href} className="flex flex-1">
+              <Link
+                href={tab.href}
+                className={cn('tabbar-item')}
+                aria-current={active ? 'page' : undefined}
+              >
+                <tab.icon size={20} strokeWidth={active ? 2.4 : 1.9} aria-hidden="true" />
+                <span>{tab.label[lang]}</span>
+                {showBadge && (
+                  <span className="tabbar-badge" aria-hidden="true">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
+                {showBadge && (
+                  <span className="sr-only">
+                    {lang === 'km' ? `${unread} ព័ត៌មានថ្មី` : `${unread} unread updates`}
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}

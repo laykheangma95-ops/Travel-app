@@ -1144,3 +1144,341 @@
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRAVEL OS — capsules, tab bar, travel deck
+   ───────────────────────────────────────────────────────────────────────────
+   The glanceable layer of Domner: compact surfaces that carry one live fact
+   each (gate, data left, weather, check-in) and expand into the detail.
+
+   Every value here comes from the existing token set — Temple Night navy,
+   Angkor Gold, the status trio — and every recipe is a variation on
+   .night-card rather than a fourth glass tier. The gold budget still holds:
+   gold appears on ONE capsule per viewport, the urgent one.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dynamic Travel Capsule ──────────────────────────────────────────────── */
+
+.capsule {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 22px;
+  padding: 0.875rem 1rem;
+  color: #fff;
+  background:
+    linear-gradient(165deg, rgba(36, 64, 107, 0.46) 0%, rgba(20, 38, 63, 0.6) 55%, rgba(11, 22, 46, 0.68) 100%);
+  border: 1px solid rgba(230, 203, 139, 0.14);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 14px 40px rgba(2, 8, 23, 0.42);
+  /* The signature ease from the motion language (§4) — reveals and position
+     changes share one curve across the whole app. */
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    background 0.35s ease;
+}
+
+/* Tappable capsules lift; a capsule that only reports (weather) does not, so
+   the movement stays a signal that something will happen. */
+a.capsule:hover,
+button.capsule:hover {
+  transform: translateY(-3px);
+  border-color: rgba(230, 203, 139, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 20px 52px rgba(2, 8, 23, 0.55);
+}
+
+a.capsule:active,
+button.capsule:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+.capsule:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #0e1b30,
+    0 0 0 4px rgba(230, 203, 139, 0.9),
+    0 14px 40px rgba(2, 8, 23, 0.42);
+}
+
+/* The eyebrow row: label on the left, live meta on the right. */
+.capsule-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.capsule-headline {
+  margin-top: 0.35rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.capsule-detail {
+  margin-top: 0.15rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+/* ── Capsule tones ───────────────────────────────────────────────────────────
+   State is carried by a hairline left rail and the eyebrow colour, never by a
+   flooded background: a capsule that turns solid red stops being glass and
+   starts being an alert box, and four of them at once is a dashboard. */
+
+.capsule-rail::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14%;
+  bottom: 14%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: currentColor;
+}
+
+.capsule-urgent {
+  color: #f7eac0;
+  border-color: rgba(230, 203, 139, 0.5);
+  background:
+    linear-gradient(165deg, rgba(198, 151, 73, 0.24) 0%, rgba(20, 38, 63, 0.62) 45%, rgba(11, 22, 46, 0.7) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 16px 46px rgba(2, 8, 23, 0.5),
+    0 0 0 1px rgba(198, 151, 73, 0.2);
+}
+
+.capsule-warning { color: #fcd34d; }
+.capsule-success { color: #6ee7b7; }
+.capsule-info    { color: #8fd8ff; }
+.capsule-quiet   { color: rgba(255, 255, 255, 0.55); }
+
+/* Loading: a calm sweep, not a spinner. A capsule waiting for a gate number
+   should look like it is listening. */
+.capsule-loading .capsule-shimmer {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.09);
+  color: transparent;
+}
+
+.capsule-loading .capsule-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: translateX(-100%);
+  animation: capsule-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes capsule-sweep {
+  to { transform: translateX(100%); }
+}
+
+/* The live dot on an urgent capsule. One per viewport by construction —
+   only the most urgent capsule renders it. */
+.capsule-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.capsule-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  opacity: 0.6;
+  animation: capsule-ping 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes capsule-ping {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  70%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Expanded body. Height is animated by grid-template-rows so the content is
+   never measured in JavaScript and never causes layout thrash. */
+.capsule-expandable {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.capsule-expandable[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.capsule-expandable > * {
+  overflow: hidden;
+}
+
+/* ── Metering bar (eSIM data, trip readiness) ────────────────────────────── */
+
+.capsule-meter {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.capsule-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: currentColor;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Bottom tab bar ──────────────────────────────────────────────────────────
+   The persistent primary navigation on mobile. Five destinations, no more.
+   Sits on the night sky, so it is glass over navy rather than a white bar. */
+
+.tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 45;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(9, 17, 38, 0.82);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.tabbar-item {
+  position: relative;
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  /* 44px minimum touch target (§6), before the safe-area padding. */
+  min-height: 3.25rem;
+  padding: 0.5rem 0.25rem 0.55rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tabbar-item:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tabbar-item[aria-current='page'] {
+  color: #f7eac0;
+}
+
+/* The active marker is a single gold bead above the icon — the one gold moment
+   the tab bar spends. */
+.tabbar-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 18px;
+  height: 2px;
+  margin-left: -9px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, transparent, #e6cb8b, transparent);
+}
+
+.tabbar-item:focus-visible {
+  outline: none;
+  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(230, 203, 139, 0.85);
+  border-radius: 12px;
+}
+
+.tabbar-badge {
+  position: absolute;
+  top: 0.35rem;
+  left: 50%;
+  margin-left: 0.35rem;
+  min-width: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  background: #c69749;
+  color: #0e1b30;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  line-height: 1rem;
+  text-align: center;
+  /* Appears rather than pops in — §22 asks for the badge to arrive naturally. */
+  animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Pages leave room for the bar instead of the bar covering their last row. */
+.has-tabbar {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .has-tabbar { padding-bottom: 0; }
+}
+
+/* ── Travel deck (the personalised band at the top of Home) ──────────────── */
+
+.travel-deck {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Capsules arrive in sequence, most urgent first. Staggered by index from the
+   component, capped so a long deck never becomes a slow reveal. */
+.deck-item {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--deck-index, 0) * 70ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capsule,
+  .capsule-expandable,
+  .capsule-meter > span,
+  .tabbar-item {
+    transition: none;
+  }
+
+  .capsule-loading .capsule-shimmer::after,
+  .capsule-live-dot::after,
+  .tabbar-badge,
+  .deck-item {
+    animation: none;
+  }
+
+  /* Reduced motion still needs the expanded body to open — it just opens
+     instantly instead of sliding. */
+  .capsule-expandable[data-open='true'] {
+    grid-template-rows: 1fr;
+  }
+
+  a.capsule:hover,
+  button.capsule:hover,
+  a.capsule:active,
+  button.capsule:active {
+    transform: none;
+  }
+}

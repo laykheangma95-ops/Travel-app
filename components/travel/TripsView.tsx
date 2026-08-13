@@ -1,0 +1,203 @@
+'use client';
+
+// TRIPS — the traveler's own journeys, grouped by where they are in time.
+//
+// Real rows from trip_plans via /api/travel/state. The previous /my-trips screen
+// rendered two hardcoded trips ("Bangkok Weekend", "Japan Cherry Blossom") that
+// every visitor saw identically, which is the same class of bug the eSIM list
+// already had fixed: a demo that reads as data loss.
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Compass, Map, Plus } from 'lucide-react';
+import type { TripSummary } from '@/lib/travel/state';
+import { TripCard } from './TripCard';
+import { useLang } from '@/lib/i18n';
+
+export function TripsView() {
+  const { lang } = useLang();
+  const [state, setState] = useState<'loading' | 'guest' | 'ready'>('loading');
+  const [trips, setTrips] = useState<TripSummary[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/travel/trips', { credentials: 'include' })
+      .then(async (res) => {
+        if (res.status === 401) {
+          if (!cancelled) setState('guest');
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
+      .then((body: { trips?: TripSummary[]; activeTripId?: string | null } | null) => {
+        if (cancelled || !body) return;
+        setTrips(body.trips ?? []);
+        setActiveId(body.activeTripId ?? null);
+        setState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setState('ready');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { now, upcoming, past } = useMemo(() => {
+    const nowList: TripSummary[] = [];
+    const upcomingList: TripSummary[] = [];
+    const pastList: TripSummary[] = [];
+
+    for (const trip of trips) {
+      const end = trip.endDate ?? trip.startDate;
+      if (!trip.startDate) {
+        // Undated trips are wishes, and a wish is still ahead of you.
+        upcomingList.push(trip);
+      } else if (end && end < today) {
+        pastList.push(trip);
+      } else if (trip.startDate <= today) {
+        nowList.push(trip);
+      } else {
+        upcomingList.push(trip);
+      }
+    }
+
+    upcomingList.sort((a, b) => (a.startDate ?? '9999').localeCompare(b.startDate ?? '9999'));
+    pastList.sort((a, b) => (b.endDate ?? b.startDate ?? '').localeCompare(a.endDate ?? a.startDate ?? ''));
+
+    return { now: nowList, upcoming: upcomingList, past: pastList };
+  }, [trips, today]);
+
+  return (
+    <div className="night-canvas has-tabbar relative min-h-screen">
+      <div className="night-stars" aria-hidden="true" />
+
+      <div className="relative mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+        <header className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-light">
+              {lang === 'km' ? 'ដំណើរ' : 'Trips'}
+            </p>
+            <h1 className="mt-1.5 font-display text-3xl text-white sm:text-4xl">
+              {lang === 'km' ? 'ដំណើររបស់អ្នក' : 'Your journeys'}
+            </h1>
+          </div>
+          <Link
+            href="/checklist"
+            className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] shrink-0 items-center gap-1.5 rounded-btn px-4 text-sm font-semibold text-primary-deep"
+          >
+            <Plus size={15} aria-hidden="true" />
+            {lang === 'km' ? 'ដំណើរថ្មី' : 'New trip'}
+          </Link>
+        </header>
+
+        {state === 'guest' ? (
+          <div className="night-card mt-8 p-8 text-center">
+            <Compass size={22} className="mx-auto text-gold-light" aria-hidden="true" />
+            <h2 className="mt-3 font-display text-xl text-white">
+              {lang === 'km' ? 'ចូលគណនីដើម្បីរក្សាទុកដំណើរ' : 'Sign in to save your trips'}
+            </h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/65">
+              {lang === 'km'
+                ? 'អ្នកអាចរកមើលគោលដៅដោយមិនចាំបាច់មានគណនី។ គណនីត្រូវការតែពេលរក្សាទុក។'
+                : 'You can explore without an account. One is only needed to keep a trip and sync it between devices.'}
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link
+                href="/sign-in?returnTo=/trips"
+                className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+              >
+                {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
+              </Link>
+              <Link
+                href="/explore"
+                className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40"
+              >
+                {lang === 'km' ? 'ស្វែងរកគោលដៅ' : 'Explore destinations'}
+              </Link>
+            </div>
+          </div>
+        ) : state === 'loading' ? (
+          <div className="mt-8 space-y-3" aria-busy="true">
+            {[0, 1].map((key) => (
+              <div key={key} className="h-48 animate-pulse rounded-card border border-white/8 bg-white/[0.03]" />
+            ))}
+          </div>
+        ) : trips.length === 0 ? (
+          <div className="night-card mt-8 p-8 text-center">
+            <Map size={22} className="mx-auto text-white/45" aria-hidden="true" />
+            <h2 className="mt-3 font-display text-xl text-white">
+              {lang === 'km' ? 'មិនមានដំណើរនៅឡើយទេ' : 'No trips yet'}
+            </h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/65">
+              {lang === 'km'
+                ? 'ចាប់ផ្តើមពីគោលដៅមួយ ហើយ Domner នឹងតាមដានផ្នែកដែលនៅសល់។'
+                : "Start with a destination and Domner keeps track of the rest — flight, stay, eSIM and the days in between."}
+            </p>
+            <Link
+              href="/explore"
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+            >
+              {lang === 'km' ? 'ស្វែងរកគោលដៅ' : 'Explore destinations'}
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-9">
+            <TripSection
+              title={lang === 'km' ? 'កំពុងធ្វើដំណើរ' : 'Right now'}
+              trips={now}
+              phase="now"
+              activeId={activeId}
+            />
+            <TripSection
+              title={lang === 'km' ? 'ខាងមុខ' : 'Upcoming'}
+              trips={upcoming}
+              phase="upcoming"
+              activeId={activeId}
+            />
+            <TripSection
+              title={lang === 'km' ? 'បានបញ្ចប់' : 'Past'}
+              trips={past}
+              phase="past"
+              activeId={activeId}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TripSection({
+  title,
+  trips,
+  phase,
+  activeId,
+}: {
+  title: string;
+  trips: TripSummary[];
+  phase: 'now' | 'upcoming' | 'past';
+  activeId: string | null;
+}) {
+  if (trips.length === 0) return null;
+  return (
+    <section aria-labelledby={`trips-${phase}`}>
+      <h2 id={`trips-${phase}`} className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+        {title}
+      </h2>
+      <div className="mt-3 space-y-3">
+        {trips.map((trip, index) => (
+          <TripCard
+            key={trip.id}
+            trip={trip}
+            phase={trip.id === activeId && phase === 'upcoming' ? 'upcoming' : phase}
+            index={index}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
