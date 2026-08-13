@@ -9,6 +9,7 @@
 import { notifyAdminNewOrder } from './telegramOps';
 import { sendEsimReadyEmail, sendOrderConfirmationEmail } from './resend';
 import { deliverEsim } from './esimDelivery';
+import { notify } from './notifications/engine';
 import { log } from './logger';
 import type { EsimOrder } from '@/types';
 
@@ -57,5 +58,29 @@ export async function announceEsimReady(order: EsimOrder): Promise<void> {
   // which renders the activation code as text.
   if (!outcome.email && order.customer_email && order.esim_activation_code) {
     await fanOut(order, [['email-fallback', sendEsimReadyEmail(order)]]);
+  }
+
+  // Also record it in the traveler's Domner Inbox, and push it if they asked for
+  // eSIM alerts. Deliberately *after* delivery and outside `deliverEsim`: the
+  // email and Telegram channels are the locked contract (docs/LOCKED.md
+  // invariant 3) and nothing here may affect whether they ran. This is an
+  // additional surface, not a replacement — and a guest checkout has no
+  // user_id, so there is no inbox to write to.
+  if (order.user_id) {
+    try {
+      await notify({
+        userId: order.user_id,
+        kind: 'esim.ready',
+        title: `Your ${order.country} eSIM is ready`,
+        body: `${order.plan_name} · ${order.duration_days} days. Tap to open your QR code.`,
+        target: { orderNumber: order.order_number },
+        // One card per order, however many times fulfilment is retried.
+        dedupeKey: `esim.ready:${order.order_number}`,
+      });
+    } catch (error) {
+      // Same rule as every other channel here: an order that is already paid
+      // and delivered must never fail because of a notification.
+      log.warn('order.inbox_failed', { orderNumber: order.order_number, error });
+    }
   }
 }
