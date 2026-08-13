@@ -13,8 +13,10 @@ import { FlightDashboard } from '@/components/flights/FlightDashboard';
 import { DomerLogo } from '@/components/brand/DomerMark';
 import { FlightCardSkeleton } from '@/components/ui/Skeleton';
 import { todayIso } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 export default function PublicTrackPage() {
+  const { t } = useLang();
   const params = useParams<{ token: string }>();
 
   const { flightNumber, date } = useMemo(() => {
@@ -46,7 +48,7 @@ export default function PublicTrackPage() {
           <span className="inline-flex justify-center">
             <DomerLogo surface="navy" />
           </span>
-          <p className="mt-1 text-sm text-white/60">Live flight tracking · ការតាមដានជើងហោះហើរផ្ទាល់</p>
+          <p className="mt-1 text-sm text-white/60">{t('track.tagline')}</p>
         </div>
 
         {loading && !flight ? (
@@ -59,7 +61,7 @@ export default function PublicTrackPage() {
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="glass-panel rounded-card p-5 text-center">
                 <p className="text-xs uppercase tracking-widest text-white/50">
-                  Time in {flight.departure.city}
+                  {t('track.timeIn', { city: flight.departure.city })}
                 </p>
                 <p className="mt-2 font-mono text-2xl font-bold text-white">
                   {localTime(flight.departure.timezone)}
@@ -67,7 +69,7 @@ export default function PublicTrackPage() {
               </div>
               <div className="glass-panel rounded-card p-5 text-center">
                 <p className="text-xs uppercase tracking-widest text-white/50">
-                  Time in {flight.arrival.city}
+                  {t('track.timeIn', { city: flight.arrival.city })}
                 </p>
                 <p className="mt-2 font-mono text-2xl font-bold text-white">
                   {localTime(flight.arrival.timezone)}
@@ -77,12 +79,12 @@ export default function PublicTrackPage() {
 
             <p className="mt-6 flex items-center justify-center gap-1.5 text-sm text-white/60">
               <Users size={14} aria-hidden="true" />
-              {flight.trackerCount ?? 1} people are tracking this flight
+              {t('track.trackerCount', { count: flight.trackerCount ?? 1 })}
             </p>
           </>
         ) : (
           <div className="glass-panel rounded-card p-10 text-center text-white/70">
-            This tracking link has expired or the flight was not found.
+            {t('track.expired')}
           </div>
         )}
       </div>
@@ -91,14 +93,14 @@ export default function PublicTrackPage() {
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-primary/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <p className="text-sm font-semibold text-white">Get Domner</p>
-            <p className="text-xs text-white/60">eSIM + flight alerts + airport guide, in Khmer</p>
+            <p className="text-sm font-semibold text-white">{t('track.getDomner')}</p>
+            <p className="text-xs text-white/60">{t('track.getDomnerSub')}</p>
           </div>
           <Link
             href="/"
             className="liquid-glass-accent liquid-sheen inline-flex shrink-0 items-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
-            <Download size={15} /> Open Domner
+            <Download size={15} /> {t('track.open')}
           </Link>
         </div>
       </div>

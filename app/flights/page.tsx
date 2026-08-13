@@ -6,8 +6,10 @@ import { Plane, Search } from 'lucide-react';
 import { getRecentSearches, saveRecentSearch } from '@/hooks/useFlightTracking';
 import type { FlightSuggestion } from '@/lib/aeroDataBox';
 import { todayIso } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 export default function FlightTrackerPage() {
+  const { t } = useLang();
   const router = useRouter();
   const [flightNumber, setFlightNumber] = useState('');
   const [date, setDate] = useState(todayIso());
@@ -59,13 +61,11 @@ export default function FlightTrackerPage() {
             className="mx-auto mb-8 h-16 w-16 animate-orb-pulse rounded-full bg-[radial-gradient(circle_at_32%_28%,#DBEAFE_0%,#60A5FA_38%,#1D4ED8_75%,#0F2A6B_100%)]"
             aria-hidden="true"
           />
-          <p className="text-sm font-semibold uppercase tracking-widest text-accent">Flight Guardian</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-accent">{t('flights.eyebrow')}</p>
           <h1 className="mt-3 font-display text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
-            Track any flight, live.
+            {t('flights.title')}
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-white/70">
-            Gate changes, delays, boarding calls — Domner tells you before the airport screens do.
-          </p>
+          <p className="mx-auto mt-4 max-w-xl text-white/70">{t('flights.sub')}</p>
         </div>
 
         {/* Search card */}
@@ -84,8 +84,8 @@ export default function FlightTrackerPage() {
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               onKeyDown={(e) => e.key === 'Escape' && setShowSuggestions(false)}
-              placeholder="Flight Number e.g. QH215 or TG…"
-              aria-label="Flight number"
+              placeholder={t('flights.numberPlaceholder')}
+              aria-label={t('flights.numberLabel')}
               aria-expanded={showSuggestions}
               aria-controls="flight-suggestions"
               role="combobox"
@@ -97,7 +97,7 @@ export default function FlightTrackerPage() {
               <ul
                 id="flight-suggestions"
                 role="listbox"
-                aria-label="Matching flights"
+                aria-label={t('flights.matching')}
                 className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-card border border-white/15 bg-[#1C3355]/95 shadow-card-hover backdrop-blur-xl animate-fade-up"
               >
                 {suggestions.map((s) => (
@@ -130,21 +130,21 @@ export default function FlightTrackerPage() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            aria-label="Flight date"
+            aria-label={t('flights.dateLabel')}
             className="rounded-btn border border-white/20 bg-white/10 px-4 py-3.5 text-sm text-white backdrop-blur focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 [color-scheme:dark]"
           />
           <button
             type="submit"
             className="liquid-glass-accent liquid-sheen inline-flex items-center justify-center gap-2 rounded-btn px-6 py-3.5 text-sm font-semibold text-white transition-all duration-200 ease-smooth hover:brightness-110 active:scale-[0.98]"
           >
-            <Search size={16} /> Track Flight →
+            <Search size={16} /> {t('flights.track')}
           </button>
         </form>
 
         {/* Recent searches */}
         {recent.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <span className="text-xs text-white/50">Recent:</span>
+            <span className="text-xs text-white/50">{t('flights.recent')}</span>
             {recent.map((r) => (
               <button
                 key={r}
@@ -160,7 +160,7 @@ export default function FlightTrackerPage() {
 
         {/* Popular flights hint */}
         <div className="mt-14 text-center">
-          <p className="text-xs uppercase tracking-widest text-white/40">Popular routes from Cambodia</p>
+          <p className="text-xs uppercase tracking-widest text-white/40">{t('flights.popular')}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {['QH215', 'K6720', 'PG934', 'VN841', 'SQ157'].map((f) => (
               <button

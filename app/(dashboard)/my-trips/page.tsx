@@ -1,9 +1,14 @@
+// Client-side so the copy follows the language toggle. Demo constants only —
+// nothing here was reading from the server.
+'use client';
+
 import Link from 'next/link';
 import { Map, Calendar, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { WavyFlag } from '@/components/ui/WavyFlag';
+import { useLang } from '@/lib/i18n';
 
 // Demo trips — served from trip_plans in Supabase once connected.
 const trips = [
@@ -32,27 +37,29 @@ const trips = [
 ];
 
 export default function MyTripsPage() {
+  const { t } = useLang();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">My Trips</h1>
-          <p className="mt-1.5 text-sm text-ink-secondary">Plan, prepare, and remember every journey.</p>
+          <h1 className="font-display text-2xl font-bold text-ink sm:text-3xl">{t('trips.title')}</h1>
+          <p className="mt-1.5 text-sm text-ink-secondary">{t('trips.sub')}</p>
         </div>
         <Link
           href="/checklist"
           className="rounded-btn bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:brightness-110"
         >
-          + New Trip
+          {t('trips.new')}
         </Link>
       </div>
 
       {trips.length === 0 ? (
         <EmptyState
           icon={Map}
-          title="No trips yet"
-          description="Start planning your next adventure with the Am I Ready? checklist."
-          ctaLabel="Plan a trip"
+          title={t('trips.empty.title')}
+          description={t('trips.empty.desc')}
+          ctaLabel={t('trips.empty.cta')}
           ctaHref="/checklist"
         />
       ) : (
@@ -66,7 +73,7 @@ export default function MyTripsPage() {
                 <div className="flex items-start justify-between">
                   <h2 className="font-display font-bold text-ink">{trip.title}</h2>
                   <Badge tone={trip.status === 'upcoming' ? 'accent' : 'neutral'}>
-                    {trip.status === 'upcoming' ? 'Upcoming' : 'Completed'}
+                    {t(trip.status === 'upcoming' ? 'trips.upcoming' : 'trips.completed')}
                   </Badge>
                 </div>
                 <div className="mt-3 space-y-1.5 text-sm text-ink-secondary">
@@ -74,19 +81,24 @@ export default function MyTripsPage() {
                     <Calendar size={14} aria-hidden="true" /> {trip.dates}
                   </p>
                   <p className="flex items-center gap-2">
-                    <Users size={14} aria-hidden="true" /> {trip.travelers}{' '}
-                    {trip.travelers === 1 ? 'traveler' : 'travelers'}
+                    <Users size={14} aria-hidden="true" />{' '}
+                    {t(trip.travelers === 1 ? 'trips.traveler' : 'trips.travelers', {
+                      count: trip.travelers,
+                    })}
                   </p>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
                   <p className="text-xs text-ink-muted">
-                    Checklist: {trip.checklistDone}/{trip.checklistTotal} done
+                    {t('trips.checklist', {
+                      done: trip.checklistDone,
+                      total: trip.checklistTotal,
+                    })}
                   </p>
                   <Link
                     href={`/trips/${trip.id}/memories`}
                     className="text-sm font-semibold text-secondary transition-colors hover:text-accent"
                   >
-                    Memories →
+                    {t('trips.memories')}
                   </Link>
                 </div>
               </div>

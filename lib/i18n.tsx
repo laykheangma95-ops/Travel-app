@@ -500,6 +500,42 @@ const dicts = {
     'guide.phrases': 'Useful phrases',
     'guide.watchOut': 'Watch out for',
     'guide.nextStep': 'Done — next step →',
+
+    // ── Flight tracker (/flights) ──
+    'flights.eyebrow': 'Flight Guardian',
+    'flights.title': 'Track any flight, live.',
+    'flights.sub':
+      'Gate changes, delays, boarding calls — Domner tells you before the airport screens do.',
+    'flights.numberPlaceholder': 'Flight Number e.g. QH215 or TG…',
+    'flights.numberLabel': 'Flight number',
+    'flights.matching': 'Matching flights',
+    'flights.dateLabel': 'Flight date',
+    'flights.track': 'Track Flight →',
+    'flights.recent': 'Recent:',
+    'flights.popular': 'Popular routes from Cambodia',
+
+    // ── Public share tracking (/track/[token]) ──
+    'track.tagline': 'Live flight tracking',
+    'track.timeIn': 'Time in {city}',
+    'track.trackerCount': '{count} people are tracking this flight',
+    'track.expired': 'This tracking link has expired or the flight was not found.',
+    'track.getDomner': 'Get Domner',
+    'track.getDomnerSub': 'eSIM + flight alerts + airport guide, in Khmer',
+    'track.open': 'Open Domner',
+
+    // ── My trips ──
+    'trips.title': 'My Trips',
+    'trips.sub': 'Plan, prepare, and remember every journey.',
+    'trips.new': '+ New Trip',
+    'trips.empty.title': 'No trips yet',
+    'trips.empty.desc': 'Start planning your next adventure with the Am I Ready? checklist.',
+    'trips.empty.cta': 'Plan a trip',
+    'trips.upcoming': 'Upcoming',
+    'trips.completed': 'Completed',
+    'trips.traveler': '{count} traveler',
+    'trips.travelers': '{count} travelers',
+    'trips.checklist': 'Checklist: {done}/{total} done',
+    'trips.memories': 'Memories →',
   },
   km: {
     // Brand
@@ -994,6 +1030,43 @@ const dicts = {
     'guide.phrases': 'ឃ្លាមានប្រយោជន៍',
     'guide.watchOut': 'ត្រូវប្រយ័ត្ន',
     'guide.nextStep': 'រួចហើយ — ជំហានបន្ទាប់ →',
+
+    // ── តាមដានជើងហោះហើរ (/flights) ──
+    'flights.eyebrow': 'អ្នកការពារជើងហោះហើរ',
+    'flights.title': 'តាមដានជើងហោះហើរណាមួយ ផ្ទាល់។',
+    'flights.sub':
+      'ការប្តូរច្រក ការពន្យារពេល ការហៅឡើងជិះ — Domner ប្រាប់អ្នកមុនអេក្រង់នៅអាកាសយានដ្ឋានទៅទៀត។',
+    'flights.numberPlaceholder': 'លេខជើងហោះហើរ ឧ. QH215 ឬ TG…',
+    'flights.numberLabel': 'លេខជើងហោះហើរ',
+    'flights.matching': 'ជើងហោះហើរដែលត្រូវគ្នា',
+    'flights.dateLabel': 'ថ្ងៃហោះហើរ',
+    'flights.track': 'តាមដានជើងហោះហើរ →',
+    'flights.recent': 'ស្វែងរកថ្មីៗ៖',
+    'flights.popular': 'ផ្លូវពេញនិយមពីកម្ពុជា',
+
+    // ── តំណតាមដានសាធារណៈ (/track/[token]) ──
+    'track.tagline': 'ការតាមដានជើងហោះហើរផ្ទាល់',
+    'track.timeIn': 'ម៉ោងនៅ {city}',
+    'track.trackerCount': 'មានមនុស្ស {count} នាក់កំពុងតាមដានជើងហោះហើរនេះ',
+    'track.expired': 'តំណតាមដាននេះផុតកំណត់ហើយ ឬរកមិនឃើញជើងហោះហើរនេះទេ។',
+    'track.getDomner': 'ទាញយក Domner',
+    'track.getDomnerSub': 'eSIM + ជូនដំណឹងជើងហោះហើរ + មគ្គុទ្ទេសក៍អាកាសយានដ្ឋាន ជាភាសាខ្មែរ',
+    'track.open': 'បើក Domner',
+
+    // ── ដំណើររបស់ខ្ញុំ ──
+    'trips.title': 'ដំណើររបស់ខ្ញុំ',
+    'trips.sub': 'រៀបចំផែនការ ត្រៀមខ្លួន និងរក្សាការចងចាំរាល់ដំណើរ។',
+    'trips.new': '+ ដំណើរថ្មី',
+    'trips.empty.title': 'មិនទាន់មានដំណើរទេ',
+    'trips.empty.desc': 'ចាប់ផ្តើមរៀបចំដំណើរបន្ទាប់របស់អ្នកជាមួយបញ្ជីត្រៀមធ្វើដំណើរ។',
+    'trips.empty.cta': 'រៀបចំដំណើរ',
+    'trips.upcoming': 'ជិតមកដល់',
+    'trips.completed': 'បានបញ្ចប់',
+    // Khmer has no plural inflection — one form covers both counts.
+    'trips.traveler': 'អ្នកដំណើរ {count} នាក់',
+    'trips.travelers': 'អ្នកដំណើរ {count} នាក់',
+    'trips.checklist': 'បញ្ជីត្រៀម៖ រួច {done}/{total}',
+    'trips.memories': 'ការចងចាំ →',
   },
 } as const;
 
