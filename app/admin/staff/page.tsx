@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Loader2, ShieldCheck, UserPlus } from 'lucide-react';
+import { Loader2, Mail, ShieldCheck, UserPlus } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -53,12 +53,22 @@ interface StaffMember {
   createdAt: string;
 }
 
+/** What the server did about the account behind the invitation. */
+interface InviteResult {
+  status: 'invited' | 'linked' | 'already_linked' | 'email_failed';
+  message: string;
+}
+
 export default function AdminStaffPage() {
   const { user, viaBootstrap } = useSession();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // An invitation whose email did not send is not an error — the person is on
+  // the team — but it is not a success either. It gets its own tone so it is
+  // not mistaken for "done".
+  const [warning, setWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
@@ -93,6 +103,7 @@ export default function AdminStaffPage() {
       setSaving('invite');
       setError(null);
       setNotice(null);
+      setWarning(null);
       try {
         const res = await fetch('/api/admin/staff', {
           method: 'POST',
@@ -100,12 +111,24 @@ export default function AdminStaffPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, fullName: fullName || undefined, role }),
         });
-        const payload = (await res.json()) as { error?: { message?: string } };
+        const payload = (await res.json()) as {
+          invite?: InviteResult;
+          error?: { message?: string };
+        };
         if (!res.ok) throw new Error(payload.error?.message ?? 'Could not add that person.');
 
-        setNotice(
-          `${email} added as ${ROLE_LABEL[role]}. They get access once they sign up with that email address.`
-        );
+        // The server says what actually happened to the account — invited,
+        // linked to one they already had, or saved with no mail sent. Repeating
+        // a hopeful sentence of our own here is how the old screen managed to
+        // report success for an address that could not sign in.
+        const line = `${email} added as ${ROLE_LABEL[role]}.`;
+        const detail = payload.invite?.message ?? '';
+        if (payload.invite?.status === 'email_failed') {
+          setWarning(`${line} ${detail}`.trim());
+        } else {
+          setNotice(`${line} ${detail}`.trim());
+        }
+
         setEmail('');
         setFullName('');
         await load();
@@ -118,11 +141,54 @@ export default function AdminStaffPage() {
     [email, fullName, role, load]
   );
 
+  /**
+   * Re-send the invitation, or attach an account that was never linked.
+   *
+   * The second case is the one that looks like nothing is wrong: they sign in
+   * successfully and the panel is empty, because authority is matched on the
+   * linked account and not on the email address.
+   */
+  const resendInvite = useCallback(
+    async (member: StaffMember) => {
+      setSaving(member.email);
+      setError(null);
+      setNotice(null);
+      setWarning(null);
+      try {
+        const res = await fetch('/api/admin/staff/invite', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: member.email }),
+        });
+        const payload = (await res.json()) as {
+          invite?: InviteResult;
+          error?: { message?: string };
+        };
+        if (!res.ok) {
+          throw new Error(payload.error?.message ?? 'Could not send that invitation.');
+        }
+
+        const message = payload.invite?.message ?? `Invitation sent to ${member.email}.`;
+        if (payload.invite?.status === 'email_failed') setWarning(message);
+        else setNotice(message);
+
+        await load();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Could not send that invitation.');
+      } finally {
+        setSaving(null);
+      }
+    },
+    [load]
+  );
+
   const update = useCallback(
     async (member: StaffMember, patch: { role?: Role; isActive?: boolean }) => {
       setSaving(member.email);
       setError(null);
       setNotice(null);
+      setWarning(null);
       try {
         const res = await fetch('/api/admin/staff', {
           method: 'PATCH',
@@ -153,8 +219,10 @@ export default function AdminStaffPage() {
           <div>
             <h2 className="font-display text-lg font-semibold text-ink">Staff &amp; access</h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              Add someone by the email address they will sign in with. They pick up their access
-              automatically the first time they sign up with it — there is no separate staff login.
+              Add someone by the email address they will sign in with. We email them an invitation
+              and they set their own password from the link — there is no separate staff login, and
+              nobody here ever needs to know their password. If they already have an account with
+              us, no email is sent: their access simply switches on.
             </p>
             {viaBootstrap && (
               <p className="mt-2 rounded-btn bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -239,17 +307,19 @@ export default function AdminStaffPage() {
         </form>
       </Card>
 
-      {(error || notice) && (
+      {(error || warning || notice) && (
         <div
           role="status"
           className={cn(
             'rounded-btn border px-4 py-3 text-sm',
             error
               ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : warning
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
           )}
         >
-          {error ?? notice}
+          {error ?? warning ?? notice}
         </div>
       )}
 
@@ -279,7 +349,14 @@ export default function AdminStaffPage() {
                   </p>
                   <p className="text-xs text-ink-secondary">{member.email}</p>
                   <p className="mt-1 flex flex-wrap gap-2 text-xs text-ink-secondary">
-                    {!member.hasSignedUp && <span>Invited — not signed up yet</span>}
+                    {/* `hasSignedUp` is really "is this row attached to an
+                        account". Until it is, this person cannot sign in — so
+                        the line says that rather than the softer "invited". */}
+                    {!member.hasSignedUp && (
+                      <span className="text-amber-700">
+                        No account yet — they cannot sign in until they accept the invitation
+                      </span>
+                    )}
                     {member.hasSignedUp && !member.mfaEnrolled && <span>No second factor</span>}
                   </p>
                 </div>
@@ -307,6 +384,24 @@ export default function AdminStaffPage() {
                       </option>
                     ))}
                   </select>
+
+                  {/* Offered for anyone still unattached, not just fresh
+                      invitations: every row created before invitations were
+                      sent at all is sitting in exactly this state. */}
+                  {!member.hasSignedUp && member.isActive && (
+                    <Button
+                      variant="secondary"
+                      disabled={saving === member.email}
+                      onClick={() => void resendInvite(member)}
+                    >
+                      {saving === member.email ? (
+                        <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <Mail size={16} aria-hidden="true" />
+                      )}
+                      Send invitation
+                    </Button>
+                  )}
 
                   <Button
                     variant="secondary"
