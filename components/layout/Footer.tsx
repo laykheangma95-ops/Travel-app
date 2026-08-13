@@ -11,6 +11,9 @@ const columns: { titleKey: DictKey; links: { labelKey: DictKey; href: string }[]
     titleKey: 'footer.esim',
     links: [
       { labelKey: 'footer.destinations', href: '/esim' },
+      // See the note in BottomNavigation.tsx: Explore no longer has a tab, so
+      // this link and the navbar's are what keep the guides reachable.
+      { labelKey: 'footer.explore', href: '/explore' },
       { labelKey: 'footer.how', href: '/#how-it-works' },
       { labelKey: 'footer.install', href: '/esim/vietnam#install' },
       { labelKey: 'footer.faq', href: '/esim/vietnam#faq' },

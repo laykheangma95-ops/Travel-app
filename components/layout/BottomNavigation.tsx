@@ -7,10 +7,31 @@
 // rather than a feature of the product:
 //
 //   HOME     where you are in your journey right now
-//   EXPLORE  where you might go
+//   ESIM     what you can buy
 //   TRIPS    what you are planning
 //   FLIGHT   what is happening today
 //   YOU      everything that is yours
+//
+// WHY THE STORE TOOK EXPLORE'S SLOT: the only thing Domner sells had no tab at
+// all. It was reachable from a Home capsule, the desktop navbar and the footer
+// — none of which is a persistent target on the phone, which is where the
+// customers are. A five-tab bar that omits the product is a bar with a hole in
+// it, and the sixth tab is not available: six targets do not fit a small screen
+// at a comfortable tap size, and Khmer labels are longer than English ones.
+//
+// The owner chose Explore as the tab to give way, and chose the product name
+// over a product-agnostic one. Both are recorded here because both have a
+// cost that will come due:
+//
+//   1. Explore is the editorial layer — written destination guides, entry
+//      requirements, real prices — and this bar was its ONLY persistent entry
+//      point. Removing the tab without re-homing it would have orphaned it, so
+//      the same change adds Explore to the navbar, the footer and the You
+//      directory. If those links go, Explore effectively goes with them.
+//   2. "eSIM" contradicts rule 1 (nothing hardcoded to eSIM — tours, hotels and
+//      flights are coming). When a second product type ships, this tab needs a
+//      rename to something product-agnostic, and returning customers will have
+//      to relearn it. That is a known, accepted debt, not an oversight.
 //
 // Two rules it enforces, both from the brief:
 //
@@ -25,7 +46,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Compass, Home, Map, Plane, User } from 'lucide-react';
+import { Home, Map, Plane, Smartphone, User } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -40,10 +61,14 @@ interface Tab {
 const TABS: Tab[] = [
   { href: '/', icon: Home, label: { en: 'Home', km: 'ដំបូង' } },
   {
-    href: '/explore',
-    matches: ['/destination', '/airport-guide'],
-    icon: Compass,
-    label: { en: 'Explore', km: 'ស្វែងរក' },
+    href: '/esim',
+    // No `matches` needed: the /esim prefix already covers the finder, the
+    // country pages and the plan pages. /my-esims deliberately stays on You —
+    // an eSIM you already own is yours, not something to buy. And /cart needs
+    // no entry here because it is in HIDDEN_ON below, where the bar does not
+    // render at all.
+    icon: Smartphone,
+    label: { en: 'eSIM', km: 'eSIM' },
   },
   {
     href: '/trips',

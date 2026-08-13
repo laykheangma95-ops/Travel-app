@@ -59,6 +59,12 @@ export const RATE_LIMITS = {
   session: { limit: 60, windowMs: 60_000 },
   /** The AI copilot: each call costs CPU and, on the paid tier, tokens. */
   chat: { limit: 20, windowMs: 60_000 },
+  /**
+   * "How much data have I got left?" — one live call to GoHub per request, so
+   * it is not free the way catalog reads are. Sized for a worried traveler
+   * pulling to refresh a few times, not for a polling loop.
+   */
+  esimUsage: { limit: 20, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

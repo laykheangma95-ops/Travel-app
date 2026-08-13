@@ -37,6 +37,10 @@ const navGroups: NavGroup[] = [
   {
     labelKey: 'nav.tools',
     items: [
+      // Explore gave up its bottom-nav tab to the store, and this bar plus the
+      // footer are now its persistent entry points. Do not remove without
+      // giving the editorial layer somewhere else to live.
+      { labelKey: 'nav.explore', href: '/explore' },
       { labelKey: 'nav.checklist', href: '/checklist' },
       { labelKey: 'nav.airportGuide', href: '/airport-guide' },
       { labelKey: 'nav.emergency', href: '/emergency' },

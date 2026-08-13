@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { DataUsageCard } from '@/components/esim/DataUsageCard';
 import { formatDate, formatUsd } from '@/lib/utils';
 import type { OrderStatus } from '@/types';
 
@@ -145,6 +146,12 @@ export default function MyEsimsPage() {
                 </div>
                 <Badge tone={statusTone[order.status]}>{statusLabel[order.status]}</Badge>
               </div>
+
+              {/* Live remaining data, but only once there is an eSIM to ask
+                  about. On a pending or paid order there is no ICCID yet, and
+                  a card that says "not activated" under an order that has not
+                  even been fulfilled is noise. */}
+              {order.status === 'fulfilled' && <DataUsageCard orderNumber={order.order_number} />}
 
               {order.status === 'paid' && (
                 <p className="mt-4 rounded-btn bg-surface-3 p-3 text-sm text-ink-secondary">
