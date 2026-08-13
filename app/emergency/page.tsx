@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Check, Stamp, Map, HeartPulse, Compass, WifiOff, Volume2, VolumeX } from 'lucide-react';
 import { phraseLanguages } from '@/data/emergencyPhrases';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 const categoryIcons: Record<string, typeof Stamp> = {
   immigration: Stamp,
@@ -27,6 +28,7 @@ const GOOGLE_TTS_LANG: Record<string, string> = {
 };
 
 export default function EmergencyPhrasesPage() {
+  const { lang: uiLang, t } = useLang();
   const [langCode, setLangCode] = useState('vi');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -140,21 +142,22 @@ export default function EmergencyPhrasesPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <div className="mb-10 text-center">
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent">Emergency Phrases</p>
+        <p className="text-sm font-semibold uppercase tracking-widest text-accent">{t('emerg.eyebrow')}</p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          Say it right, when it matters
+          {t('emerg.title')}
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-ink-secondary">
-          Tap <Volume2 size={14} className="inline text-accent" aria-hidden="true" /> to play the phrase out
-          loud for a local person, or copy it and show your phone.
+          {t('emerg.subBefore')}{' '}
+          <Volume2 size={14} className="inline text-accent" aria-hidden="true" />{' '}
+          {t('emerg.subAfter')}
         </p>
         <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-medium text-success">
-          <WifiOff size={13} aria-hidden="true" /> Phrases available without internet
+          <WifiOff size={13} aria-hidden="true" /> {t('emerg.offline')}
         </p>
       </div>
 
       {/* Language selector */}
-      <div className="mb-10 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Select destination language">
+      <div className="mb-10 flex flex-wrap justify-center gap-2" role="tablist" aria-label={t('emerg.selectLang')}>
         {phraseLanguages.map((l) => (
           <button
             key={l.code}
@@ -181,8 +184,7 @@ export default function EmergencyPhrasesPage() {
       {ttsUnavailable && (
         <p className="mb-8 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-ink">
           <VolumeX size={16} className="shrink-0 text-warning" aria-hidden="true" />
-          Voice playback needs an internet connection or a device voice for this language. The copy
-          button still works — show the phrase on your screen instead.
+          {t('emerg.ttsUnavailable')}
         </p>
       )}
 
@@ -196,13 +198,29 @@ export default function EmergencyPhrasesPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-card bg-[#F5EEDC]">
                   <Icon size={18} className="text-accent" aria-hidden="true" />
                 </span>
-                {cat.title} <span className="font-khmer text-sm font-normal text-ink-muted">{cat.titleKm}</span>
+                {/* Whichever language the visitor reads leads; the other stays
+                    underneath, because a phrasebook is more useful bilingual. */}
+                {uiLang === 'km' ? (
+                  <>
+                    <span className="font-khmer">{cat.titleKm}</span>{' '}
+                    <span className="text-sm font-normal text-ink-muted">{cat.title}</span>
+                  </>
+                ) : (
+                  <>
+                    {cat.title}{' '}
+                    <span className="font-khmer text-sm font-normal text-ink-muted">{cat.titleKm}</span>
+                  </>
+                )}
               </h2>
               <div className="space-y-2.5">
                 {cat.phrases.map((phrase, i) => {
                   const id = `${lang.code}-${cat.id}-${i}`;
                   const copied = copiedId === id;
                   const speaking = speakingId === id;
+                  // The phrase as the visitor reads it — used in both the card
+                  // and the button labels a screen reader announces.
+                  const own = uiLang === 'km' ? phrase.km : phrase.en;
+                  const other = uiLang === 'km' ? phrase.en : phrase.km;
                   return (
                     <div
                       key={id}
@@ -216,15 +234,23 @@ export default function EmergencyPhrasesPage() {
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-ink">“{phrase.en}”</p>
-                        <p className="font-khmer text-sm text-ink-secondary">{phrase.km}</p>
+                        <p className={cn('text-sm font-semibold text-ink', uiLang === 'km' && 'font-khmer')}>
+                          “{own}”
+                        </p>
+                        <p className={cn('text-sm text-ink-secondary', uiLang === 'en' && 'font-khmer')}>
+                          {other}
+                        </p>
                         <p className="mt-2 text-lg font-medium text-secondary">{phrase.translation}</p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                         <button
                           type="button"
                           onClick={() => speakPhrase(id, phrase.translation)}
-                          aria-label={speaking ? `Stop playing "${phrase.en}"` : `Play "${phrase.en}" out loud in ${lang.name}`}
+                          aria-label={
+                            speaking
+                              ? t('emerg.stop', { phrase: own })
+                              : t('emerg.play', { phrase: own, language: lang.name })
+                          }
                           aria-pressed={speaking}
                           className={cn(
                             'flex h-11 w-11 items-center justify-center rounded-btn text-white transition-all duration-200 active:scale-95',
@@ -236,7 +262,7 @@ export default function EmergencyPhrasesPage() {
                         <button
                           type="button"
                           onClick={() => copyPhrase(id, phrase.translation)}
-                          aria-label={`Copy "${phrase.en}" in ${lang.name}`}
+                          aria-label={t('emerg.copy', { phrase: own, language: lang.name })}
                           className={cn(
                             'flex h-11 w-11 items-center justify-center rounded-btn transition-all duration-200 active:scale-95',
                             copied
@@ -256,10 +282,7 @@ export default function EmergencyPhrasesPage() {
         })}
       </div>
 
-      <p className="mt-10 text-center text-xs text-ink-muted">
-        Voice playback uses your device&apos;s built-in speech voices when available, and Google
-        Translate audio otherwise. Phrases and copying always work offline.
-      </p>
+      <p className="mt-10 text-center text-xs text-ink-muted">{t('emerg.footnote')}</p>
     </div>
   );
 }

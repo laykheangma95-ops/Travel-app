@@ -5,9 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import { Search, AlertTriangle, MessageSquare, PlaneTakeoff, PlaneLanding, Map, ExternalLink } from 'lucide-react';
 import { airportGuides } from '@/data/airportGuides';
 import { cn } from '@/lib/utils';
+import { RichText, useLang } from '@/lib/i18n';
 import type { AirportGuide } from '@/types';
 
 function AirportGuideContent() {
+  const { lang, t } = useLang();
   const searchParams = useSearchParams();
   const initial = searchParams.get('airport');
   const [selected, setSelected] = useState<AirportGuide | null>(
@@ -30,16 +32,17 @@ function AirportGuideContent() {
 
   const steps = selected ? (mode === 'departure' ? selected.departureSteps : selected.arrivalSteps) : [];
 
+  // Khmer where it exists, English where it does not — a step must never come
+  // out blank just because its translation is still outstanding.
+  const km = (khmer: string | undefined, english: string): string =>
+    lang === 'km' && khmer ? khmer : english;
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
       <div className="mb-10 text-center">
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent">Airport Companion</p>
-        <h1 className="mt-3 font-display text-3xl font-bold text-ink sm:text-4xl">
-          Never feel lost at an airport again
-        </h1>
-        <p className="mx-auto mt-3 max-w-xl text-ink-secondary">
-          Step-by-step guidance for every stage — check-in, security, immigration, gate, boarding.
-        </p>
+        <p className="text-sm font-semibold uppercase tracking-widest text-accent">{t('guide.eyebrow')}</p>
+        <h1 className="mt-3 font-display text-3xl font-bold text-ink sm:text-4xl">{t('guide.title')}</h1>
+        <p className="mx-auto mt-3 max-w-xl text-ink-secondary">{t('guide.sub')}</p>
       </div>
 
       {/* Airport selection */}
@@ -49,8 +52,8 @@ function AirportGuideContent() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search airports (e.g. PNH, Bangkok)…"
-          aria-label="Search airports"
+          placeholder={t('guide.searchPlaceholder')}
+          aria-label={t('guide.searchLabel')}
           className="w-full rounded-btn border border-line bg-white py-3 pl-11 pr-4 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
         />
       </div>
@@ -96,7 +99,7 @@ function AirportGuideContent() {
               )}
               aria-pressed={mode === 'departure'}
             >
-              <PlaneTakeoff size={16} /> Departing
+              <PlaneTakeoff size={16} /> {t('guide.departing')}
             </button>
             <button
               type="button"
@@ -110,12 +113,15 @@ function AirportGuideContent() {
               )}
               aria-pressed={mode === 'arrival'}
             >
-              <PlaneLanding size={16} /> Arriving
+              <PlaneLanding size={16} /> {t('guide.arriving')}
             </button>
           </div>
 
           <h2 className="mb-6 text-center font-display text-xl font-bold uppercase tracking-wide text-ink">
-            {mode === 'departure' ? 'Departing from' : 'Arriving at'} {selected.city} ({selected.code})
+            {t(mode === 'departure' ? 'guide.departingFrom' : 'guide.arrivingAt', {
+              city: selected.city,
+              code: selected.code,
+            })}
           </h2>
 
           {/* Digital map — links to the airport's official / interactive terminal map */}
@@ -126,11 +132,11 @@ function AirportGuideContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110"
-                aria-label={`Open the digital terminal map for ${selected.name}`}
+                aria-label={t('guide.mapOpen', { airport: selected.name })}
               >
-                <Map size={16} /> Digital Map
+                <Map size={16} /> {t('guide.map')}
                 <span className="hidden items-center gap-1 text-xs font-normal text-white/80 sm:inline-flex">
-                  · {selected.digitalMapLabel ?? 'Interactive terminal map'}
+                  · {selected.digitalMapLabel ?? t('guide.mapDefault')}
                   <ExternalLink size={12} />
                 </span>
               </a>
@@ -155,7 +161,10 @@ function AirportGuideContent() {
                           ? 'border-accent bg-accent text-white'
                           : 'border-line bg-white text-ink-muted'
                     )}
-                    aria-label={`Step ${i + 1}: ${step.title}`}
+                    aria-label={t('guide.stepAria', {
+                      n: i + 1,
+                      title: km(step.titleKm, step.title),
+                    })}
                   >
                     {isDone ? '✓' : i + 1}
                   </button>
@@ -169,21 +178,26 @@ function AirportGuideContent() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="font-display font-bold uppercase tracking-wide text-ink">
-                        Step {i + 1} {isActive ? '●' : '○'} {step.title}
+                        {t('guide.step', { n: i + 1 })} {isActive ? '●' : '○'}{' '}
+                        {km(step.titleKm, step.title)}
                       </h3>
                       {step.timing && (
                         <span className="shrink-0 rounded-full bg-surface-3 px-3 py-1 text-xs font-medium text-ink-secondary">
-                          {step.timing}
+                          {km(step.timingKm, step.timing)}
                         </span>
                       )}
                     </div>
                     {isActive && (
                       <div className="mt-3 space-y-4 animate-fade-up">
-                        <p className="text-sm leading-relaxed text-ink-secondary">{step.description}</p>
+                        {/* Khmer has no capital letters, so the emphasis the
+                            English carries in CAPS is marked with <b> instead. */}
+                        <p className="text-sm leading-relaxed text-ink-secondary">
+                          <RichText text={km(step.descriptionKm, step.description)} />
+                        </p>
                         {step.phrases && step.phrases.length > 0 && (
                           <div className="rounded-btn bg-blue-50 p-4">
                             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary">
-                              <MessageSquare size={13} /> Useful phrases
+                              <MessageSquare size={13} /> {t('guide.phrases')}
                             </p>
                             {step.phrases.map((p) => (
                               <p key={p.label} className="text-sm text-ink">
@@ -195,9 +209,9 @@ function AirportGuideContent() {
                         {step.watchOut && (
                           <div className="rounded-btn bg-amber-50 p-4">
                             <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-warning">
-                              <AlertTriangle size={13} /> Watch out for
+                              <AlertTriangle size={13} /> {t('guide.watchOut')}
                             </p>
-                            <p className="text-sm text-ink">{step.watchOut}</p>
+                            <p className="text-sm text-ink">{km(step.watchOutKm, step.watchOut)}</p>
                           </div>
                         )}
                         {i < steps.length - 1 && (
@@ -209,7 +223,7 @@ function AirportGuideContent() {
                             }}
                             className="rounded-btn bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:brightness-110"
                           >
-                            Done — next step →
+                            {t('guide.nextStep')}
                           </button>
                         )}
                       </div>

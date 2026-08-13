@@ -258,6 +258,13 @@ export interface AirportStep {
   description: string;
   phrases?: { label: string; phrase: string }[];
   watchOut?: string;
+  // Khmer copy, all optional: a step with no Khmer yet falls back to the
+  // English above rather than rendering blank. Travellers read this while
+  // standing in a queue, so a missing translation must never hide the step.
+  titleKm?: string;
+  timingKm?: string;
+  descriptionKm?: string;
+  watchOutKm?: string;
 }
 
 export interface AirportGuide {
