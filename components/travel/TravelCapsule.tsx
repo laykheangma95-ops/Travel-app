@@ -20,6 +20,7 @@
 import Link from 'next/link';
 import { useId, useState } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { DotMeter } from './DotMeter';
 import { cn } from '@/lib/utils';
 
 export type CapsuleTone = 'urgent' | 'warning' | 'success' | 'info' | 'quiet';
@@ -41,8 +42,14 @@ export interface TravelCapsuleProps {
   href?: string;
   /** Expanded body. Present means the capsule is a disclosure. */
   children?: React.ReactNode;
-  /** 0–100. Renders the meter rail under the detail line. */
+  /** 0–100. Renders the meter under the detail line. */
   meter?: number;
+  /**
+   * How the meter draws. `dots` for a quantity someone is worried about
+   * running out of — you count the dark ones without meaning to. `bar` for a
+   * proportion that is merely informative.
+   */
+  meterStyle?: 'bar' | 'dots';
   /** Pulsing dot in the eyebrow. Reserve it for the one thing happening now. */
   live?: boolean;
   className?: string;
@@ -61,6 +68,7 @@ export function TravelCapsule({
   href,
   children,
   meter,
+  meterStyle = 'bar',
   live = false,
   className,
   index = 0,
@@ -103,11 +111,16 @@ export function TravelCapsule({
 
       {detail && <span className={cn('capsule-detail block', loading && 'capsule-shimmer')}>{detail}</span>}
 
-      {typeof meter === 'number' && (
-        <span className="capsule-meter mt-2.5 block" aria-hidden="true">
-          <span style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} />
-        </span>
-      )}
+      {typeof meter === 'number' &&
+        (meterStyle === 'dots' ? (
+          <span className="mt-2.5 block">
+            <DotMeter percent={meter} total={20} />
+          </span>
+        ) : (
+          <span className="capsule-meter mt-2.5 block" aria-hidden="true">
+            <span style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} />
+          </span>
+        ))}
     </>
   );
 

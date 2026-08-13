@@ -87,3 +87,39 @@ export const PATCH = route(
   },
   { rateLimit: 'notifications', name: 'notifications.mark_read' }
 );
+
+const deleteSchema = z.object({ id: z.string().uuid() });
+
+/**
+ * Clear one notification.
+ *
+ * A real delete rather than an archive flag: this is the traveler's own inbox,
+ * they asked for it gone, and keeping a hidden copy of something someone
+ * dismissed is the kind of retention nobody consented to. The audit trail that
+ * matters — what we sent and whether it was delivered — is a separate concern
+ * from what the traveler chooses to keep on their screen.
+ *
+ * RLS scopes the delete to their own rows; the user_id filter here is the
+ * second lock, not the first.
+ */
+export const DELETE = route(
+  async (request) => {
+    const user = await requireUser(request);
+    const supabase = supabaseFromRequest(request);
+    if (!supabase) return ok({ ok: true, persisted: false });
+
+    const parsed = deleteSchema.safeParse(await readJson<unknown>(request));
+    if (!parsed.success) throw new ApiError('BAD_REQUEST', 'Send the id to clear.');
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('id', parsed.data.id);
+
+    if (error) throw new ApiError('INTERNAL', 'Could not clear that update.');
+
+    return ok({ ok: true });
+  },
+  { rateLimit: 'notifications', name: 'notifications.clear' }
+);

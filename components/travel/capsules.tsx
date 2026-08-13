@@ -210,6 +210,10 @@ export function ESIMCapsule(props: ESIMCapsuleProps) {
       tone={tone}
       status={props.loading ? 'loading' : 'ready'}
       meter={pct ?? undefined}
+      // Dots, not a bar. Data left is the number a traveler abroad is actually
+      // anxious about, and a grid you can count beats a proportion you have to
+      // interpret.
+      meterStyle="dots"
       href={
         props.orderNumber
           ? `/my-esims?order=${encodeURIComponent(props.orderNumber)}`

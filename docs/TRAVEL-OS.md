@@ -181,6 +181,68 @@ keys. A prompt that cannot lead anywhere teaches people to dismiss ours.
 
 The browser prompt only ever fires from an explicit click.
 
+### The inbox interaction model
+
+`/updates` is the interaction-heavy screen, and its shape is an argument:
+
+**1. The Island** (`LiveIsland.tsx`) — exactly one live thing, in exactly one
+place, always. It morphs from pill to card via framer-motion `layout`, so the
+pill genuinely *becomes* the card rather than cross-fading into a second
+component. A traveler learns that spot once.
+
+`selectLive()` picks it: unread, level 1–2, **and from today**. A critical alert
+from Tuesday is history, not a live state — pinning it would make the Island
+lie, and an Island that lies once stops being the place people look.
+
+**2. Stacks** (`NotificationStack.tsx`) — a delayed flight does not send one
+notification. It sends "delayed 20 minutes", "delayed 40 minutes", "gate
+changed", "boarding". Flat, one bad afternoon buries the rest of the trip under
+five near-identical cards and the traveler starts scrolling past all of them.
+So updates about one entity collapse into a deck with a count and fan out on tap.
+A stack of one renders as a plain row — an affordance that does nothing is worse
+than no affordance.
+
+**3. Swipe** (`SwipeableRow.tsx`) — right to mark read, left to clear. The intent
+label is legible before the threshold, so the gesture teaches itself instead of
+firing a surprise. Below the threshold nothing happens.
+
+**4. Urgency before time.** Within a day, a gate change from an hour ago outranks
+a weather note from ten minutes ago. That inversion is the reason the priority
+engine exists; sorting by timestamp at the last step would throw the levels away.
+
+**5. Numbers as shapes.** `DotMeter` for data remaining — you count the dark dots
+without meaning to, which beats parsing "1.4 GB of 5 GB". `HourStrip` for
+weather, because "rain this afternoon" makes you go and look, while 4PM–7PM with
+the wet hours marked answers the question inside the notification. Both read
+`metadata` (`remainingPercent`, `hours`, `peakHourIndex`) and are skipped
+silently when a sender did not provide it — a card must never look broken
+because a job sent less than it could have.
+
+Shaping logic lives in `lib/notifications/inbox.ts`, pure and tested
+(`tests/notificationInbox.test.ts`), not inside the component.
+
+### Two rules anything animated here must follow
+
+**Every gesture has a button.** Swipe is never the only path to an action — each
+row carries real Read and Clear buttons for keyboard, screen-reader and trackpad
+users. A gesture-only affordance is an inaccessible one.
+
+**Never branch the DOM on `useReducedMotion()`.** The server always evaluates it
+as "no preference", so a component that returns a different *tree* — or a
+different className — hands every reduced-motion visitor a hydration mismatch and
+a full client re-render, silently. Reduced motion switches behaviour through
+props (`drag={false}`, `transition={{ duration: 0 }}`) and through CSS media
+queries. `app/template.tsx` carries the long version; it was a production bug.
+
+### Bundle cost
+
+framer-motion is deliberately **off the critical path site-wide** (see
+`app/template.tsx`). `/updates` keeps it that way with `LazyMotion` + the `m`
+shorthand under `strict`: only the ~5 kB core is in the route bundle, and
+`domMax` — needed for drag and layout — loads in a second chunk after the inbox
+is on screen and readable. `strict` makes `motion.*` a build error inside that
+tree so it cannot be undone by accident.
+
 ---
 
 ## 5. PWA
