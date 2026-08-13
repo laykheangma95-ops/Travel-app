@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope, Marcellus, Noto_Sans_Khmer, Noto_Serif_Khmer } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
@@ -109,6 +110,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main id="main-content" className="flex-1">{children}</main>
           <Footer />
+          {/* Primary navigation on a phone. Renders below the footer in the DOM
+              so it is late in the tab order — it is fixed to the viewport, and a
+              persistent bar should not sit between the skip link and the page
+              content for a keyboard user. It hides itself during checkout,
+              payment, authentication and the admin panel. */}
+          <BottomNavigation />
           <TripCopilot />
         </LanguageProvider>
       </body>

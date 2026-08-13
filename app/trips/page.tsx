@@ -1,6 +1,14 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { TripsView } from '@/components/travel/TripsView';
 
-// /trips is an alias for the trips view inside the dashboard.
+export const metadata: Metadata = {
+  title: 'Trips',
+  description: 'Every journey in one place — flights, stay, eSIM, places and itinerary.',
+  robots: { index: false, follow: false },
+};
+
+// /trips is now the real trips workspace. It used to redirect into the
+// dashboard's demo list, which showed every visitor the same two invented trips.
 export default function TripsPage() {
-  redirect('/my-trips');
+  return <TripsView />;
 }
