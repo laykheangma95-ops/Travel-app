@@ -82,9 +82,28 @@ export async function readJson<T>(request: Request): Promise<T> {
 
 export interface RouteContext {
   requestId: string;
+  /**
+   * Dynamic segment values for routes that have them (`[tripId]` and friends).
+   * Empty on a static route. Next.js passes these as the handler's second
+   * argument, which this wrapper would otherwise swallow.
+   */
+  params: Record<string, string | string[] | undefined>;
 }
 
 type Handler = (request: Request, context: RouteContext) => Promise<NextResponse>;
+
+/** The second argument Next.js hands a route handler on a dynamic segment. */
+interface NextRouteArgs {
+  params?: Record<string, string | string[] | undefined>;
+}
+
+/** A required dynamic segment, as a single string. */
+export function requireParam(context: RouteContext, name: string): string {
+  const value = context.params[name];
+  const single = Array.isArray(value) ? value[0] : value;
+  if (!single) throw new ApiError('BAD_REQUEST', 'That address is missing something.');
+  return single;
+}
 
 /**
  * Wraps a route handler with request IDs, optional rate limiting, and a single
@@ -97,8 +116,8 @@ type Handler = (request: Request, context: RouteContext) => Promise<NextResponse
 export function route(
   handler: Handler,
   options: { rateLimit?: RateLimitName; name?: string } = {}
-): (request: Request) => Promise<NextResponse> {
-  return async (request: Request) => {
+): (request: Request, args?: NextRouteArgs) => Promise<NextResponse> {
+  return async (request: Request, args?: NextRouteArgs) => {
     const requestId = newRequestId();
     const name = options.name ?? new URL(request.url).pathname;
 
@@ -118,7 +137,7 @@ export function route(
     }
 
     try {
-      return await handler(request, { requestId });
+      return await handler(request, { requestId, params: args?.params ?? {} });
     } catch (error) {
       // Configuration is missing somewhere it must not be faked.
       if (error instanceof ConfigurationError) {

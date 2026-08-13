@@ -24,6 +24,7 @@ import {
   CloudSun,
   ListChecks,
   MapPin,
+  Pencil,
   Plane,
   Signal,
 } from 'lucide-react';
@@ -169,13 +170,24 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
         {lang === 'km' ? 'ដំណើរ' : 'Trips'}
       </Link>
 
-      <header className="mt-4">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-light">
-          {trip.flag ? `${trip.flag} ` : ''}
-          {trip.destination}
-        </p>
-        <h1 className="mt-1.5 font-display text-3xl leading-tight text-white sm:text-4xl">{trip.title}</h1>
-        <p className="mt-1.5 font-mono text-sm text-white/60">{dates}</p>
+      <header className="mt-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-light">
+            {trip.flag ? `${trip.flag} ` : ''}
+            {trip.destination}
+          </p>
+          <h1 className="mt-1.5 font-display text-3xl leading-tight text-white sm:text-4xl">{trip.title}</h1>
+          <p className="mt-1.5 font-mono text-sm text-white/60">{dates}</p>
+        </div>
+        {/* Outlined rather than gold: the sections below own the accent, and a
+            trip's own details are rarely the thing you came here to change. */}
+        <Link
+          href={`/trips/${trip.id}/edit`}
+          className="inline-flex min-h-[2.75rem] shrink-0 items-center gap-1.5 rounded-btn border border-white/15 px-4 text-sm font-semibold text-white/80 transition-colors duration-200 ease-smooth hover:border-gold-light/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+        >
+          <Pencil size={14} aria-hidden="true" />
+          {lang === 'km' ? 'កែសម្រួល' : 'Edit'}
+        </Link>
       </header>
 
       {!past && (

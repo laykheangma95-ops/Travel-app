@@ -1,7 +1,10 @@
 # Trip Itinerary Planner — gap report and build plan
 
-**Status: report only. No code has been written.** This is the §6 "report first"
-step for the trip itinerary planner described in `STRATEGY.md:59, 84, 126`.
+**Status: Gap 0 shipped. Gaps 1–5 not started.** This began as the §6 "report
+first" step for the trip itinerary planner described in `STRATEGY.md:59, 84,
+126`, and the owner approved §7 — build Gap 0 alone.
+
+Gaps 1–5 remain untouched, and decisions A–D in §5 are still open.
 
 The reference product is Triply, which is itself a Western repackaging of a
 pattern mature in China since ~2015 — Qyer's 行程助手, Mafengwo, Ctrip's trip
@@ -62,18 +65,22 @@ its front door.
 
 ## 3. The gaps, ranked
 
-### Gap 0 — Trip create/edit/delete · **blocking, cheap, no new tables**
+### Gap 0 — Trip create/edit/delete · **SHIPPED**
 
-Add `POST` / `PATCH` / `DELETE` to `app/api/travel/trips/route.ts`, and a create
-screen behind the "New trip" button.
+`POST /api/travel/trips`, `PATCH` and `DELETE` on
+`app/api/travel/trips/[tripId]`, a create screen at `/trips/new`, an edit screen
+at `/trips/[tripId]/edit`, and the "New trip" button pointed at the former
+instead of the packing checklist.
 
-- No schema change. No migration. RLS already permits it.
-- Touches nothing in `docs/LOCKED.md`, nothing in checkout.
-- Turns ~1,300 lines of already-built, already-paid-for UI from a demo into a
-  product.
+- No schema change and no migration — `interests` and every other column already
+  existed. RLS (`trips_all_own`) was already correct and is what confines a
+  traveler to their own rows; neither route re-implements that check.
+- Validation lives in `lib/travel/trips.ts` and is run twice — inline by the
+  form in the traveler's language, and again by the routes — from one module, so
+  the two cannot drift. 20 tests cover it.
+- Nothing in `docs/LOCKED.md` and nothing in checkout was touched.
 
-This is the smallest possible change that produces a working trip planner, and
-it should ship on its own before anything else is discussed.
+Gates: `npm run typecheck` clean, `npm run build` passes, 342 tests pass.
 
 ### Gap 1 — A places layer · **needs a decision before it can start**
 

@@ -60,6 +60,13 @@ export const RATE_LIMITS = {
   /** The AI copilot: each call costs CPU and, on the paid tier, tokens. */
   chat: { limit: 20, windowMs: 60_000 },
   /**
+   * Creating, editing and deleting trips. Roomier than `checkout` because
+   * editing a trip is a normal, repeated act — a traveler fixing dates and
+   * travellers in one sitting must not be locked out of their own plan — but
+   * tighter than `session` because each one writes a row.
+   */
+  tripWrite: { limit: 30, windowMs: 60_000 },
+  /**
    * "How much data have I got left?" — one live call to GoHub per request, so
    * it is not free the way catalog reads are. Sized for a worried traveler
    * pulling to refresh a few times, not for a polling loop.
