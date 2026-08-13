@@ -1706,6 +1706,51 @@ button.capsule:active {
   .has-tabbar { padding-bottom: 0; }
 }
 
+/* ── Copilot FAB ─────────────────────────────────────────────────────────── */
+
+/* Its resting place, before the traveler has dragged it anywhere.
+   It used to sit at bottom: 1.25rem, which put a 56px button directly on top
+   of the last tab — "You" was covered and effectively untappable. So the
+   default clears the bar, and TripCopilot.tsx lets it be moved from there. */
+.copilot-fab {
+  right: 1.25rem;
+  bottom: calc(4.25rem + env(safe-area-inset-bottom) + 0.75rem);
+}
+
+/* No tab bar on desktop, so nothing to clear. */
+@media (min-width: 1024px) {
+  .copilot-fab {
+    bottom: 1.25rem;
+  }
+}
+
+/* The panel clears the tab bar AND the button's resting slot above it.
+   Raising the FAB to uncover the "You" tab moved it into the panel's old
+   footprint, which put the chat's input row on top of the close button. */
+.copilot-panel {
+  bottom: calc(4.25rem + env(safe-area-inset-bottom) + 0.75rem + 3.5rem + 0.75rem);
+}
+
+@media (min-width: 1024px) {
+  .copilot-panel {
+    bottom: 5.5rem;
+  }
+}
+
+/* The glide back to the edge after a drag. Suppressed while the finger is
+   down — the button must track the finger exactly, not lag behind it. */
+.copilot-fab-settling {
+  transition:
+    left 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-fab-settling {
+    transition: none;
+  }
+}
+
 /* ── Travel deck (the personalised band at the top of Home) ──────────────── */
 
 .travel-deck {
