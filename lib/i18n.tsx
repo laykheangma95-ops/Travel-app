@@ -26,6 +26,12 @@ const dicts = {
     'nav.support': 'Support',
     'nav.signIn': 'Sign In',
     'nav.getStarted': 'Get Started',
+    'nav.account': 'Account',
+    'nav.dashboard': 'Dashboard',
+    'nav.settings': 'Settings',
+    'nav.adminPanel': 'Admin Panel',
+    'nav.signOut': 'Sign Out',
+    'nav.signedInAs': 'Signed in as',
     // Sign-in and sign-up failures. Each one names what the traveller should do
     // next — an error they cannot act on is the same as no error at all.
     'auth.error.providerUnavailable':
@@ -220,6 +226,12 @@ const dicts = {
     'nav.support': 'ជំនួយ',
     'nav.signIn': 'ចូលគណនី',
     'nav.getStarted': 'ចាប់ផ្តើម',
+    'nav.account': 'គណនី',
+    'nav.dashboard': 'ផ្ទាំងគ្រប់គ្រង',
+    'nav.settings': 'ការកំណត់',
+    'nav.adminPanel': 'ផ្ទាំងអ្នកគ្រប់គ្រង',
+    'nav.signOut': 'ចាកចេញ',
+    'nav.signedInAs': 'បានចូលក្នុងនាម',
     // ការចូល និងការចុះឈ្មោះមិនបានសម្រេច
     'auth.error.providerUnavailable':
       'វិធីចូលនេះមិនទាន់មានទេ។ សូមប្រើអាសយដ្ឋានអ៊ីមែលរបស់អ្នកជំនួសវិញ។',
