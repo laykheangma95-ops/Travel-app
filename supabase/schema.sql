@@ -190,12 +190,26 @@ CREATE TABLE trip_plans (
   travelers INTEGER DEFAULT 1,
   budget TEXT,
   interests TEXT[],
+  -- The raw document the generator last produced. Superseded by the
+  -- itinerary_days / itinerary_items tables below, which is what the traveler
+  -- actually edits — kept because it holds live rows and because it is the
+  -- record of what was generated. See migration 007.
   generated_itinerary JSONB,
   cover_image_url TEXT,
   is_public BOOLEAN DEFAULT FALSE,
   share_token TEXT UNIQUE DEFAULT gen_random_uuid()::TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  -- Resolved once at creation, so reads do not fuzzy-match free text against
+  -- the catalogue to find a flag. `destination` keeps what the traveler typed.
+  destination_slug TEXT,
+  itinerary_status TEXT NOT NULL DEFAULT 'none'
+    CHECK (itinerary_status IN ('none', 'generating', 'generated', 'adjusted', 'failed')),
+  itinerary_generated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_trip_plans_user ON trip_plans(user_id, start_date DESC);
+CREATE INDEX idx_trip_plans_slug ON trip_plans(destination_slug);
 
 CREATE TABLE trip_checklist_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -219,6 +233,145 @@ CREATE TABLE trip_memories (
   taken_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ── Saved places & itineraries (migration 007) ───────────────────────────────
+
+-- Places collected from social media, long before a trip exists. `trip_id` is
+-- nullable on purpose: people save a restaurant in March and decide it is a
+-- Bangkok trip in July, so saving must not require a trip to exist first.
+CREATE TABLE saved_places (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  trip_id UUID REFERENCES trip_plans(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  -- Constrained, because this is what the generator personalises on — it has to
+  -- be able to tell a climbing-and-museums traveler from a shopping one.
+  category TEXT NOT NULL DEFAULT 'other'
+    CHECK (category IN (
+      'food', 'cafe', 'shopping', 'museum', 'nature', 'hiking', 'climbing',
+      'beach', 'nightlife', 'temple', 'landmark', 'activity', 'stay', 'other'
+    )),
+  source TEXT NOT NULL DEFAULT 'manual'
+    CHECK (source IN ('manual', 'tiktok', 'instagram', 'facebook', 'youtube', 'web', 'search')),
+  source_url TEXT,
+  -- Whatever the share sheet handed us, before parsing, so a parser bug can be
+  -- re-run over the original instead of losing it.
+  source_payload JSONB,
+  country_slug TEXT,
+  city TEXT,
+  address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  external_place_id TEXT,
+  image_url TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_saved_places_user    ON saved_places(user_id, created_at DESC);
+CREATE INDEX idx_saved_places_trip    ON saved_places(trip_id) WHERE trip_id IS NOT NULL;
+CREATE INDEX idx_saved_places_country ON saved_places(user_id, country_slug);
+
+-- Where the traveler is staying. The anchor every day's route starts and ends
+-- at. A trip can have several (three nights in Osaka, then four in Kyoto).
+CREATE TABLE trip_stays (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID NOT NULL REFERENCES trip_plans(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  external_place_id TEXT,
+  check_in DATE,
+  check_out DATE,
+  booking_reference TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT trip_stays_dates_ordered CHECK (
+    check_in IS NULL OR check_out IS NULL OR check_out >= check_in
+  )
+);
+
+CREATE INDEX idx_trip_stays_trip ON trip_stays(trip_id, check_in);
+
+-- `day_number` is the ordering, not `date`: a trip can exist before its dates
+-- do ("five days in Vietnam, sometime in March").
+CREATE TABLE itinerary_days (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID NOT NULL REFERENCES trip_plans(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  day_number INTEGER NOT NULL CHECK (day_number >= 1),
+  date DATE,
+  title TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Without this a retried generation silently produces two of every day.
+  CONSTRAINT itinerary_days_unique_per_trip UNIQUE (trip_id, day_number)
+);
+
+CREATE INDEX idx_itinerary_days_trip ON itinerary_days(trip_id, day_number);
+
+-- One stop: the unit the traveler drags, deletes and argues with. Stored as
+-- rows rather than inside trip_plans.generated_itinerary because a JSONB
+-- document cannot be reordered, cannot hold the travel leg between two stops,
+-- and cannot be partly locked against regeneration.
+CREATE TABLE itinerary_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  day_id UUID NOT NULL REFERENCES itinerary_days(id) ON DELETE CASCADE,
+  -- Denormalised from the day so "everything in this trip" is one query and RLS
+  -- needs no join per row.
+  trip_id UUID NOT NULL REFERENCES trip_plans(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  -- Gapped (10, 20, 30) so a stop can be dropped between two others without
+  -- renumbering every row after it on every drag.
+  position INTEGER NOT NULL,
+  item_type TEXT NOT NULL DEFAULT 'place'
+    CHECK (item_type IN ('place', 'meal', 'transport', 'rest', 'flight', 'checkin', 'note')),
+  -- SET NULL, not CASCADE: deleting a bookmark must not silently edit the trip.
+  saved_place_id UUID REFERENCES saved_places(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  note TEXT,
+  address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  external_place_id TEXT,
+  start_time TIME,
+  end_time TIME,
+  duration_minutes INTEGER CHECK (duration_minutes IS NULL OR duration_minutes >= 0),
+  -- The leg from the previous stop, stored on the arriving stop so reordering a
+  -- day only recomputes what actually moved.
+  travel_minutes INTEGER CHECK (travel_minutes IS NULL OR travel_minutes >= 0),
+  travel_distance_metres INTEGER CHECK (travel_distance_metres IS NULL OR travel_distance_metres >= 0),
+  travel_mode TEXT CHECK (travel_mode IS NULL OR travel_mode IN
+    ('walk', 'transit', 'car', 'taxi', 'bike', 'ferry', 'flight')),
+  -- Why this might be a bad time to go. NULL means "not checked", never "fine":
+  -- queue times and holiday calendars are paid per-country data we do not have
+  -- everywhere, and a confident wrong answer costs more than a blank.
+  advisory_code TEXT CHECK (advisory_code IS NULL OR advisory_code IN
+    ('weather', 'public_holiday', 'closed', 'long_queue', 'peak_hour', 'seasonal', 'safety')),
+  advisory_note TEXT,
+  expected_wait_minutes INTEGER CHECK (expected_wait_minutes IS NULL OR expected_wait_minutes >= 0),
+  advisory_checked_at TIMESTAMPTZ,
+  estimated_cost_usd DECIMAL(10,2) CHECK (estimated_cost_usd IS NULL OR estimated_cost_usd >= 0),
+  source TEXT NOT NULL DEFAULT 'ai' CHECK (source IN ('ai', 'user', 'saved_place')),
+  -- What makes "adjust it if you don't like it" survivable: a regeneration
+  -- rebuilds unlocked rows and leaves locked ones where the traveler put them.
+  is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT itinerary_items_times_ordered CHECK (
+    start_time IS NULL OR end_time IS NULL OR end_time >= start_time
+  )
+);
+
+CREATE INDEX idx_itinerary_items_day   ON itinerary_items(day_id, position);
+CREATE INDEX idx_itinerary_items_trip  ON itinerary_items(trip_id);
+CREATE INDEX idx_itinerary_items_place ON itinerary_items(saved_place_id)
+  WHERE saved_place_id IS NOT NULL;
 
 -- ── Notifications ────────────────────────────────────────────────────────────
 
@@ -412,6 +565,26 @@ CREATE TRIGGER profiles_touch
   BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
+CREATE TRIGGER trip_plans_touch
+  BEFORE UPDATE ON trip_plans
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE TRIGGER saved_places_touch
+  BEFORE UPDATE ON saved_places
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE TRIGGER trip_stays_touch
+  BEFORE UPDATE ON trip_stays
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE TRIGGER itinerary_days_touch
+  BEFORE UPDATE ON itinerary_days
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE TRIGGER itinerary_items_touch
+  BEFORE UPDATE ON itinerary_items
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
 -- Auto-create a profile on signup, carrying the email so guest orders can be
 -- matched to the account later.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -453,6 +626,10 @@ ALTER TABLE flight_shares         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_plans            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_checklist_items  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_memories         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE saved_places          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trip_stays            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE itinerary_days        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE itinerary_items       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications            ENABLE ROW LEVEL SECURITY;
@@ -527,6 +704,34 @@ CREATE POLICY "trips_all_own"      ON trip_plans FOR ALL USING (auth.uid() = use
 CREATE POLICY "trips_public_read"  ON trip_plans FOR SELECT USING (is_public = TRUE);
 CREATE POLICY "checklist_all_own"  ON trip_checklist_items FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "memories_all_own"   ON trip_memories FOR ALL USING (auth.uid() = user_id);
+
+-- WITH CHECK written out rather than defaulted from USING: these rows carry a
+-- trip_id as well as a user_id, and being explicit is what stops one being
+-- inserted against somebody else's trip.
+CREATE POLICY "saved_places_all_own" ON saved_places
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "trip_stays_all_own" ON trip_stays
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "itinerary_days_all_own" ON itinerary_days
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "itinerary_items_all_own" ON itinerary_items
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- A shared trip has to render for whoever it was shared with, so the itinerary
+-- follows trip_plans' own `is_public` switch — one toggle governs the whole
+-- trip, and a trip cannot be published with its days left invisible.
+--
+-- Read only, and narrower than the trip itself: stays are NOT included. A
+-- booking reference and the address of the bed someone sleeps in are not part
+-- of "here is my itinerary", and a public link is one anybody can forward.
+CREATE POLICY "itinerary_days_public_read" ON itinerary_days
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM trip_plans t WHERE t.id = itinerary_days.trip_id AND t.is_public = TRUE)
+  );
+CREATE POLICY "itinerary_items_public_read" ON itinerary_items
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM trip_plans t WHERE t.id = itinerary_items.trip_id AND t.is_public = TRUE)
+  );
 
 -- Push
 CREATE POLICY "push_all_own" ON push_subscriptions FOR ALL USING (auth.uid() = user_id);
