@@ -37,7 +37,11 @@
   background: #050b2e;
   position: relative;
   isolation: isolate;
-  min-height: 100svh;
+  /* 100svh MINUS the sticky header, not 100svh. The header sits above this in
+     the flow, so a full-viewport root here pushed the first screen exactly one
+     header past the fold and Home always had a stub of scroll under it with
+     nothing to read. See --chrome-top in app/globals.css. */
+  min-height: calc(100svh - var(--chrome-top));
   color: #fff;
   overflow-x: clip;
 }
@@ -178,17 +182,25 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
 .v3-stage {
   position: relative;
   z-index: 1;
-  min-height: 100svh;
+  min-height: calc(100svh - var(--chrome-top));
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 52svh 1.25rem clamp(2.5rem, 8vh, 5rem);
+  padding: 46svh 1.25rem clamp(1.75rem, 5vh, 3.5rem);
   transition: opacity var(--d-reveal) var(--ease-signature),
     transform var(--d-reveal) var(--ease-signature);
 }
 /* Once we have landed, the first screen leaves the flow entirely — otherwise it
    would hold a full viewport of empty space above the journey. It only ever
    gets this class when the flight is over, so nothing visible is displaced. */
+/* The phone tab bar is fixed over the foot of the screen, so the first screen
+   has to end above it — otherwise the hint under the search field reads through
+   the frosted bar. Mirrors .has-tabbar in globals.css. */
+@media (max-width: 1023px) {
+  .v3-stage {
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+}
 .v3-stage.is-hidden {
   position: absolute;
   top: 0;
@@ -1522,7 +1534,9 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.25rem 1.25rem;
-  padding: 3rem 1.25rem 4rem;
+  /* Kept compact on purpose: this is a crawlable index, not a section. It used
+     to add most of a phone screen of padding between the hero and the footer. */
+  padding: 1.5rem 1.25rem 2rem;
   font-size: 0.8125rem;
 }
 .v3-index a {

@@ -39,7 +39,9 @@ export default function PublicTrackPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#0E1B30_0%,#14263F_50%,#23406A_100%)] pb-28">
+    // See app/flights/[flightNumber]/page.tsx — night-canvas is what darkens the
+    // document behind the transparent sticky header.
+    <div className="night-canvas relative min-h-screen overflow-hidden pb-28">
       <div className="stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="mb-8 text-center">

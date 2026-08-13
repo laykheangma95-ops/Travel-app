@@ -100,9 +100,18 @@ export function DomerSplash() {
 
   useEffect(() => {
     if (skip) return;
-    if (sessionStorage.getItem('domer-splash-shown')) return;
-    sessionStorage.setItem('domer-splash-shown', '1');
-    setVisible(true);
+    // The sessionStorage flag decides whether to SHOW the splash. It must not
+    // also decide whether to arm the dismissal: returning early once the flag
+    // was set meant a second run of this effect — React StrictMode remounts it
+    // in development, and a `skip` change remounts it in production — left an
+    // already-visible curtain on screen with nothing left to take it down,
+    // covering the entire page for the rest of the session. So the dismissal
+    // below is armed unconditionally; on a run where nothing was shown it is a
+    // no-op, and on a re-run over a live splash it is the thing that saves it.
+    if (!sessionStorage.getItem('domer-splash-shown')) {
+      sessionStorage.setItem('domer-splash-shown', '1');
+      setVisible(true);
+    }
 
     const start = Date.now();
     let dismissTimer: ReturnType<typeof setTimeout>;
