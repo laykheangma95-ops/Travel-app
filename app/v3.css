@@ -137,49 +137,31 @@ body:has(.v3-globe-layer.is-pointing) {
   transition: opacity 700ms var(--ease-smooth);
 }
 
-/* ── Quieting the site chrome on the first screen ──────────────────────────
-   The brief for this screen is literal: the globe is the hero and the search
-   field is the only thing to do. So while we are in space, everything the
-   layout normally hangs around the edges steps back — nav links, the cart, the
-   copilot button — leaving the wordmark and the language toggle. It all returns
-   on landing, when a cart is something you might actually want. */
+/* ── The site chrome on the first screen ───────────────────────────────────
+   The nav used to be stripped back to the wordmark while the globe was on
+   screen. It no longer is: the bar is a floating capsule of glass (.nav-liquid
+   in globals.css), so it can sit over the night sky from the very first frame
+   without pasting a strip of daylight across it. The first screen is therefore
+   exactly three things — the bar, the search field, and the few lines of text
+   around it — and nothing has to appear later to be reachable.
 
-/* The site header is a light bar. On the night canvas it reads as a strip of
-   daylight pasted over the sky, so both v3 states darken it — transparent while
-   we are in space, a smoked pane once we have landed and it has to hold
-   contrast over artwork. */
-body[data-v3] header {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+   The capsule carries its own material, so all this file does is give it a
+   little more body over a moving starfield and hold back the one thing that
+   would put a second gold CTA in the same viewport as the search field. */
+body[data-v3] header nav {
+  /* Over a moving starfield the bar needs slightly more body than it does over
+     a static page, or the dots read straight through the labels. */
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(14, 27, 48, 0.42) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.16);
 }
-body[data-v3='landed'] header {
-  background: rgba(6, 14, 36, 0.94) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
-}
-body[data-v3] header :is(a, button) {
-  color: rgba(255, 255, 255, 0.82);
-}
-body[data-v3] header a[href='/'] :is(span, p, div) {
-  color: rgba(255, 255, 255, 0.92);
-}
-/* Everything in the header steps back except the wordmark and the language
-   toggle — the two things a visitor may legitimately need before they have
-   decided anything. */
-body[data-v3='first'] header nav > *:not(:first-child) > *:not(:has(> svg[aria-hidden='false'])) {
-  transition: opacity var(--d-reveal) var(--ease-smooth);
-}
-body[data-v3='first'] header :is(a[href='/cart'], a[href='/sign-in'], a[href='/sign-up']),
-body[data-v3='first'] header nav > div:nth-child(2),
-body[data-v3='first'] header nav > div:last-child > button:last-child {
-  opacity: 0;
-  pointer-events: none;
-}
-body[data-v3='first'] header a[href='/'] :is(span, p, div) {
-  color: rgba(255, 255, 255, 0.92);
-}
-body[data-v3='first'] header nav > div:last-child > button:first-child {
-  color: rgba(255, 255, 255, 0.7);
+/* Once we have landed there is a page of text scrolling underneath, and glass
+   thin enough to read a paragraph through is not glass, it is a smudge. */
+body[data-v3='landed'] header nav {
+  background: linear-gradient(165deg, rgba(20, 38, 63, 0.9) 0%, rgba(6, 14, 36, 0.94) 100%);
 }
 /* The copilot's gold FAB is a second accent CTA — it waits until we land. */
 body[data-v3='first'] button.fixed.bottom-5.right-5 {
@@ -555,14 +537,16 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
 }
 .v3-back-floating {
   position: fixed;
-  top: 5rem;
+  /* Clears the floating nav capsule: the bar is 4rem tall and now sits on a
+     0.75rem rail, so anything else pinned to the top starts below 5.5rem. */
+  top: 6.5rem;
   left: 1rem;
   z-index: 30;
 }
 
 .v3-strip {
   position: sticky;
-  top: 4rem;
+  top: 5.5rem;
   z-index: 25;
   display: flex;
   align-items: center;
@@ -674,6 +658,149 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
 }
 .v3-chapter-wide {
   max-width: 56rem;
+}
+
+/* ── The folds ─────────────────────────────────────────────────────────────
+   Everything that is not the eSIM. Closed, a fold is one quiet line of glass:
+   a symbol, the phrase that says what is inside, and the word that opens it.
+   Four of them stacked read as a short list of offers rather than as four
+   chapters someone has to scroll past to reach a price.
+
+   Gold is spent carefully here (the brand rule is one or two gold moments per
+   viewport): the symbols are cool white while closed, and only the fold you
+   have actually opened lights up. */
+.v3-folds {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 0 1.25rem clamp(4.5rem, 12vh, 8rem);
+}
+.v3-folds-title {
+  margin: 0.75rem 0 0.5rem;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.v3-folds-hint {
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.v3-fold {
+  margin-top: 0.75rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  overflow: hidden;
+  transition:
+    background var(--d-micro, 240ms) var(--ease-smooth),
+    border-color var(--d-micro, 240ms) var(--ease-smooth);
+}
+.v3-fold.is-open {
+  background: rgba(255, 255, 255, 0.065);
+  border-color: rgba(230, 203, 139, 0.3);
+}
+.v3-fold-heading {
+  margin: 0;
+  font: inherit;
+}
+.v3-fold-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.85rem;
+  /* Comfortably past the 44px touch minimum — this is the primary control on
+     the lower half of the page. */
+  min-height: 3.75rem;
+  padding: 0.85rem 1.1rem;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  transition: background var(--d-micro, 240ms) var(--ease-smooth);
+}
+.v3-fold-head:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.v3-fold-head:focus-visible {
+  outline: 2px solid #e6cb8b;
+  outline-offset: -2px;
+}
+.v3-fold-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition:
+    color var(--d-micro, 240ms) var(--ease-smooth),
+    background var(--d-micro, 240ms) var(--ease-smooth),
+    border-color var(--d-micro, 240ms) var(--ease-smooth);
+}
+.v3-fold.is-open .v3-fold-icon {
+  color: #e6cb8b;
+  background: rgba(230, 203, 139, 0.12);
+  border-color: rgba(230, 203, 139, 0.34);
+}
+.v3-fold-label {
+  flex: 1 1 auto;
+}
+.v3-fold-action {
+  flex: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+/* On the narrowest phones the word would push the label into two lines; the
+   chevron says the same thing, and the button still announces its state. */
+@media (max-width: 400px) {
+  .v3-fold-action {
+    display: none;
+  }
+}
+.v3-fold-chev {
+  flex: none;
+  color: rgba(255, 255, 255, 0.55);
+  transition: transform 320ms var(--ease-settle);
+}
+.v3-fold.is-open .v3-fold-chev {
+  transform: rotate(180deg);
+}
+.v3-fold-panel {
+  padding: 0 1.1rem 1.5rem;
+}
+.v3-fold-body {
+  animation: v3-fold-in 520ms var(--ease-settle) both;
+}
+.v3-fold-body > *:first-child {
+  margin-top: 0;
+}
+@keyframes v3-fold-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v3-fold-body {
+    animation: none;
+  }
+  .v3-fold-chev,
+  .v3-fold,
+  .v3-fold-head,
+  .v3-fold-icon {
+    transition: none;
+  }
 }
 
 .v3-eyebrow {

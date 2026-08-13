@@ -150,6 +150,20 @@ const dicts = {
     'v3.ch5.title': 'Worth the flight',
     'v3.ch6.eyebrow': 'One last thing',
     'v3.ch6.title': 'Staying connected',
+    // The folded chapters. Everything that is not the eSIM lives behind one of
+    // these, opened by name.
+    // The eSIM chapter is no longer last, so it can no longer be introduced as
+    // the last thing. The old key stays for anyone still pointing at it.
+    'v3.esim.eyebrow': 'First things first',
+    'v3.more.eyebrow': 'If you want it',
+    'v3.more.title': 'Everything else about this place',
+    'v3.more.hint': 'Tap any of these to open it.',
+    'v3.fold.basics': 'Money, power, signal',
+    'v3.fold.entry': 'Visa and entry',
+    'v3.fold.around': 'Airport and transport',
+    'v3.fold.places': 'Places worth going',
+    'v3.fold.show': 'Show',
+    'v3.fold.hide': 'Hide',
     // Field labels
     'v3.currency': 'Currency',
     'v3.power': 'Power',
@@ -348,6 +362,16 @@ const dicts = {
     'v3.ch5.title': 'សមនឹងជើងហោះហើរ',
     'v3.ch6.eyebrow': 'រឿងចុងក្រោយ',
     'v3.ch6.title': 'ការតភ្ជាប់',
+    'v3.esim.eyebrow': 'រឿងសំខាន់មុនគេ',
+    'v3.more.eyebrow': 'បើអ្នកចង់ដឹង',
+    'v3.more.title': 'រឿងផ្សេងទៀតអំពីទីនេះ',
+    'v3.more.hint': 'ចុចលើមួយណាក៏បាន ដើម្បីបើកមើល។',
+    'v3.fold.basics': 'លុយ ភ្លើង សេវាទូរស័ព្ទ',
+    'v3.fold.entry': 'ទិដ្ឋាការ និងការចូលប្រទេស',
+    'v3.fold.around': 'អាកាសយានដ្ឋាន និងការធ្វើដំណើរ',
+    'v3.fold.places': 'កន្លែងគួរទៅ',
+    'v3.fold.show': 'បង្ហាញ',
+    'v3.fold.hide': 'លាក់',
     // Field labels
     'v3.currency': 'រូបិយប័ណ្ណ',
     'v3.power': 'ចរន្តអគ្គិសនី',

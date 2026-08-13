@@ -46,6 +46,8 @@ interface DomerLogoProps {
   surface?: 'navy' | 'light';
   size?: number;
   kicker?: boolean;
+  /** Seats the mark in a raised light disc — the nav's brand button. */
+  badge?: boolean;
   className?: string;
 }
 
@@ -53,13 +55,28 @@ interface DomerLogoProps {
 // "Domner" (Marcellus) + "TRAVEL" kicker in English, "ដំណើរ" (Khmer serif) +
 // "DOMNER" kicker in Khmer — so the logo visibly responds to the language
 // toggle instead of staying pinned to English.
-export function DomerLogo({ surface = 'light', size = 30, kicker = true, className }: DomerLogoProps) {
+export function DomerLogo({
+  surface = 'light',
+  size = 30,
+  kicker = true,
+  badge = false,
+  className,
+}: DomerLogoProps) {
   const { lang, t } = useLang();
   const wordColor = surface === 'navy' ? 'text-sandstone' : 'text-primary';
   const wordFont = lang === 'km' ? 'font-khmer' : 'font-display';
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
-      <DomerMark surface={surface} size={size} />
+      {badge ? (
+        // Seated in its own disc, the mark stops being a small graphic beside
+        // some words and becomes the one round thing in a bar of rounded
+        // rectangles — which is what makes it read as a button you can press.
+        <span className="brand-badge" style={{ width: size, height: size }}>
+          <DomerMark surface="light" size={Math.round(size * 0.58)} />
+        </span>
+      ) : (
+        <DomerMark surface={surface} size={size} />
+      )}
       <span key={lang} className="leading-none animate-fade-up">
         <span className={`block ${wordFont} text-xl tracking-[0.05em] ${wordColor}`}>{t('brand.word')}</span>
         {kicker && (
