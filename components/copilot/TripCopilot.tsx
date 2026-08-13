@@ -43,6 +43,14 @@ const DRAG_THRESHOLD = 6;
 const KEY_STEP = 24;
 
 const STORAGE_KEY = 'domner-copilot-position';
+const HINT_KEY = 'domner-copilot-hint-seen';
+
+/** How long the "drag me" hint stays up on a first visit. */
+const HINT_MS = 7000;
+/** Idle time before the button fades back so it stops covering the page. */
+const IDLE_MS = 3500;
+/** Resting opacity once idle. Low enough to read through, high enough to find. */
+const IDLE_OPACITY = 0.45;
 
 interface Position {
   x: number;
@@ -153,6 +161,20 @@ export function TripCopilot() {
   const [side, setSide] = useState<'left' | 'right'>('right');
   const [dragging, setDragging] = useState(false);
 
+  // Two problems the drag alone did not solve.
+  //
+  // "It doesn't seem movable": a round button that opens a chat when tapped
+  // gives no sign that it can also be dragged, so nobody discovers it. A
+  // one-time hint on the first visit is what makes the feature exist for a
+  // real traveler rather than only for whoever wrote it.
+  //
+  // "It's still hiding things": wherever it rests it covers something — on Home
+  // that is the search field. So it fades back when untouched and returns to
+  // full strength the moment it is approached. Opacity does not affect hit
+  // testing, so a faded button is exactly as tappable as a solid one.
+  const [showHint, setShowHint] = useState(false);
+  const [idle, setIdle] = useState(false);
+
   const dragRef = useRef<{
     pointerId: number;
     grabX: number;
@@ -207,6 +229,61 @@ export function TripCopilot() {
     return () => window.removeEventListener('resize', onResize);
   }, [position]);
 
+  const dismissHint = useCallback(() => {
+    setShowHint(false);
+    try {
+      window.localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      // Storage unavailable — the hint will show again next visit. Harmless.
+    }
+  }, []);
+
+  // Show it once, ever, and only to someone who has not already moved the
+  // button — if they have, they already know.
+  useEffect(() => {
+    let seen = true;
+    try {
+      seen = window.localStorage.getItem(HINT_KEY) === '1';
+    } catch {
+      // Storage unavailable. Treat as seen rather than nagging every page load.
+    }
+    if (seen || readStored()) return;
+
+    setShowHint(true);
+    const timer = window.setTimeout(dismissHint, HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [dismissHint]);
+
+  // Idle fade. Any pointer activity anywhere wakes it, because a finger heading
+  // for the button passes over the page first — waiting for a touch ON the
+  // button would mean aiming at something half-faded.
+  useEffect(() => {
+    // While the panel is open, or mid-drag, it must stay solid.
+    if (open || dragging) {
+      setIdle(false);
+      return;
+    }
+
+    let timer = window.setTimeout(() => setIdle(true), IDLE_MS);
+
+    const wake = () => {
+      setIdle(false);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setIdle(true), IDLE_MS);
+    };
+
+    window.addEventListener('pointerdown', wake, { passive: true });
+    window.addEventListener('pointermove', wake, { passive: true });
+    window.addEventListener('scroll', wake, { passive: true });
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('pointermove', wake);
+      window.removeEventListener('scroll', wake);
+    };
+  }, [open, dragging]);
+
   const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     // Ignore right-clicks and anything that is not a primary press.
     if (event.button !== 0) return;
@@ -237,6 +314,7 @@ export function TripCopilot() {
       if (travelled < DRAG_THRESHOLD) return;
       drag.moved = true;
       setDragging(true);
+      dismissHint();
     }
 
     setPosition(next);
@@ -365,7 +443,30 @@ export function TripCopilot() {
 
   return (
     <>
-      <button
+      {/* One wrapper owns the position so the button and its hint can never
+          drift apart. The button keeps the pointer handlers. */}
+      <div
+        className={`fixed z-[95] h-14 w-14 ${position ? '' : 'copilot-fab'} ${
+          dragging ? '' : 'copilot-fab-settling'
+        }`}
+        style={
+          position
+            ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
+            : undefined
+        }
+      >
+        {showHint && (
+          <p
+            role="status"
+            className={`animate-fade-up absolute top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-gold-light/30 bg-[#0E1B30]/95 px-3.5 py-2 text-xs font-medium text-white shadow-lg backdrop-blur-md ${
+              side === 'left' ? 'left-[4.25rem]' : 'right-[4.25rem]'
+            }`}
+          >
+            {lang === 'km' ? 'អូសខ្ញុំទៅកន្លែងផ្សេង' : 'Drag me out of the way'}
+          </p>
+        )}
+
+        <button
         type="button"
         onClick={() => {
           // A drag ends in a click too. Swallow that one so moving the button
@@ -393,14 +494,10 @@ export function TripCopilot() {
         // z-[95] puts it above the panel (z-[90]). The button is also the close
         // button, so once it can be dragged anywhere it must never end up
         // underneath the panel it opened, with no way to dismiss it.
-        className={`liquid-glass-accent liquid-sheen liquid-touch fixed z-[95] flex h-14 w-14 touch-none items-center justify-center rounded-full text-white shadow-lg [backdrop-filter:none] [-webkit-backdrop-filter:none] ${
-          position ? '' : 'copilot-fab'
-        } ${dragging ? 'scale-105 cursor-grabbing' : 'copilot-fab-settling liquid-press cursor-grab hover:scale-105'}`}
-        style={
-          position
-            ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
-            : undefined
-        }
+        className={`liquid-glass-accent liquid-sheen liquid-touch flex h-14 w-14 touch-none items-center justify-center rounded-full text-white shadow-lg transition-opacity duration-500 [backdrop-filter:none] [-webkit-backdrop-filter:none] ${
+          dragging ? 'scale-105 cursor-grabbing' : 'liquid-press cursor-grab hover:scale-105'
+        }`}
+        style={{ opacity: idle && !showHint ? IDLE_OPACITY : 1 }}
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
         <span id="copilot-drag-hint" className="sr-only">
@@ -408,7 +505,8 @@ export function TripCopilot() {
             ? 'អាចអូសដើម្បីផ្លាស់ទី ឬប្រើគ្រាប់ចុចព្រួញ'
             : 'Draggable. Use the arrow keys to move it.'}
         </span>
-      </button>
+        </button>
+      </div>
 
       {open && (
         <div
