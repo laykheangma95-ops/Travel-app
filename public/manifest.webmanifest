@@ -1,15 +1,52 @@
 {
-  "name": "Domer — The Art of the Journey",
-  "short_name": "Domer",
-  "description": "Premium travel super app for Cambodian travelers — eSIM, live flight tracking, airport guidance, in Khmer.",
-  "start_url": "/",
+  "id": "/",
+  "name": "Domner — Travel Confidently. Stay Connected.",
+  "short_name": "Domner",
+  "description": "Your travel companion for the whole journey — eSIM, live flight alerts, trips and airport guidance, in Khmer.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#14263F",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#0E1B30",
   "theme_color": "#14263F",
   "orientation": "portrait",
+  "lang": "km",
+  "dir": "ltr",
+  "categories": ["travel", "navigation", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Updates",
+      "short_name": "Updates",
+      "description": "Flight changes, eSIM data and trip reminders",
+      "url": "/updates?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My eSIMs",
+      "short_name": "eSIMs",
+      "description": "QR codes and data for your eSIMs",
+      "url": "/my-esims?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track a flight",
+      "short_name": "Flights",
+      "description": "Live status, gate and boarding",
+      "url": "/flights?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Emergency",
+      "short_name": "Emergency",
+      "description": "Khmer phrases and numbers, offline",
+      "url": "/emergency?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

@@ -222,13 +222,88 @@ CREATE TABLE trip_memories (
 
 -- ── Notifications ────────────────────────────────────────────────────────────
 
+-- One row per device that agreed to hear from us. Two providers share the
+-- table: Firebase Cloud Messaging (a single token) and the W3C Push API (an
+-- endpoint URL plus two keys). Same concept, so one table and one place to
+-- unsubscribe. See migration 006 for the reasoning.
 CREATE TABLE push_subscriptions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  fcm_token TEXT NOT NULL UNIQUE,
+  provider TEXT NOT NULL DEFAULT 'fcm' CHECK (provider IN ('fcm', 'webpush')),
+  fcm_token TEXT UNIQUE,
+  endpoint TEXT,
+  p256dh TEXT,
+  auth_secret TEXT,
   device_type TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  user_agent TEXT,
+  lang TEXT CHECK (lang IS NULL OR lang IN ('km', 'en')),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  failed_at TIMESTAMPTZ,
+  last_seen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT push_subscriptions_credential_present CHECK (
+    (provider = 'fcm'     AND fcm_token IS NOT NULL) OR
+    (provider = 'webpush' AND endpoint IS NOT NULL AND p256dh IS NOT NULL AND auth_secret IS NOT NULL)
+  )
 );
+
+CREATE UNIQUE INDEX idx_push_endpoint ON push_subscriptions (endpoint) WHERE endpoint IS NOT NULL;
+CREATE INDEX idx_push_user_active ON push_subscriptions (user_id) WHERE is_active;
+
+-- Per-category notification consent. Discovery and local information default
+-- OFF: a traveler should have to ask for marketing, never ask us to stop.
+CREATE TABLE notification_preferences (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  push_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  flight_gate_changes BOOLEAN NOT NULL DEFAULT TRUE,
+  flight_delays       BOOLEAN NOT NULL DEFAULT TRUE,
+  flight_boarding     BOOLEAN NOT NULL DEFAULT TRUE,
+  flight_check_in     BOOLEAN NOT NULL DEFAULT TRUE,
+  trip_reminders      BOOLEAN NOT NULL DEFAULT TRUE,
+  trip_itinerary      BOOLEAN NOT NULL DEFAULT TRUE,
+  trip_hotel          BOOLEAN NOT NULL DEFAULT TRUE,
+  esim_activation     BOOLEAN NOT NULL DEFAULT TRUE,
+  esim_data_usage     BOOLEAN NOT NULL DEFAULT TRUE,
+  esim_low_data       BOOLEAN NOT NULL DEFAULT TRUE,
+  travel_weather      BOOLEAN NOT NULL DEFAULT TRUE,
+  travel_local_info   BOOLEAN NOT NULL DEFAULT FALSE,
+  discover_deals        BOOLEAN NOT NULL DEFAULT FALSE,
+  discover_destinations BOOLEAN NOT NULL DEFAULT FALSE,
+  discover_suggestions  BOOLEAN NOT NULL DEFAULT FALSE,
+  quiet_hours_start SMALLINT CHECK (quiet_hours_start IS NULL OR quiet_hours_start BETWEEN 0 AND 23),
+  quiet_hours_end   SMALLINT CHECK (quiet_hours_end   IS NULL OR quiet_hours_end   BETWEEN 0 AND 23),
+  timezone TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The Domner Inbox. The inbox is the record; push is one delivery channel for
+-- it, so a traveler who denied browser permission still sees their gate change.
+CREATE TABLE notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('flights', 'trips', 'esim', 'travel', 'discover', 'account')),
+  kind TEXT NOT NULL,
+  level SMALLINT NOT NULL CHECK (level BETWEEN 1 AND 4),
+  title TEXT NOT NULL,
+  body TEXT,
+  deep_link TEXT NOT NULL,
+  entity_type TEXT,
+  entity_id TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  dedupe_key TEXT,
+  read_at TIMESTAMPTZ,
+  pushed_at TIMESTAMPTZ,
+  push_attempts SMALLINT NOT NULL DEFAULT 0,
+  push_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_notifications_dedupe ON notifications (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX idx_notifications_inbox ON notifications (user_id, created_at DESC);
+CREATE INDEX idx_notifications_unread ON notifications (user_id) WHERE read_at IS NULL;
 
 -- ── Affiliates ───────────────────────────────────────────────────────────────
 
@@ -378,7 +453,9 @@ ALTER TABLE flight_shares         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_plans            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_checklist_items  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_memories         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE push_subscriptions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliates            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliate_events      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE support_tickets       ENABLE ROW LEVEL SECURITY;
@@ -453,6 +530,17 @@ CREATE POLICY "memories_all_own"   ON trip_memories FOR ALL USING (auth.uid() = 
 
 -- Push
 CREATE POLICY "push_all_own" ON push_subscriptions FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "notif_prefs_own" ON notification_preferences
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Read your own inbox; mark it read; delete it. There is deliberately no INSERT
+-- policy — notifications are written server-side by the priority engine. A
+-- browser that could insert here could forge "your flight is cancelled".
+CREATE POLICY "notifications_select_own" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notifications_update_own" ON notifications
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "notifications_delete_own" ON notifications FOR DELETE USING (auth.uid() = user_id);
 
 -- Affiliates
 CREATE POLICY "affiliates_select_own" ON affiliates FOR SELECT USING (auth.uid() = user_id OR public.is_admin());

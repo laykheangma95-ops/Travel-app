@@ -19,7 +19,7 @@
 //                        absent; a stale gate number is worse than no gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const STATIC_CACHE = `domner-static-${VERSION}`;
 const PAGES_CACHE = `domner-pages-${VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -133,34 +133,67 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ── Push notifications ───────────────────────────────────────────────────────
+//
+// Two senders share this handler:
+//   • Firebase Cloud Messaging, for the legacy flight-alert tokens
+//   • the standard Web Push API (lib/push/webPush.ts), for everything new
+//
+// Both send the same JSON shape, so nothing here needs to know which arrived.
+
+const FALLBACK_URL = '/updates';
 
 self.addEventListener('push', (event) => {
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch {
+    // A push service is allowed to deliver a bare string. Better a notification
+    // with only a body than a swallowed one.
     data = { body: event.data ? event.data.text() : '' };
   }
 
+  // Deep-linking is the whole point (§15): a gate change opens THAT flight. If
+  // a sender ever omits the url we land on the inbox, never the homepage —
+  // the inbox at least still contains the message.
+  const url = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : FALLBACK_URL;
+
   event.waitUntil(
-    self.registration.showNotification(data.title || '✈️ Domner App', {
+    self.registration.showNotification(data.title || 'Domner', {
       body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: data.tag || 'domner-flight',
+      // The tag collapses repeats about the same subject: a second gate update
+      // for one flight replaces the first rather than stacking.
+      tag: data.tag || 'domner',
       renotify: true,
-      data: { url: data.url || '/' },
+      // Only level 1 asks the OS to hold the notification until it is dealt
+      // with. Anything quieter must not sit on someone's lock screen.
+      requireInteraction: data.requireInteraction === true,
+      data: { url, notificationId: data.notificationId ?? null },
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || '/';
+  const target = (event.notification.data && event.notification.data.url) || FALLBACK_URL;
 
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+      // Prefer a tab already showing the destination — focusing it beats
+      // re-navigating and losing whatever state it had.
+      for (const win of windows) {
+        try {
+          if (new URL(win.url).pathname === new URL(target, self.location.origin).pathname) {
+            return win.focus();
+          }
+        } catch {
+          /* an unparseable client URL is not worth failing the click over */
+        }
+      }
+
       for (const win of windows) {
         if ('focus' in win) {
           // navigate() is not implemented everywhere; falling through to
@@ -168,6 +201,7 @@ self.addEventListener('notificationclick', (event) => {
           if (typeof win.navigate === 'function') {
             try {
               await win.navigate(target);
+              return win.focus();
             } catch {
               /* fall through to focus */
             }
@@ -175,6 +209,7 @@ self.addEventListener('notificationclick', (event) => {
           return win.focus();
         }
       }
+
       return self.clients.openWindow(target);
     })()
   );

@@ -7,17 +7,17 @@ import {
   Map,
   Smartphone,
   BellRing,
-  Camera,
+  UserRound,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'My Trips', href: '/my-trips', icon: Map },
+  { label: 'Trips', href: '/trips', icon: Map },
   { label: 'My eSIMs', href: '/my-esims', icon: Smartphone },
-  { label: 'Flight Alerts', href: '/flights', icon: BellRing },
-  { label: 'Memories', href: '/trips', icon: Camera },
+  { label: 'Updates', href: '/updates', icon: BellRing },
+  { label: 'You', href: '/you', icon: UserRound },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -25,7 +25,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   return (
-    <div className="mx-auto flex max-w-7xl gap-8 px-4 py-10 sm:px-6">
+    // has-tabbar reserves the safe-area-aware room the global bottom bar needs,
+    // so the last row of a dashboard screen is never hidden behind it.
+    <div className="has-tabbar mx-auto flex max-w-7xl gap-8 px-4 py-10 sm:px-6">
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 lg:block" aria-label="Dashboard navigation">
         <nav className="sticky top-24 space-y-1">
@@ -51,31 +53,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </aside>
 
-      <div className="min-w-0 flex-1 pb-20 lg:pb-0">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
 
-      {/* Mobile bottom tabs */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 backdrop-blur-lg lg:hidden"
-        aria-label="Dashboard navigation"
-      >
-        {navItems.slice(0, 5).map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors',
-                active ? 'text-accent' : 'text-ink-muted'
-              )}
-              aria-current={active ? 'page' : undefined}
-            >
-              <item.icon size={19} aria-hidden="true" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* No mobile bottom tabs here any more.
+          This layout used to render its own fixed bottom bar. The app now has a
+          single global one (components/layout/BottomNavigation.tsx), and two
+          stacked fixed bars is both a visual bug and two competing answers to
+          "where am I?". The desktop sidebar above stays — it is the right shape
+          for a wide utility screen, and the global tab bar is mobile-only. */}
     </div>
   );
 }
