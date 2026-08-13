@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Search, Sparkles } from 'lucide-react';
+import { ArrowRight, Compass, Search, Sparkles } from 'lucide-react';
 import { destinations } from '@/data/destinations';
 import { DestinationCard } from '@/components/esim/DestinationCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -115,6 +115,16 @@ export default function EsimStorePage() {
             </button>
           ))}
         </div>
+
+        {/* This tab used to be Explore. Someone who tapped the third slot out of
+            habit now lands here, so the store says where the guides went. */}
+        <Link
+          href="/explore"
+          className="mb-8 inline-flex items-center gap-1.5 text-sm text-white/55 underline underline-offset-4 transition-colors hover:text-white"
+        >
+          <Compass size={15} aria-hidden="true" />
+          Looking for destination guides? Explore them here
+        </Link>
 
         {/* Grid */}
         {filtered.length > 0 ? (

@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import {
   Bell,
   ChevronRight,
+  Compass,
   FileText,
   LifeBuoy,
   ListChecks,
@@ -59,6 +60,18 @@ const GROUPS: { title: { en: string; km: string }; rows: Row[] }[] = [
         label: { en: 'My eSIMs', km: 'eSIM របស់ខ្ញុំ' },
         hint: { en: 'QR codes, data and orders', km: 'កូដ QR ទិន្នន័យ និងការបញ្ជាទិញ' },
         private: true,
+      },
+      {
+        // Explore traded its bottom-nav tab for the store. This row is one of
+        // its three remaining persistent entry points (navbar and footer are
+        // the others) — see the note in BottomNavigation.tsx.
+        href: '/explore',
+        icon: Compass,
+        label: { en: 'Explore destinations', km: 'ស្វែងរកគោលដៅ' },
+        hint: {
+          en: 'Guides, visas and real prices',
+          km: 'មគ្គុទ្ទេសក៍ ទិដ្ឋាការ និងតម្លៃពិត',
+        },
       },
       {
         href: '/checklist',
