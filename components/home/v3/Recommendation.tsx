@@ -13,7 +13,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Check, ShoppingBag } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShoppingBag } from 'lucide-react';
 import { getPlansForCountry } from '@/data/esimPlans';
 import { getDestination } from '@/data/destinations';
 import { useCart } from '@/hooks/useCart';
@@ -31,10 +32,11 @@ export function Recommendation({
 }) {
   const { t } = useLang();
   const bi = useBi();
+  const router = useRouter();
   const addItem = useCart((s) => s.addItem);
   const [days, setDays] = useState(8);
   const [enabled, setEnabled] = useState<string[]>(DEFAULT_LINE_IDS);
-  const [added, setAdded] = useState(false);
+  const [buying, setBuying] = useState(false);
 
   const destination = getDestination(guide.esimCountrySlug);
   const plans = useMemo(() => getPlansForCountry(guide.esimCountrySlug), [guide.esimCountrySlug]);
@@ -77,11 +79,16 @@ export function Recommendation({
       priceUsd: plan.priceUsd,
       quantity: 1,
     });
-    setAdded(true);
+    setBuying(true);
     // Resolved downward, the opposite shape to the unlock cue: choosing a
     // destination opens something, buying settles it.
     play('confirm');
     onBought?.();
+    // This card is advice that ends in a decision, so pressing the button
+    // finishes it. It used to swap itself for a link to the cart — a second
+    // decision, on a page the customer had not asked to think about, one
+    // chapter after we told them the choice was made.
+    router.push('/esim/checkout');
   };
 
   return (
@@ -151,15 +158,9 @@ export function Recommendation({
       )}
 
       <div className="v3-rec-actions">
-        {added ? (
-          <Link href="/cart" className="v3-btn v3-btn-primary">
-            <Check size={17} aria-hidden="true" /> {t('v3.rec.added')}
-          </Link>
-        ) : (
-          <button type="button" className="v3-btn v3-btn-primary" onClick={buy}>
-            <ShoppingBag size={17} aria-hidden="true" /> {t('v3.rec.buy')}
-          </button>
-        )}
+        <button type="button" className="v3-btn v3-btn-primary" onClick={buy} disabled={buying}>
+          <ShoppingBag size={17} aria-hidden="true" /> {t('v3.rec.buy')}
+        </button>
 
         <div className="v3-rec-days">
           <span id="v3-days-label">{t('v3.rec.tripLength')}</span>
