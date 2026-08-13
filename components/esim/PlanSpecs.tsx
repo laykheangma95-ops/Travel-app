@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { Check, Globe2, Info, Minus, Signal, Smartphone, Timer } from 'lucide-react';
 import type { EsimPlan } from '@/types';
 import { destinationNetworks } from '@/data/gohubNetworks';
+import { carriersInCountry, coverageFor } from '@/data/coverage';
 import { activationDeadline, policyFor } from '@/data/planPolicy';
 import { describeAllowance } from '@/data/esimPlans';
 
@@ -37,6 +39,13 @@ export function PlanSpecs({ countrySlug, countryName, plans }: PlanSpecsProps) {
 
   const network = destinationNetworks[countrySlug];
   const policy = policyFor(countrySlug);
+  // Deduped: one entry per country, not one per price-list row.
+  const covered = coverageFor(countrySlug);
+  // Show the panel where it earns its place: wherever the supplier gave a real
+  // per-country breakdown (as before), plus the bundles whose breakdown is blank
+  // but whose name already names several countries — Hong Kong · Macao and
+  // USA · Mexico · Canada used to render no coverage panel at all.
+  const showCoverage = covered.length > 1 || (network?.coverage.length ?? 0) > 0;
   const [reference] = plans;
 
   const carriers = network
@@ -133,18 +142,35 @@ export function PlanSpecs({ countrySlug, countryName, plans }: PlanSpecsProps) {
         </dl>
 
         <div className="space-y-4">
-          {network && network.coverage.length > 0 && (
+          {/* The valid-country list.
+              Counted from the deduped coverage index rather than from the price
+              list's rows: GoHub list France twice on the Europe SKU (Free Mobile
+              and Wireless France), which used to read as "33 countries" and gave
+              two <li>s the same React key. It is 32 countries, and each one now
+              links to its own page so a traveller can confirm their destination. */}
+          {showCoverage && (
             <div className="night-card p-6">
               <p className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Globe2 size={16} aria-hidden="true" className="text-gold-light" />
-                Works in {network.coverage.length}{' '}
-                {network.coverage.length === 1 ? 'country' : 'countries'}
+                Works in {covered.length} {covered.length === 1 ? 'country' : 'countries'}
               </p>
               <ul className="mt-3 space-y-1.5">
-                {network.coverage.map((entry) => (
-                  <li key={entry.country} className="text-xs text-white/70">
-                    <span className="text-white/90">{entry.country}</span>
-                    <span className="text-white/45"> — {entry.carriers.join(', ')}</span>
+                {covered.map((entry) => (
+                  <li key={entry.iso2} className="text-xs text-white/70">
+                    <Link
+                      href={`/esim/${entry.slug}`}
+                      className="text-white/90 underline-offset-2 transition-colors hover:text-gold-light hover:underline"
+                    >
+                      {entry.name}
+                    </Link>
+                    {/* Blank for a bundle whose breakdown the price list omits.
+                        A dangling em-dash reads as missing data, so drop it. */}
+                    {carriersInCountry(countrySlug, entry.slug).length > 0 && (
+                      <span className="text-white/45">
+                        {' '}
+                        — {carriersInCountry(countrySlug, entry.slug).join(', ')}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
