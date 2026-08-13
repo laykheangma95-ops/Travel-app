@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, LogOut, Menu, ShieldCheck, ShoppingCart, User, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useSession } from '@/hooks/useSession';
@@ -100,6 +100,49 @@ export function Navbar() {
     };
   }, [accountOpen]);
 
+  /* ── The liquid indicator ────────────────────────────────────────────────
+     One pill of light lives behind the whole link cluster and glides from item
+     to item as you sweep across it, taking each one's exact width on the way.
+     It is a single element, so the movement is continuous — the thing you are
+     watching is the same thing the whole time, which is what makes it read as
+     liquid rather than as five separate hover states blinking on and off.
+
+     At rest it parks on the section you are actually in, so the bar answers
+     "where am I" with the same object it uses to answer "what am I about to
+     press". Nothing here is required to operate the nav: with JavaScript off,
+     or before hydration, every link still works and still shows its focus ring.
+     Measured from the DOM rather than hardcoded, because the labels are
+     bilingual and Khmer is wider than English. */
+  const listRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState({ x: 0, w: 0, on: false });
+
+  const glideTo = useCallback((el: HTMLElement | null) => {
+    const list = listRef.current;
+    if (!list || !el) return;
+    const listBox = list.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    setPill({ x: box.left - listBox.left, w: box.width, on: true });
+  }, []);
+
+  // Back to the current section — or out entirely, if you are somewhere the nav
+  // does not cover.
+  const restPill = useCallback(() => {
+    const active = listRef.current?.querySelector<HTMLElement>('[data-active="true"]');
+    if (active) glideTo(active);
+    else setPill((p) => ({ ...p, on: false }));
+  }, [glideTo]);
+
+  // Re-measure on navigation, on a language switch (the labels change width) and
+  // on resize. Fonts land late, so also once the webfonts are ready — otherwise
+  // the resting pill is sized to the fallback face.
+  useEffect(() => {
+    restPill();
+    const onResize = () => restPill();
+    window.addEventListener('resize', onResize);
+    document.fonts?.ready.then(restPill).catch(() => {});
+    return () => window.removeEventListener('resize', onResize);
+  }, [pathname, lang, user, restPill]);
+
   // Sign out, then leave. Staying put would land a signed-out visitor on a
   // page they can no longer read — their eSIMs, their settings — and the empty
   // screen looks like data loss rather than a sign-out.
@@ -123,13 +166,32 @@ export function Navbar() {
   // page on the site — the store, the plan pages, the cart, the checkout, the
   // flight tracker. One inconsistent element repeated on every screen does more
   // damage to a premium feeling than any single page can repair.
-  const lightSurfaces = ['/admin', '/dashboard', '/settings', '/my-esims', '/my-trips', '/privacy', '/terms', '/refunds'];
+  //
+  // The four auth screens are on this list because they are light pages: they
+  // were not on it, so the dark bar rendered white labels on a white surface
+  // and the entire nav was invisible on /sign-in, /sign-up and both password
+  // screens. It only became obvious once the bar stopped painting its own
+  // opaque band and started taking its ground from the page underneath.
+  const lightSurfaces = [
+    '/admin',
+    '/dashboard',
+    '/settings',
+    '/my-esims',
+    '/my-trips',
+    '/privacy',
+    '/terms',
+    '/refunds',
+    '/sign-in',
+    '/sign-up',
+    '/forgot-password',
+    '/reset-password',
+  ];
   const onLight = lightSurfaces.some((r) => pathname.startsWith(r));
   const inkClass = onLight ? 'text-ink-secondary hover:text-ink' : 'text-white/80 hover:text-white';
   const pillClass = onLight ? 'nav-pill nav-pill-light' : 'nav-pill';
 
-  // Which group owns the page you are on. Used for the single gold dot — the
-  // bar should always be able to answer "where am I" without you reading it.
+  // Which group owns the page you are on. The bar should always be able to
+  // answer "where am I" without you reading it.
   const isActive = (group: NavGroup) =>
     group.href
       ? pathname.startsWith(group.href)
@@ -142,34 +204,53 @@ export function Navbar() {
     <header className="sticky top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-4">
       <nav
         className={cn(
-          'mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full pl-4 pr-2 sm:pl-6 sm:pr-3',
+          'mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full py-2 pl-2.5 pr-2.5 sm:pl-3',
           'nav-liquid',
           onLight && 'nav-liquid-light',
           scrolled && 'nav-liquid-scrolled'
         )}
         aria-label="Main"
+        // Opts the capsule into the global pointer tracker, which writes the
+        // cursor position into --gx/--gy for the specular highlight.
+        data-liquid
       >
-        {/* Logo */}
-        <Link href="/" className="shrink-0">
-          <DomerLogo surface={onLight ? 'light' : 'navy'} />
+        {/* Brand — the one circle in a bar of capsules, so it reads as the way
+            home without needing a label to say so. */}
+        <Link href="/" className="nav-brand shrink-0">
+          <DomerLogo surface={onLight ? 'light' : 'navy'} badge size={44} />
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden items-center gap-1 lg:flex">
+        <div
+          ref={listRef}
+          className="relative hidden items-center gap-1 lg:flex"
+          onMouseLeave={restPill}
+        >
+          {/* The travelling pill. Purely decorative — every link below is a real
+              link with its own focus ring. */}
+          <span
+            className={cn('nav-indicator', pill.on && 'is-on', onLight && 'nav-indicator-light')}
+            aria-hidden="true"
+            style={{ transform: `translate3d(${pill.x}px, 0, 0)`, width: pill.w }}
+          />
           {navGroups.map((group) =>
             group.items ? (
               <div
                 key={group.labelKey}
                 className="relative"
-                onMouseEnter={() => setOpenDropdown(group.labelKey)}
+                onMouseEnter={(e) => {
+                  setOpenDropdown(group.labelKey);
+                  glideTo(e.currentTarget.querySelector('button'));
+                }}
                 onMouseLeave={() => setOpenDropdown(null)}
               >
                 <button
                   type="button"
-                  className={`${pillClass} flex items-center gap-1 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
+                  className={`nav-link ${inkClass}`}
                   aria-expanded={openDropdown === group.labelKey}
                   data-open={openDropdown === group.labelKey}
                   data-active={isActive(group)}
+                  onFocus={(e) => glideTo(e.currentTarget)}
                 >
                   {t(group.labelKey)}
                   <ChevronDown
@@ -200,8 +281,10 @@ export function Navbar() {
               <Link
                 key={group.labelKey}
                 href={group.href!}
-                className={`${pillClass} rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
+                className={`nav-link ${inkClass}`}
                 data-active={isActive(group)}
+                onMouseEnter={(e) => glideTo(e.currentTarget)}
+                onFocus={(e) => glideTo(e.currentTarget)}
               >
                 {t(group.labelKey)}
               </Link>
