@@ -147,11 +147,38 @@ function SummaryView({ data, dayLabel, onAdd, onRemove, onDragStart, onDrop }: {
 }
 
 function DaySection({ title, day, places, onAdd, onRemove, onDragStart, onDrop }: { title: string; day?: ItineraryDay; places: ItineraryPlace[]; onAdd: () => void; onRemove: (id: string) => void; onDragStart: (id: string) => void; onDrop: (id: string) => void }) {
-  return <section className="border-b border-black/[.04] pb-5 last:border-0"><div className="flex items-center"><h2 className="text-[22px] font-bold tracking-[-.03em]">{title}</h2><button className="ml-3 text-sm text-black/25">Add remarks</button><button aria-label="Collapse section" className="ml-auto text-black/35"><ChevronUp size={22} /></button></div><div className="mt-4 space-y-2">{places.map((item, index) => <PlaceCard key={item.id} item={item} index={index} onDelete={() => onRemove(item.id)} onDragStart={() => onDragStart(item.id)} onDrop={() => onDrop(item.id)} />)}<button type="button" onClick={onAdd} className="flex w-full items-center gap-5 rounded-xl py-4 text-left text-[17px] text-black/25 transition-colors hover:bg-black/[.02]"><span className="text-[31px] font-light leading-none">+</span><span>Add</span></button></div></section>;
+  return <section className="border-b border-black/[.04] pb-5 last:border-0">
+    <div className="flex items-start">
+      <div><h2 className="text-[22px] font-bold tracking-[-.03em]">{title}</h2>{day?.theme && <p className="mt-1 text-sm font-semibold text-black/55">{day.theme}</p>}</div>
+      <button className="ml-3 mt-1 text-sm text-black/25">Add remarks</button>
+      <button aria-label="Collapse section" className="ml-auto mt-1 text-black/35"><ChevronUp size={22} /></button>
+    </div>
+    <div className="mt-4 space-y-1">
+      {places.map((item, index) => <div key={item.id}><PlaceCard item={item} index={index} onDelete={() => onRemove(item.id)} onDragStart={() => onDragStart(item.id)} onDrop={() => onDrop(item.id)} />{index < places.length - 1 && <TravelGap item={item} next={places[index + 1]} />}</div>)}
+      <button type="button" onClick={onAdd} className="flex w-full items-center gap-5 rounded-xl py-4 text-left text-[17px] text-black/25 transition-colors hover:bg-black/[.02]"><span className="text-[31px] font-light leading-none">+</span><span>Add</span></button>
+    </div>
+  </section>;
 }
 
 function PlaceCard({ item, index, onDelete, onDragStart, onDrop }: { item: ItineraryPlace; index: number; onDelete: () => void; onDragStart: () => void; onDrop: () => void }) {
-  return <article draggable onDragStart={onDragStart} onDragOver={(event) => event.preventDefault()} onDrop={onDrop} className="group flex items-start gap-3 rounded-2xl border border-black/[.06] bg-white p-3 shadow-[0_4px_16px_rgba(28,34,40,.05)]"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#eef7fa] text-sm font-bold text-[#1699ca]">{index + 1}</span><span className="min-w-0 flex-1"><b className="block">{item.place.name}</b><span className="text-xs text-black/40">{labels[item.category] ?? 'Place'}</span><p className="mt-1 text-sm leading-relaxed text-black/48">{item.place.description}</p></span><button aria-label="Remove place" onClick={onDelete} className="p-1.5 text-black/25 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"><Trash2 size={16} /></button></article>;
+  const timeSlots = ['10:00 - 12:00', '12:00 - 13:30', '14:00 - 15:30', '16:00 - 17:30'];
+  const time = item.time_start && item.time_end ? item.time_start.slice(0, 5) + ' - ' + item.time_end.slice(0, 5) : timeSlots[index % timeSlots.length];
+  const description = item.notes ?? item.place.description;
+  return <article draggable onDragStart={onDragStart} onDragOver={(event) => event.preventDefault()} onDrop={onDrop} className="group flex items-start gap-3">
+    <div className="mt-1 h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-[#dceff3] to-[#b2c8ca]" style={item.place.photo_url ? { backgroundImage: 'url(' + item.place.photo_url + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+      {!item.place.photo_url && <MapPin size={19} className="mx-auto mt-3 text-[#159dca]" />}
+    </div>
+    <div className="min-w-0 flex-1">
+      <span className="text-sm font-semibold text-[#73ae8e]">{labels[item.category] ?? 'Place'}</span>
+      <div className="flex items-start gap-2"><h3 className="text-[18px] font-bold leading-tight">{index + 1}.{item.place.name}</h3><button aria-label="Edit place" className="ml-auto shrink-0 text-black/30">⌕</button></div>
+      <div className="mt-2 rounded-2xl bg-[#f8f8f8] px-3 py-2.5"><p className="font-bold text-black/65">{time}</p><p className="mt-1 line-clamp-2 text-[15px] leading-snug text-black/60">{description}</p><span className="text-sm text-black/25">Show more</span></div>
+      <button aria-label="Remove place" onClick={onDelete} className="mt-1 p-1 text-black/25 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"><Trash2 size={15} /></button>
+    </div>
+  </article>;
+}
+
+function TravelGap({ item, next }: { item: ItineraryPlace; next: ItineraryPlace }) {
+  return <div className="ml-[60px] flex items-center gap-2 py-3 text-xs font-semibold text-[#9aaab1]"><span>♧</span><span>{item.category === 'transport' || next.category === 'transport' ? 'Transit' : 'Walk'} · 11 min</span><span>›</span></div>;
 }
 
 function AddPlaceSheet({ targetLabel, filter, setFilter, query, setQuery, places, onAdd, onClose, onCustom }: { targetLabel: string; filter: PickerFilter; setFilter: (value: PickerFilter) => void; query: string; setQuery: (value: string) => void; places: CuratedPlace[]; onAdd: (place: CuratedPlace) => void; onClose: () => void; onCustom: () => void }) {
