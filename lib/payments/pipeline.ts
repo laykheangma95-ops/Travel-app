@@ -16,7 +16,6 @@
 //   • the settled amount is reconciled against the order before fulfilment
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { generateOrderNumber } from '@/lib/utils';
 import { ApiError } from '@/lib/http';
 import { getUser } from '@/lib/serverAuth';
 import { log, redactEmail } from '@/lib/logger';
@@ -32,6 +31,7 @@ import type { PaymentSession } from '@/lib/providers/payments/types';
 import {
   createOrder,
   getOrderByNumber,
+  nextOrderNumber,
   ordersPersistenceAvailable,
   transitionOrder,
 } from '@/lib/orders';
@@ -105,7 +105,7 @@ export async function startPayment(
   }
 
   const user = await getUser(request);
-  const orderNumber = generateOrderNumber();
+  const orderNumber = await nextOrderNumber();
 
   const session = await provider.createPayment({
     orderNumber,

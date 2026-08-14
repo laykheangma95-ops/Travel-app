@@ -403,7 +403,14 @@ COMMENT ON FUNCTION public.next_order_number() IS
   'lib/utils.ts:generateOrderNumber() still owns checkout until the owner '
   'approves the switch. Sequence-based, so it cannot collide.';
 
-REVOKE EXECUTE ON FUNCTION public.next_order_number() FROM anon, authenticated;
+-- FROM PUBLIC, not "FROM anon, authenticated". Postgres grants EXECUTE on new
+-- functions to PUBLIC by default, and revoking from a role that inherits it
+-- through PUBLIC leaves the privilege in place — verified: after revoking from
+-- anon and authenticated alone, has_function_privilege() still returned true
+-- for both. Without this a signed-in browser could burn sequence numbers at
+-- will. service_role is granted back explicitly because server code calls this.
+REVOKE EXECUTE ON FUNCTION public.next_order_number() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.next_order_number() TO service_role;
 
 -- ── updated_at triggers ──────────────────────────────────────────────────────
 --

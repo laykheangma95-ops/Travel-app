@@ -16,6 +16,7 @@ import { getSupabaseAdmin } from './supabase';
 import { log, redactEmail } from './logger';
 import { logSupabaseError } from './supabaseError';
 import { ApiError } from './http';
+import { generateOrderNumber } from './utils';
 import type { PricedOrder } from './pricing';
 import type { DeliveryChannel, EsimOrder, OrderStatus, PaymentMethod } from '@/types';
 
@@ -73,6 +74,42 @@ function requireDb() {
 /** True when Supabase is configured. Callers use this to degrade gracefully in dev. */
 export function ordersPersistenceAvailable(): boolean {
   return getSupabaseAdmin() !== null;
+}
+
+/**
+ * The order number for a new checkout, from the database sequence.
+ *
+ * Why this exists: generateOrderNumber() in lib/utils.ts picks a random 4-digit
+ * number, so it can only produce 9,000 values per year while order_number
+ * carries a UNIQUE constraint. By the birthday paradox a collision becomes
+ * likely after only a few hundred orders in a year, and a collision is not a
+ * cosmetic problem — the insert fails and a real customer's checkout breaks
+ * after they have already been sent to the payment gateway.
+ *
+ * next_order_number() is a Postgres sequence (migration 007), so it cannot
+ * collide no matter how many orders exist or how many checkouts overlap.
+ *
+ * Falls back to the local generator when Supabase is absent (dev with an empty
+ * .env, per the degrade-to-demo convention) or when the call fails. The
+ * fallback keeps its old DN- prefix, which is what makes it safe: a DN- number
+ * can never collide with a DMN- number from the sequence, so a transient
+ * database blip cannot produce a duplicate.
+ */
+export async function nextOrderNumber(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return generateOrderNumber();
+
+  const { data, error } = await supabase.rpc('next_order_number');
+
+  if (error || typeof data !== 'string' || !data) {
+    // Not fatal: a checkout with a fallback number is far better than a
+    // checkout that fails. Logged loudly because it means the sequence is
+    // unreachable and numbering has silently stopped being sequential.
+    if (error) logSupabaseError('order.number_sequence_failed', error, {});
+    return generateOrderNumber();
+  }
+
+  return data;
 }
 
 /**
