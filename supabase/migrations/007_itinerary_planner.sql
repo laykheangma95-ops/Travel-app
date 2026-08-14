@@ -57,13 +57,17 @@ ALTER TABLE destination_places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE itinerary_days ENABLE ROW LEVEL SECURITY;
 ALTER TABLE itinerary_places ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "destination_places_read_authenticated" ON destination_places;
 CREATE POLICY "destination_places_read_authenticated" ON destination_places
   FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "itinerary_days_owner" ON itinerary_days;
 CREATE POLICY "itinerary_days_owner" ON itinerary_days FOR ALL USING (
   EXISTS (SELECT 1 FROM trip_plans t WHERE t.id = itinerary_days.trip_id AND t.user_id = auth.uid())
 ) WITH CHECK (
   EXISTS (SELECT 1 FROM trip_plans t WHERE t.id = itinerary_days.trip_id AND t.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "itinerary_places_owner" ON itinerary_places;
 CREATE POLICY "itinerary_places_owner" ON itinerary_places FOR ALL USING (
   EXISTS (SELECT 1 FROM itinerary_days d JOIN trip_plans t ON t.id = d.trip_id
           WHERE d.id = itinerary_places.itinerary_day_id AND t.user_id = auth.uid())
