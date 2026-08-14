@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
-import { ItineraryEditor } from '@/components/travel/ItineraryEditor';
+import { ItineraryStartView } from '@/components/travel/ItineraryStartView';
 
-export const metadata: Metadata = { title: 'Itinerary', robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: 'Build itinerary',
+  description: 'Choose how to plan your trip itinerary.',
+  robots: { index: false, follow: false },
+};
 
-export default function ItineraryPage({ params }: { params: { tripId: string } }) {
-  return <ItineraryEditor tripId={params.tripId} />;
+export default async function ItineraryPage({ params }: { params: { tripId: string } }) {
+  return <ItineraryStartView tripId={params.tripId} />;
 }
