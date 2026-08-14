@@ -62,6 +62,34 @@ A supplier country that is not in the registry is **silently dropped** rather
 than rendered half-formed. `tests/coverage.test.ts` fails if that ever happens,
 so a new GoHub country shows up as a failing test rather than a missing card.
 
+## Cities — `data/cities.ts`
+
+Nobody says "I'm going to France." They say Paris. They say Guangzhou, not
+China. The coverage index answers country questions; the city index turns the
+question people actually type into a country.
+
+- A city is **a pointer, never a product**. `countrySlug` names a country in
+  `COUNTRY_REGISTRY`, and coverage decides which SKU serves it. So Paris →
+  France → the France or Europe plan, whichever is cheaper.
+- A city whose country we do not sell is **dropped at load**, not rendered.
+  Athens and Riga are in the list and stay invisible until GoHub add Greece or
+  Latvia — at which point they light up with no code change.
+- Aliases carry IATA codes and the other spellings people type: `CAN`,
+  `Canton`, `Saigon`, `Peking`, `Macau`.
+- Khmer spellings are given where they are settled in Khmer-language media, and
+  omitted rather than transliterated by guesswork.
+
+Both search boxes read it:
+
+| Search | Behaviour |
+|---|---|
+| Homepage globe search | A city hit shows the city with its country beside it and offers that country's eSIM — "Paris · France". A written guide always wins over a city that resolves to the same country, so "Bangkok" is still one row. |
+| `/esim` store search | A city query filters the country grid and the top grid — "Guangzhou" surfaces China, "Paris" surfaces France and the Europe bundle. |
+
+Ranking: guides first, then country names, then cities. A city is scored one
+point under a country name at the same match strength, so "chi" leads with China
+rather than Chiang Mai.
+
 ## What the store shows
 
 Four tabs on `/esim`:
@@ -72,6 +100,11 @@ Four tabs on `/esim`:
 | **Countries** | All 52, each card naming the plan that serves it |
 | **Regions** | Multi-country bundles, plus country SKUs that roam (France's 32) |
 | **Global** | Every plan crossing three or more countries, widest first |
+
+The region chips (Southeast Asia, East Asia, Europe …) belong to the
+**Countries** tab only. Top destinations is already a short curated grid, and a
+region chip left switched on there quietly hid most of it. Switching away from
+Countries resets the filter rather than leaving it applied off screen.
 
 A country card for Italy says *"Covered by the France plan"*, and
 `/esim/italy` repeats it above the plans. The customer learns which product they

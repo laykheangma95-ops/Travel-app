@@ -103,7 +103,14 @@ export function DestinationSearch({
     setQuery('');
     onPreview?.(null);
     if (hit.kind === 'guide') onSelect({ guide: hit.guide });
-    else onSelect({ esimSlug: hit.slug, esimName: hit.name });
+    else if (hit.viaCity) {
+      // Name the place they typed, not the country we resolved it to. Someone
+      // who searched Paris should not be greeted by a page headed "France".
+      onSelect({
+        esimSlug: hit.slug,
+        esimName: bi({ en: hit.viaCity.name, km: hit.viaCity.nameKm ?? hit.viaCity.name }),
+      });
+    } else onSelect({ esimSlug: hit.slug, esimName: hit.name });
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -196,13 +203,26 @@ export function DestinationSearch({
               <span className="v3-suggestion-dot" aria-hidden="true" />
               <span className="v3-suggestion-body">
                 <span className="v3-suggestion-name">
-                  {hit.kind === 'guide' ? bi(hit.guide.city) : hit.name}
+                  {hit.kind === 'guide'
+                    ? bi(hit.guide.city)
+                    : hit.viaCity
+                      ? bi({ en: hit.viaCity.name, km: hit.viaCity.nameKm ?? hit.viaCity.name })
+                      : hit.name}
                   {hit.kind === 'guide' && (
                     <span className="v3-suggestion-country">{bi(hit.guide.country)}</span>
                   )}
+                  {hit.kind === 'esim-only' && hit.viaCity && (
+                    <span className="v3-suggestion-country">
+                      {bi({ en: hit.name, km: hit.nameKm })}
+                    </span>
+                  )}
                 </span>
                 <span className="v3-suggestion-meta">
-                  {hit.kind === 'guide' ? (
+                  {hit.kind === 'esim-only' && hit.viaCity ? (
+                    // The country is already on the line above as the chip, so
+                    // this says what we can do about it rather than repeating it.
+                    t('v3.cityCovered')
+                  ) : hit.kind === 'guide' ? (
                     <>
                       {flightLabel(hit.guide.directFlightMins, t)}
                       <span className="v3-dot-sep" aria-hidden="true" />

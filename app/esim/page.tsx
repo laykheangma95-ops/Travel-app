@@ -9,12 +9,14 @@ import { RegionCard } from '@/components/esim/RegionCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
   coverageStats,
+  destinationsServing,
   globalReachPlans,
   regionalBundles,
   servedCountries,
   topDestinations,
   wideCoverageCountryPlans,
 } from '@/data/coverage';
+import { countrySlugsForCityQuery } from '@/data/cities';
 import { cn } from '@/lib/utils';
 
 // The store used to be one flat grid of 29 destination SKUs, which is the
@@ -48,24 +50,40 @@ export default function EsimStorePage() {
 
   const q = query.trim().toLowerCase();
 
+  // A search is a place, not a SKU name. "Paris" has to reach France, and
+  // "Guangzhou" China — the city index does that join once, for both grids.
+  const cityCountrySlugs = useMemo(() => countrySlugsForCityQuery(query), [query]);
+
   const filteredCountries = useMemo(
     () =>
       servedCountries.filter((c) => {
         const matchesRegion = region === 'All' || c.region === region;
-        const matchesQuery = !q || c.name.toLowerCase().includes(q) || c.nameKm.includes(query.trim());
+        const matchesQuery =
+          !q ||
+          c.name.toLowerCase().includes(q) ||
+          c.nameKm.includes(query.trim()) ||
+          cityCountrySlugs.has(c.slug);
         return matchesRegion && matchesQuery;
       }),
-    [q, query, region]
+    [q, query, region, cityCountrySlugs]
   );
 
   const filteredTop = useMemo(
     () =>
       topDestinations.filter((d) => {
         const matchesRegion = region === 'All' || d.region === region;
-        const matchesQuery = !q || d.name.toLowerCase().includes(q) || d.nameKm.includes(query.trim());
+        const matchesQuery =
+          !q ||
+          d.name.toLowerCase().includes(q) ||
+          d.nameKm.includes(query.trim()) ||
+          // A city reaches a top destination two ways: it is in that country
+          // (Guangzhou → China) or that plan's bundle covers it (Paris →
+          // Europe, which is what a Paris traveller should actually buy).
+          cityCountrySlugs.has(d.slug) ||
+          [...cityCountrySlugs].some((slug) => destinationsServing(slug).some((s) => s.slug === d.slug));
         return matchesRegion && matchesQuery;
       }),
-    [q, query, region]
+    [q, query, region, cityCountrySlugs]
   );
 
   return (
@@ -120,7 +138,12 @@ export default function EsimStorePage() {
               type="button"
               role="tab"
               aria-selected={tab === item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => {
+                setTab(item.id);
+                // Leaving Countries takes the region chips off screen, so the
+                // filter goes with them rather than staying on invisibly.
+                if (item.id !== 'countries') setRegion('All');
+              }}
               className={cn(
                 'rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ease-smooth',
                 tab === item.id
@@ -133,12 +156,12 @@ export default function EsimStorePage() {
           ))}
         </div>
 
-        {/* Search and region filter only apply to the two country-shaped tabs.
-            Filtering a four-card Global tab by region is noise. */}
+        {/* Search applies to the two country-shaped tabs. Filtering a
+            four-card Global tab by region is noise. */}
         {(tab === 'top' || tab === 'countries') && (
           <>
             <form
-              className="mb-6 flex max-w-xl gap-2"
+              className={cn('flex max-w-xl gap-2', tab === 'countries' ? 'mb-6' : 'mb-10')}
               onSubmit={(e) => e.preventDefault()}
               role="search"
               aria-label="Search destinations"
@@ -153,7 +176,7 @@ export default function EsimStorePage() {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search any country..."
+                  placeholder="Search any country or city..."
                   aria-label="Search destination"
                   className="w-full rounded-btn border border-gold-light/20 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/40 backdrop-blur-md transition-all focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25"
                 />
@@ -167,6 +190,11 @@ export default function EsimStorePage() {
               </button>
             </form>
 
+            {/* Region chips belong to the Countries tab only.
+                On "Top destinations" they were answering a question nobody had
+                asked — that grid is already the short, curated list, and a
+                region chip left switched on there silently hid most of it. */}
+            {tab === 'countries' && (
             <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label="Filter by region">
               {REGION_FILTERS.map((f) => (
                 <button
@@ -186,6 +214,7 @@ export default function EsimStorePage() {
                 </button>
               ))}
             </div>
+            )}
           </>
         )}
 
