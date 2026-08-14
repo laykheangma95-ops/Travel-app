@@ -15,6 +15,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [error, setError] = useState<string | null>(null);
+  const [dragged, setDragged] = useState<string | null>(null);
 
   const request = async (body?: Record<string, unknown>) => {
     const response = await fetch('/api/travel/itinerary/' + tripId, {
@@ -32,6 +33,14 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   useEffect(() => { void request().catch((cause) => setError(cause.message)); }, [tripId]);
   const active = data?.days.find((day) => day.id === tab);
   const places = tab === 'ideas' ? data?.ideas ?? [] : active?.places ?? [];
+  const reorder = (targetId: string) => {
+    if (!active || !dragged || dragged === targetId) return;
+    const ids = places.map((place) => place.id);
+    const from = ids.indexOf(dragged); const to = ids.indexOf(targetId);
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    void request({ action: 'reorder', dayId: active.id, placeIds: ids }).catch((cause) => setError(cause.message));
+    setDragged(null);
+  };
   const curated = (data?.curatedPlaces ?? []).filter((place) =>
     (filter === 'all' || place.category === filter) && place.name.toLowerCase().includes(query.toLowerCase())
   );
@@ -64,7 +73,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
         </div>
         {error && <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-200">{error}</p>}
         <div className="mt-3 flex items-center justify-between"><div><h2 className="font-semibold">{active ? 'Day ' + active.day_index : 'Unscheduled ideas'}</h2><p className="text-sm text-white/55">{active?.date ?? 'Add a day to start planning'}</p></div><button onClick={() => setPicker(true)} className="liquid-glass-accent inline-flex min-h-10 items-center gap-1.5 rounded-btn px-3 text-sm font-semibold text-primary-deep"><Plus size={15} />Add place</button></div>
-        <div className="mt-4 space-y-2">{places.map((item, index) => <PlaceCard key={item.id} item={item} index={index} days={data.days} onDelete={() => void request({ action: 'delete', placeId: item.id }).catch((cause) => setError(cause.message))} onMove={(dayId) => void request({ action: 'move', placeId: item.id, dayId }).catch((cause) => setError(cause.message))} />)}
+        <div className="mt-4 space-y-2">{places.map((item, index) => <PlaceCard key={item.id} item={item} index={index} days={data.days} onDelete={() => void request({ action: 'delete', placeId: item.id }).catch((cause) => setError(cause.message))} onMove={(dayId) => void request({ action: 'move', placeId: item.id, dayId }).catch((cause) => setError(cause.message))} onDragStart={() => setDragged(item.id)} onDrop={() => reorder(item.id)} />)}
         {!places.length && <div className="rounded-card border border-dashed border-white/15 p-6 text-center text-sm text-white/55">No places here yet. Add a day, then choose curated places for {data.trip.destination}.</div>}</div>
       </section>
     </main>
@@ -72,8 +81,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   </div>;
 }
 
-function PlaceCard({ item, index, days, onDelete, onMove }: { item: ItineraryPlace; index: number; days: ItineraryDay[]; onDelete: () => void; onMove: (dayId: string) => void }) {
-  return <article className="rounded-card border border-white/10 bg-white/[.035] p-3"><div className="flex items-start gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gold-light text-xs font-bold text-primary-deep">{index + 1}</span><span className="min-w-0 flex-1"><b>{item.place.name}</b><span className="ml-2 text-xs text-white/55">{labels[item.category]}</span><p className="mt-1 text-sm text-white/55">{item.place.description}</p></span><button onClick={onDelete} className="p-1.5 text-white/45"><Trash2 size={16} /></button></div>{days.length > 1 && <select defaultValue="" onChange={(event) => event.target.value && onMove(event.target.value)} className="mt-3 ml-auto block rounded-lg border border-white/10 bg-[#16243a] px-2 py-1 text-xs text-white"><option value="" disabled>Move to day</option>{days.map((day) => <option value={day.id} key={day.id}>Day {day.day_index}</option>)}</select>}</article>;
+function PlaceCard({ item, index, days, onDelete, onMove, onDragStart, onDrop }: { item: ItineraryPlace; index: number; days: ItineraryDay[]; onDelete: () => void; onMove: (dayId: string) => void; onDragStart: () => void; onDrop: () => void }) {
+  return <article draggable onDragStart={onDragStart} onDragOver={(event) => event.preventDefault()} onDrop={onDrop} className="rounded-card border border-white/10 bg-white/[.035] p-3"><div className="flex items-start gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gold-light text-xs font-bold text-primary-deep">{index + 1}</span><span className="min-w-0 flex-1"><b>{item.place.name}</b><span className="ml-2 text-xs text-white/55">{labels[item.category]}</span><p className="mt-1 text-sm text-white/55">{item.place.description}</p></span><button onClick={onDelete} className="p-1.5 text-white/45"><Trash2 size={16} /></button></div>{days.length > 1 && <select defaultValue="" onChange={(event) => event.target.value && onMove(event.target.value)} className="mt-3 ml-auto block rounded-lg border border-white/10 bg-[#16243a] px-2 py-1 text-xs text-white"><option value="" disabled>Move to day</option>{days.map((day) => <option value={day.id} key={day.id}>Day {day.day_index}</option>)}</select>}</article>;
 }
 
 function RouteMap({ places, destination }: { places: ItineraryPlace[]; destination: string }) {
