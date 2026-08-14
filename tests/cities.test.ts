@@ -7,7 +7,8 @@ import {
   searchCities,
 } from '@/data/cities';
 import { getServedCountry } from '@/data/coverage';
-import { searchDestinations } from '@/content/destinations';
+import { getDestination } from '@/data/destinations';
+import { searchEsimProducts } from '@/data/esimSearch';
 
 describe('city index', () => {
   it('never points at a country we cannot sell', () => {
@@ -55,54 +56,68 @@ describe('city index', () => {
   });
 });
 
-describe('destination search with cities', () => {
-  it('answers a city search with the country plan that covers it', () => {
-    const [top] = searchDestinations('Paris');
-    expect(top.kind).toBe('esim-only');
-    if (top.kind !== 'esim-only') return;
+describe('homepage product search', () => {
+  it('answers a city search with the plan that covers it', () => {
+    const [top] = searchEsimProducts('Paris');
     expect(top.slug).toBe('france');
     expect(top.viaCity?.name).toBe('Paris');
   });
 
   it('sends Guangzhou to the China plan', () => {
-    const hit = searchDestinations('Guangzhou').find(
-      (h) => h.kind === 'esim-only' && h.slug === 'china'
-    );
-    expect(hit).toBeDefined();
+    expect(searchEsimProducts('Guangzhou')[0].slug).toBe('china');
   });
 
-  it('still prefers a written guide over the city that duplicates it', () => {
-    const hits = searchDestinations('Bangkok');
-    expect(hits[0].kind).toBe('guide');
-    // Thailand must appear once, as the guide — not again as a city row.
-    const thailand = hits.filter(
-      (h) => h.kind === 'esim-only' && h.slug === 'thailand'
-    );
-    expect(thailand).toHaveLength(0);
+  it('answers a country search with that country, never a guide', () => {
+    // The two the owner named: both must come back as a plan, priced.
+    for (const [query, slug] of [
+      ['china', 'china'],
+      ['switzerland', 'switzerland'],
+    ]) {
+      const [top] = searchEsimProducts(query);
+      expect(top.slug, query).toBe(slug);
+      expect(top.fromPriceUsd, query).toBeGreaterThan(0);
+    }
   });
 
-  it('leaves a country search behaving exactly as before', () => {
-    const hits = searchDestinations('Japan');
-    expect(hits[0].kind).toBe('guide');
+  it('answers a written-up city with its country plan too', () => {
+    // Bangkok has a guide. The search bar still sells: Thailand, one row.
+    const hits = searchEsimProducts('Bangkok');
+    expect(hits[0].slug).toBe('thailand');
+    expect(hits.filter((h) => h.slug === 'thailand')).toHaveLength(1);
+  });
+
+  it('prices every row', () => {
+    for (const hit of searchEsimProducts('s')) {
+      expect(Number.isFinite(hit.fromPriceUsd), hit.slug).toBe(true);
+      expect(hit.fromPriceUsd, hit.slug).toBeGreaterThan(0);
+    }
   });
 
   it('finds a country that only a bundle covers', () => {
     // Italy has no SKU of its own — it rides the Europe eSIM, and /esim/italy
     // has existed for a while. The search box has to be able to reach it.
-    const hit = searchDestinations('Italy').find((h) => h.kind === 'esim-only' && h.slug === 'italy');
-    expect(hit).toBeDefined();
+    expect(searchEsimProducts('Italy')[0].slug).toBe('italy');
   });
 
   it('puts a country name above a city that matched as well', () => {
     // "chi" must lead with China, not Chiang Mai.
-    const hits = searchDestinations('chi');
-    const china = hits.findIndex((h) => h.kind === 'esim-only' && h.slug === 'china');
-    const thailand = hits.findIndex((h) => h.kind === 'esim-only' && h.slug === 'thailand');
+    const hits = searchEsimProducts('chi');
+    const china = hits.findIndex((h) => h.slug === 'china');
+    const thailand = hits.findIndex((h) => h.slug === 'thailand');
     expect(china).toBeGreaterThanOrEqual(0);
     if (thailand >= 0) expect(china).toBeLessThan(thailand);
   });
 
+  it('never offers a slug with no page behind it', () => {
+    for (const query of ['paris', 'rome', 'tokyo', 'europe', 'switzerland', 'bali']) {
+      for (const hit of searchEsimProducts(query)) {
+        const real = getDestination(hit.slug) ?? getServedCountry(hit.slug);
+        expect(real, `${query} → ${hit.slug}`).toBeDefined();
+      }
+    }
+  });
+
   it('still finds nothing for a place nobody sells', () => {
-    expect(searchDestinations('Atlantis')).toHaveLength(0);
+    expect(searchEsimProducts('Atlantis')).toHaveLength(0);
   });
 });
