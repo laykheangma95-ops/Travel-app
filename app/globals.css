@@ -1767,3 +1767,97 @@ button.capsule:active {
     transform: none;
   }
 }
+
+/* AI itinerary generation — the globe is a calm, editorial loading moment rather than a progress bar. */
+.itinerary-ai-loading { isolation: isolate; }
+.itinerary-globe {
+  position: relative;
+  width: min(68vw, 430px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255,255,255,.9), transparent 12%),
+    radial-gradient(circle at 37% 30%, #9eced6 0%, #548d9c 38%, #2d5d72 68%, #173a52 100%);
+  border: 5px solid rgba(255,255,255,.68);
+  box-shadow: inset -30px -38px 60px rgba(11,35,54,.42), inset 20px 14px 34px rgba(255,255,255,.3), 0 28px 70px rgba(55,73,75,.22);
+  animation: itinerary-globe-float 5s ease-in-out infinite;
+}
+.itinerary-globe::before, .itinerary-globe::after {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  border: 1px solid rgba(245,232,198,.7);
+  border-radius: 50%;
+  transform: rotate(26deg) scaleX(.44);
+}
+.itinerary-globe::after { transform: rotate(-26deg) scaleX(.44); }
+.itinerary-globe-grid {
+  position: absolute;
+  inset: -22%;
+  background: repeating-linear-gradient(90deg, transparent 0 43px, rgba(245,232,198,.28) 44px 45px);
+  border-radius: 50%;
+  animation: itinerary-grid-turn 18s linear infinite;
+}
+.itinerary-globe-grid::after {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-top: 1px solid rgba(245,232,198,.5);
+  border-bottom: 1px solid rgba(245,232,198,.35);
+  border-radius: 50%;
+  box-shadow: 0 46px 0 rgba(245,232,198,.25), 0 -46px 0 rgba(245,232,198,.22);
+}
+.itinerary-globe-glow {
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 68% 70%, rgba(244,206,116,.5), transparent 34%);
+  animation: itinerary-globe-shine 4s ease-in-out infinite;
+}
+.itinerary-globe-pin {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 0;
+  color: transparent;
+  background: #c2933e;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 8px rgba(42,55,59,.35);
+}
+.itinerary-globe-pin::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: white; }
+.pin-one { top: 32%; left: 28%; }.pin-two { top: 48%; right: 24%; }.pin-three { bottom: 22%; left: 51%; }
+.itinerary-landmark {
+  position: absolute;
+  z-index: 2;
+  color: rgba(183,139,60,.86);
+  font-size: clamp(3rem, 11vw, 6.5rem);
+  line-height: 1;
+  filter: drop-shadow(0 9px 10px rgba(46,58,57,.2));
+  animation: itinerary-landmark-float 4s ease-in-out infinite;
+}
+.itinerary-landmark-eiffel { top: 17%; left: 14%; transform: scaleX(.58); }.itinerary-landmark-liberty { top: 25%; right: 12%; animation-delay: -1.4s; }.itinerary-landmark-temple { bottom: 12%; right: 15%; animation-delay: -.7s; }
+.itinerary-flight-path {
+  position: absolute;
+  z-index: 1;
+  width: 140px;
+  height: 62px;
+  border-top: 2px dashed rgba(180,137,61,.6);
+  border-radius: 50%;
+  transform: rotate(-26deg);
+  animation: itinerary-path-pulse 2.8s ease-in-out infinite;
+}
+.path-one { top: 36%; left: 16%; }.path-two { bottom: 25%; right: 17%; transform: rotate(22deg); animation-delay: -1.2s; }
+.itinerary-ai-loading b { display: block; margin-top: 4px; font-size: 8px; font-weight: 700; line-height: 1.35; }
+@keyframes itinerary-globe-float { 0%,100% { transform: translateY(7px) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
+@keyframes itinerary-grid-turn { to { transform: translateX(45px); } }
+@keyframes itinerary-globe-shine { 0%,100% { opacity: .45; transform: scale(.96); } 50% { opacity: .9; transform: scale(1.04); } }
+@keyframes itinerary-landmark-float { 0%,100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+@keyframes itinerary-path-pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .itinerary-globe, .itinerary-globe-grid, .itinerary-globe-glow, .itinerary-landmark, .itinerary-flight-path { animation: none; }
+}
