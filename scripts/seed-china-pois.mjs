@@ -17,9 +17,13 @@
 //   everything Overpass has that matches the filters below and stops there;
 //   it does not pad or invent rows to hit a target count.
 // - Descriptions are generated from OSM tags (category + name + tag hints),
-//   not hand-written, so source is written as "osm", not "editorial" -- keep
-//   that distinction when you import, since CLAUDE.md/table conventions may
-//   expect editorial to mean human-reviewed copy.
+//   not hand-written. destination_places.source has CHECK (source IN
+//   ('editorial', 'ai_generated')) in supabase/migrations/007_itinerary_planner.sql --
+//   'osm' would violate that constraint on insert, so this writes
+//   'ai_generated' instead. It is not actually AI-generated; it is the
+//   closest allowed value to "not human-reviewed copy". Rows from this
+//   script should still get a human skim before they reach production data,
+//   since OSM tagging quality is uneven.
 // - No API key needed; be a considerate citizen of the free public instance
 //   (one query per city, no parallel hammering, timeout generous).
 
@@ -149,7 +153,7 @@ async function main() {
       lng: el.lon,
       description: describe(tags, category),
       photo_url: "",
-      source: "osm",
+      source: "ai_generated",
     });
   }
 
