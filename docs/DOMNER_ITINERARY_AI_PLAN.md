@@ -61,3 +61,19 @@ This document is the reference memory for the Domner itinerary feature. It is ba
 
 When this file is mentioned later, use it as the accumulated Domner itinerary feature context. Do not assume unshown behavior is final; ask or wait for requirements when implementation choices are not covered by the reference.
 
+## Domner-China Itinerary Experience
+
+The intended user journey is:
+
+1. The user opens Domner and starts from a destination, an existing guide, a saved place, a link, or a screenshot.
+2. They create a plan by entering destinations, travel dates, and interests such as food, shopping, classic attractions, hidden places, photography, city walks, nature, or art.
+3. They choose manual planning or AI planning.
+4. AI turns the user's choices into an editable travel request, then searches for relevant places and shows progress with a Cancel option.
+5. Domner generates a day-by-day itinerary containing places, categories, time slots, descriptions, travel distances, travel times, and transportation.
+6. The itinerary appears with an interactive map, daily routes, numbered locations, and daily distance totals.
+7. The user switches between Summary, individual days, and Ideas, then edits, reorders, expands, removes, or adds places and asks the AI to revise the plan.
+8. The user completes the trip with Notes, Checklist, Photos, Cover image, Weather, and Transport planning.
+9. The user collaborates with friends or shares the itinerary using invitations, links, codes, social sharing, or an exported itinerary image.
+
+The experience should feel like moving from â€œWhere should I go?â€ to â€œMy complete, editable China travel plan,â€ with AI reducing planning effort while the traveler remains in control.
+
