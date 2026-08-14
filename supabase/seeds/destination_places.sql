@@ -1,11 +1,8 @@
 -- 50 itinerary destination places (editorial seed).
 -- Generated from supabase/seeds/destination_places.csv -- edit the CSV, not this file.
---
--- Set the target table to whatever the itinerary table is actually called in
--- the live database before running this in the Supabase SQL editor.
 
 insert into public.destination_places
-  (destination, name, category, latitude, longitude, description, photo_url, source)
+  (destination, name, category, lat, lng, description, photo_url, source)
 values
   ('Thailand', 'Grand Palace', 'spot', 13.7500, 100.4913, 'Royal complex in Bangkok housing the revered Emerald Buddha temple.', '', 'editorial'),
   ('Thailand', 'Wat Pho', 'spot', 13.7465, 100.4927, 'Home of the giant reclining Buddha and traditional Thai massage.', '', 'editorial'),
