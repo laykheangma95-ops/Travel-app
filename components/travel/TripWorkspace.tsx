@@ -290,8 +290,8 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               ? 'រៀបចំថ្ងៃរបស់អ្នក ដោយប្រើបញ្ជីត្រួតពិនិត្យដំណើរ។'
               : 'Lay out your days with the travel checklist.'
           }
-          actionLabel={lang === 'km' ? 'បើកបញ្ជី' : 'Open checklist'}
-          actionHref="/checklist"
+          actionLabel={lang === 'km' ? 'បើកកម្មវិធី' : 'Open itinerary'}
+          actionHref={`/trips/${trip.id}/itinerary`}
         />
 
         <section id="memories" className="scroll-mt-20">
