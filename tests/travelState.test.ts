@@ -29,6 +29,7 @@ function trip(overrides: Partial<TripSummary> = {}): TripSummary {
     startDate: iso(10),
     endDate: iso(14),
     travelers: 1,
+    interests: [],
     readiness: emptyReadiness(),
     coverImageUrl: null,
     ...overrides,

@@ -22,6 +22,7 @@ import {
   type TravelerContext,
   type TripSummary,
 } from './state';
+import { TRIP_INTERESTS, type TripInterest } from './trips';
 
 interface TripRow {
   id: string;
@@ -30,6 +31,7 @@ interface TripRow {
   start_date: string | null;
   end_date: string | null;
   travelers: number | null;
+  interests: string[] | null;
   generated_itinerary: Record<string, unknown> | null;
   cover_image_url: string | null;
 }
@@ -68,6 +70,20 @@ function matchDestination(destination: string): { slug: string; flag: string } |
       candidate.slug === needle
   );
   return found ? { slug: found.slug, flag: found.flag } : null;
+}
+
+/**
+ * Keep only the interests the app still recognises.
+ *
+ * `interests` is a free-form TEXT[], so a row written before a tag was renamed
+ * (or by hand in the dashboard) can hold something the form has no chip for.
+ * Dropping the unknown ones keeps the edit screen honest rather than silently
+ * discarding them on the next save.
+ */
+function knownInterests(values: string[] | null): TripInterest[] {
+  if (!values) return [];
+  const known = new Set<string>(TRIP_INTERESTS);
+  return values.filter((value): value is TripInterest => known.has(value));
 }
 
 /** Does an ISO date fall inside the trip's window (inclusive)? */
@@ -156,7 +172,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   const [tripsResult, flightsResult, ordersResult, checklistResult] = await Promise.all([
     supabase
       .from('trip_plans')
-      .select('id, title, destination, start_date, end_date, travelers, generated_itinerary, cover_image_url')
+      .select('id, title, destination, start_date, end_date, travelers, interests, generated_itinerary, cover_image_url')
       .order('start_date', { ascending: true, nullsFirst: false })
       .limit(20),
     supabase
@@ -195,6 +211,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
       startDate: trip.start_date,
       endDate: trip.end_date,
       travelers: trip.travelers ?? 1,
+      interests: knownInterests(trip.interests),
       readiness: deriveReadiness(trip, flightRows, orderRows, checklistRows),
       coverImageUrl: trip.cover_image_url,
     };

@@ -11,6 +11,8 @@
 // lib/travel/context.ts (server-only).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { TripInterest } from './trips';
+
 export const TRAVEL_STATES = [
   'new_user',
   'discovering',
@@ -41,6 +43,8 @@ export interface TripSummary {
   startDate: string | null;
   endDate: string | null;
   travelers: number;
+  /** What the traveler is into. Drives itinerary generation later; edited on TripForm. */
+  interests: TripInterest[];
   readiness: Readiness;
   coverImageUrl: string | null;
 }

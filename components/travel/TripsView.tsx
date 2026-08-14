@@ -86,7 +86,7 @@ export function TripsView() {
             </h1>
           </div>
           <Link
-            href="/checklist"
+            href="/trips/new"
             className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] shrink-0 items-center gap-1.5 rounded-btn px-4 text-sm font-semibold text-primary-deep"
           >
             <Plus size={15} aria-hidden="true" />
@@ -137,9 +137,11 @@ export function TripsView() {
                 ? 'ចាប់ផ្តើមពីគោលដៅមួយ ហើយ Domner នឹងតាមដានផ្នែកដែលនៅសល់។'
                 : "Start with a destination and Domner keeps track of the rest — flight, stay, eSIM and the days in between."}
             </p>
+            {/* Outlined, not accent-gold: the header's "New trip" is already the
+                one gold CTA in this viewport (ui-ux §5). */}
             <Link
               href="/explore"
-              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+              className="mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors duration-200 ease-smooth hover:border-gold-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
             >
               {lang === 'km' ? 'ស្វែងរកគោលដៅ' : 'Explore destinations'}
             </Link>
