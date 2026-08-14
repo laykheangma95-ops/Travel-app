@@ -77,6 +77,13 @@ Apply to every task, without being asked.
     naming, styling approach and component patterns unless they violate rules
     1–10.
 
+15. **Follow the Domner-to-China itinerary experience.** Every new traveler-facing
+    feature must strengthen one cohesive trip experience: inspiration leads to
+    saved places, saved places lead to clear next actions and organised days,
+    and the result remains useful while travelling with limited or no cellular
+    service. Extend the existing trip, place, itinerary, map and notification
+    foundations rather than creating disconnected feature surfaces.
+
 **Known standing exception to rule 1:** `esim_orders` already exists and holds
 live orders. Rule 12 forbids dropping it. The path out is Step 1 — an additive
 rename plus typed line items — and it is not yet done. See §12 and
