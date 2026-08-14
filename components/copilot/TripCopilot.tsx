@@ -37,6 +37,25 @@ interface FlightSummary {
   departureGate?: string;
 }
 
+// Drag-to-move for the floating button. The FAB sits over every page, so it
+// will always cover *something* — travelers need to be able to shove it out of
+// the way. Position is kept in px from the viewport's top-left and remembered
+// between visits; `null` means "unmoved", i.e. the default bottom-right corner.
+interface Point {
+  x: number;
+  y: number;
+}
+
+const FAB_SIZE = 56; // h-14/w-14
+const EDGE = 12; // keep this much clear of every edge
+const DRAG_THRESHOLD = 4; // px of travel before a tap counts as a drag
+const POS_KEY = 'domner:copilot-pos';
+
+const clampToViewport = (p: Point): Point => ({
+  x: Math.min(Math.max(p.x, EDGE), Math.max(EDGE, window.innerWidth - FAB_SIZE - EDGE)),
+  y: Math.min(Math.max(p.y, EDGE), Math.max(EDGE, window.innerHeight - FAB_SIZE - EDGE)),
+});
+
 export function TripCopilot() {
   const pathname = usePathname();
   const { lang } = useLang();
@@ -46,6 +65,89 @@ export function TripCopilot() {
   const [loading, setLoading] = useState(false);
   const [flightSummary, setFlightSummary] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const [pos, setPos] = useState<Point | null>(null);
+  const [viewport, setViewport] = useState<Point | null>(null);
+  const dragRef = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
+  const justDraggedRef = useRef(false);
+
+  // Restore the remembered position, and keep the button on screen when the
+  // window is resized or the phone is rotated.
+  useEffect(() => {
+    const readViewport = () => setViewport({ x: window.innerWidth, y: window.innerHeight });
+    readViewport();
+
+    try {
+      const saved = window.localStorage.getItem(POS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<Point>;
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          setPos(clampToViewport({ x: parsed.x, y: parsed.y }));
+        }
+      }
+    } catch {
+      // Corrupt or blocked storage just means the FAB starts in its corner.
+    }
+
+    const onResize = () => {
+      readViewport();
+      setPos((p) => (p ? clampToViewport(p) : p));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 && event.pointerType === 'mouse') return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      dx: event.clientX - rect.left,
+      dy: event.clientY - rect.top,
+      moved: false,
+    };
+    // Start from the current rendered spot so the first drag doesn't jump from
+    // the corner-anchored layout to the pixel-anchored one.
+    setPos((p) => p ?? { x: rect.left, y: rect.top });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const next = clampToViewport({ x: event.clientX - drag.dx, y: event.clientY - drag.dy });
+    setPos((prev) => {
+      if (prev && !drag.moved) {
+        const travelled = Math.hypot(next.x - prev.x, next.y - prev.y);
+        if (travelled < DRAG_THRESHOLD) return prev;
+        drag.moved = true;
+      }
+      return next;
+    });
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (drag.moved) {
+      // Swallow the click that follows the drag so a reposition never toggles
+      // the panel open or shut.
+      justDraggedRef.current = true;
+      setPos((p) => {
+        if (p) {
+          try {
+            window.localStorage.setItem(POS_KEY, JSON.stringify(p));
+          } catch {
+            // Private mode / storage disabled — the move still applies this session.
+          }
+        }
+        return p;
+      });
+    }
+  };
 
   const flightMatch = pathname?.match(/\/flights\/([^/?]+)/);
   const flightNumber = flightMatch ? decodeURIComponent(flightMatch[1]) : null;
@@ -110,6 +212,20 @@ export function TripCopilot() {
 
   const suggestions = lang === 'km' ? SUGGESTIONS_KM : SUGGESTIONS_EN;
 
+  // Once the button has been moved the panel has to follow it: it opens on
+  // whichever side of the button has room, so it never hangs off the screen.
+  const panelStyle: React.CSSProperties | undefined =
+    pos && viewport
+      ? {
+          ...(pos.x + FAB_SIZE / 2 < viewport.x / 2
+            ? { left: Math.max(EDGE, pos.x) }
+            : { right: Math.max(EDGE, viewport.x - pos.x - FAB_SIZE) }),
+          ...(pos.y + FAB_SIZE / 2 > viewport.y / 2
+            ? { bottom: Math.max(EDGE, viewport.y - pos.y + EDGE) }
+            : { top: pos.y + FAB_SIZE + EDGE }),
+        }
+      : undefined;
+
   // The Apsara hero is a standalone full-screen page — keep the FAB off it.
   if (pathname === '/apsara-hero') return null;
 
@@ -117,13 +233,29 @@ export function TripCopilot() {
     <>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (justDraggedRef.current) {
+            justDraggedRef.current = false;
+            return;
+          }
+          setOpen((v) => !v);
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         aria-label={open ? 'Close Domner Copilot' : 'Open Domner Copilot'}
+        title={lang === 'km' ? 'អូសដើម្បីផ្លាស់ទី' : 'Drag to move'}
         data-liquid=""
+        // touch-none: without it the browser claims the gesture for scrolling
+        // and the button never receives pointermove, so it cannot be dragged.
         // [backdrop-filter:none]: the blur is invisible on this opaque gold FAB
         // but rendered a square halo behind the circle (Chromium backdrop-filter
         // + border-radius clipping bug), so we disable it here.
-        className="liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105 [backdrop-filter:none] [-webkit-backdrop-filter:none]"
+        className={`liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed z-[90] flex h-14 w-14 touch-none items-center justify-center rounded-full text-white shadow-lg hover:scale-105 [backdrop-filter:none] [-webkit-backdrop-filter:none] ${
+          pos ? 'cursor-grab active:cursor-grabbing' : 'bottom-5 right-5'
+        }`}
+        style={pos ? { left: pos.x, top: pos.y } : undefined}
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
       </button>
@@ -132,7 +264,10 @@ export function TripCopilot() {
         <div
           role="dialog"
           aria-label="Domner Trip Copilot"
-          className="fixed bottom-24 right-5 z-[90] flex h-[70vh] max-h-[560px] w-[92vw] max-w-sm flex-col overflow-hidden rounded-card border border-white/10 bg-[#0E1B30]/95 shadow-2xl backdrop-blur-xl animate-fade-up"
+          className={`fixed z-[90] flex h-[70vh] max-h-[560px] w-[92vw] max-w-sm flex-col overflow-hidden rounded-card border border-white/10 bg-[#0E1B30]/95 shadow-2xl backdrop-blur-xl animate-fade-up ${
+            panelStyle ? '' : 'bottom-24 right-5'
+          }`}
+          style={panelStyle}
         >
           <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3.5">
             <DomerMark surface="gold" size={24} />
