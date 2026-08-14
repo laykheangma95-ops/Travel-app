@@ -58,6 +58,8 @@ export function TripForm({ tripId, initial }: TripFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [destinationOpen, setDestinationOpen] = useState(false);
+  const [activeDatePicker, setActiveDatePicker] = useState<'start' | 'end' | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
 
   // Whether the traveler has taken ownership of the title. Once they have, a
   // later change of destination must not overwrite what they typed.
@@ -96,6 +98,28 @@ export function TripForm({ tripId, initial }: TripFormProps) {
     const query = draft.destination.trim().toLocaleLowerCase();
     return suggestions.filter((name) => !query || name.toLocaleLowerCase().includes(query)).slice(0, 8);
   }, [draft.destination, suggestions]);
+
+  const openDatePicker = (field: 'start' | 'end') => {
+    const selected = field === 'start' ? draft.startDate : draft.endDate ?? draft.startDate;
+    setCalendarMonth(startOfMonth(selected ? dateFromValue(selected) : new Date()));
+    setActiveDatePicker(field);
+  };
+
+  const selectTripDate = (value: string) => {
+    if (activeDatePicker === 'start') {
+      setDraft((current) => ({
+        ...current,
+        startDate: value,
+        endDate: !current.endDate || current.endDate < value ? value : current.endDate,
+      }));
+      setErrors((current) => ({ ...current, startDate: undefined, endDate: undefined }));
+      setActiveDatePicker('end');
+      return;
+    }
+    setDraft((current) => ({ ...current, endDate: value }));
+    setErrors((current) => ({ ...current, endDate: undefined }));
+    setActiveDatePicker(null);
+  };
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -273,36 +297,43 @@ export function TripForm({ tripId, initial }: TripFormProps) {
             }}
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              dark
-              id="trip-startDate"
-              type="date"
-              label={lang === 'km' ? 'ថ្ងៃចេញដំណើរ' : 'Leaving'}
-              value={draft.startDate ?? ''}
-              error={errors.startDate}
-              onChange={(event) => {
-                const startDate = event.target.value || null;
-                setDraft((current) => ({
-                  ...current,
-                  startDate,
-                  // The return field starts at the leaving date. Moving the
-                  // leaving date later also keeps an earlier return valid.
-                  endDate: startDate && (!current.endDate || current.endDate < startDate) ? startDate : current.endDate,
-                }));
-                setErrors((current) => ({ ...current, startDate: undefined, endDate: undefined }));
-              }}
-            />
-            <Input
-              dark
-              id="trip-endDate"
-              type="date"
-              label={lang === 'km' ? 'ថ្ងៃត្រឡប់' : 'Returning'}
-              min={draft.startDate ?? undefined}
-              value={draft.endDate ?? ''}
-              error={errors.endDate}
-              onChange={(event) => set('endDate', event.target.value || null)}
-            />
+          <div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <DateField
+                id="trip-startDate"
+                label={lang === 'km' ? 'ថ្ងៃចេញដំណើរ' : 'Leaving'}
+                value={draft.startDate}
+                error={errors.startDate}
+                locale={lang === 'km' ? 'km-KH' : 'en-US'}
+                open={activeDatePicker === 'start'}
+                onClick={() => openDatePicker('start')}
+              />
+              <DateField
+                id="trip-endDate"
+                label={lang === 'km' ? 'ថ្ងៃត្រឡប់' : 'Returning'}
+                value={draft.endDate}
+                error={errors.endDate}
+                locale={lang === 'km' ? 'km-KH' : 'en-US'}
+                open={activeDatePicker === 'end'}
+                onClick={() => openDatePicker('end')}
+              />
+            </div>
+            {draft.startDate && draft.endDate && (
+              <p className="mt-2 text-sm text-gold-light">
+                {tripLength(draft.startDate, draft.endDate)} {lang === 'km' ? 'ថ្ងៃ' : tripLength(draft.startDate, draft.endDate) === 1 ? 'day' : 'days'}
+              </p>
+            )}
+            {activeDatePicker && (
+              <TripDateRangeCalendar
+                month={calendarMonth}
+                startDate={draft.startDate}
+                endDate={draft.endDate}
+                selecting={activeDatePicker}
+                locale={lang === 'km' ? 'km-KH' : 'en-US'}
+                onMonthChange={setCalendarMonth}
+                onSelect={selectTripDate}
+              />
+            )}
           </div>
 
           <Select
@@ -430,3 +461,62 @@ export function TripForm({ tripId, initial }: TripFormProps) {
     </div>
   );
 }
+
+function DateField({ id, label, value, error, locale, open, onClick }: {
+  id: string; label: string; value: string | null; error?: string; locale: string; open: boolean; onClick: () => void;
+}) {
+  return <div>
+    <label htmlFor={id} className="block text-sm font-medium text-white/80">{label}</label>
+    <button
+      id={id}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={onClick}
+      className="mt-1.5 flex min-h-12 w-full items-center rounded-btn border border-white/15 bg-white/[.035] px-3 text-left text-sm text-white transition-colors hover:border-gold-light/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+    >
+      {value ? formatTripDate(value, locale) : 'Select date'}
+    </button>
+    {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+  </div>;
+}
+
+function TripDateRangeCalendar({ month, startDate, endDate, selecting, locale, onMonthChange, onSelect }: {
+  month: Date; startDate: string | null; endDate: string | null; selecting: 'start' | 'end'; locale: string;
+  onMonthChange: (month: Date) => void; onSelect: (value: string) => void;
+}) {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  const totalDays = new Date(year, monthIndex + 1, 0).getDate();
+  const cells = Array.from({ length: firstWeekday + totalDays }, (_, index) => index < firstWeekday ? null : index - firstWeekday + 1);
+  return <section role="dialog" aria-label="Select trip dates" className="mt-3 rounded-card border border-gold-light/30 bg-[#142238] p-4 shadow-2xl">
+    <div className="flex items-center justify-between">
+      <button type="button" onClick={() => onMonthChange(new Date(year, monthIndex - 1, 1))} className="grid h-9 w-9 place-items-center rounded-full text-white/75 hover:bg-white/10" aria-label="Previous month">‹</button>
+      <p className="text-sm font-semibold text-white">{new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(month)}</p>
+      <button type="button" onClick={() => onMonthChange(new Date(year, monthIndex + 1, 1))} className="grid h-9 w-9 place-items-center rounded-full text-white/75 hover:bg-white/10" aria-label="Next month">›</button>
+    </div>
+    <p className="mt-1 text-center text-xs text-white/55">{selecting === 'start' ? 'Choose leaving date' : 'Choose return date'}</p>
+    <div className="mt-3 grid grid-cols-7 text-center text-[11px] text-white/45">{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => <span key={day + index}>{day}</span>)}</div>
+    <div className="mt-1 grid grid-cols-7 gap-y-1">
+      {cells.map((day, index) => {
+        if (!day) return <span key={'blank-' + index} />;
+        const value = toDateValue(year, monthIndex, day);
+        const disabled = selecting === 'end' && Boolean(startDate && value < startDate);
+        const selected = value === startDate || value === endDate;
+        const inRange = Boolean(startDate && endDate && value > startDate && value < endDate);
+        return <button key={value} type="button" disabled={disabled} onClick={() => onSelect(value)} className={cn(
+          'mx-auto grid h-9 w-9 place-items-center rounded-full text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light disabled:cursor-not-allowed disabled:text-white/20',
+          selected ? 'bg-gold-light font-bold text-primary-deep' : inRange ? 'rounded-none bg-gold-light/25 text-gold-bright' : 'text-white/80 hover:bg-white/10'
+        )}>{day}</button>;
+      })}
+    </div>
+    {startDate && endDate && <p className="mt-3 text-center text-xs text-gold-light">{tripLength(startDate, endDate)} {tripLength(startDate, endDate) === 1 ? 'day selected' : 'days selected'}</p>}
+  </section>;
+}
+
+function startOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
+function dateFromValue(value: string) { const [year, month, day] = value.split('-').map(Number); return new Date(year, month - 1, day); }
+function toDateValue(year: number, month: number, day: number) { return [year, String(month + 1).padStart(2, '0'), String(day).padStart(2, '0')].join('-'); }
+function formatTripDate(value: string, locale: string) { return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z')); }
+function tripLength(startDate: string, endDate: string) { return Math.floor((Date.parse(endDate + 'T00:00:00Z') - Date.parse(startDate + 'T00:00:00Z')) / 86_400_000) + 1; }
