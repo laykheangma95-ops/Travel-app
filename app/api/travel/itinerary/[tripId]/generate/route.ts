@@ -65,6 +65,7 @@ export const POST = route(async (request, context) => {
       trip_id: tripId,
       day_index: index + 1,
       date: nextDayDate(trip.start_date, index + 1),
+      theme: ['Heritage alleys & riverside drinks', 'Local flavours & hidden corners', 'Slow mornings & golden-hour views'][index] ?? 'A day made for discovery',
     }));
     const { data: createdDays, error: createDaysError } = await supabase
       .from('itinerary_days')
@@ -90,10 +91,19 @@ export const POST = route(async (request, context) => {
 
   if (clearError) throw new ApiError('INTERNAL', 'Could not refresh your itinerary draft.');
 
+  const timeSlots = [
+    ['10:00', '12:00'],
+    ['12:00', '13:30'],
+    ['14:00', '15:30'],
+    ['16:00', '17:30'],
+  ];
   const rows = places.map((place, index) => ({
     itinerary_day_id: days[index % days.length].id,
     place_id: place.id,
     category: place.category,
+    time_start: timeSlots[index % timeSlots.length][0],
+    time_end: timeSlots[index % timeSlots.length][1],
+    notes: place.category === 'transport' ? 'A comfortable connection between your next stops.' : 'A carefully chosen moment for your ' + trip.destination + ' trip.',
     sort_order: Math.floor(index / days.length),
   }));
 
