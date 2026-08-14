@@ -11,6 +11,7 @@ const category = z.enum(['spot', 'food', 'shopping', 'transport', 'other']);
 const mutation = z.discriminatedUnion('action', [
   z.object({ action: z.literal('addDay') }).strict(),
   z.object({ action: z.literal('addPlace'), dayId: z.string().uuid(), placeId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal('addIdea'), placeId: z.string().uuid() }).strict(),
   z.object({ action: z.literal('reorder'), dayId: z.string().uuid(), placeIds: z.array(z.string().uuid()).min(1) }).strict(),
   z.object({ action: z.literal('move'), placeId: z.string().uuid(), dayId: z.string().uuid() }).strict(),
   z.object({ action: z.literal('update'), placeId: z.string().uuid(), timeStart: z.string().nullable(), timeEnd: z.string().nullable(), notes: z.string().max(1000).nullable(), category: category }).strict(),
@@ -94,6 +95,20 @@ export const PATCH = route(async (request, context) => {
     const { count } = await supabase.from('itinerary_places').select('*', { count: 'exact', head: true }).eq('itinerary_day_id', day.id);
     const { error } = await supabase.from('itinerary_places').insert({ itinerary_day_id: day.id, place_id: place.id, category: place.category as ItineraryCategory, sort_order: count ?? 0 });
     if (error) throw new ApiError('INTERNAL', 'Could not add that place.');
+  }
+
+  if (body.data.action === 'addIdea') {
+    let { data: ideasDay } = await supabase.from('itinerary_days').select('id').eq('trip_id', tripId).eq('day_index', 0).maybeSingle();
+    if (!ideasDay) {
+      const { data, error } = await supabase.from('itinerary_days').insert({ trip_id: tripId, day_index: 0, date: null }).select('id').single();
+      if (error || !data) throw new ApiError('INTERNAL', 'Could not prepare your Ideas list.');
+      ideasDay = data;
+    }
+    const { data: place } = await supabase.from('destination_places').select('id,category').eq('id', body.data.placeId).eq('destination', trip.destination).maybeSingle();
+    if (!place) throw new ApiError('NOT_FOUND', 'That place could not be found.');
+    const { count } = await supabase.from('itinerary_places').select('*', { count: 'exact', head: true }).eq('itinerary_day_id', ideasDay.id);
+    const { error } = await supabase.from('itinerary_places').insert({ itinerary_day_id: ideasDay.id, place_id: place.id, category: place.category as ItineraryCategory, sort_order: count ?? 0 });
+    if (error) throw new ApiError('INTERNAL', 'Could not add that idea.');
   }
 
   if (body.data.action === 'reorder') {
