@@ -2,13 +2,11 @@
 
 import { useState } from 'react';
 import { ArrowRight, CalendarDays, Check, Loader2, MapPinned, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { ItineraryEditor } from './ItineraryEditor';
 
 type Mode = 'choose' | 'manual' | 'generating';
 
 export function ItineraryStartView({ tripId }: { tripId: string }) {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>('choose');
   const [error, setError] = useState<string | null>(null);
 
@@ -22,8 +20,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'Could not generate itinerary.');
-      router.push('/trips/' + tripId + '/itinerary?mode=manual');
-      router.refresh();
+      setMode('manual');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not generate itinerary.');
       setMode('choose');
