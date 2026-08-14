@@ -57,6 +57,7 @@ export function TripForm({ tripId, initial }: TripFormProps) {
   const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [destinationOpen, setDestinationOpen] = useState(false);
 
   // Whether the traveler has taken ownership of the title. Once they have, a
   // later change of destination must not overwrite what they typed.
@@ -86,12 +87,15 @@ export function TripForm({ tripId, initial }: TripFormProps) {
     }));
   };
 
-  // A full country list means a traveler can begin a trip anywhere in the
-  // world. The native datalist filters as they type (for example, "A" or "C").
+  // A full country list means a traveler can begin a trip anywhere in the world.
   const suggestions = useMemo(
     () => countries.map((country) => country.name).sort((a, b) => a.localeCompare(b)),
     []
   );
+  const matchingDestinations = useMemo(() => {
+    const query = draft.destination.trim().toLocaleLowerCase();
+    return suggestions.filter((name) => !query || name.toLocaleLowerCase().includes(query)).slice(0, 8);
+  }, [draft.destination, suggestions]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -202,24 +206,56 @@ export function TripForm({ tripId, initial }: TripFormProps) {
         </header>
 
         <form onSubmit={onSubmit} noValidate className="night-card mt-6 space-y-5 p-5 sm:p-6">
-          <div>
+          <div className="relative">
             <Input
               dark
               id="trip-destination"
-              list="trip-destination-options"
               label={lang === 'km' ? 'គោលដៅ' : 'Destination'}
-              placeholder={lang === 'km' ? 'ជប៉ុន, តូក្យូ, បាងកក…' : 'Japan, Tokyo, Bangkok…'}
+              placeholder={lang === 'km' ? 'ជ្រើសរើសប្រទេស…' : 'Search a country…'}
               required
               autoComplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={destinationOpen}
+              aria-controls="trip-destination-options"
               value={draft.destination}
               error={errors.destination}
-              onChange={(event) => onDestination(event.target.value)}
+              onFocus={() => setDestinationOpen(true)}
+              onBlur={() => window.setTimeout(() => setDestinationOpen(false), 120)}
+              onChange={(event) => {
+                onDestination(event.target.value);
+                setDestinationOpen(true);
+              }}
             />
-            <datalist id="trip-destination-options">
-              {suggestions.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+            {destinationOpen && (
+              <div
+                id="trip-destination-options"
+                role="listbox"
+                className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-btn border border-white/15 bg-[#142238] p-1 shadow-2xl"
+              >
+                {matchingDestinations.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    role="option"
+                    aria-selected={draft.destination === name}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      onDestination(name);
+                      setDestinationOpen(false);
+                    }}
+                    className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    {name}
+                  </button>
+                ))}
+                {!matchingDestinations.length && (
+                  <p className="px-3 py-3 text-sm text-white/55">
+                    {lang === 'km' ? 'រកមិនឃើញប្រទេសនេះទេ។' : 'No country found.'}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <Input
@@ -250,9 +286,9 @@ export function TripForm({ tripId, initial }: TripFormProps) {
                 setDraft((current) => ({
                   ...current,
                   startDate,
-                  // Moving the leaving date forward also moves an earlier return
-                  // date forward, so the date range always remains valid.
-                  endDate: startDate && current.endDate && current.endDate < startDate ? startDate : current.endDate,
+                  // The return field starts at the leaving date. Moving the
+                  // leaving date later also keeps an earlier return valid.
+                  endDate: startDate && (!current.endDate || current.endDate < startDate) ? startDate : current.endDate,
                 }));
                 setErrors((current) => ({ ...current, startDate: undefined, endDate: undefined }));
               }}
