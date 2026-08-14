@@ -99,6 +99,12 @@ export const PATCH = route(async (request, context) => {
   if (body.data.action === 'reorder') {
     const { data: day } = await supabase.from('itinerary_days').select('id').eq('id', body.data.dayId).eq('trip_id', tripId).maybeSingle();
     if (!day) throw new ApiError('NOT_FOUND', 'That day could not be found.');
+    // Move all touched rows out of the unique sort-order range first. Updating
+    // 0→1 before 1→0 would otherwise violate the unique constraint midway.
+    for (const [index, placeId] of body.data.placeIds.entries()) {
+      const { error } = await supabase.from('itinerary_places').update({ sort_order: 10_000 + index }).eq('id', placeId).eq('itinerary_day_id', day.id);
+      if (error) throw new ApiError('INTERNAL', 'Could not reorder places.');
+    }
     for (const [sortOrder, placeId] of body.data.placeIds.entries()) {
       const { error } = await supabase.from('itinerary_places').update({ sort_order: sortOrder }).eq('id', placeId).eq('itinerary_day_id', day.id);
       if (error) throw new ApiError('INTERNAL', 'Could not reorder places.');
