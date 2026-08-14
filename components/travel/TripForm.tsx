@@ -21,8 +21,7 @@ import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Check, Loader2, Trash2 } from 'lucide-react';
-import { destinations } from '@/data/destinations';
-import { guides } from '@/content/destinations';
+import { countries } from '@/data/countries';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Input, Select } from '@/components/ui/Input';
@@ -87,18 +86,12 @@ export function TripForm({ tripId, initial }: TripFormProps) {
     }));
   };
 
-  // Country names and guide cities, in both scripts, so "Japan", "ជប៉ុន" and
-  // "Tokyo" all resolve. Free text still wins — the list is a suggestion, not a
-  // constraint, because Domner does not sell every place a traveler might go.
-  const suggestions = useMemo(() => {
-    const names = new Set<string>();
-    for (const destination of destinations) {
-      names.add(destination.name);
-      if (lang === 'km' && destination.nameKm) names.add(destination.nameKm);
-    }
-    for (const guide of guides) names.add(guide.city[lang]);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [lang]);
+  // A full country list means a traveler can begin a trip anywhere in the
+  // world. The native datalist filters as they type (for example, "A" or "C").
+  const suggestions = useMemo(
+    () => countries.map((country) => country.name).sort((a, b) => a.localeCompare(b)),
+    []
+  );
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -252,7 +245,17 @@ export function TripForm({ tripId, initial }: TripFormProps) {
               label={lang === 'km' ? 'ថ្ងៃចេញដំណើរ' : 'Leaving'}
               value={draft.startDate ?? ''}
               error={errors.startDate}
-              onChange={(event) => set('startDate', event.target.value || null)}
+              onChange={(event) => {
+                const startDate = event.target.value || null;
+                setDraft((current) => ({
+                  ...current,
+                  startDate,
+                  // Moving the leaving date forward also moves an earlier return
+                  // date forward, so the date range always remains valid.
+                  endDate: startDate && current.endDate && current.endDate < startDate ? startDate : current.endDate,
+                }));
+                setErrors((current) => ({ ...current, startDate: undefined, endDate: undefined }));
+              }}
             />
             <Input
               dark
