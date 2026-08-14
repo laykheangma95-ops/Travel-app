@@ -46,8 +46,12 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   );
 
   const add = async (place: CuratedPlace) => {
-    if (!active) { setError('Choose or add a day first.'); return; }
-    try { await request({ action: 'addPlace', dayId: active.id, placeId: place.id }); setPicker(false); } catch (cause) { setError((cause as Error).message); }
+    try {
+      if (tab === 'ideas') await request({ action: 'addIdea', placeId: place.id });
+      else if (active) await request({ action: 'addPlace', dayId: active.id, placeId: place.id });
+      else { setError('Choose or add a day first.'); return; }
+      setPicker(false);
+    } catch (cause) { setError((cause as Error).message); }
   };
   const share = async () => {
     try {
