@@ -1,15 +1,14 @@
 'use client';
 
-// The search field is the only control on the first screen, so it carries every
-// job a second control would otherwise take:
+// The search field is the only control on the first screen, and it sells eSIMs.
 //
-//  • it searches, obviously
-//  • its suggestions say *why* they rank — "1h 5m direct from Phnom Penh ·
-//    visa-free" — so the list answers the question before you finish asking it
-//  • for a returning visitor it becomes the express lane: the last row is their
-//    eSIM, two taps from keystroke to checkout with no chapter scrolled
-//  • it degrades honestly: somewhere we have not written up says so, and offers
-//    the eSIM if we sell one
+//  • every row is a plan we can put on a phone today — a country, a regional
+//    bundle, or the country a city sits in ("Guangzhou" answers with China,
+//    "Paris" with France). Pressing one goes to that plan.
+//  • it does not answer a shopping question with editorial. A destination we
+//    have not written up is not a dead end here; it is a product, priced.
+//  • for a returning visitor the last row is the express lane: their previous
+//    eSIM, two taps from keystroke to checkout
 //
 // Fully keyboard operable: ↑ ↓ to move, Enter to commit, Escape to clear,
 // "/" from anywhere on the page to focus. Implements the combobox pattern with
@@ -18,7 +17,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { play } from '@/lib/sound';
 import { Search, X, CornerDownLeft } from 'lucide-react';
-import { searchDestinations, type SearchHit } from '@/content/destinations';
+import { guides } from '@/content/destinations';
+import { searchEsimProducts, type EsimProductHit } from '@/data/esimSearch';
 import { useBi, useLang } from '@/lib/i18n';
 import type { DestinationGuide } from '@/content/schema';
 
@@ -26,13 +26,6 @@ export interface SearchSelection {
   guide?: DestinationGuide;
   esimSlug?: string;
   esimName?: string;
-}
-
-function flightLabel(mins: number | null, t: (k: 'v3.direct' | 'v3.oneStop') => string): string {
-  if (mins == null) return t('v3.oneStop');
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h ? `${h}h ` : ''}${m ? `${m}m ` : ''}${t('v3.direct')}`;
 }
 
 export function DestinationSearch({
@@ -64,17 +57,20 @@ export function DestinationSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
-  const hits = useMemo(() => searchDestinations(query), [query]);
+  const hits = useMemo(() => searchEsimProducts(query), [query]);
   const rowCount = hits.length + (expressPlan && hits.length ? 1 : 0);
 
   useEffect(() => setCursor(0), [query]);
 
   // Light whatever is currently under the cursor, and put it out when the list
-  // closes. Guides only — we cannot light a city we have not written up.
+  // closes. The globe can only light a city it has coordinates for, which means
+  // the seven written-up ones — a plan whose country is one of them lights that
+  // city, everything else simply leaves the planet as it is.
   useEffect(() => {
     if (!onPreview) return;
     const hit = open && query.trim() ? hits[cursor] : undefined;
-    onPreview(hit && hit.kind === 'guide' ? hit.guide.slug : null);
+    const lit = hit ? guides.find((g) => g.esimCountrySlug === hit.slug) : undefined;
+    onPreview(lit?.slug ?? null);
   }, [hits, cursor, open, query, onPreview]);
 
   useEffect(() => () => onPreview?.(null), [onPreview]);
@@ -102,15 +98,7 @@ export function DestinationSearch({
     setOpen(false);
     setQuery('');
     onPreview?.(null);
-    if (hit.kind === 'guide') onSelect({ guide: hit.guide });
-    else if (hit.viaCity) {
-      // Name the place they typed, not the country we resolved it to. Someone
-      // who searched Paris should not be greeted by a page headed "France".
-      onSelect({
-        esimSlug: hit.slug,
-        esimName: bi({ en: hit.viaCity.name, km: hit.viaCity.nameKm ?? hit.viaCity.name }),
-      });
-    } else onSelect({ esimSlug: hit.slug, esimName: hit.name });
+    onSelect({ esimSlug: hit.slug, esimName: hit.name });
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -184,9 +172,9 @@ export function DestinationSearch({
               {t('v3.noResults')}
             </li>
           )}
-          {hits.map((hit: SearchHit, i) => (
+          {hits.map((hit: EsimProductHit, i) => (
             <li
-              key={hit.kind === 'guide' ? hit.guide.slug : `esim-${hit.slug}`}
+              key={`esim-${hit.slug}`}
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === cursor}
@@ -203,38 +191,20 @@ export function DestinationSearch({
               <span className="v3-suggestion-dot" aria-hidden="true" />
               <span className="v3-suggestion-body">
                 <span className="v3-suggestion-name">
-                  {hit.kind === 'guide'
-                    ? bi(hit.guide.city)
-                    : hit.viaCity
-                      ? bi({ en: hit.viaCity.name, km: hit.viaCity.nameKm ?? hit.viaCity.name })
-                      : hit.name}
-                  {hit.kind === 'guide' && (
-                    <span className="v3-suggestion-country">{bi(hit.guide.country)}</span>
-                  )}
-                  {hit.kind === 'esim-only' && hit.viaCity && (
+                  {/* The place they typed leads. When that was a city, the
+                      country it resolved to sits beside it, so the join we
+                      made is visible rather than surprising. */}
+                  {hit.viaCity
+                    ? bi({ en: hit.viaCity.name, km: hit.viaCity.nameKm ?? hit.viaCity.name })
+                    : bi({ en: hit.name, km: hit.nameKm })}
+                  {hit.viaCity && (
                     <span className="v3-suggestion-country">
                       {bi({ en: hit.name, km: hit.nameKm })}
                     </span>
                   )}
                 </span>
                 <span className="v3-suggestion-meta">
-                  {hit.kind === 'esim-only' && hit.viaCity ? (
-                    // The country is already on the line above as the chip, so
-                    // this says what we can do about it rather than repeating it.
-                    t('v3.cityCovered')
-                  ) : hit.kind === 'guide' ? (
-                    <>
-                      {flightLabel(hit.guide.directFlightMins, t)}
-                      <span className="v3-dot-sep" aria-hidden="true" />
-                      {hit.guide.entry.visa.kind === 'visa-free'
-                        ? bi({ en: 'visa-free', km: 'ឥតទិដ្ឋាការ' })
-                        : hit.guide.entry.visa.kind === 'check-before-booking'
-                          ? bi({ en: 'check entry rules', km: 'ពិនិត្យលក្ខខណ្ឌចូល' })
-                          : bi({ en: 'visa required', km: 'ត្រូវការទិដ្ឋាការ' })}
-                    </>
-                  ) : (
-                    t('v3.guideSoon')
-                  )}
+                  {t('v3.esimFrom')} ${hit.fromPriceUsd.toFixed(2)}
                 </span>
               </span>
               {i === cursor && <CornerDownLeft size={14} className="v3-suggestion-enter" aria-hidden="true" />}

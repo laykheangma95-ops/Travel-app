@@ -83,12 +83,13 @@ Both search boxes read it:
 
 | Search | Behaviour |
 |---|---|
-| Homepage globe search | A city hit shows the city with its country beside it and offers that country's eSIM — "Paris · France". A written guide always wins over a city that resolves to the same country, so "Bangkok" is still one row. |
+| Homepage search bar | **Sells plans only** — see `data/esimSearch.ts`. Every row is a country, a bundle, or the country a city sits in, priced "eSIM from $3.99", and pressing one goes to `/esim/<slug>`. No guide rows, and no "we haven't written this guide yet" screen: that was an editorial answer to a shopping question. The written guides are still reached from the globe pins and from `/explore`. |
 | `/esim` store search | A city query filters the country grid and the top grid — "Guangzhou" surfaces China, "Paris" surfaces France and the Europe bundle. |
 
-Ranking: guides first, then country names, then cities. A city is scored one
-point under a country name at the same match strength, so "chi" leads with China
-rather than Chiang Mai.
+Ranking in both: product names first (exact 70, prefix 55, contained 25), then
+cities one point below a name that matched as well, so "chi" leads with China
+rather than Chiang Mai. A city's weight (0–10) only orders cities among
+themselves.
 
 ## What the store shows
 

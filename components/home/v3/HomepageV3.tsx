@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { getGuide, guides } from '@/content/destinations';
@@ -28,7 +29,7 @@ import { play } from '@/lib/sound';
 import { getJourneys, recordJourney } from '@/lib/journeys';
 import type { DestinationGuide } from '@/content/schema';
 import { FirstScreen } from './FirstScreen';
-import { DestinationJourney, UnwrittenDestination } from './DestinationJourney';
+import { DestinationJourney } from './DestinationJourney';
 import type { SearchSelection } from './DestinationSearch';
 import type { GlobeApi } from './GlobeCanvas';
 
@@ -41,13 +42,11 @@ const GlobeCanvas = dynamic(() => import('./GlobeCanvas'), {
 
 const LAST_KEY = 'domner-last-destination';
 
-type View =
-  | { kind: 'globe' }
-  | { kind: 'guide'; guide: DestinationGuide }
-  | { kind: 'unwritten'; name: string; esimSlug: string | null };
+type View = { kind: 'globe' } | { kind: 'guide'; guide: DestinationGuide };
 
 export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   const { t } = useLang();
+  const router = useRouter();
   const [tier, setTier] = useState<Tier | null>(null);
   const [view, setView] = useState<View>(() => {
     const g = initialSlug ? getGuide(initialSlug) : undefined;
@@ -182,15 +181,11 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         goToGuide(selection.guide);
         return;
       }
-      if (selection.esimSlug) {
-        setView({
-          kind: 'unwritten',
-          name: selection.esimName ?? selection.esimSlug,
-          esimSlug: selection.esimSlug,
-        });
-      }
+      // The search bar sells plans. A result goes straight to that plan's page
+      // rather than to a screen explaining which guides we have written.
+      if (selection.esimSlug) router.push(`/esim/${selection.esimSlug}`);
     },
-    [goToGuide],
+    [goToGuide, router],
   );
 
   const goHome = useCallback(() => {
@@ -305,23 +300,13 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
         />
       </div>
 
-      {view.kind !== 'globe' && (
+      {view.kind === 'guide' && (
         <div className="v3-landed">
-          {view.kind === 'guide' ? (
-            <DestinationJourney
-              guide={view.guide}
-              onBack={goHome}
-              onTravelled={() => addMark(view.guide.slug, 'travelled')}
-            />
-          ) : (
-            <>
-              <button type="button" className="v3-back v3-back-floating" onClick={goHome}>
-                <ArrowLeft size={15} aria-hidden="true" />
-                <span className="v3-back-label">{t('v3.back')}</span>
-              </button>
-              <UnwrittenDestination name={view.name} esimSlug={view.esimSlug} />
-            </>
-          )}
+          <DestinationJourney
+            guide={view.guide}
+            onBack={goHome}
+            onTravelled={() => addMark(view.guide.slug, 'travelled')}
+          />
         </div>
       )}
 

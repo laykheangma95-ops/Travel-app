@@ -137,9 +137,8 @@ const dicts = {
     'v3.oneStop': 'one stop from Phnom Penh',
     'v3.guideReady': 'Full guide',
     'v3.guideSoon': 'Guide coming soon',
-    // Shown when the search matched a city and answered with its country's
-    // plan — "Paris" is served by the France eSIM, "Guangzhou" by China's.
-    'v3.cityCovered': 'eSIM available · this city is covered',
+    // The homepage search sells plans, so every row is priced.
+    'v3.esimFrom': 'eSIM from',
     'v3.esimExpress': 'eSIM · buy now',
     'v3.noResults': 'Nothing matched that.',
     'v3.noGuideTitle': "We haven't written this guide yet.",
@@ -355,7 +354,7 @@ const dicts = {
     'v3.oneStop': 'ឈប់ម្តងពីភ្នំពេញ',
     'v3.guideReady': 'មគ្គុទ្ទេសក៍ពេញលេញ',
     'v3.guideSoon': 'មគ្គុទ្ទេសក៍នឹងមកដល់ឆាប់ៗ',
-    'v3.cityCovered': 'មាន eSIM · ទីក្រុងនេះត្រូវបានគ្របដណ្តប់',
+    'v3.esimFrom': 'eSIM ចាប់ពី',
     'v3.esimExpress': 'eSIM · ទិញឥឡូវ',
     'v3.noResults': 'រកមិនឃើញអ្វីត្រូវគ្នាទេ។',
     'v3.noGuideTitle': 'យើងមិនទាន់សរសេរមគ្គុទ្ទេសក៍នេះទេ។',
