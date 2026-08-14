@@ -1,0 +1,51 @@
+destination,name,category,latitude,longitude,description,photo_url,source
+Thailand,Grand Palace,spot,13.7500,100.4913,"Royal complex in Bangkok housing the revered Emerald Buddha temple.",,editorial
+Thailand,Wat Pho,spot,13.7465,100.4927,"Home of the giant reclining Buddha and traditional Thai massage.",,editorial
+Thailand,Wat Arun,spot,13.7437,100.4889,"Riverside temple with a porcelain-tiled spire best seen at sunset.",,editorial
+Thailand,Chatuchak Weekend Market,shopping,13.7999,100.5502,"Sprawling weekend market with thousands of stalls selling almost everything.",,editorial
+Thailand,ICONSIAM,shopping,13.7264,100.5100,"Riverside luxury mall with an indoor floating market food hall.",,editorial
+Thailand,Terminal 21 Asok,shopping,13.7376,100.5601,"Airport-themed mall where each floor imitates a different world city.",,editorial
+Thailand,Jodd Fairs Rama 9,food,13.7554,100.5658,"Night market famous for volcano pork ribs and cheap seafood.",,editorial
+Thailand,Yaowarat Chinatown,food,13.7398,100.5090,"Bangkok's Chinatown street-food strip, busiest and best after dark.",,editorial
+Thailand,Suvarnabhumi Airport,transport,13.6900,100.7501,"Bangkok's main international airport, linked to the city by Airport Rail Link.",,editorial
+Thailand,Hua Lamphong Station,transport,13.7376,100.5170,"Historic Bangkok rail terminus, now a heritage hub beside the MRT.",,editorial
+Thailand,Asiatique The Riverfront,shopping,13.7047,100.5029,"Open-air riverside night market with a Ferris wheel and restaurants.",,editorial
+Thailand,Wat Phra That Doi Suthep,spot,18.8047,98.9217,"Golden mountain temple above Chiang Mai with sweeping valley views.",,editorial
+Thailand,Nimman Road,food,18.7967,98.9670,"Chiang Mai's cafe and dining street, popular with digital nomads.",,editorial
+Thailand,Patong Beach,spot,7.8965,98.2960,"Phuket's busiest beach, lined with water sports, bars and hotels.",,editorial
+Thailand,Ayutthaya Historical Park,spot,14.3567,100.5340,"UNESCO ruins of Siam's old capital, an easy day trip north.",,editorial
+Vietnam,Hoan Kiem Lake,spot,21.0287,105.8524,"Hanoi's central lake with Ngoc Son Temple on a small island.",,editorial
+Vietnam,Ho Chi Minh Mausoleum,spot,21.0367,105.8347,"Solemn granite memorial in Ba Dinh Square, strict dress code applies.",,editorial
+Vietnam,Ben Thanh Market,shopping,10.7724,106.6980,"Landmark Saigon market for souvenirs, fabric, coffee and street snacks.",,editorial
+Vietnam,War Remnants Museum,spot,10.7797,106.6923,"Ho Chi Minh City museum documenting the war through photos and vehicles.",,editorial
+Vietnam,Bui Vien Walking Street,food,10.7670,106.6930,"Backpacker street alive each night with cheap beer and grilled food.",,editorial
+Vietnam,Tan Son Nhat Airport,transport,10.8188,106.6520,"Ho Chi Minh City's international airport, about seven kilometres from downtown.",,editorial
+Vietnam,Ha Long Bay,spot,20.9101,107.1839,"Emerald bay of limestone karsts, usually visited on an overnight cruise.",,editorial
+Vietnam,Hoi An Ancient Town,spot,15.8801,108.3260,"Lantern-lit trading port, walkable old quarter and fast tailor shops.",,editorial
+Vietnam,Golden Bridge Ba Na Hills,spot,15.9955,107.9966,"Hilltop walkway held by giant stone hands above Da Nang.",,editorial
+Vietnam,Noi Bai Airport,transport,21.2212,105.8072,"Hanoi's international airport, roughly forty minutes from the Old Quarter.",,editorial
+Singapore,Marina Bay Sands SkyPark,spot,1.2834,103.8607,"Rooftop observation deck over the bay, the city's signature skyline view.",,editorial
+Singapore,Gardens by the Bay,spot,1.2816,103.8636,"Supertree grove and cooled domes, free light show every evening.",,editorial
+Singapore,Merlion Park,spot,1.2868,103.8545,"Waterfront statue of Singapore's lion-fish mascot facing Marina Bay.",,editorial
+Singapore,Sentosa Island,spot,1.2494,103.8303,"Resort island with beaches, Universal Studios and cable car access.",,editorial
+Singapore,Orchard Road,shopping,1.3040,103.8318,"Singapore's main shopping boulevard, malls stacked end to end.",,editorial
+Singapore,Maxwell Food Centre,food,1.2805,103.8449,"Classic hawker centre in Chinatown, famous for Hainanese chicken rice.",,editorial
+Singapore,Jewel Changi Airport,transport,1.3606,103.9899,"Airport mall with the world's tallest indoor waterfall and gardens.",,editorial
+Singapore,Bugis Street,shopping,1.3006,103.8559,"Budget street market for clothes, accessories and quick local snacks.",,editorial
+Malaysia,Petronas Twin Towers,spot,3.1578,101.7117,"Kuala Lumpur's twin skyscrapers with a skybridge and observation deck.",,editorial
+Malaysia,Batu Caves,spot,3.2379,101.6840,"Limestone cave temple reached by 272 brightly painted steps.",,editorial
+Malaysia,Jalan Alor,food,3.1450,101.7080,"Kuala Lumpur's night food street of grilled seafood and satay.",,editorial
+Malaysia,Pavilion Bukit Bintang,shopping,3.1488,101.7133,"Central Kuala Lumpur mall anchoring the Bukit Bintang shopping district.",,editorial
+Malaysia,Kuala Lumpur International Airport,transport,2.7456,101.7099,"Malaysia's main airport, connected to the city by the KLIA Ekspres.",,editorial
+Malaysia,Central Market Kuala Lumpur,shopping,3.1457,101.6958,"Art deco hall selling batik, handicrafts and Malaysian souvenirs.",,editorial
+Malaysia,Armenian Street George Town,spot,5.4171,100.3369,"Penang heritage lane known for its painted street-art murals.",,editorial
+Japan,Sensoji Temple,spot,35.7148,139.7967,"Tokyo's oldest temple in Asakusa, approached through Nakamise shopping lane.",,editorial
+Japan,Shibuya Crossing,spot,35.6595,139.7005,"The world's busiest pedestrian scramble, best watched from above.",,editorial
+Japan,Tsukiji Outer Market,food,35.6654,139.7707,"Tokyo market lanes serving fresh sushi, tamagoyaki and seafood skewers.",,editorial
+Japan,Fushimi Inari Taisha,spot,34.9671,135.7727,"Kyoto shrine with thousands of vermilion torii gates up the hillside.",,editorial
+Japan,Dotonbori,food,34.6687,135.5013,"Osaka's neon canal street, home of takoyaki and okonomiyaki.",,editorial
+South Korea,Gyeongbokgung Palace,spot,37.5796,126.9770,"Seoul's main Joseon palace with a daily guard-changing ceremony.",,editorial
+South Korea,Myeongdong Shopping Street,shopping,37.5636,126.9827,"Seoul's cosmetics and fashion district, packed with street food carts.",,editorial
+South Korea,N Seoul Tower,spot,37.5512,126.9882,"Namsan mountain tower with panoramic city views and love locks.",,editorial
+South Korea,Gwangjang Market,food,37.5700,126.9997,"Historic Seoul market known for bindaetteok pancakes and knife-cut noodles.",,editorial
+South Korea,Incheon International Airport,transport,37.4491,126.4506,"Korea's main gateway, about an hour from central Seoul by train.",,editorial
