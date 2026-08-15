@@ -7,6 +7,8 @@
   --light-green: #e5f0e9;
   --coral: #ed866e;
   --card-shadow: 0 18px 40px rgba(40, 68, 57, 0.08);
+  --card-shadow-hover: 0 24px 56px rgba(40, 68, 57, 0.14);
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -22,6 +24,24 @@ body {
   background: var(--cream);
   color: var(--ink);
   font-family: "DM Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(237, 134, 110, 0.42);
+  outline-offset: 3px;
 }
 
 button,
@@ -48,6 +68,8 @@ select {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 5;
 }
 
 .brand {
@@ -81,6 +103,12 @@ select {
   color: #7b867f;
   text-decoration: none;
   font-size: 14px;
+  padding: 8px 0;
+  transition: color 0.2s ease;
+}
+
+.nav nav a:hover {
+  color: var(--ink);
 }
 
 .nav nav a.active {
@@ -109,11 +137,18 @@ select {
   color: #fff;
   font-size: 11px;
   font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease-premium), box-shadow 0.25s ease;
+}
+
+.avatar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(171, 117, 77, 0.2);
 }
 
 .hero {
   text-align: center;
-  padding: 70px 0 47px;
+  padding: 84px 0 54px;
 }
 
 .eyebrow {
@@ -142,7 +177,10 @@ select {
 }
 
 .hero h1 {
-  font-size: 57px;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: clamp(43px, 5.2vw, 64px);
   line-height: 1.08;
   letter-spacing: -2px;
   margin: 17px 0 18px;
@@ -174,13 +212,18 @@ select {
   background: #fff;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.25s, box-shadow 0.25s;
+  transition: transform 0.35s var(--ease-premium), box-shadow 0.35s ease, border-color 0.25s ease;
   border-bottom: 3px solid transparent;
 }
 
 .choice-card:hover {
   transform: translateY(-4px);
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.choice-card:focus-visible {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px rgba(46, 102, 84, 0.14), var(--card-shadow-hover);
 }
 
 .choice-card.manual:hover {
@@ -192,7 +235,7 @@ select {
 }
 
 .card-art {
-  height: 190px;
+  height: 204px;
   position: relative;
   overflow: hidden;
 }
@@ -304,7 +347,11 @@ select {
 }
 
 .choice-copy {
-  padding: 27px 29px 30px;
+  min-height: 196px;
+  padding: 29px 30px 31px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .card-kicker {
@@ -317,20 +364,25 @@ select {
 
 .choice-copy h2 {
   font-size: 29px;
-  margin: 8px 0;
+  margin: 9px 0 10px;
   font-weight: 600;
 }
 
 .choice-copy p {
   color: var(--muted);
   font-size: 14px;
-  margin: 0 0 20px;
+  margin: 0 0 24px;
+  line-height: 1.55;
 }
 
 .card-link {
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
 }
 
 .card-link b {
@@ -354,9 +406,10 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 18px 22px;
   border-radius: 13px;
   background: #edf2eb;
+  border: 1px solid #dfe8df;
 }
 
 .saved-strip > div {
@@ -400,6 +453,13 @@ select {
   color: var(--green);
   font-size: 12px;
   font-weight: 700;
+  transition: color 0.2s ease, transform 0.25s var(--ease-premium), background 0.2s ease;
+}
+
+.text-button:hover,
+.ghost-button:hover {
+  color: var(--coral);
+  transform: translateY(-1px);
 }
 
 .text-button span {
@@ -411,7 +471,7 @@ select {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 24px;
-  padding: 28px;
+  padding: 32px;
   box-shadow: var(--card-shadow);
 }
 
@@ -420,7 +480,7 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .workspace h2 {
@@ -439,6 +499,7 @@ select {
   border-radius: 999px;
   color: var(--ink);
   background: #fff;
+  white-space: nowrap;
 }
 
 .flow-grid {
@@ -452,6 +513,7 @@ select {
   border-radius: 18px;
   padding: 20px;
   background: #fcfcf9;
+  box-shadow: 0 8px 24px rgba(40, 68, 57, 0.035);
 }
 
 .field {
@@ -476,6 +538,20 @@ select {
   color: var(--ink);
   outline-color: var(--green);
   background: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:hover,
+.field textarea:hover,
+.field select:hover {
+  border-color: #cbd8ce;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px rgba(46, 102, 84, 0.1);
 }
 
 .field textarea {
@@ -503,6 +579,14 @@ select {
   color: #fff;
   font-weight: 700;
   padding: 14px 18px;
+  box-shadow: 0 8px 18px rgba(46, 102, 84, 0.16);
+  transition: transform 0.25s var(--ease-premium), box-shadow 0.25s ease, background 0.2s ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: #255947;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(46, 102, 84, 0.22);
 }
 
 .primary:disabled {
@@ -749,6 +833,17 @@ select {
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.25s var(--ease-premium), color 0.2s ease;
+}
+
+.category-button:hover,
+.drawer-mode:hover,
+.drawer-tab:hover,
+.mini-button:hover,
+.secondary:hover,
+.chip:hover {
+  border-color: #cbd8ce;
+  transform: translateY(-1px);
 }
 
 .category-button.active,
@@ -822,7 +917,7 @@ select {
 .map-surface {
   position: relative;
   height: 58%;
-  transition: height 0.35s ease;
+  transition: height 0.55s var(--ease-premium);
 }
 
 .map-stage.mode-map .map-surface {
@@ -997,6 +1092,7 @@ select {
   backdrop-filter: blur(16px);
   box-shadow: 0 24px 40px rgba(30, 48, 42, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.86);
+  transition: height 0.55s var(--ease-premium), box-shadow 0.3s ease;
 }
 
 .map-stage.mode-map .drawer-panel {
@@ -1022,6 +1118,8 @@ select {
 .drawer-tab-row {
   overflow-x: auto;
   padding-bottom: 8px;
+  scrollbar-width: thin;
+  overscroll-behavior-inline: contain;
 }
 
 .drawer-body {
@@ -1132,6 +1230,9 @@ select {
   border-radius: 18px;
   background: #fcfcf9;
   border: 1px dashed #d7ddd7;
+  min-height: 112px;
+  display: grid;
+  align-content: center;
 }
 
 .empty-card strong {
@@ -1151,6 +1252,7 @@ select {
     radial-gradient(circle at bottom right, rgba(87, 150, 168, 0.24), transparent 42%),
     linear-gradient(180deg, #f6f6f1, #eef4f4);
   border: 1px solid #e3e7df;
+  animation: state-in 0.5s var(--ease-premium) both;
 }
 
 .loading-panel.preview {
@@ -1462,6 +1564,13 @@ select {
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: var(--card-shadow);
+  transition: transform 0.3s var(--ease-premium), box-shadow 0.3s ease, border-color 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+  border-color: #d5e1d7;
+  box-shadow: var(--card-shadow-hover);
 }
 
 .feature-card h3 {
@@ -1486,6 +1595,21 @@ select {
   font-size: 15px;
   vertical-align: -1px;
   margin-right: 5px;
+}
+
+@keyframes state-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media (max-width: 920px) {
@@ -1536,25 +1660,49 @@ select {
   }
 
   .hero {
-    padding: 52px 0 36px;
+    padding: 58px 0 38px;
   }
 
   .hero h1 {
-    font-size: 43px;
+    font-size: clamp(39px, 12vw, 48px);
+    letter-spacing: -1.4px;
+  }
+
+  .intro {
+    max-width: 31ch;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.55;
   }
 
   .card-art {
-    height: 160px;
+    height: 148px;
+  }
+
+  .choice-copy {
+    min-height: 184px;
+    padding: 23px 22px 25px;
+  }
+
+  .choice-copy h2 {
+    font-size: 27px;
   }
 
   .saved-strip {
     align-items: flex-start;
     gap: 15px;
     flex-direction: column;
+    padding: 18px;
+  }
+
+  .saved-strip .text-button {
+    align-self: flex-start;
+    padding-left: 0;
   }
 
   .workspace {
-    padding: 20px;
+    padding: 20px 16px;
+    border-radius: 20px;
   }
 
   .workspace h2,
@@ -1590,11 +1738,62 @@ select {
 
   .map-stage {
     min-height: 760px;
+    border-radius: 22px;
   }
 
   .drawer-panel {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 12px 12px 14px;
+    border-radius: 21px;
+  }
+
+  .drawer-tab-row {
+    flex-wrap: nowrap;
+    margin-inline: -2px;
+    padding-inline: 2px;
+  }
+
+  .drawer-tab {
+    flex: 0 0 auto;
+    padding: 9px 12px;
+  }
+
+  .map-headline {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .map-route-legend {
+    display: none;
+  }
+
+  .map-pin {
+    padding: 8px 10px 8px 8px;
+  }
+
+  .map-pin-label {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-card {
+    padding: 13px 10px;
+  }
+
+  .item-card {
+    padding: 14px;
+  }
+
+  .item-actions {
+    display: flex;
+    flex-wrap: wrap;
   }
 }
