@@ -63,6 +63,11 @@ MIGRATIONS=(
   supabase/migrations/003_cost_and_reporting.sql
   supabase/migrations/004_staff_roles.sql
   supabase/migrations/005_restore_guest_order_claim.sql
+  supabase/migrations/006_travel_notifications.sql
+  supabase/migrations/007_itinerary_planner.sql
+  supabase/migrations/008_itinerary_readiness.sql
+  supabase/migrations/009_custom_places.sql
+  supabase/migrations/010_place_opening_hours.sql
 )
 
 # Every migration on disk must be listed above, or a new one silently never

@@ -4,6 +4,7 @@ import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
 import {
   nextDayDate,
+  minutesFromTime,
   PLACE_DESCRIPTION_MAX,
   PLACE_NAME_MAX,
   type ItineraryCategory,
@@ -34,6 +35,8 @@ const mutation = z.discriminatedUnion('action', [
       category: category.default('other'),
       lat: z.number().min(-90).max(90).nullable().default(null),
       lng: z.number().min(-180).max(180).nullable().default(null),
+      openingStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().default(null),
+      openingEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().default(null),
       /** Where to put it: a day id, or 'ideas' for the unscheduled list. */
       target: z.union([z.string().uuid(), z.literal('ideas')]).default('ideas'),
     })
@@ -168,6 +171,14 @@ export const PATCH = route(async (request, context) => {
   }
 
   if (body.data.action === 'addCustom') {
+    const openingStart = body.data.openingStart;
+    const openingEnd = body.data.openingEnd;
+    if (Boolean(openingStart) !== Boolean(openingEnd)) {
+      throw new ApiError('BAD_REQUEST', 'Add both an opening and closing time, or leave both blank.');
+    }
+    if (openingStart && openingEnd && (minutesFromTime(openingEnd) ?? 0) <= (minutesFromTime(openingStart) ?? 0)) {
+      throw new ApiError('BAD_REQUEST', 'Closing time must be after opening time.');
+    }
     // Stamped with the caller's id, so migration 009's policies scope it to
     // them: nobody else can read it, and it can never be mistaken for part of
     // the editorial catalogue.
@@ -185,6 +196,12 @@ export const PATCH = route(async (request, context) => {
         description: body.data.description,
         source: 'editorial',
         created_by: user.id,
+        opening_hours:
+          openingStart && openingEnd
+            ? Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((day) => [
+                day, [{ open: openingStart, close: openingEnd }],
+              ]))
+            : null,
       })
       .select('id, category')
       .single();
