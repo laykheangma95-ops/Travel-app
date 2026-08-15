@@ -29,12 +29,14 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEven
 import Link from 'next/link';
 import {
   ArrowLeft,
+  AlertTriangle,
   BedDouble,
   CalendarDays,
   Check,
   ChevronDown,
   ChevronUp,
   Clock,
+  CarFront,
   Copy,
   Link2,
   MapPin,
@@ -50,18 +52,21 @@ import {
   CATEGORY_LABEL,
   PLACE_DESCRIPTION_MAX,
   PLACE_NAME_MAX,
-  straightLineKm,
+  scheduleWarnings,
   type CuratedPlace,
   type ItineraryCategory,
   type ItineraryDay,
   type ItineraryPayload,
   type ItineraryPlace,
+  type RouteLeg,
+  type RoutedJourney,
+  type ScheduleWarning,
 } from '@/lib/travel/itinerary';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 type Tab = 'summary' | 'ideas' | string;
-type PickerFilter = 'all' | 'stay' | 'transport' | 'mine';
+type PickerFilter = 'all' | 'stay' | 'transport' | 'saved' | 'mine';
 
 const CATEGORIES: ItineraryCategory[] = ['spot', 'food', 'shopping', 'transport', 'stay', 'other'];
 
@@ -85,6 +90,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [journey, setJourney] = useState<RoutedJourney | null>(null);
+  const [routeState, setRouteState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
 
   const request = useCallback(
     async (body?: Record<string, unknown>) => {
@@ -144,6 +151,37 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
     [request]
   );
 
+  const routeDay = data?.days.find((day) => day.id === tab) ?? null;
+  useEffect(() => {
+    const located = routeDay?.places.filter((item) => hasLocation(item.place)).slice(0, 12) ?? [];
+    if (located.length < 2) {
+      setJourney(null);
+      setRouteState('idle');
+      return;
+    }
+    const controller = new AbortController();
+    setJourney(null);
+    setRouteState('loading');
+    fetch('/api/travel/route', {
+      method: 'POST', credentials: 'include', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ points: located.map((item) => ({
+        id: item.id, lat: Number(item.place.lat), lng: Number(item.place.lng),
+      })) }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('route unavailable');
+        return response.json() as Promise<RoutedJourney>;
+      })
+      .then((result) => { setJourney(result); setRouteState('ready'); })
+      .catch((cause) => {
+        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        setJourney(null);
+        setRouteState('unavailable');
+      });
+    return () => controller.abort();
+  }, [routeDay]);
+
   if (loadState === 'loading') return <EditorSkeleton />;
 
   if (loadState === 'error' || !data) {
@@ -180,6 +218,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   const dayLabel = (day: ItineraryDay) => formatDay(day.date, day.day_index, lang);
   const targetLabel = tab === 'ideas' ? (lang === 'km' ? 'គំនិត' : 'Ideas') : active ? dayLabel(active) : '';
 
+  const activeWarnings = scheduleWarnings(visible, active?.date ?? null, journey?.legs ?? []);
+
   const addExisting = async (place: CuratedPlace) => {
     const result =
       tab === 'ideas' || !active
@@ -194,6 +234,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
       name: draft.name,
       description: draft.description,
       category: draft.category,
+      openingStart: draft.openingStart,
+      openingEnd: draft.openingEnd,
       target: tab === 'ideas' || !active ? 'ideas' : active.id,
     });
     if (result) setPicker(false);
@@ -213,7 +255,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
       <div className="night-stars" aria-hidden="true" />
 
       <div className="relative h-[38svh] min-h-[240px] overflow-hidden">
-        <RouteMap places={mapPlaces} destination={data.trip.destination} lang={lang} />
+        <RouteMap places={mapPlaces} journey={tab === 'summary' ? null : journey} destination={data.trip.destination} lang={lang} />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 pt-6 sm:px-6">
           <Link
             href={`/trips/${tripId}`}
@@ -307,6 +349,9 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
                   onEdit={setEditing}
                   onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
                   onNudge={() => undefined}
+                  routeLegs={[]}
+                  routeState="idle"
+                  warnings={[]}
                   busy={busy}
                 />
               ))}
@@ -322,6 +367,9 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
                 onEdit={setEditing}
                 onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
                 onNudge={() => undefined}
+                routeLegs={[]}
+                routeState="idle"
+                warnings={[]}
                 busy={busy}
               />
             </div>
@@ -336,6 +384,9 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
                 onEdit={setEditing}
                 onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
                 onNudge={(index, direction) => void nudge(visible, index, direction)}
+                routeLegs={journey?.legs ?? []}
+                routeState={routeState}
+                warnings={activeWarnings}
                 busy={busy}
               />
             </div>
@@ -359,6 +410,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
         <AddPlaceSheet
           targetLabel={targetLabel || (lang === 'km' ? 'គំនិត' : 'Ideas')}
           places={data.curatedPlaces}
+          savedPlaceIds={data.ideas.map((item) => item.place_id)}
           busy={busy}
           onAdd={addExisting}
           onAddCustom={addCustom}
@@ -465,6 +517,9 @@ function DaySection({
   onEdit,
   onRemove,
   onNudge,
+  routeLegs,
+  routeState,
+  warnings,
   busy,
 }: {
   title: string;
@@ -475,6 +530,9 @@ function DaySection({
   onEdit: (item: ItineraryPlace) => void;
   onRemove: (id: string) => void;
   onNudge: (index: number, direction: -1 | 1) => void;
+  routeLegs: RouteLeg[];
+  routeState: 'idle' | 'loading' | 'ready' | 'unavailable';
+  warnings: ScheduleWarning[];
   busy: boolean;
 }) {
   const { lang } = useLang();
@@ -511,6 +569,16 @@ function DaySection({
 
       {!collapsed && (
         <div className="mt-4 space-y-1">
+          {routeState === 'loading' && (
+            <p role="status" className="rounded-btn border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/65">
+              {lang === 'km' ? 'កំពុងគណនាពេល និងចម្ងាយផ្លូវពិត…' : 'Calculating live road time and distance…'}
+            </p>
+          )}
+          {routeState === 'unavailable' && (
+            <p className="rounded-btn border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/65">
+              {lang === 'km' ? 'មិនអាចទទួលពេលធ្វើដំណើរផ្លូវពិតបានឥឡូវនេះទេ។' : 'Live road time is unavailable; no estimate has been substituted.'}
+            </p>
+          )}
           {places.length === 0 && (
             <div className="rounded-card border border-dashed border-white/15 bg-white/[0.03] px-4 py-5">
               <p className="text-sm font-semibold text-white">
@@ -534,8 +602,13 @@ function DaySection({
                 onEdit={() => onEdit(item)}
                 onRemove={() => onRemove(item.id)}
                 onNudge={(direction) => onNudge(index, direction)}
+                warnings={warnings.filter((warning) => warning.placeId === item.id)}
               />
-              {index < places.length - 1 && <TravelGap from={item} to={places[index + 1]} />}
+              {index < places.length - 1 && (
+                <TravelGap
+                  leg={routeLegs.find((leg) => leg.fromPlaceId === item.id && leg.toPlaceId === places[index + 1].id)}
+                />
+              )}
             </div>
           ))}
 
@@ -564,6 +637,7 @@ function PlaceCard({
   onEdit,
   onRemove,
   onNudge,
+  warnings,
 }: {
   item: ItineraryPlace;
   index: number;
@@ -573,6 +647,7 @@ function PlaceCard({
   onEdit: () => void;
   onRemove: () => void;
   onNudge: (direction: -1 | 1) => void;
+  warnings: ScheduleWarning[];
 }) {
   const { lang } = useLang();
 
@@ -658,6 +733,12 @@ function PlaceCard({
             <Trash2 size={14} aria-hidden="true" />
           </IconButton>
         </div>
+        {warnings.map((warning) => (
+          <p key={warning.kind} role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-amber-200">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+            {warning.message[lang]}
+          </p>
+        ))}
       </div>
     </article>
   );
@@ -693,33 +774,19 @@ function IconButton({
 }
 
 /**
- * The distance between two consecutive stops, derived from their coordinates.
- *
- * Renders nothing at all when either place has no location — which is the
- * honest answer, and the one the previous hardcoded "Walk · 11 min" refused to
- * give. Presented as approximate because it is a straight line, not a route.
+ * Real road distance and duration returned by the configured routing service.
+ * Renders nothing when a route is unknown; the day-level status explains why.
  */
-function TravelGap({ from, to }: { from: ItineraryPlace; to: ItineraryPlace }) {
+function TravelGap({ leg }: { leg: RouteLeg | undefined }) {
   const { lang } = useLang();
-  if (!hasLocation(from.place) || !hasLocation(to.place)) return null;
-
-  const km = straightLineKm(from.place, to.place);
-  if (km < 0.05) return null;
-
-  // 4.5 km/h is an unhurried city walking pace.
-  const walkable = km <= 1.5;
-  const minutes = Math.max(1, Math.round((km / 4.5) * 60));
+  if (!leg) return null;
+  const km = leg.distanceMeters / 1000;
+  const minutes = Math.max(1, Math.round(leg.durationSeconds / 60));
 
   return (
     <p className="ml-[52px] flex items-center gap-2 py-2 text-xs font-medium text-white/60">
-      <span aria-hidden="true">↓</span>
-      {walkable
-        ? lang === 'km'
-          ? `ដើរ ប្រហែល ${minutes} នាទី`
-          : `Walk · about ${minutes} min`
-        : lang === 'km'
-          ? `ប្រហែល ${km.toFixed(1)} គ.ម ដាច់ដោយផ្ទាល់`
-          : `About ${km.toFixed(1)} km apart`}
+      <CarFront size={14} aria-hidden="true" />
+      {lang === 'km' ? `${minutes} នាទី · ${km.toFixed(1)} គ.ម តាមផ្លូវ` : `${minutes} min · ${km.toFixed(1)} km by road`}
     </p>
   );
 }
@@ -730,11 +797,14 @@ interface CustomDraft {
   name: string;
   description: string;
   category: ItineraryCategory;
+  openingStart: string | null;
+  openingEnd: string | null;
 }
 
 function AddPlaceSheet({
   targetLabel,
   places,
+  savedPlaceIds,
   busy,
   onAdd,
   onAddCustom,
@@ -742,6 +812,7 @@ function AddPlaceSheet({
 }: {
   targetLabel: string;
   places: CuratedPlace[];
+  savedPlaceIds: string[];
   busy: boolean;
   onAdd: (place: CuratedPlace) => void;
   onAddCustom: (draft: CustomDraft) => void;
@@ -751,7 +822,9 @@ function AddPlaceSheet({
   const [filter, setFilter] = useState<PickerFilter>('all');
   const [query, setQuery] = useState('');
   const [custom, setCustom] = useState(false);
-  const [draft, setDraft] = useState<CustomDraft>({ name: '', description: '', category: 'other' });
+  const [draft, setDraft] = useState<CustomDraft>({
+    name: '', description: '', category: 'other', openingStart: null, openingEnd: null,
+  });
 
   // The old filters lied: "Stay" filtered to category 'other' (a catch-all) and
   // "My saved" filtered to source 'editorial' — Domner's own picks, the exact
@@ -760,6 +833,7 @@ function AddPlaceSheet({
     { value: 'all', label: { en: 'All', km: 'ទាំងអស់' }, icon: Link2 },
     { value: 'stay', label: { en: 'Stay', km: 'ស្នាក់នៅ' }, icon: BedDouble },
     { value: 'transport', label: { en: 'Transit', km: 'ធ្វើដំណើរ' }, icon: TrainFront },
+    { value: 'saved', label: { en: 'Saved', km: 'បានរក្សាទុក' }, icon: Star },
     { value: 'mine', label: { en: 'Mine', km: 'របស់ខ្ញុំ' }, icon: Star },
   ];
 
@@ -769,16 +843,19 @@ function AddPlaceSheet({
       if (needle && !`${place.name} ${place.description}`.toLowerCase().includes(needle)) return false;
       if (filter === 'stay') return place.category === 'stay';
       if (filter === 'transport') return place.category === 'transport';
+      if (filter === 'saved') return savedPlaceIds.includes(place.id);
       if (filter === 'mine') return place.created_by !== null;
       return true;
     });
-  }, [places, query, filter]);
+  }, [places, query, filter, savedPlaceIds]);
 
   const submitCustom = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.name.trim()) return;
+    if (Boolean(draft.openingStart) !== Boolean(draft.openingEnd)) return;
     onAddCustom(draft);
   };
+  const incompleteHours = Boolean(draft.openingStart) !== Boolean(draft.openingEnd);
 
   return (
     <div
@@ -862,6 +939,32 @@ function AddPlaceSheet({
                 className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
               />
             </div>
+            <fieldset>
+              <legend className="text-sm font-medium text-white/80">
+                {lang === 'km' ? 'ម៉ោងបើកធម្មតា (ជាជម្រើស)' : 'Typical opening hours (optional)'}
+              </legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-3">
+                <input
+                  type="time"
+                  aria-label={lang === 'km' ? 'ម៉ោងបើក' : 'Opening time'}
+                  value={draft.openingStart ?? ''}
+                  onChange={(event) => setDraft({ ...draft, openingStart: event.target.value || null })}
+                  className="min-h-[2.75rem] rounded-btn border border-white/12 bg-white/[0.04] px-3 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                />
+                <input
+                  type="time"
+                  aria-label={lang === 'km' ? 'ម៉ោងបិទ' : 'Closing time'}
+                  value={draft.openingEnd ?? ''}
+                  onChange={(event) => setDraft({ ...draft, openingEnd: event.target.value || null })}
+                  className="min-h-[2.75rem] rounded-btn border border-white/12 bg-white/[0.04] px-3 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                />
+              </div>
+              {incompleteHours && (
+                <p role="alert" className="mt-1.5 text-xs text-amber-200">
+                  {lang === 'km' ? 'សូមបញ្ចូលទាំងម៉ោងបើក និងម៉ោងបិទ។' : 'Enter both opening and closing time.'}
+                </p>
+              )}
+            </fieldset>
             <p className="text-xs text-white/60">
               {lang === 'km'
                 ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
@@ -870,7 +973,7 @@ function AddPlaceSheet({
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
-                disabled={busy || !draft.name.trim()}
+                disabled={busy || !draft.name.trim() || incompleteHours}
                 className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-btn px-5 text-sm font-semibold text-primary-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
               >
                 {lang === 'km' ? 'បន្ថែម' : 'Add it'}
@@ -1323,10 +1426,12 @@ function tripDates(start: string | null, end: string | null, lang: 'en' | 'km'):
  */
 function RouteMap({
   places,
+  journey,
   destination,
   lang,
 }: {
   places: ItineraryPlace[];
+  journey: RoutedJourney | null;
   destination: string;
   lang: 'en' | 'km';
 }) {
@@ -1399,15 +1504,18 @@ function RouteMap({
         .bindTooltip(item.place.name);
     });
 
+    const roadGeometry = journey?.geometry.map(([lng, lat]) => [lat, lng] as [number, number]) ?? [];
+    if (roadGeometry.length > 1) {
+      L.polyline(roadGeometry, { color: '#e8c887', weight: 3, opacity: 0.82 }).addTo(layer);
+    }
     if (points.length > 1) {
-      L.polyline(points, { color: '#e8c887', weight: 3, opacity: 0.75 }).addTo(layer);
       instance.flyToBounds(points, { padding: [34, 34], ...motion });
     } else if (points[0]) {
       instance.flyTo(points[0], 12, motion);
     } else {
       instance.flyTo([13.7563, 100.5018], 4, motion);
     }
-  }, [located, ready]);
+  }, [located, journey, ready]);
 
   return (
     <div
