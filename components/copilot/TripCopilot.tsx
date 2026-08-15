@@ -51,9 +51,38 @@ const EDGE = 12; // keep this much clear of every edge
 const DRAG_THRESHOLD = 4; // px of travel before a tap counts as a drag
 const POS_KEY = 'domner:copilot-pos';
 
-const clampToViewport = (p: Point): Point => ({
+const FOCUSED_ROUTE_PREFIXES = [
+  '/admin',
+  '/auth/callback',
+  '/cart',
+  '/esim/checkout',
+  '/forgot-password',
+  '/order-confirmation',
+  '/reset-password',
+  '/sign-in',
+  '/sign-up',
+];
+
+const routeBottomInset = (pathname?: string | null): number => {
+  if (!pathname) return 84;
+  if (/^\/trips\/[^/]+\/itinerary(?:\/)?$/.test(pathname)) return 112;
+  if (
+    pathname === '/' ||
+    pathname.startsWith('/destination/') ||
+    FOCUSED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  ) {
+    return 20;
+  }
+  return 84;
+};
+
+const shouldHideCopilot = (pathname?: string | null): boolean =>
+  pathname === '/apsara-hero' ||
+  FOCUSED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname?.startsWith(`${prefix}/`));
+
+const clampToViewport = (p: Point, bottomInset = EDGE): Point => ({
   x: Math.min(Math.max(p.x, EDGE), Math.max(EDGE, window.innerWidth - FAB_SIZE - EDGE)),
-  y: Math.min(Math.max(p.y, EDGE), Math.max(EDGE, window.innerHeight - FAB_SIZE - EDGE)),
+  y: Math.min(Math.max(p.y, EDGE), Math.max(EDGE, window.innerHeight - FAB_SIZE - Math.max(EDGE, bottomInset))),
 });
 
 export function TripCopilot() {
@@ -70,6 +99,7 @@ export function TripCopilot() {
   const [viewport, setViewport] = useState<Point | null>(null);
   const dragRef = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
   const justDraggedRef = useRef(false);
+  const bottomInset = routeBottomInset(pathname);
 
   // Restore the remembered position, and keep the button on screen when the
   // window is resized or the phone is rotated.
@@ -82,7 +112,7 @@ export function TripCopilot() {
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<Point>;
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          setPos(clampToViewport({ x: parsed.x, y: parsed.y }));
+          setPos(clampToViewport({ x: parsed.x, y: parsed.y }, bottomInset));
         }
       }
     } catch {
@@ -91,11 +121,11 @@ export function TripCopilot() {
 
     const onResize = () => {
       readViewport();
-      setPos((p) => (p ? clampToViewport(p) : p));
+      setPos((p) => (p ? clampToViewport(p, bottomInset) : p));
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [bottomInset]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 && event.pointerType === 'mouse') return;
@@ -114,7 +144,7 @@ export function TripCopilot() {
   const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const next = clampToViewport({ x: event.clientX - drag.dx, y: event.clientY - drag.dy });
+    const next = clampToViewport({ x: event.clientX - drag.dx, y: event.clientY - drag.dy }, bottomInset);
     setPos((prev) => {
       if (prev && !drag.moved) {
         const travelled = Math.hypot(next.x - prev.x, next.y - prev.y);
@@ -178,7 +208,8 @@ export function TripCopilot() {
   }, [open, flightNumber]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: reducedMotion ? 'auto' : 'smooth' });
   }, [messages, loading]);
 
   const send = async (text: string) => {
@@ -227,7 +258,11 @@ export function TripCopilot() {
       : undefined;
 
   // The Apsara hero is a standalone full-screen page — keep the FAB off it.
-  if (pathname === '/apsara-hero') return null;
+  if (shouldHideCopilot(pathname)) return null;
+
+  const defaultFabStyle: React.CSSProperties = pos
+    ? { left: pos.x, top: pos.y }
+    : { right: EDGE + 4, bottom: `calc(${bottomInset}px + env(safe-area-inset-bottom))` };
 
   return (
     <>
@@ -253,9 +288,9 @@ export function TripCopilot() {
         // but rendered a square halo behind the circle (Chromium backdrop-filter
         // + border-radius clipping bug), so we disable it here.
         className={`liquid-glass-accent liquid-sheen liquid-touch liquid-press fixed z-[90] flex h-14 w-14 touch-none items-center justify-center rounded-full text-white shadow-lg hover:scale-105 [backdrop-filter:none] [-webkit-backdrop-filter:none] ${
-          pos ? 'cursor-grab active:cursor-grabbing' : 'bottom-5 right-5'
+          pos ? 'cursor-grab active:cursor-grabbing' : ''
         }`}
-        style={pos ? { left: pos.x, top: pos.y } : undefined}
+        style={defaultFabStyle}
       >
         {open ? <X size={22} /> : <Sparkles size={22} aria-hidden="true" />}
       </button>
@@ -267,7 +302,7 @@ export function TripCopilot() {
           className={`fixed z-[90] flex h-[70vh] max-h-[560px] w-[92vw] max-w-sm flex-col overflow-hidden rounded-card border border-white/10 bg-[#0E1B30]/95 shadow-2xl backdrop-blur-xl animate-fade-up ${
             panelStyle ? '' : 'bottom-24 right-5'
           }`}
-          style={panelStyle}
+          style={panelStyle ?? { right: EDGE + 4, bottom: `calc(${bottomInset + FAB_SIZE + 12}px + env(safe-area-inset-bottom))` }}
         >
           <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3.5">
             <DomerMark surface="gold" size={24} />
@@ -291,7 +326,7 @@ export function TripCopilot() {
                       key={s}
                       type="button"
                       onClick={() => send(s)}
-                      className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                      className="min-h-[2.75rem] rounded-full border border-white/15 bg-white/5 px-3 py-2 text-[11px] text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
                     >
                       {s}
                     </button>
@@ -329,13 +364,13 @@ export function TripCopilot() {
               onChange={(e) => setInput(e.target.value)}
               placeholder={lang === 'km' ? 'សរសេរសំណួររបស់អ្នក...' : 'Ask a question...'}
               aria-label="Message"
-              className="flex-1 rounded-btn border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-accent focus:outline-none"
+              className="min-h-[2.75rem] flex-1 rounded-btn border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/45 focus:border-accent focus:outline-none"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
               aria-label="Send"
-              className="liquid-glass-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40 [backdrop-filter:none] [-webkit-backdrop-filter:none]"
+              className="liquid-glass-accent flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright [backdrop-filter:none] [-webkit-backdrop-filter:none]"
             >
               <Send size={16} />
             </button>

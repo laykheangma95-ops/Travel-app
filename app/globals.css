@@ -1583,7 +1583,7 @@ button.capsule:active {
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .capsule-headline {
@@ -1746,12 +1746,12 @@ button.capsule:active {
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.68);
   transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tabbar-item:hover {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .tabbar-item[aria-current='page'] {
@@ -1954,6 +1954,11 @@ button.capsule:active {
   line-height: 1;
   filter: drop-shadow(0 9px 10px rgba(46,58,57,.2));
   animation: itinerary-landmark-float 4s ease-in-out infinite;
+}
+.itinerary-landmark svg {
+  display: block;
+  width: 1em;
+  height: 1em;
 }
 .itinerary-landmark-eiffel { top: 17%; left: 14%; transform: scaleX(.58); }.itinerary-landmark-liberty { top: 25%; right: 12%; animation-delay: -1.4s; }.itinerary-landmark-temple { bottom: 12%; right: 15%; animation-delay: -.7s; }
 .itinerary-flight-path {

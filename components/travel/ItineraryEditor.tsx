@@ -25,7 +25,7 @@
 // not say it. A place with no time shows no time and offers to set one.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -83,6 +83,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   const [editing, setEditing] = useState<ItineraryPlace | null>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const request = useCallback(
@@ -128,8 +129,11 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
     async (body: Record<string, unknown>) => {
       setBusy(true);
       setError(null);
+      setNotice(null);
       try {
-        return await request(body);
+        const result = await request(body);
+        setNotice(mutationSuccess(body.action, lang));
+        return result;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : null);
         return null;
@@ -263,7 +267,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
                 const next = await mutate({ action: 'addDay' });
                 if (next) setTab(next.days[next.days.length - 1]?.id ?? tab);
               }}
-              className="mb-2 grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 text-lg font-light text-white/70 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              className="mb-2 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 text-lg font-light text-white/70 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
             >
               +
             </button>
@@ -272,6 +276,18 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
           {error && (
             <p role="alert" className="mt-4 rounded-btn border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-red-200">
               {error}
+            </p>
+          )}
+          <div className="sr-only" role="status" aria-live="polite">
+            {busy
+              ? lang === 'km'
+                ? 'កំពុងរក្សាទុកការផ្លាស់ប្តូរ'
+                : 'Saving itinerary changes'
+              : notice}
+          </div>
+          {notice && !error && (
+            <p className="mt-4 rounded-btn border border-success/30 bg-success/10 px-3.5 py-2.5 text-sm font-medium text-emerald-100">
+              {notice}
             </p>
           )}
 
@@ -382,6 +398,32 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
+function mutationSuccess(action: unknown, lang: 'en' | 'km'): string {
+  const km = lang === 'km';
+  switch (action) {
+    case 'addDay':
+      return km ? 'បានបន្ថែមថ្ងៃថ្មី។' : 'A new day was added.';
+    case 'addPlace':
+    case 'addIdea':
+    case 'addCustom':
+      return km ? 'បានបន្ថែមទីតាំង។' : 'Place added to the itinerary.';
+    case 'delete':
+      return km ? 'បានលុបទីតាំង។' : 'Place removed.';
+    case 'reorder':
+      return km ? 'បានផ្លាស់ប្តូរលំដាប់។' : 'Order updated.';
+    case 'update':
+      return km ? 'បានរក្សាទុកទីតាំង។' : 'Place saved.';
+    case 'move':
+      return km ? 'បានផ្លាស់ទីទៅថ្ងៃថ្មី។' : 'Moved to another day.';
+    case 'share':
+      return km ? 'បានបង្កើតតំណចែករំលែក។' : 'Share link created.';
+    case 'unshare':
+      return km ? 'បានបញ្ឈប់ការចែករំលែក។' : 'Sharing turned off.';
+    default:
+      return km ? 'បានរក្សាទុកការផ្លាស់ប្តូរ។' : 'Changes saved.';
+  }
+}
+
 function TabButton({
   active,
   onClick,
@@ -397,8 +439,8 @@ function TabButton({
       onClick={onClick}
       aria-current={active ? 'true' : undefined}
       className={cn(
-        'relative shrink-0 pb-3.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
-        active ? 'text-white' : 'text-white/45 hover:text-white/75'
+        'relative min-h-[2.75rem] shrink-0 pb-3.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
+        active ? 'text-white' : 'text-white/65 hover:text-white/85'
       )}
     >
       {children}
@@ -437,7 +479,7 @@ function DaySection({
 }) {
   const { lang } = useLang();
   const [collapsed, setCollapsed] = useState(false);
-  const headingId = `day-${title.replace(/\W+/g, '-')}`;
+  const headingId = useId();
 
   return (
     <section aria-labelledby={headingId}>
@@ -461,7 +503,7 @@ function DaySection({
                 ? `បង្រួម ${title}`
                 : `Collapse ${title}`
           }
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/45 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/65 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
         >
           {collapsed ? <ChevronDown size={20} aria-hidden="true" /> : <ChevronUp size={20} aria-hidden="true" />}
         </button>
@@ -469,6 +511,18 @@ function DaySection({
 
       {!collapsed && (
         <div className="mt-4 space-y-1">
+          {places.length === 0 && (
+            <div className="rounded-card border border-dashed border-white/15 bg-white/[0.03] px-4 py-5">
+              <p className="text-sm font-semibold text-white">
+                {lang === 'km' ? 'មិនទាន់មានទីតាំងនៅឡើយ។' : 'No places yet.'}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-white/65">
+                {lang === 'km'
+                  ? 'បន្ថែមទីតាំងមួយ ដើម្បីឱ្យផែនទី និងលំដាប់ថ្ងៃចាប់ផ្តើមមានអត្ថន័យ។'
+                  : 'Add a place to give this day a route, timing and map context.'}
+              </p>
+            </div>
+          )}
           {places.map((item, index) => (
             <div key={item.id}>
               <PlaceCard
@@ -488,7 +542,7 @@ function DaySection({
           <button
             type="button"
             onClick={onAdd}
-            className="flex min-h-[3rem] w-full items-center gap-4 rounded-btn px-2 text-left text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            className="flex min-h-[3rem] w-full items-center gap-4 rounded-btn px-2 text-left text-white/65 transition-colors hover:bg-white/[0.04] hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
           >
             <span className="text-2xl font-light leading-none" aria-hidden="true">
               +
@@ -556,7 +610,7 @@ function PlaceCard({
             <button
               type="button"
               onClick={onEdit}
-              className="flex items-center gap-1.5 text-sm text-white/45 transition-colors hover:text-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              className="flex min-h-[2.75rem] items-center gap-1.5 text-sm text-white/65 transition-colors hover:text-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
             >
               <Clock size={13} aria-hidden="true" />
               {lang === 'km' ? 'កំណត់ពេលវេលា' : 'Set a time'}
@@ -629,7 +683,7 @@ function IconButton({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        'grid h-9 w-9 place-items-center rounded-full text-white/35 transition-colors disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2',
+        'grid h-11 w-11 place-items-center rounded-full text-white/60 transition-colors disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2',
         danger ? 'hover:text-danger focus-visible:ring-danger' : 'hover:text-white focus-visible:ring-gold-light'
       )}
     >
@@ -657,7 +711,7 @@ function TravelGap({ from, to }: { from: ItineraryPlace; to: ItineraryPlace }) {
   const minutes = Math.max(1, Math.round((km / 4.5) * 60));
 
   return (
-    <p className="ml-[52px] flex items-center gap-2 py-2 text-xs font-medium text-white/35">
+    <p className="ml-[52px] flex items-center gap-2 py-2 text-xs font-medium text-white/60">
       <span aria-hidden="true">↓</span>
       {walkable
         ? lang === 'km'
@@ -750,7 +804,7 @@ function AddPlaceSheet({
             type="button"
             onClick={onClose}
             aria-label={lang === 'km' ? 'បិទ' : 'Close'}
-            className="grid h-9 w-9 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            className="grid h-11 w-11 place-items-center rounded-full text-white/65 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -770,7 +824,7 @@ function AddPlaceSheet({
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 placeholder={lang === 'km' ? 'សណ្ឋាគាររបស់យើង' : 'Our hotel'}
-                className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/35 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
               />
             </div>
             <div>
@@ -805,10 +859,10 @@ function AddPlaceSheet({
                 placeholder={
                   lang === 'km' ? 'អាសយដ្ឋាន លេខទូរស័ព្ទ ឬលេខកក់…' : 'Address, phone, booking reference…'
                 }
-                className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
               />
             </div>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-white/60">
               {lang === 'km'
                 ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
                 : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
@@ -840,10 +894,10 @@ function AddPlaceSheet({
                   onClick={() => setFilter(value)}
                   aria-pressed={filter === value}
                   className={cn(
-                    'flex min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border px-3 py-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
+                    'flex min-h-[2.75rem] min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border px-3 py-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
                     filter === value
                       ? 'border-gold-light/50 bg-gold-light/15 text-gold-bright'
-                      : 'border-white/12 text-white/65 hover:border-white/25 hover:text-white'
+                      : 'border-white/12 text-white/75 hover:border-white/25 hover:text-white'
                   )}
                 >
                   <Icon size={18} aria-hidden="true" />
@@ -853,7 +907,7 @@ function AddPlaceSheet({
               <button
                 type="button"
                 onClick={() => setCustom(true)}
-                className="flex min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border border-dashed border-gold-light/40 px-3 py-3 text-xs font-semibold text-gold-bright transition-colors hover:border-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                className="flex min-h-[2.75rem] min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border border-dashed border-gold-light/40 px-3 py-3 text-xs font-semibold text-gold-bright transition-colors hover:border-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
               >
                 <Plus size={18} aria-hidden="true" />
                 {lang === 'km' ? 'ផ្ទាល់ខ្លួន' : 'Custom'}
@@ -861,14 +915,14 @@ function AddPlaceSheet({
             </div>
 
             <label className="mt-4 flex items-center gap-3 rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5">
-              <MapPin size={18} className="shrink-0 text-white/40" aria-hidden="true" />
+              <MapPin size={18} className="shrink-0 text-white/60" aria-hidden="true" />
               <span className="sr-only">{lang === 'km' ? 'ស្វែងរកទីតាំង' : 'Search places'}</span>
               <input
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={lang === 'km' ? 'ស្វែងរកទីតាំង' : 'Search places'}
-                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/45"
               />
             </label>
 
@@ -879,7 +933,7 @@ function AddPlaceSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => onAdd(place)}
-                  className="flex w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                  className="flex min-h-[3.5rem] w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
                 >
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card bg-gold-light/12 text-gold-light">
                     <MapPin size={18} aria-hidden="true" />
@@ -888,7 +942,7 @@ function AddPlaceSheet({
                     <b className="block truncate text-sm font-semibold text-white">{place.name}</b>
                     <span className="block truncate text-xs text-white/50">{place.description}</span>
                   </span>
-                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/35">
+                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/60">
                     {CATEGORY_LABEL[place.category]?.[lang] ?? CATEGORY_LABEL.other[lang]}
                   </span>
                 </button>
@@ -975,7 +1029,7 @@ function EditPlaceSheet({
             type="button"
             onClick={onClose}
             aria-label={lang === 'km' ? 'បិទ' : 'Close'}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/65 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -1037,7 +1091,7 @@ function EditPlaceSheet({
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder={item.place.description}
-            className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+            className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
           />
         </div>
 
@@ -1059,7 +1113,7 @@ function EditPlaceSheet({
 
         {days.length > 0 && (
           <div className="mt-6 border-t border-white/10 pt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/65">
               {lang === 'km' ? 'ផ្លាស់ទៅថ្ងៃផ្សេង' : 'Move to another day'}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-2">
@@ -1069,7 +1123,7 @@ function EditPlaceSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => onMove(day.id)}
-                  className="inline-flex min-h-[2.5rem] items-center rounded-btn border border-white/15 px-3.5 text-sm font-medium text-white/75 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                  className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-3.5 text-sm font-medium text-white/80 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
                 >
                   {formatDay(day.date, day.day_index, lang)}
                 </button>
@@ -1142,7 +1196,7 @@ function ShareSheet({
             type="button"
             onClick={onClose}
             aria-label={lang === 'km' ? 'បិទ' : 'Close'}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/65 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -1216,8 +1270,11 @@ function ShareSheet({
 // ── Chrome ───────────────────────────────────────────────────────────────────
 
 function EditorSkeleton() {
+  const { lang } = useLang();
+
   return (
-    <div className="night-canvas has-tabbar relative min-h-screen" aria-busy="true">
+    <div className="night-canvas has-tabbar relative min-h-screen" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{lang === 'km' ? 'កំពុងផ្ទុកកម្មវិធីដំណើរ' : 'Loading itinerary'}</span>
       <div className="night-stars" aria-hidden="true" />
       <div className="relative h-[38svh] min-h-[240px] animate-pulse bg-white/[0.04] motion-reduce:animate-none" />
       <div className="relative z-20 mx-auto -mt-8 max-w-3xl rounded-t-[28px] border-t border-white/10 bg-primary-deep/95 px-5 pt-8 sm:px-8">

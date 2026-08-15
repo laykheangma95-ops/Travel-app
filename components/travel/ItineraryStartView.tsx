@@ -295,6 +295,36 @@ function ReplaceDialog({
   );
 }
 
+function LandmarkSvg({ kind }: { kind: 'tower' | 'liberty' | 'temple' }) {
+  const paths = {
+    tower: (
+      <>
+        <path d="M12 3L7 21M12 3l5 18M8.5 15h7M9.5 11h5M6.5 21h11" />
+        <path d="M10 7h4M8 19h8" />
+      </>
+    ),
+    liberty: (
+      <>
+        <path d="M12 4l-3 4h6l-3-4Z" />
+        <path d="M10 8v4l-2 7h8l-2-7V8" />
+        <path d="M8 12h8M9 19h6M12 4V2M8.5 5.5 7 4M15.5 5.5 17 4" />
+      </>
+    ),
+    temple: (
+      <>
+        <path d="M4 10h16L12 4 4 10Z" />
+        <path d="M6 10v9M10 10v9M14 10v9M18 10v9M4 19h16M5 22h14" />
+      </>
+    ),
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {paths[kind]}
+    </svg>
+  );
+}
+
 function GeneratingView() {
   const { lang } = useLang();
 
@@ -321,27 +351,33 @@ function GeneratingView() {
         </div>
 
         <div className="relative flex flex-1 items-center justify-center py-8">
-          <div className="itinerary-landmark itinerary-landmark-eiffel" aria-hidden="true">♜</div>
-          <div className="itinerary-landmark itinerary-landmark-liberty" aria-hidden="true">♟</div>
-          <div className="itinerary-landmark itinerary-landmark-temple" aria-hidden="true">⌂</div>
+          <div className="itinerary-landmark itinerary-landmark-eiffel" aria-hidden="true">
+            <LandmarkSvg kind="tower" />
+          </div>
+          <div className="itinerary-landmark itinerary-landmark-liberty" aria-hidden="true">
+            <LandmarkSvg kind="liberty" />
+          </div>
+          <div className="itinerary-landmark itinerary-landmark-temple" aria-hidden="true">
+            <LandmarkSvg kind="temple" />
+          </div>
           <div className="itinerary-globe" aria-hidden="true">
             <div className="itinerary-globe-grid" />
             <div className="itinerary-globe-glow" />
-            <span className="itinerary-globe-pin pin-one">•</span>
-            <span className="itinerary-globe-pin pin-two">•</span>
-            <span className="itinerary-globe-pin pin-three">•</span>
+            <span className="itinerary-globe-pin pin-one" />
+            <span className="itinerary-globe-pin pin-two" />
+            <span className="itinerary-globe-pin pin-three" />
           </div>
           <div className="itinerary-flight-path path-one" aria-hidden="true" />
           <div className="itinerary-flight-path path-two" aria-hidden="true" />
         </div>
 
         <div className="mx-auto w-full max-w-3xl rounded-[28px] border border-white/80 bg-white/55 p-5 shadow-[0_14px_50px_rgba(102,92,60,.1)] backdrop-blur-md sm:p-6">
-          <div className="flex items-center justify-center gap-6 text-center text-[10px] font-semibold uppercase tracking-[.12em] text-[#94733a] sm:gap-12" aria-hidden="true">
-            <span>◎<b>Global<br />destinations</b></span>
-            <span>✈<b>Seamless<br />journeys</b></span>
-            <span>✧<b>Curated<br />experiences</b></span>
-            <span>✓<b>Trusted<br />service</b></span>
-            <span>▣<b>Memories<br />that last</b></span>
+          <div className="flex flex-wrap items-center justify-center gap-5 text-center text-[10px] font-semibold uppercase tracking-[.12em] text-[#94733a] sm:gap-10 [&_span]:inline-flex [&_span]:items-center [&_span]:gap-2" aria-hidden="true">
+            <span><MapPinned size={16} aria-hidden="true" /><b>Global<br />destinations</b></span>
+            <span><ArrowRight size={16} aria-hidden="true" /><b>Seamless<br />journeys</b></span>
+            <span><Sparkles size={16} aria-hidden="true" /><b>Curated<br />experiences</b></span>
+            <span><Check size={16} aria-hidden="true" /><b>Trusted<br />service</b></span>
+            <span><CalendarDays size={16} aria-hidden="true" /><b>Memories<br />that last</b></span>
           </div>
           <p role="status" className="mt-5 flex items-center justify-center gap-2 text-sm font-semibold text-black/65">
             <Loader2 size={16} className="animate-spin text-[#b18436] motion-reduce:animate-none" aria-hidden="true" />

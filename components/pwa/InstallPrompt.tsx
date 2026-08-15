@@ -138,7 +138,7 @@ export function InstallPrompt({
       <button
         type="button"
         onClick={dismiss}
-        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+        className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
         aria-label={lang === 'km' ? 'បិទ' : 'Dismiss'}
       >
         <X size={16} aria-hidden="true" />

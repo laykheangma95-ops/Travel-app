@@ -599,6 +599,9 @@ const dicts = {
   },
 } as const;
 
+const completeKhmerCoverage: Record<keyof typeof dicts.en, string> = dicts.km;
+void completeKhmerCoverage;
+
 export type DictKey = keyof typeof dicts.en;
 
 interface LangContextValue {
