@@ -13,6 +13,7 @@ import { Compass, Map } from 'lucide-react';
 import type { TripSummary } from '@/lib/travel/state';
 import type { TripDraft } from '@/lib/travel/trips';
 import { TripForm } from './TripForm';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 
 function toDraft(trip: TripSummary): TripDraft {
@@ -28,27 +29,32 @@ function toDraft(trip: TripSummary): TripDraft {
 
 export function EditTripView({ tripId }: { tripId: string }) {
   const { lang } = useLang();
-  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'offline' | 'ready'>('loading');
   const [draft, setDraft] = useState<TripDraft | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/travel/trips', { credentials: 'include' })
+    fetch(`/api/travel/trips/${tripId}`, { credentials: 'include' })
       .then(async (response) => {
         if (response.status === 401) {
           if (!cancelled) setStatus('guest');
           return null;
         }
-        return response.ok ? response.json() : null;
+        if (response.status === 404) {
+          if (!cancelled) setStatus('missing');
+          return null;
+        }
+        if (!response.ok) throw new Error('unavailable');
+        return response.json();
       })
-      .then((body: { trips?: TripSummary[] } | null) => {
-        if (cancelled || !body) return;
-        const found = (body.trips ?? []).find((candidate) => candidate.id === tripId) ?? null;
-        setDraft(found ? toDraft(found) : null);
-        setStatus(found ? 'ready' : 'missing');
+      .then((body: { trip?: TripSummary } | null) => {
+        if (cancelled || !body?.trip) return;
+        setDraft(toDraft(body.trip));
+        setStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setStatus('missing');
+        // A dropped connection is not a deleted trip.
+        if (!cancelled) setStatus('offline');
       });
     return () => {
       cancelled = true;
@@ -74,18 +80,24 @@ export function EditTripView({ tripId }: { tripId: string }) {
             <h1 className="mt-3 font-display text-xl text-white">
               {lang === 'km' ? 'ចូលគណនីដើម្បីកែសម្រួល' : 'Sign in to edit this trip'}
             </h1>
-            <Link
-              href={`/sign-in?returnTo=/trips/${tripId}/edit`}
+            <SignInLink
+              returnTo={`/trips/${tripId}/edit`}
               className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
             >
               {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-            </Link>
+            </SignInLink>
           </div>
         ) : (
           <div className="night-card p-8 text-center">
             <Map size={22} className="mx-auto text-white/45" aria-hidden="true" />
             <h1 className="mt-3 font-display text-xl text-white">
-              {lang === 'km' ? 'រកដំណើរនេះមិនឃើញ' : 'That trip could not be found'}
+              {status === 'offline'
+                ? lang === 'km'
+                  ? 'មិនអាចទាញយកដំណើរនេះបានទេ'
+                  : "We couldn't load this trip"
+                : lang === 'km'
+                  ? 'រកដំណើរនេះមិនឃើញ'
+                  : 'That trip could not be found'}
             </h1>
             <Link
               href="/trips"

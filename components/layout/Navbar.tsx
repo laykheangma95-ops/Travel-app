@@ -46,7 +46,8 @@ const navGroups: NavGroup[] = [
       { labelKey: 'nav.emergency', href: '/emergency' },
     ],
   },
-  { labelKey: 'nav.support', href: '/affiliate' },
+  // 'Support' pointed at /affiliate — the reseller signup, not help.
+  { labelKey: 'nav.support', href: 'https://t.me/domnerapp' },
 ];
 
 export function Navbar() {

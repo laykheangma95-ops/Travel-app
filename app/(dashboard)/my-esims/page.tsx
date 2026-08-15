@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { DataUsageCard } from '@/components/esim/DataUsageCard';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { formatDate, formatUsd } from '@/lib/utils';
 import type { OrderStatus } from '@/types';
 
@@ -113,9 +114,12 @@ export default function MyEsimsPage() {
       {!loading && error && (
         <div role="alert" className="rounded-card border border-line bg-surface-3 p-6 text-center">
           <p className="text-sm text-ink-secondary">{error}</p>
-          <Button href="/sign-in?returnTo=/my-esims" size="sm" className="mt-4">
+          <SignInLink
+            returnTo="/my-esims"
+            className="mt-4 inline-flex min-h-[2.25rem] items-center rounded-btn bg-secondary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+          >
             Sign in
-          </Button>
+          </SignInLink>
         </div>
       )}
 

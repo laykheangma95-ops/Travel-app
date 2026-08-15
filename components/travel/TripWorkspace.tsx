@@ -33,6 +33,7 @@ import { readinessPercent } from '@/lib/travel/state';
 import { TripProgress } from './TripProgress';
 import { WeatherCapsule } from './capsules';
 import { StatusBadge } from './StatusBadge';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { PermissionPrompt } from '@/components/notifications/PermissionPrompt';
 import { useLang } from '@/lib/i18n';
@@ -49,28 +50,35 @@ function isWet(code: number): boolean {
 
 export function TripWorkspace({ tripId }: { tripId: string }) {
   const { lang } = useLang();
-  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'offline' | 'ready'>('loading');
   const [trip, setTrip] = useState<TripSummary | null>(null);
   const [weather, setWeather] = useState<Weather | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/travel/trips', { credentials: 'include' })
+    fetch(`/api/travel/trips/${tripId}`, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 401) {
           if (!cancelled) setStatus('guest');
           return null;
         }
-        return res.ok ? res.json() : null;
+        if (res.status === 404) {
+          if (!cancelled) setStatus('missing');
+          return null;
+        }
+        if (!res.ok) throw new Error('unavailable');
+        return res.json();
       })
-      .then((body: { trips?: TripSummary[] } | null) => {
-        if (cancelled || !body) return;
-        const found = (body.trips ?? []).find((candidate) => candidate.id === tripId) ?? null;
-        setTrip(found);
-        setStatus(found ? 'ready' : 'missing');
+      .then((body: { trip?: TripSummary } | null) => {
+        if (cancelled || !body?.trip) return;
+        setTrip(body.trip);
+        setStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setStatus('missing');
+        // Not 'missing'. A dropped connection used to render "It may have been
+        // deleted, or it belongs to another account" — an accusation, at the
+        // moment a traveler is most likely to be offline.
+        if (!cancelled) setStatus('offline');
       });
     return () => {
       cancelled = true;
@@ -116,7 +124,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     );
   }
 
-  if (status === 'guest' || status === 'missing') {
+  if (status === 'guest' || status === 'missing' || status === 'offline') {
     return (
       <Shell>
         <div className="night-card p-8 text-center">
@@ -125,31 +133,42 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               ? lang === 'km'
                 ? 'ចូលគណនីដើម្បីមើលដំណើរនេះ'
                 : 'Sign in to open this trip'
-              : lang === 'km'
-                ? 'រកមិនឃើញដំណើរនេះទេ'
-                : "We can't find that trip"}
+              : status === 'offline'
+                ? lang === 'km'
+                  ? 'មិនអាចទាញយកដំណើរនេះបានទេ'
+                  : "We couldn't load this trip"
+                : lang === 'km'
+                  ? 'រកមិនឃើញដំណើរនេះទេ'
+                  : "We can't find that trip"}
           </h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/65">
             {status === 'guest'
               ? lang === 'km'
                 ? 'ដំណើរត្រូវបានរក្សាទុកក្នុងគណនីរបស់អ្នក។'
                 : 'Trips are saved to your account.'
-              : lang === 'km'
-                ? 'វាអាចត្រូវបានលុប ឬជាកម្មសិទ្ធិគណនីផ្សេង។'
-                : 'It may have been deleted, or it belongs to another account.'}
+              : status === 'offline'
+                ? lang === 'km'
+                  ? 'ដំណើររបស់អ្នកនៅតែមាន។ សូមព្យាយាមម្ដងទៀតពេលមានអ៊ីនធឺណិត។'
+                  : 'Your trip is still there — we just cannot reach it right now.'
+                : lang === 'km'
+                  ? 'វាអាចត្រូវបានលុប ឬជាកម្មសិទ្ធិគណនីផ្សេង។'
+                  : 'It may have been deleted, or it belongs to another account.'}
           </p>
-          <Link
-            href={status === 'guest' ? `/sign-in?returnTo=/trips/${tripId}` : '/trips'}
-            className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
-          >
-            {status === 'guest'
-              ? lang === 'km'
-                ? 'ចូលគណនី'
-                : 'Sign in'
-              : lang === 'km'
-                ? 'ដំណើរទាំងអស់'
-                : 'All trips'}
-          </Link>
+          {status === 'guest' ? (
+            <SignInLink
+              returnTo={`/trips/${tripId}`}
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+            >
+              {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
+            </SignInLink>
+          ) : (
+            <Link
+              href="/trips"
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+            >
+              {lang === 'km' ? 'ដំណើរទាំងអស់' : 'All trips'}
+            </Link>
+          )}
         </div>
       </Shell>
     );
@@ -234,7 +253,9 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               : "Domner doesn't book hotels yet. You can note where you're staying in your itinerary."
           }
           actionLabel={lang === 'km' ? 'បើកកម្មវិធី' : 'Open itinerary'}
-          actionHref="#itinerary"
+          // Was "#itinerary", which scrolled a few hundred pixels down the same
+          // page to another gap card rather than opening anything.
+          actionHref={`/trips/${trip.id}/itinerary`}
         />
 
         <Section

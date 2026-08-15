@@ -1,4 +1,4 @@
-export type ItineraryCategory = 'spot' | 'food' | 'shopping' | 'transport' | 'other';
+export type ItineraryCategory = 'spot' | 'food' | 'shopping' | 'transport' | 'stay' | 'other';
 
 export interface CuratedPlace {
   id: string;
@@ -9,7 +9,27 @@ export interface CuratedPlace {
   description: string;
   photo_url: string | null;
   source: 'editorial' | 'ai_generated';
+  /**
+   * Null for the editorial catalogue everyone sees, set for a place this
+   * traveler added themselves (migration 009). Drives the "Mine" filter in the
+   * add-place sheet, which previously claimed to show saved places and in fact
+   * filtered to editorial ones — the exact opposite.
+   */
+  created_by: string | null;
 }
+
+export const PLACE_NAME_MAX = 120;
+export const PLACE_DESCRIPTION_MAX = 400;
+
+/** Category labels, bilingual. `km` mirrors `en`, never a subset. */
+export const CATEGORY_LABEL: Record<ItineraryCategory, { en: string; km: string }> = {
+  spot: { en: 'Attraction', km: 'ទីកន្លែងទស្សនា' },
+  food: { en: 'Food', km: 'អាហារ' },
+  shopping: { en: 'Shopping', km: 'ទិញទំនិញ' },
+  transport: { en: 'Transit', km: 'ការធ្វើដំណើរ' },
+  stay: { en: 'Stay', km: 'កន្លែងស្នាក់នៅ' },
+  other: { en: 'Place', km: 'ទីតាំង' },
+};
 
 export interface ItineraryPlace {
   id: string;

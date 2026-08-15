@@ -32,7 +32,6 @@ interface TripRow {
   end_date: string | null;
   travelers: number | null;
   interests: string[] | null;
-  generated_itinerary: Record<string, unknown> | null;
   cover_image_url: string | null;
 }
 
@@ -53,10 +52,57 @@ interface OrderRow {
   fulfilled_at: string | null;
 }
 
-interface ChecklistRow {
-  trip_id: string;
+/** One `itinerary_places` row, with the day it belongs to carried alongside. */
+interface ItineraryPlaceRow {
   category: string;
-  is_completed: boolean;
+  itinerary_day_id: string;
+}
+
+/** One `itinerary_days` row. day_index 0 is the unscheduled Ideas list. */
+interface ItineraryDayRow {
+  id: string;
+  trip_id: string;
+  day_index: number;
+}
+
+/** What readiness needs to know about one trip's itinerary, already counted. */
+interface ItinerarySignal {
+  /** Places saved anywhere on this trip, Ideas included. */
+  savedPlaces: number;
+  /** Places sitting on a numbered day — i.e. actually scheduled. */
+  scheduledPlaces: number;
+  /** Somewhere to sleep has been recorded. */
+  hasStay: boolean;
+}
+
+const NO_ITINERARY: ItinerarySignal = { savedPlaces: 0, scheduledPlaces: 0, hasStay: false };
+
+/**
+ * Fold the day and place rows into one signal per trip.
+ *
+ * Done once for the whole context rather than per trip, so twenty trips cost
+ * the same two queries as one.
+ */
+function itinerarySignals(
+  days: ItineraryDayRow[],
+  places: ItineraryPlaceRow[]
+): Map<string, ItinerarySignal> {
+  const dayToTrip = new Map(days.map((day) => [day.id, day.trip_id]));
+  const scheduledDays = new Set(days.filter((day) => day.day_index > 0).map((day) => day.id));
+  const signals = new Map<string, ItinerarySignal>();
+
+  for (const place of places) {
+    const tripId = dayToTrip.get(place.itinerary_day_id);
+    if (!tripId) continue;
+
+    const current = signals.get(tripId) ?? { savedPlaces: 0, scheduledPlaces: 0, hasStay: false };
+    current.savedPlaces += 1;
+    if (scheduledDays.has(place.itinerary_day_id)) current.scheduledPlaces += 1;
+    if (place.category === 'stay') current.hasStay = true;
+    signals.set(tripId, current);
+  }
+
+  return signals;
 }
 
 /** Match a free-text destination to a catalogue entry, for the flag and the link. */
@@ -96,26 +142,37 @@ function withinTrip(trip: TripRow, isoDate: string): boolean {
 /**
  * Work out how ready a trip is.
  *
- * Four of the five steps are answerable from tables that exist today. `stay` is
- * read out of generated_itinerary because there is no bookings table yet —
- * hotels are a later product type (CLAUDE.md §1). It reports honestly as "not
- * done" rather than pretending, which is the right failure: the worst outcome
- * would be telling someone their accommodation is sorted when nothing recorded
- * it.
+ * WHERE THIS USED TO READ FROM, AND WHY IT MOVED:
+ *   `stay`, `places` and `itinerary` were all derived from
+ *   `trip_plans.generated_itinerary`. Nothing in this repository has ever
+ *   written that column — it appears only in reads — and the fallback path for
+ *   `places` read `trip_checklist_items`, which nothing writes either. All
+ *   three were therefore permanently false for every trip that has ever
+ *   existed, so readiness could never exceed 40% and "Everything is in place"
+ *   was unreachable code.
+ *
+ *   The itinerary builder writes `itinerary_days` and `itinerary_places`
+ *   (migration 007). Those are the tables that actually know whether a trip has
+ *   a plan, so those are the tables this reads.
+ *
+ * The three still mean distinct things:
+ *   places    — anything saved at all, including the unscheduled Ideas list
+ *   itinerary — at least one numbered day with something in it
+ *   stay      — a place recorded with category 'stay' (migration 008)
+ *
+ * `stay` staying false is still the honest answer for a trip where nobody has
+ * noted where they are sleeping. What changed is that it is now *possible* to
+ * answer it.
  */
 function deriveReadiness(
   trip: TripRow,
   flights: FlightRow[],
   orders: OrderRow[],
-  checklist: ChecklistRow[]
+  itinerary: ItinerarySignal
 ): Readiness {
   const readiness = emptyReadiness();
-  const itinerary = trip.generated_itinerary ?? null;
 
   readiness.flight = flights.some((flight) => withinTrip(trip, flight.flight_date));
-
-  const stay = itinerary?.stay ?? itinerary?.hotel ?? itinerary?.accommodation;
-  readiness.stay = Boolean(stay);
 
   const destination = trip.destination.trim().toLowerCase();
   readiness.esim = orders.some(
@@ -125,14 +182,9 @@ function deriveReadiness(
         destination.includes(order.country.trim().toLowerCase()))
   );
 
-  const places = itinerary?.places;
-  readiness.places =
-    (Array.isArray(places) && places.length > 0) ||
-    checklist.some((item) => item.trip_id === trip.id && item.category === 'places');
-
-  readiness.itinerary = Boolean(
-    itinerary && Object.keys(itinerary).length > 0
-  );
+  readiness.places = itinerary.savedPlaces > 0;
+  readiness.itinerary = itinerary.scheduledPlaces > 0;
+  readiness.stay = itinerary.hasStay;
 
   return readiness;
 }
@@ -169,10 +221,10 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   // traveler's whole history into every homepage render.
   const since = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [tripsResult, flightsResult, ordersResult, checklistResult] = await Promise.all([
+  const [tripsResult, flightsResult, ordersResult, daysResult, placesResult] = await Promise.all([
     supabase
       .from('trip_plans')
-      .select('id, title, destination, start_date, end_date, travelers, interests, generated_itinerary, cover_image_url')
+      .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url')
       .order('start_date', { ascending: true, nullsFirst: false })
       .limit(20),
     supabase
@@ -186,10 +238,14 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
       .select('order_number, country, plan_name, duration_days, data_gb_daily, status, fulfilled_at')
       .order('created_at', { ascending: false })
       .limit(20),
-    supabase.from('trip_checklist_items').select('trip_id, category, is_completed').limit(200),
+    // Both scoped by RLS to days and places hanging off this traveler's own
+    // trips (itinerary_days_owner / itinerary_places_owner, migration 007), so
+    // neither needs an explicit trip filter here.
+    supabase.from('itinerary_days').select('id, trip_id, day_index').limit(400),
+    supabase.from('itinerary_places').select('category, itinerary_day_id').limit(1000),
   ]);
 
-  for (const result of [tripsResult, flightsResult, ordersResult, checklistResult]) {
+  for (const result of [tripsResult, flightsResult, ordersResult, daysResult, placesResult]) {
     // A missing table on a partly-migrated project must degrade to "no data",
     // not to a broken homepage.
     if (result.error) log.warn('travel.context_query_failed', { error: result.error.message });
@@ -198,7 +254,10 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   const tripRows = (tripsResult.data ?? []) as TripRow[];
   const flightRows = (flightsResult.data ?? []) as FlightRow[];
   const orderRows = (ordersResult.data ?? []) as OrderRow[];
-  const checklistRows = (checklistResult.data ?? []) as ChecklistRow[];
+  const signals = itinerarySignals(
+    (daysResult.data ?? []) as ItineraryDayRow[],
+    (placesResult.data ?? []) as ItineraryPlaceRow[]
+  );
 
   const trips: TripSummary[] = tripRows.map((trip) => {
     const matched = matchDestination(trip.destination);
@@ -212,7 +271,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
       endDate: trip.end_date,
       travelers: trip.travelers ?? 1,
       interests: knownInterests(trip.interests),
-      readiness: deriveReadiness(trip, flightRows, orderRows, checklistRows),
+      readiness: deriveReadiness(trip, flightRows, orderRows, signals.get(trip.id) ?? NO_ITINERARY),
       coverImageUrl: trip.cover_image_url,
     };
   });

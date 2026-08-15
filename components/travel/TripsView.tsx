@@ -9,16 +9,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Map, Plus } from 'lucide-react';
+import { Compass, Map, Plus, WifiOff } from 'lucide-react';
 import type { TripSummary } from '@/lib/travel/state';
 import { TripCard } from './TripCard';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 
 export function TripsView() {
   const { lang } = useLang();
-  const [state, setState] = useState<'loading' | 'guest' | 'ready'>('loading');
+  const [state, setState] = useState<'loading' | 'guest' | 'offline' | 'ready'>('loading');
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +30,8 @@ export function TripsView() {
           if (!cancelled) setState('guest');
           return null;
         }
-        return res.ok ? res.json() : null;
+        if (!res.ok) throw new Error('unavailable');
+        return res.json();
       })
       .then((body: { trips?: TripSummary[]; activeTripId?: string | null } | null) => {
         if (cancelled || !body) return;
@@ -37,12 +40,16 @@ export function TripsView() {
         setState('ready');
       })
       .catch(() => {
-        if (!cancelled) setState('ready');
+        // A failed request used to land here as `ready` with an empty list, so
+        // a traveler with no signal was told "No trips yet" — which reads as
+        // their trips having been deleted, at the exact moment they most need
+        // to trust this screen.
+        if (!cancelled) setState('offline');
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -106,12 +113,12 @@ export function TripsView() {
                 : 'You can explore without an account. One is only needed to keep a trip and sync it between devices.'}
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/sign-in?returnTo=/trips"
+              <SignInLink
+                returnTo="/trips"
                 className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
               >
                 {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-              </Link>
+              </SignInLink>
               <Link
                 href="/explore"
                 className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40"
@@ -123,8 +130,30 @@ export function TripsView() {
         ) : state === 'loading' ? (
           <div className="mt-8 space-y-3" aria-busy="true">
             {[0, 1].map((key) => (
-              <div key={key} className="h-48 animate-pulse rounded-card border border-white/8 bg-white/[0.03]" />
+              <div key={key} className="h-48 animate-pulse rounded-card border border-white/8 bg-white/[0.03] motion-reduce:animate-none" />
             ))}
+          </div>
+        ) : state === 'offline' ? (
+          <div className="night-card mt-8 p-8 text-center">
+            <WifiOff size={22} className="mx-auto text-white/45" aria-hidden="true" />
+            <h2 className="mt-3 font-display text-xl text-white">
+              {lang === 'km' ? 'មិនអាចទាញយកដំណើររបស់អ្នកបានទេ' : "We couldn't reach your trips"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/65">
+              {lang === 'km'
+                ? 'ដំណើររបស់អ្នកនៅតែមាន — យើងគ្រាន់តែមិនអាចទាញយកវាឥឡូវនេះទេ។ សូមព្យាយាមម្ដងទៀតពេលមានអ៊ីនធឺណិត។'
+                : 'Your trips are still there — we just cannot load them right now. Try again once you have a connection.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setState('loading');
+                setAttempt((value) => value + 1);
+              }}
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+            >
+              {lang === 'km' ? 'ព្យាយាមម្ដងទៀត' : 'Try again'}
+            </button>
           </div>
         ) : trips.length === 0 ? (
           <div className="night-card mt-8 p-8 text-center">

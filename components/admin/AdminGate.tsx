@@ -4,6 +4,7 @@ import { Lock, Loader2, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { Button } from '@/components/ui/Button';
+import { SignInLink } from '@/components/ui/SignInLink';
 
 /**
  * Presentation-only gate for the admin panel.
@@ -52,7 +53,8 @@ export function AdminGate({ children }: { children: ReactNode }) {
       <GateMessage
         title="Sign in required"
         body="The Domner control panel is only available to signed-in staff accounts."
-        href="/sign-in?returnTo=/admin"
+        href="/sign-in"
+        returnTo="/admin"
         cta="Sign in"
       />
     );
@@ -77,8 +79,8 @@ export function AdminGate({ children }: { children: ReactNode }) {
       <GateMessage
         title="Account deactivated"
         body="This staff account is no longer active. Ask an administrator to restore it."
-        href="/dashboard"
-        cta="Back to dashboard"
+        href="/"
+        cta="Back to Domner"
       />
     );
   }
@@ -103,8 +105,8 @@ export function AdminGate({ children }: { children: ReactNode }) {
       <GateMessage
         title="No staff access"
         body={`${user.email ?? 'This account'} has no staff role. Ask an administrator to add you and choose the access you need.`}
-        href="/dashboard"
-        cta="Back to dashboard"
+        href="/"
+        cta="Back to Domner"
       />
     );
   }
@@ -117,11 +119,14 @@ function GateMessage({
   body,
   href,
   cta,
+  returnTo,
 }: {
   title: string;
   body: string;
   href: string;
   cta: string;
+  /** When set, the CTA records where to come back to after signing in. */
+  returnTo?: string;
 }) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col items-center justify-center px-4 text-center">
@@ -130,9 +135,18 @@ function GateMessage({
       </span>
       <h1 className="mt-5 font-display text-xl font-bold text-ink">{title}</h1>
       <p className="mt-1.5 text-sm text-ink-secondary">{body}</p>
-      <Button href={href} variant="secondary" className="mt-6">
-        {cta}
-      </Button>
+      {returnTo ? (
+        <SignInLink
+          returnTo={returnTo}
+          className="mt-6 inline-flex min-h-[2.75rem] items-center rounded-btn bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+        >
+          {cta}
+        </SignInLink>
+      ) : (
+        <Button href={href} variant="secondary" className="mt-6">
+          {cta}
+        </Button>
+      )}
     </div>
   );
 }

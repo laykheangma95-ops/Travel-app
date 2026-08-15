@@ -18,6 +18,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUser } from '@/lib/serverAuth';
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { clientKey } from '@/lib/rateLimit';
 import { log, redactEmail } from '@/lib/logger';
@@ -141,7 +142,16 @@ export const POST = route(
       return ok({ ok: true, alreadyApplied: true });
     }
 
+    // Attach the application to the signed-in account when there is one.
+    // Without this, `affiliates_select_own` (auth.uid() = user_id) could never
+    // match, so an approved affiliate had no way to read back their own row —
+    // which is why /affiliate showed a hardcoded referral code and invented
+    // earnings to everyone. Applying while signed out still works; the row is
+    // then reachable by the email it was filed under.
+    const applicant = await getUser(request);
+
     const { error } = await supabase.from('affiliates').insert({
+      user_id: applicant?.id ?? null,
       name: event.name,
       email: event.email,
       phone: event.phone ?? null,

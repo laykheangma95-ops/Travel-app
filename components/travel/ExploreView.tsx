@@ -75,6 +75,17 @@ export function ExploreView() {
               ? 'គោលដៅដែលយើងបានសរសេរយ៉ាងលម្អិត — លក្ខខណ្ឌចូល តម្លៃពិត ការធ្វើដំណើរ និងការតភ្ជាប់។'
               : 'Seven destinations written up properly — entry rules for a Cambodian passport, real local prices, transport and connectivity.'}
           </p>
+
+          {/* Explore is where someone decides they are going. Until this
+              existed, /trips/new was reachable from exactly one button in the
+              whole product and this page could only send you to a guide. */}
+          <Link
+            href="/trips/new"
+            className="mt-4 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-gold-light/40 px-4 text-sm font-semibold text-gold-bright transition-colors duration-200 ease-smooth hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <Sparkles size={15} aria-hidden="true" />
+            {lang === 'km' ? 'ចាប់ផ្តើមដំណើរថ្មី' : 'Start a trip'}
+          </Link>
         </header>
 
         {/* Search + lenses. One row on desktop, stacked on a phone. */}

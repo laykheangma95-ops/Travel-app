@@ -91,6 +91,20 @@ export function TravelDeck() {
   }, [slug, wantsWeather]);
 
   // Guests, and travelers with nothing on record, see the homepage untouched.
+  //
+  // While the fetch is still in flight we do not yet know which of those two
+  // this is, so the deck reserves its own height rather than appearing later
+  // and pushing the hero down the page. `data === null` means "still asking";
+  // a resolved guest gives a snapshot of null and collapses to nothing.
+  if (data === null) {
+    return (
+      <div
+        className="mx-auto h-44 max-w-5xl px-4 pt-6 sm:px-6"
+        aria-hidden="true"
+        data-deck-placeholder
+      />
+    );
+  }
   if (!snapshot || snapshot.state === 'new_user') return null;
 
   const greeting = STATE_GREETING[snapshot.state][lang];

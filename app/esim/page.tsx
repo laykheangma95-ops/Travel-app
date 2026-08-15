@@ -17,6 +17,7 @@ import {
   wideCoverageCountryPlans,
 } from '@/data/coverage';
 import { countrySlugsForCityQuery } from '@/data/cities';
+import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 // The store used to be one flat grid of 29 destination SKUs, which is the
@@ -24,11 +25,11 @@ import { cn } from '@/lib/utils';
 // tabs are the four ways someone actually shops: what do people buy, does it
 // work where I'm going, I'm doing a multi-country trip, I'm going far.
 const TABS = [
-  { id: 'top', label: 'Top destinations' },
-  { id: 'countries', label: 'Countries' },
-  { id: 'regions', label: 'Regions' },
-  { id: 'global', label: 'Global' },
-] as const;
+  { id: 'top', labelKey: 'shop.tab.top' },
+  { id: 'countries', labelKey: 'shop.tab.countries' },
+  { id: 'regions', labelKey: 'shop.tab.regions' },
+  { id: 'global', labelKey: 'shop.tab.global' },
+] as const satisfies readonly { id: string; labelKey: DictKey }[];
 type Tab = (typeof TABS)[number]['id'];
 
 const REGION_FILTERS = [
@@ -44,6 +45,7 @@ const REGION_FILTERS = [
 type RegionFilter = (typeof REGION_FILTERS)[number];
 
 export default function EsimStorePage() {
+  const { lang, t } = useLang();
   const [tab, setTab] = useState<Tab>('top');
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState<RegionFilter>('All');
@@ -93,8 +95,8 @@ export default function EsimStorePage() {
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Global data</p>
-          <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">eSIM Store</h1>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">{t('shop.eyebrow')}</p>
+          <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">{t('shop.title')}</h1>
           <p className="mt-3 text-white/70">
             Data in <span className="font-semibold text-white">{coverageStats.countries} countries</span>, from{' '}
             {coverageStats.destinations} plans. Buy now, scan the QR, and connect the moment you land.
@@ -117,10 +119,10 @@ export default function EsimStorePage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-base font-bold text-white">
-              Not sure how much data you need?
+              {t('shop.finderTitle')}
             </span>
             <span className="mt-0.5 block text-sm text-white/65">
-              Answer three quick questions and we&rsquo;ll pick a plan for you.
+              {t('shop.finderBody')}
             </span>
           </span>
           <ArrowRight
@@ -131,7 +133,7 @@ export default function EsimStorePage() {
         </Link>
 
         {/* Tabs */}
-        <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="Browse by">
+        <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label={t('shop.browseBy')}>
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -151,7 +153,7 @@ export default function EsimStorePage() {
                   : 'border border-white/10 bg-white/5 text-white/70 hover:border-gold-light/40 hover:text-white'
               )}
             >
-              {item.label}
+              {t(item.labelKey)}
             </button>
           ))}
         </div>
@@ -164,7 +166,7 @@ export default function EsimStorePage() {
               className={cn('flex max-w-xl gap-2', tab === 'countries' ? 'mb-6' : 'mb-10')}
               onSubmit={(e) => e.preventDefault()}
               role="search"
-              aria-label="Search destinations"
+              aria-label={t('shop.searchLabel')}
             >
               <div className="relative flex-1">
                 <Search
@@ -176,15 +178,15 @@ export default function EsimStorePage() {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search any country or city..."
-                  aria-label="Search destination"
+                  placeholder={t('shop.searchPlaceholder')}
+                  aria-label={t('shop.searchLabel')}
                   className="w-full rounded-btn border border-gold-light/20 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/40 backdrop-blur-md transition-all focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/25"
                 />
               </div>
               <button
                 type="submit"
                 className="liquid-glass-accent liquid-press rounded-btn px-5 py-3 text-sm font-semibold text-primary-deep transition-all hover:brightness-110"
-                aria-label="Search"
+                aria-label={t('shop.searchLabel')}
               >
                 <Search size={18} />
               </button>
@@ -195,7 +197,7 @@ export default function EsimStorePage() {
                 asked — that grid is already the short, curated list, and a
                 region chip left switched on there silently hid most of it. */}
             {tab === 'countries' && (
-            <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label="Filter by region">
+            <div className="mb-10 flex flex-wrap gap-2" role="tablist" aria-label={t('shop.regionFilter')}>
               {REGION_FILTERS.map((f) => (
                 <button
                   key={f}
@@ -210,7 +212,7 @@ export default function EsimStorePage() {
                       : 'border border-white/10 bg-white/5 text-white/70 hover:border-gold-light/40 hover:text-white'
                   )}
                 >
-                  {f}
+                  {f === 'All' ? t('shop.region.All') : f}
                 </button>
               ))}
             </div>
@@ -225,13 +227,13 @@ export default function EsimStorePage() {
           className="mb-8 inline-flex items-center gap-1.5 text-sm text-white/55 underline underline-offset-4 transition-colors hover:text-white"
         >
           <Compass size={15} aria-hidden="true" />
-          Looking for destination guides? Explore them here
+          {t('shop.guidesLink')}
         </Link>
 
         {tab === 'top' && (
           <Section
-            title="What Cambodians buy most"
-            description="The destinations that move first every month."
+            title={t('shop.top.title')}
+            description={t('shop.top.body')}
           >
             {filteredTop.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
@@ -247,8 +249,12 @@ export default function EsimStorePage() {
 
         {tab === 'countries' && (
           <Section
-            title={`Every country we cover — ${coverageStats.countries} of them`}
-            description="Including the ones that have no plan of their own. Italy, Portugal and Norway are all on the Europe eSIM; the card tells you which plan you're buying."
+            title={
+              lang === 'km'
+                ? `គ្រប់ប្រទេសដែលយើងគ្របដណ្តប់ — ${coverageStats.countries} ប្រទេស`
+                : `Every country we cover — ${coverageStats.countries} of them`
+            }
+            description={t('shop.countries.body')}
           >
             {filteredCountries.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
@@ -265,8 +271,8 @@ export default function EsimStorePage() {
         {tab === 'regions' && (
           <>
             <Section
-              title="Multi-country plans"
-              description="One eSIM across a whole trip. For a Bangkok–Singapore–KL run this beats buying three."
+              title={t('shop.regions.title')}
+              description={t('shop.regions.body')}
             >
               <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {regionalBundles.map((dest) => (
@@ -277,8 +283,8 @@ export default function EsimStorePage() {
 
             {wideCoverageCountryPlans.length > 0 && (
               <Section
-                title="Country plans that roam"
-                description="Filed under one country by our supplier, but valid across many. The France eSIM is the clearest example — it works in 32 countries."
+                title={t('shop.roaming.title')}
+                description={t('shop.roaming.body')}
                 className="mt-14"
               >
                 <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -293,8 +299,8 @@ export default function EsimStorePage() {
 
         {tab === 'global' && (
           <Section
-            title="Widest coverage we sell"
-            description="Every plan that crosses a border three times or more, widest first."
+            title={t('shop.global.title')}
+            description={t('shop.global.body')}
           >
             <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
               {globalReachPlans.map((dest) => (
@@ -343,12 +349,17 @@ function Section({
 }
 
 function NoResults({ query }: { query: string }) {
+  const { lang, t } = useLang();
   return (
     <EmptyState
       icon={Globe}
-      title="No destinations found"
-      description={`We couldn't find "${query}". Try another country name or clear your filters.`}
-      ctaLabel="Clear search"
+      title={t('shop.noResults.title')}
+      description={
+        lang === 'km'
+          ? `រកមិនឃើញ «${query}» ទេ។ សូមសាកល្បងឈ្មោះប្រទេសផ្សេង ឬសម្អាតតម្រង។`
+          : `We couldn't find "${query}". Try another country name or clear your filters.`
+      }
+      ctaLabel={t('shop.noResults.cta')}
       ctaHref="/esim"
       dark
     />

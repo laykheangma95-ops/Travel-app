@@ -2,18 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Map,
-  Smartphone,
-  BellRing,
-  UserRound,
-  Settings,
-} from 'lucide-react';
+import { Map, Smartphone, BellRing, UserRound, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// No "Dashboard" row any more: /dashboard now redirects to Home, and a sidebar
+// link that bounces you out of the sidebar is worse than no link. Home is the
+// real personalised summary — see app/(dashboard)/dashboard/page.tsx.
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Trips', href: '/trips', icon: Map },
   { label: 'My eSIMs', href: '/my-esims', icon: Smartphone },
   { label: 'Updates', href: '/updates', icon: BellRing },

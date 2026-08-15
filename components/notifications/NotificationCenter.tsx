@@ -21,6 +21,7 @@ import {
 } from '@/lib/notifications/catalog';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { SignInLink } from '@/components/ui/SignInLink';
 
 type Filter = 'all' | NotificationCategory;
 
@@ -158,12 +159,12 @@ export function NotificationCenter() {
               ? 'ព័ត៌មានជើងហោះហើរ eSIM និងដំណើររបស់អ្នកត្រូវការគណនី ដើម្បីរក្សាទុក។'
               : 'Flight, eSIM and trip updates are tied to your account so they follow you between devices.'}
           </p>
-          <Link
-            href="/sign-in?returnTo=/updates"
+          <SignInLink
+            returnTo="/updates"
             className="liquid-glass-accent liquid-press mt-4 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
           >
             {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-          </Link>
+          </SignInLink>
         </div>
       ) : (
         <>
