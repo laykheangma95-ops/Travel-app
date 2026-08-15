@@ -7,7 +7,7 @@ import { nextDayDate, type ItineraryCategory } from '@/lib/travel/itinerary';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const category = z.enum(['spot', 'food', 'shopping', 'transport', 'other']);
+const category = z.enum(['spot', 'food', 'shopping', 'transport', 'stay', 'other']);
 const mutation = z.discriminatedUnion('action', [
   z.object({ action: z.literal('addDay') }).strict(),
   z.object({ action: z.literal('addPlace'), dayId: z.string().uuid(), placeId: z.string().uuid() }).strict(),

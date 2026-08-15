@@ -1,4 +1,4 @@
-export type ItineraryCategory = 'spot' | 'food' | 'shopping' | 'transport' | 'other';
+export type ItineraryCategory = 'spot' | 'food' | 'shopping' | 'transport' | 'stay' | 'other';
 
 export interface CuratedPlace {
   id: string;
