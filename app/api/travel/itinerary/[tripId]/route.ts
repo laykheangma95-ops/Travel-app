@@ -196,12 +196,11 @@ export const PATCH = route(async (request, context) => {
         description: body.data.description,
         source: 'editorial',
         created_by: user.id,
-        opening_hours:
-          openingStart && openingEnd
-            ? Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((day) => [
+        ...(openingStart && openingEnd
+          ? { opening_hours: Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((day) => [
                 day, [{ open: openingStart, close: openingEnd }],
-              ]))
-            : null,
+              ])) }
+          : {}),
       })
       .select('id, category')
       .single();
