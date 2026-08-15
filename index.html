@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Domner - Plan your next escape</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="nav shell">
+      <a class="brand" href="#top"><span class="brand-mark">&#10022;</span> domner</a>
+      <nav>
+        <a href="#discover">Discover</a>
+        <a class="active" href="#itinerary">Itinerary</a>
+        <a href="#payments">Payments</a>
+        <a href="#saved">Saved places <span class="count">3</span></a>
+      </nav>
+      <button class="avatar" aria-label="Open profile">JM</button>
+    </header>
+
+    <main class="shell" id="top">
+      <section class="hero" id="itinerary">
+        <div class="eyebrow"><span></span> Your trip, your way</div>
+        <h1>Let&apos;s make a plan<br /><em>you&apos;ll remember.</em></h1>
+        <p class="intro">
+          Choose a manual planner or generate a polished draft from your travel details.
+        </p>
+      </section>
+
+      <section class="choice-grid" aria-label="Choose how to create your trip">
+        <button class="choice-card manual" data-path="manual">
+          <div class="card-art art-manual">
+            <span class="sun"></span>
+            <span class="mountain one"></span>
+            <span class="mountain two"></span>
+            <span class="art-note note-one">&#10022;</span>
+            <span class="art-note note-two">&#8998;</span>
+          </div>
+          <div class="choice-copy">
+            <div class="card-kicker">For the hands-on planner</div>
+            <h2>Create it yourself</h2>
+            <p>Build your day from saved places, stays, and local stops.</p>
+            <span class="card-link">Open manual planner <b>&rarr;</b></span>
+          </div>
+        </button>
+        <button class="choice-card ai" data-path="ai">
+          <div class="card-art art-ai">
+            <span class="orb orb-one"></span>
+            <span class="orb orb-two"></span>
+            <span class="spark spark-one">&#10022;</span>
+            <span class="spark spark-two">&#10022;</span>
+            <div class="ai-lines"></div>
+          </div>
+          <div class="choice-copy">
+            <div class="card-kicker">For the inspired explorer</div>
+            <h2>Auto-generate a draft</h2>
+            <p>Turn your destination and vibe into a polished draft itinerary you can refine.</p>
+            <span class="card-link">Build a draft itinerary <b>&rarr;</b></span>
+          </div>
+        </button>
+      </section>
+
+      <section class="saved-strip" id="saved">
+        <div>
+          <span class="saved-icon">&#9825;</span>
+          <div>
+            <strong>Your saved places are ready</strong>
+            <p>We found 3 places waiting for your next adventure.</p>
+          </div>
+        </div>
+        <button class="text-button" data-path="manual">Use saved places <span>&rarr;</span></button>
+      </section>
+
+      <section class="workspace hidden" id="workspace" aria-live="polite">
+        <div class="workspace-head">
+          <div>
+            <div class="eyebrow"><span></span> Trip workspace</div>
+            <h2 id="workspace-title">Build your next itinerary</h2>
+            <p id="workspace-subtitle">Choose a planning mode to begin.</p>
+          </div>
+          <button class="ghost-button" id="reset-workspace" type="button">Start over</button>
+        </div>
+        <div id="workspace-content"></div>
+      </section>
+
+      <section class="discover" id="discover">
+        <div class="section-title">
+          <div class="eyebrow"><span></span> Ready for launch</div>
+          <h2>What now works in production</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Manual planning</h3>
+            <p>Create a trip, choose dates, and turn saved places into a usable day plan.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Auto-generated itinerary draft</h3>
+            <p>Generate a structured premium draft from destination, dates, and travel style.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Stable navigation</h3>
+            <p>All main sections now load correctly without empty anchors or broken UI states.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="payments" id="payments" aria-live="polite">
+        <div class="section-title">
+          <div class="eyebrow"><span></span> Booking trust</div>
+          <h2>Payment readiness</h2>
+        </div>
+        <div id="payment-app"></div>
+      </section>
+
+      <section class="bottom-note">
+        <span>&#9788;</span> You can switch between manual planning and AI-generated drafts at any time.
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
