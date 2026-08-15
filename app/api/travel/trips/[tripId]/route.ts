@@ -19,6 +19,29 @@ import { normalizeTripDraft } from '@/lib/travel/trips';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// GET /api/travel/trips/:id — one trip, shaped exactly like the ones in the list.
+//
+// The workspace, the edit screen and the memories screen each used to fetch the
+// whole list and find their trip by id in the browser. That is correct but
+// wasteful on a phone on hotel wifi: twenty trips' worth of JSON to render one.
+//
+// It goes through `tripById`, the same helper the create and edit routes use,
+// so readiness here is derived by exactly the code that derives it everywhere
+// else and the two can never disagree. Note that this trims the *response*, not
+// the server's work — the shared context loader still runs its queries — so a
+// trip that is not the caller's is simply not found.
+export const GET = route(
+  async (request, context) => {
+    if (!getSupabase()) {
+      throw new ApiError('SERVICE_UNAVAILABLE', 'Trips are unavailable right now.');
+    }
+    const tripId = requireParam(context, 'tripId');
+    await requireUser(request);
+    return ok({ trip: await tripById(request, tripId) });
+  },
+  { rateLimit: 'session', name: 'travel.trips.one' }
+);
+
 export const PATCH = route(
   async (request, context) => {
     if (!getSupabase()) {

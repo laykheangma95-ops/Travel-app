@@ -34,20 +34,23 @@ export function EditTripView({ tripId }: { tripId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/travel/trips', { credentials: 'include' })
+    fetch(`/api/travel/trips/${tripId}`, { credentials: 'include' })
       .then(async (response) => {
         if (response.status === 401) {
           if (!cancelled) setStatus('guest');
           return null;
         }
+        if (response.status === 404) {
+          if (!cancelled) setStatus('missing');
+          return null;
+        }
         if (!response.ok) throw new Error('unavailable');
         return response.json();
       })
-      .then((body: { trips?: TripSummary[] } | null) => {
-        if (cancelled || !body) return;
-        const found = (body.trips ?? []).find((candidate) => candidate.id === tripId) ?? null;
-        setDraft(found ? toDraft(found) : null);
-        setStatus(found ? 'ready' : 'missing');
+      .then((body: { trip?: TripSummary } | null) => {
+        if (cancelled || !body?.trip) return;
+        setDraft(toDraft(body.trip));
+        setStatus('ready');
       })
       .catch(() => {
         // A dropped connection is not a deleted trip.

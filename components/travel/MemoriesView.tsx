@@ -49,7 +49,7 @@ export function MemoriesView({ tripId }: { tripId: string }) {
   const load = useCallback(async () => {
     try {
       const [tripsResponse, memoriesResponse] = await Promise.all([
-        fetch('/api/travel/trips', { credentials: 'include' }),
+        fetch(`/api/travel/trips/${tripId}`, { credentials: 'include' }),
         fetch(`/api/travel/trips/${tripId}/memories`, { credentials: 'include' }),
       ]);
 
@@ -58,13 +58,12 @@ export function MemoriesView({ tripId }: { tripId: string }) {
         return;
       }
 
-      const tripsBody = (await tripsResponse.json().catch(() => null)) as { trips?: TripSummary[] } | null;
-      const found = (tripsBody?.trips ?? []).find((candidate) => candidate.id === tripId) ?? null;
-      if (!found) {
+      const tripsBody = (await tripsResponse.json().catch(() => null)) as { trip?: TripSummary } | null;
+      if (!tripsResponse.ok || !tripsBody?.trip) {
         setStatus('missing');
         return;
       }
-      setTrip(found);
+      setTrip(tripsBody.trip);
 
       const memoriesBody = (await memoriesResponse.json().catch(() => null)) as
         | { memories?: TripMemory[] }

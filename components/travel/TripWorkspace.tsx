@@ -56,20 +56,23 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/travel/trips', { credentials: 'include' })
+    fetch(`/api/travel/trips/${tripId}`, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 401) {
           if (!cancelled) setStatus('guest');
           return null;
         }
+        if (res.status === 404) {
+          if (!cancelled) setStatus('missing');
+          return null;
+        }
         if (!res.ok) throw new Error('unavailable');
         return res.json();
       })
-      .then((body: { trips?: TripSummary[] } | null) => {
-        if (cancelled || !body) return;
-        const found = (body.trips ?? []).find((candidate) => candidate.id === tripId) ?? null;
-        setTrip(found);
-        setStatus(found ? 'ready' : 'missing');
+      .then((body: { trip?: TripSummary } | null) => {
+        if (cancelled || !body?.trip) return;
+        setTrip(body.trip);
+        setStatus('ready');
       })
       .catch(() => {
         // Not 'missing'. A dropped connection used to render "It may have been
