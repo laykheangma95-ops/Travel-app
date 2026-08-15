@@ -57,6 +57,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [marks, setMarks] = useState<{ slug: string; kind: 'explored' | 'travelled' }[]>([]);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const globeRef = useRef<GlobeApi | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const addItem = useCart((s) => s.addItem);
@@ -96,10 +97,43 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   // furniture that is not a descendant of this tree.
   useEffect(() => {
     document.body.dataset.v3 = view.kind === 'globe' ? 'first' : 'landed';
+    document.body.dataset.v3Scroll = view.kind === 'globe' ? 'locked' : 'free';
+    if (view.kind === 'globe') window.scrollTo(0, 0);
     return () => {
       delete document.body.dataset.v3;
+      delete document.body.dataset.v3Scroll;
     };
   }, [view.kind]);
+
+  // Keep the first frame quiet on desktop, then let the visitor's first pointer
+  // or keyboard gesture bring the welcome/search block in. The listener is
+  // intentionally global: the globe canvas is deferred and should not be the
+  // thing responsible for making the primary action reachable.
+  useEffect(() => {
+    const reveal = () => {
+      setHasInteracted(true);
+      // A keyboard gesture can otherwise ask the browser to scroll the newly
+      // revealed focus target into view. The globe frame is deliberately
+      // fixed, so keep the document at its top edge for every reveal path.
+      window.requestAnimationFrame(() => window.scrollTo(0, 0));
+    };
+    const options: AddEventListenerOptions = { once: true, passive: true };
+    window.addEventListener('pointermove', reveal, options);
+    window.addEventListener('pointerdown', reveal, options);
+    window.addEventListener('keydown', reveal, options);
+    return () => {
+      window.removeEventListener('pointermove', reveal);
+      window.removeEventListener('pointerdown', reveal);
+      window.removeEventListener('keydown', reveal);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.dataset.v3Interaction = hasInteracted ? 'ready' : 'idle';
+    return () => {
+      delete document.body.dataset.v3Interaction;
+    };
+  }, [hasInteracted]);
 
   useEffect(() => {
     try {
@@ -260,7 +294,7 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
   return (
     <div
       ref={rootRef}
-      className={`v3-root ${flying ? 'is-flying' : ''} ${view.kind !== 'globe' ? 'is-landed' : ''}`}
+      className={`v3-root ${flying ? 'is-flying' : ''} ${view.kind !== 'globe' ? 'is-landed' : ''} ${hasInteracted ? 'is-interacted' : ''}`}
       data-tier={tier ?? 'pending'}
     >
       {/* Poster: a drawn night sky that is correct on its own, so there is no

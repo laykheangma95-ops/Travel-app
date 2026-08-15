@@ -46,6 +46,22 @@
   overflow-x: clip;
 }
 
+/* The globe screen is a contained app-like surface. Locking both the surface
+   and the document prevents the crawlable index/footer below it from creating
+   a deceptive sliver of page scroll before the visitor chooses a destination. */
+.v3-root:not(.is-landed) {
+  height: calc(100svh - var(--chrome-top));
+  overflow: hidden;
+}
+.v3-root:not(.is-landed) .v3-index {
+  display: none;
+}
+html:has(body[data-v3-scroll='locked']),
+body[data-v3-scroll='locked'] {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .v3-space {
   position: fixed;
   inset: 0;
@@ -173,6 +189,18 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   pointer-events: none;
   transition: opacity var(--d-reveal) var(--ease-smooth);
 }
+/* The copilot button uses fixed positioning without the utility offsets on
+   some viewport tiers, so keep the semantic selector alongside the legacy
+   utility selector. */
+body[data-v3='first'] button[aria-label='Open Domner Copilot'] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-reveal) var(--ease-smooth);
+}
+body[data-v3='first'][data-v3-interaction='idle'] .v3-sound {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* ── First screen ──────────────────────────────────────────────────────── */
 
@@ -215,13 +243,68 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   width: 100%;
   max-width: 40rem;
   text-align: center;
-  transition: transform var(--d-reveal) var(--ease-signature);
+  transition: transform var(--d-reveal) var(--ease-signature),
+    opacity var(--d-reveal) var(--ease-signature),
+    filter var(--d-reveal) var(--ease-signature),
+    visibility 0s linear 0s;
 }
 /* When the suggestion list opens, the whole block rises so the list is never
    clipped by the fold on a phone. The globe stays where it is — only the copy
    makes room, which reads as the page leaning in rather than jumping. */
 .v3-first:has(.v3-suggestions) {
   transform: translateY(-9vh);
+}
+
+/* Desktop opens on the globe alone. A first pointer/keyboard gesture reveals
+   the welcome copy and search as a single, soft glass-panel motion. Mobile is
+   intentionally excluded: the search stays ready in the thumb zone. */
+@media (min-width: 1024px) {
+  .v3-root:not(.is-interacted) .v3-first {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(1.25rem) scale(0.985);
+    filter: blur(10px);
+    pointer-events: none;
+  }
+
+  .v3-root.is-interacted .v3-first {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    filter: none;
+    pointer-events: auto;
+  }
+
+  .v3-root.is-interacted .v3-first:has(.v3-suggestions) {
+    transform: translateY(-9vh);
+  }
+}
+
+/* The bar is present from the first mobile frame, then lifts a few pixels with
+   the same first-touch gesture so it feels anchored rather than pasted on. */
+@media (max-width: 1023px) {
+  body[data-v3='first'] .tabbar {
+    opacity: 0.94;
+    transform: translateY(0.2rem);
+    transition: transform 520ms var(--ease-signature), opacity 520ms var(--ease-smooth),
+      box-shadow 520ms var(--ease-smooth);
+  }
+
+  body[data-v3='first'][data-v3-interaction='ready'] .tabbar {
+    opacity: 1;
+    transform: none;
+    box-shadow: 0 -14px 38px rgba(3, 8, 30, 0.32);
+  }
+
+  /* Search and welcome remain immediately available on a phone, including
+     before the first gesture. */
+  .v3-first {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    filter: none;
+    pointer-events: auto;
+  }
 }
 
 .v3-greeting {
@@ -1622,6 +1705,16 @@ body.lang-km :is(.v3-visa-facts span, .v3-req-tag, .v3-place-kind, .v3-flag) {
   }
   .v3-globe-canvas {
     transition: none;
+  }
+}
+
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+  .v3-root:not(.is-interacted) .v3-first {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    filter: none;
+    pointer-events: auto;
   }
 }
 
