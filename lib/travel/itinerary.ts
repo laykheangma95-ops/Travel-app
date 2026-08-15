@@ -1,5 +1,10 @@
 export type ItineraryCategory = 'spot' | 'food' | 'shopping' | 'transport' | 'stay' | 'other';
 
+export const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+export interface OpeningWindow { open: string; close: string }
+export type OpeningHours = Partial<Record<Weekday, OpeningWindow[]>>;
+
 export interface CuratedPlace {
   id: string;
   name: string;
@@ -16,6 +21,8 @@ export interface CuratedPlace {
    * filtered to editorial ones — the exact opposite.
    */
   created_by: string | null;
+  opening_hours?: OpeningHours | null;
+  timezone?: string | null;
 }
 
 export const PLACE_NAME_MAX = 120;
@@ -71,4 +78,89 @@ export function straightLineKm(a: CuratedPlace, b: CuratedPlace): number {
   const dLng = radians(b.lng - a.lng);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(radians(a.lat)) * Math.cos(radians(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * earthKm * Math.asin(Math.sqrt(h));
+}
+
+export function minutesFromTime(value: string | null): number | null {
+  if (!value) return null;
+  const match = /^(\d{2}):(\d{2})/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function openingWindows(place: ItineraryPlace, date: string | null): OpeningWindow[] | null {
+  if (!date || !place.place.opening_hours) return null;
+  const weekday = WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+  return place.place.opening_hours[weekday] ?? null;
+}
+
+export function scheduleWarnings(
+  places: ItineraryPlace[], date: string | null, legs: RouteLeg[] = []
+): ScheduleWarning[] {
+  const warnings: ScheduleWarning[] = [];
+  const legByPair = new Map(legs.map((leg) => [`${leg.fromPlaceId}:${leg.toPlaceId}`, leg]));
+  places.forEach((place, index) => {
+    const start = minutesFromTime(place.time_start);
+    const end = minutesFromTime(place.time_end);
+    if (start !== null && end !== null && end <= start) {
+      warnings.push({ kind: 'invalid-time', placeId: place.id, message: {
+        en: 'End time must be after the start time.', km: 'ម៉ោងបញ្ចប់ត្រូវតែក្រោយម៉ោងចាប់ផ្តើម។',
+      } });
+    }
+    const windows = openingWindows(place, date);
+    if (windows && start !== null) {
+      const visitEnd = end ?? start;
+      const fits = windows.some((window) => {
+        const opens = minutesFromTime(window.open);
+        const closes = minutesFromTime(window.close);
+        return opens !== null && closes !== null && start >= opens && visitEnd <= closes;
+      });
+      if (!fits) warnings.push({ kind: 'closed', placeId: place.id, message: {
+        en: `${place.place.name} is outside its saved opening hours.`,
+        km: `${place.place.name} ស្ថិតនៅក្រៅម៉ោងបើកដែលបានរក្សាទុក។`,
+      } });
+    }
+    const next = places[index + 1];
+    if (!next) return;
+    const nextStart = minutesFromTime(next.time_start);
+    if (end === null || nextStart === null) return;
+    if (nextStart < end) {
+      warnings.push({ kind: 'overlap', placeId: next.id, message: {
+        en: `${next.place.name} overlaps the previous stop.`,
+        km: `${next.place.name} ត្រួតពេលជាមួយចំណតមុន។`,
+      } });
+      return;
+    }
+    const leg = legByPair.get(`${place.id}:${next.id}`);
+    if (leg && nextStart < end + Math.ceil(leg.durationSeconds / 60)) {
+      warnings.push({ kind: 'transfer', placeId: next.id, message: {
+        en: `Allow more travel time before ${next.place.name}.`,
+        km: `សូមទុកពេលធ្វើដំណើរបន្ថែមមុនទៅ ${next.place.name}។`,
+      } });
+    }
+  });
+  return warnings;
+}
+
+export interface RouteLeg {
+  fromPlaceId: string;
+  toPlaceId: string;
+  distanceMeters: number;
+  durationSeconds: number;
+}
+
+export interface RoutedJourney {
+  provider: 'osrm';
+  profile: 'driving';
+  legs: RouteLeg[];
+  geometry: [number, number][];
+}
+
+export type ScheduleWarningKind = 'invalid-time' | 'overlap' | 'transfer' | 'closed';
+export interface ScheduleWarning {
+  kind: ScheduleWarningKind;
+  placeId: string;
+  message: { en: string; km: string };
 }

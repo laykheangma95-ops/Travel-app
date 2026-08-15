@@ -21,16 +21,26 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, CalendarDays, Check, Loader2, MapPinned, Sparkles, TriangleAlert } from 'lucide-react';
 import type { ItineraryPayload } from '@/lib/travel/itinerary';
+import type { DraftPace, DraftPreferences } from '@/lib/travel/smartDraft';
 import { ItineraryEditor } from './ItineraryEditor';
 import { useLang } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual' | 'generating';
+type GenerationStage = 'reading' | 'building' | 'verifying';
 
 interface Snapshot {
   curatedCount: number;
-  /** Places already placed on days or in Ideas — what generation would discard. */
+  /** Scheduled places the smart draft would replace. Ideas are preserved. */
   existingCount: number;
+  savedCount: number;
 }
+
+const INTERESTS = [
+  { value: 'spot', en: 'Culture & sights', km: 'វប្បធម៌ និងទេសភាព' },
+  { value: 'food', en: 'Local food', km: 'ម្ហូបមូលដ្ឋាន' },
+  { value: 'shopping', en: 'Shopping', km: 'ការទិញទំនិញ' },
+  { value: 'stay', en: 'Stays', km: 'កន្លែងស្នាក់នៅ' },
+] as const;
 
 export function ItineraryStartView({ tripId }: { tripId: string }) {
   const { lang } = useLang();
@@ -38,6 +48,10 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [stage, setStage] = useState<GenerationStage>('reading');
+  const [preferences, setPreferences] = useState<DraftPreferences>({
+    pace: 'balanced', interests: ['spot', 'food'], startTime: '09:00', includeSaved: true,
+  });
 
   // Read the trip once so this screen knows what it is about to overwrite and
   // whether there is anything to generate from.
@@ -50,7 +64,8 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
         const scheduled = body.days.reduce((total, day) => total + day.places.length, 0);
         setSnapshot({
           curatedCount: body.curatedPlaces.length,
-          existingCount: scheduled + body.ideas.length,
+          existingCount: scheduled,
+          savedCount: body.ideas.length,
         });
       })
       .catch(() => undefined);
@@ -64,9 +79,15 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
     setConfirming(false);
     setMode('generating');
     try {
+      setStage('reading');
+      const latest = await fetch(`/api/travel/itinerary/${tripId}`, { credentials: 'include' });
+      if (!latest.ok) throw new Error(lang === 'km' ? 'បើកទិន្នន័យដំណើរមិនបាន។' : 'Could not read the latest trip details.');
+      setStage('building');
       const response = await fetch(`/api/travel/itinerary/${tripId}/generate`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(preferences),
       });
       const result = (await response.json().catch(() => null)) as
         | { error?: { message?: string } }
@@ -78,6 +99,12 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
           result?.error?.message ??
             (lang === 'km' ? 'បង្កើតកម្មវិធីមិនបាន។' : 'Could not generate an itinerary.')
         );
+      }
+      setStage('verifying');
+      const verified = await fetch(`/api/travel/itinerary/${tripId}`, { credentials: 'include' });
+      const itinerary = verified.ok ? (await verified.json() as ItineraryPayload) : null;
+      if (!itinerary || itinerary.days.every((day) => day.places.length === 0)) {
+        throw new Error(lang === 'km' ? 'មិនអាចផ្ទៀងផ្ទាត់កម្មវិធីដំណើរដែលបានរក្សាទុក។' : 'The saved itinerary could not be verified.');
       }
       setMode('manual');
     } catch (cause) {
@@ -102,7 +129,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
   }
 
   if (mode === 'manual') return <ItineraryEditor tripId={tripId} />;
-  if (mode === 'generating') return <GeneratingView />;
+  if (mode === 'generating') return <GeneratingView stage={stage} />;
 
   const empty = snapshot !== null && snapshot.curatedCount === 0;
 
@@ -135,7 +162,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
               <span>
                 {lang === 'km'
                   ? 'យើងមិនទាន់បានសរសេរអំពីគោលដៅនេះទេ ដូច្នេះមិនមានអនុសាសន៍ដើម្បីបង្កើតកម្មវិធីដោយស្វ័យប្រវត្តិឡើយ។ អ្នកនៅតែអាចបន្ថែមទីតាំងផ្ទាល់ខ្លួនបាន។'
-                  : "We haven't written this destination up yet, so there is nothing for the AI draft to draw on. You can still build the days yourself and add your own places."}
+                  : "We haven't written this destination up yet, so there is nothing for a smart draft to draw on. You can still build the days yourself and add your own places."}
               </span>
             </p>
           </div>
@@ -181,7 +208,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
             <div className="relative flex h-44 items-end justify-between overflow-hidden rounded-t-card bg-gradient-to-br from-[#282b52] via-[#644d78] to-[#d47e68] p-5">
               <Sparkles size={42} className="text-gold-bright" strokeWidth={1.5} aria-hidden="true" />
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs text-white/75">
-                {lang === 'km' ? 'ជំនួយដោយ AI' : 'AI-assisted'}
+                {lang === 'km' ? 'រៀបចំឆ្លាតវៃ' : 'Smart planning'}
               </span>
             </div>
             <div className="p-5">
@@ -189,7 +216,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
                 {lang === 'km' ? 'សម្រាប់អ្នកចង់បានគំនិត' : 'For the inspired explorer'}
               </p>
               <h2 className="mt-2 font-display text-2xl">
-                {lang === 'km' ? 'បង្កើតដោយ AI' : 'Generate with AI'}
+                {lang === 'km' ? 'បង្កើតសេចក្តីព្រាងឆ្លាតវៃ' : 'Build a smart draft'}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-white/60">
                 {empty
@@ -202,12 +229,88 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
               </p>
               <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-gold-bright">
                 <Sparkles size={16} aria-hidden="true" />
-                {lang === 'km' ? 'បង្កើតវា' : 'Dream it up'}
+                {lang === 'km' ? 'រៀបចំឲ្យខ្ញុំ' : 'Arrange my trip'}
                 <ArrowRight size={16} aria-hidden="true" />
               </span>
             </div>
           </button>
         </section>
+
+        {!empty && (
+          <section className="night-card mt-5 p-5 sm:p-6" aria-labelledby="draft-preferences-title">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-light">
+                  {lang === 'km' ? 'ចំណូលចិត្តសម្រាប់សេចក្តីព្រាង' : 'Draft preferences'}
+                </p>
+                <h2 id="draft-preferences-title" className="mt-1 font-display text-xl text-white">
+                  {lang === 'km' ? 'ធ្វើឲ្យថ្ងៃទាំងនេះសមនឹងអ្នក' : 'Make the days fit you'}
+                </h2>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-white/75">
+                <input
+                  type="checkbox"
+                  checked={preferences.includeSaved}
+                  onChange={(event) => setPreferences({ ...preferences, includeSaved: event.target.checked })}
+                  className="h-5 w-5 accent-[#e8c887]"
+                />
+                {lang === 'km' ? `ប្រើទីតាំងដែលបានរក្សាទុក (${snapshot?.savedCount ?? 0})` : `Prioritise saved places (${snapshot?.savedCount ?? 0})`}
+              </label>
+            </div>
+
+            <fieldset className="mt-5">
+              <legend className="text-sm font-semibold text-white/80">{lang === 'km' ? 'ល្បឿនដំណើរ' : 'Travel pace'}</legend>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {(['relaxed', 'balanced', 'full'] as DraftPace[]).map((pace) => (
+                  <button
+                    key={pace}
+                    type="button"
+                    aria-pressed={preferences.pace === pace}
+                    onClick={() => setPreferences({ ...preferences, pace })}
+                    className={`min-h-[2.75rem] rounded-btn border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light ${preferences.pace === pace ? 'border-gold-light/60 bg-gold-light/15 text-gold-bright' : 'border-white/12 text-white/70 hover:border-white/25'}`}
+                  >
+                    {pace === 'relaxed' ? (lang === 'km' ? 'សម្រាក' : 'Relaxed') : pace === 'balanced' ? (lang === 'km' ? 'សមតុល្យ' : 'Balanced') : (lang === 'km' ? 'ពេញថ្ងៃ' : 'Full days')}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="mt-5">
+              <legend className="text-sm font-semibold text-white/80">{lang === 'km' ? 'អ្វីដែលអ្នកចូលចិត្ត' : 'What you enjoy'}</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {INTERESTS.map((interest) => {
+                  const selected = preferences.interests.includes(interest.value);
+                  return (
+                    <button
+                      key={interest.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setPreferences({
+                        ...preferences,
+                        interests: selected && preferences.interests.length > 1
+                          ? preferences.interests.filter((value) => value !== interest.value)
+                          : selected ? preferences.interests : [...preferences.interests, interest.value],
+                      })}
+                      className={`min-h-[2.75rem] rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light ${selected ? 'border-gold-light/60 bg-gold-light/15 text-gold-bright' : 'border-white/12 text-white/70 hover:border-white/25'}`}
+                    >
+                      {interest[lang]}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <label className="mt-5 flex max-w-xs items-center justify-between gap-4 text-sm font-semibold text-white/80">
+              {lang === 'km' ? 'ចាប់ផ្តើមរាល់ថ្ងៃ' : 'Start each day'}
+              <input
+                type="time"
+                value={preferences.startTime}
+                onChange={(event) => setPreferences({ ...preferences, startTime: event.target.value })}
+                className="min-h-[2.75rem] rounded-btn border border-white/12 bg-white/[0.04] px-3 text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+              />
+            </label>
+          </section>
+        )}
 
         <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/45">
           <span className="inline-flex items-center gap-1.5">
@@ -220,7 +323,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Sparkles size={14} className="text-gold-light" aria-hidden="true" />
-            {lang === 'km' ? 'អនុសាសន៍ AI នៅតែកែបាន' : 'AI suggestions stay editable'}
+            {lang === 'km' ? 'សេចក្តីព្រាងឆ្លាតវៃនៅតែកែបាន' : 'Smart drafts stay editable'}
           </span>
         </div>
       </main>
@@ -271,8 +374,8 @@ function ReplaceDialog({
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-white/70">
           {lang === 'km'
-            ? `ការបង្កើតដោយ AI នឹងលុបទីតាំងទាំង ${count} ដែលមានស្រាប់ក្នុងដំណើរនេះ រួមទាំងបញ្ជីគំនិតរបស់អ្នក ហើយសរសេរសេចក្តីព្រាងថ្មី។ មិនអាចត្រឡប់វិញបានទេ។`
-            : `Generating will remove the ${count} ${count === 1 ? 'place' : 'places'} already on this trip, including your Ideas list, and write a fresh draft. This cannot be undone.`}
+            ? `សេចក្តីព្រាងឆ្លាតវៃនឹងជំនួសទីតាំងដែលបានកំណត់ពេលទាំង ${count}។ បញ្ជីគំនិតដែលបានរក្សាទុករបស់អ្នកនឹងនៅដដែល។`
+            : `The smart draft will replace ${count} scheduled ${count === 1 ? 'place' : 'places'}. Your saved Ideas list will stay intact.`}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <button
@@ -325,8 +428,13 @@ function LandmarkSvg({ kind }: { kind: 'tower' | 'liberty' | 'temple' }) {
   );
 }
 
-function GeneratingView() {
+function GeneratingView({ stage }: { stage: GenerationStage }) {
   const { lang } = useLang();
+  const labels: Record<GenerationStage, { en: string; km: string }> = {
+    reading: { en: 'Reading your saved places and trip dates…', km: 'កំពុងអានទីតាំងដែលបានរក្សាទុក និងកាលបរិច្ឆេទ…' },
+    building: { en: 'Grouping nearby places around your preferences…', km: 'កំពុងរៀបទីតាំងជិតគ្នាតាមចំណូលចិត្តរបស់អ្នក…' },
+    verifying: { en: 'Checking the itinerary was saved correctly…', km: 'កំពុងផ្ទៀងផ្ទាត់ថាកម្មវិធីដំណើរបានរក្សាទុកត្រឹមត្រូវ…' },
+  };
 
   return (
     <div className="itinerary-ai-loading relative min-h-screen overflow-hidden text-[#1c252a]">
@@ -381,8 +489,14 @@ function GeneratingView() {
           </div>
           <p role="status" className="mt-5 flex items-center justify-center gap-2 text-sm font-semibold text-black/65">
             <Loader2 size={16} className="animate-spin text-[#b18436] motion-reduce:animate-none" aria-hidden="true" />
-            {lang === 'km' ? 'កំពុងរៀបចំថ្ងៃរបស់អ្នក…' : 'Mapping your perfect days…'}
+            {labels[stage][lang]}
           </p>
+          <div className="mt-4 grid grid-cols-3 gap-2" aria-hidden="true">
+            {(['reading', 'building', 'verifying'] as GenerationStage[]).map((item, index) => {
+              const current = ['reading', 'building', 'verifying'].indexOf(stage);
+              return <span key={item} className={`h-1.5 rounded-full transition-colors ${index <= current ? 'bg-[#b18436]' : 'bg-black/10'}`} />;
+            })}
+          </div>
         </div>
       </main>
     </div>
