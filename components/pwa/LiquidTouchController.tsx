@@ -14,10 +14,22 @@ import { useEffect } from 'react';
 export function LiquidTouchController() {
   useEffect(() => {
     let current: HTMLElement | null = null;
+    let frame = 0;
+    let pending: { el: HTMLElement; x: number; y: number } | null = null;
 
     const reset = (el: HTMLElement) => {
       el.style.setProperty('--gx', '50%');
       el.style.setProperty('--gy', '0%');
+    };
+
+    const paint = () => {
+      frame = 0;
+      if (!pending) return;
+      const { el, x, y } = pending;
+      pending = null;
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty('--gx', `${x - rect.left}px`);
+      el.style.setProperty('--gy', `${y - rect.top}px`);
     };
 
     const track = (event: PointerEvent) => {
@@ -31,13 +43,18 @@ export function LiquidTouchController() {
       current = el;
 
       if (el) {
-        const rect = el.getBoundingClientRect();
-        el.style.setProperty('--gx', `${event.clientX - rect.left}px`);
-        el.style.setProperty('--gy', `${event.clientY - rect.top}px`);
+        pending = { el, x: event.clientX, y: event.clientY };
+        // Pointer move can fire far faster than the screen can paint. One
+        // measurement per frame keeps the highlight silky without forcing
+        // layout work for every raw touch event.
+        if (!frame) frame = window.requestAnimationFrame(paint);
       }
     };
 
     const release = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
+      pending = null;
       if (current) reset(current);
       current = null;
     };
@@ -52,6 +69,7 @@ export function LiquidTouchController() {
       window.removeEventListener('pointerdown', track);
       window.removeEventListener('pointerup', release);
       window.removeEventListener('pointercancel', release);
+      if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 

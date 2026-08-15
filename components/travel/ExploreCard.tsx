@@ -43,7 +43,7 @@ export function ExploreCard({
     <Link
       href={`/destination/${guide.slug}`}
       className={cn(
-        'deck-item group relative block overflow-hidden rounded-card border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
+        'deck-item interaction-card group relative block overflow-hidden rounded-card border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
         className
       )}
       style={{ '--deck-index': index } as React.CSSProperties}

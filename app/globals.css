@@ -492,7 +492,7 @@
 
   /* Menus and the mobile drawer are the same material, poured deeper so text
      holds contrast over whatever is behind them. */
-  .nav-menu-glass {
+.nav-menu-glass {
     background: linear-gradient(168deg, rgba(20, 38, 63, 0.94) 0%, rgba(6, 14, 36, 0.96) 100%);
     backdrop-filter: blur(26px) saturate(160%);
     -webkit-backdrop-filter: blur(26px) saturate(160%);
@@ -874,6 +874,87 @@
     font-size: 11px;
   }
 }
+
+/* Mobile navigation is a real drawer, not a panel that pushes page content.
+   Keeping it in its own compositor layer avoids repainting the underlying map
+   or hero while it settles into place. */
+.mobile-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.mobile-drawer.is-open { pointer-events: auto; }
+
+.mobile-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 8, 23, 0.28);
+  opacity: 0;
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-drawer-panel {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  display: flex;
+  width: min(23.5rem, calc(100vw - 1.5rem));
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.5rem;
+  background: linear-gradient(168deg, rgba(20, 38, 63, 0.98) 0%, rgba(6, 14, 36, 0.99) 100%);
+  box-shadow: -18px 28px 70px rgba(2, 8, 23, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  transform: translate3d(calc(100% + 1.5rem), 0, 0);
+  will-change: transform;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-drawer.is-open .mobile-drawer-scrim { opacity: 1; }
+.mobile-drawer.is-open .mobile-drawer-panel { transform: translate3d(0, 0, 0); }
+
+.mobile-drawer-topline {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem 0 1.25rem;
+}
+
+.mobile-drawer-handle {
+  width: 2rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.mobile-drawer-close {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.75);
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.mobile-drawer-close:hover,
+.mobile-drawer-close:focus-visible { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.mobile-drawer-close:active { transform: scale(0.92); }
+
+.mobile-drawer-link {
+  min-height: 2.875rem;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-drawer-link:hover,
+.mobile-drawer-link:focus-visible { background: rgba(255, 255, 255, 0.09); color: #fff; outline: none; }
+.mobile-drawer-link:active { transform: translateX(3px); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Night-sky page system (see .claude/skills/ui-ux)
@@ -1689,7 +1770,10 @@ button.capsule:active {
   margin-left: -9px;
   border-radius: 0 0 3px 3px;
   background: linear-gradient(90deg, transparent, #e6cb8b, transparent);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
 }
+
+.tabbar-item:active { transform: scale(0.94); }
 
 .tabbar-item:focus-visible {
   outline: none;
@@ -1737,6 +1821,37 @@ button.capsule:active {
 .deck-item {
   animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--deck-index, 0) * 70ms);
+}
+
+/* Card movement is intentionally quiet: lift on a precise pointer, settle on a
+   finger. Restricting the expensive hover affordance to hover-capable devices
+   avoids sticky hover and accidental movement on phones. */
+.interaction-card {
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .interaction-card:hover { transform: translate3d(0, -3px, 0); }
+}
+
+.interaction-card:active { transform: scale(0.985); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-drawer-scrim,
+  .mobile-drawer-panel,
+  .mobile-drawer-close,
+  .mobile-drawer-link,
+  .tabbar-item,
+  .tabbar-item[aria-current='page']::before,
+  .interaction-card {
+    transition: none;
+  }
+  .interaction-card:active,
+  .tabbar-item:active,
+  .mobile-drawer-link:active,
+  .mobile-drawer-close:active { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
