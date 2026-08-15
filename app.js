@@ -127,6 +127,12 @@ const appState = {
   auto: createDefaultAutoState(),
 };
 
+const drawerGesture = {
+  active: false,
+  startY: 0,
+  pointerId: null,
+};
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => {
     const entities = {
@@ -297,10 +303,45 @@ function showWorkspace(title, subtitle, content) {
   workspace.classList.remove("hidden");
   workspaceTitle.textContent = title;
   workspaceSubtitle.textContent = subtitle;
+  workspaceContent.classList.remove("is-entering");
   workspaceContent.innerHTML = content;
+  workspaceContent.classList.add("is-entering");
+  window.requestAnimationFrame(() => {
+    workspaceContent.classList.remove("is-entering");
+  });
   if (shouldScroll) {
     workspace.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+}
+
+function getActivePlanForWorkspace() {
+  if (appState.workspaceMode === "manual") {
+    return appState.manual;
+  }
+
+  if (appState.workspaceMode === "auto" && appState.auto.plan) {
+    return appState.auto.plan;
+  }
+
+  return null;
+}
+
+function moveDrawerByGesture(direction) {
+  const plan = getActivePlanForWorkspace();
+  if (!plan) {
+    return;
+  }
+
+  const modes = ["map", "split", "plan"];
+  const currentIndex = modes.indexOf(plan.drawerMode);
+  const nextIndex = Math.min(Math.max(currentIndex + direction, 0), modes.length - 1);
+
+  if (nextIndex === currentIndex) {
+    return;
+  }
+
+  plan.drawerMode = modes[nextIndex];
+  rerenderWorkspace();
 }
 
 function clearAutoTimer() {
@@ -1665,6 +1706,43 @@ resetWorkspaceButton.addEventListener("click", () => {
   appState.workspaceMode = "";
   workspace.classList.add("hidden");
   workspaceContent.innerHTML = "";
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (!event.isPrimary || !["touch", "pen"].includes(event.pointerType)) {
+    return;
+  }
+
+  const handle = event.target.closest(".drawer-handle");
+  if (!handle || !getActivePlanForWorkspace()) {
+    return;
+  }
+
+  drawerGesture.active = true;
+  drawerGesture.startY = event.clientY;
+  drawerGesture.pointerId = event.pointerId;
+  handle.setPointerCapture?.(event.pointerId);
+});
+
+document.addEventListener("pointerup", (event) => {
+  if (!drawerGesture.active || event.pointerId !== drawerGesture.pointerId) {
+    return;
+  }
+
+  const distance = event.clientY - drawerGesture.startY;
+  drawerGesture.active = false;
+  drawerGesture.pointerId = null;
+
+  if (Math.abs(distance) < 44) {
+    return;
+  }
+
+  moveDrawerByGesture(distance < 0 ? 1 : -1);
+});
+
+document.addEventListener("pointercancel", () => {
+  drawerGesture.active = false;
+  drawerGesture.pointerId = null;
 });
 
 document.addEventListener("click", (event) => {

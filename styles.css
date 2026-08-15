@@ -51,6 +51,11 @@ select {
   font: inherit;
 }
 
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 .hidden {
   display: none;
 }
@@ -214,6 +219,7 @@ select {
   cursor: pointer;
   transition: transform 0.35s var(--ease-premium), box-shadow 0.35s ease, border-color 0.25s ease;
   border-bottom: 3px solid transparent;
+  will-change: transform;
 }
 
 .choice-card:hover {
@@ -224,6 +230,16 @@ select {
 .choice-card:focus-visible {
   border-color: var(--green);
   box-shadow: 0 0 0 4px rgba(46, 102, 84, 0.14), var(--card-shadow-hover);
+}
+
+.choice-card:active,
+.primary:active,
+.secondary:active,
+.drawer-mode:active,
+.drawer-tab:active,
+.category-button:active,
+.mini-button:active {
+  transform: scale(0.985);
 }
 
 .choice-card.manual:hover {
@@ -453,6 +469,7 @@ select {
   color: var(--green);
   font-size: 12px;
   font-weight: 700;
+  min-height: 44px;
   transition: color 0.2s ease, transform 0.25s var(--ease-premium), background 0.2s ease;
 }
 
@@ -491,6 +508,15 @@ select {
 .workspace-head p {
   color: var(--muted);
   margin: 0;
+}
+
+#workspace-content {
+  transition: opacity 0.28s ease, transform 0.38s var(--ease-premium);
+}
+
+#workspace-content.is-entering {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .ghost-button {
@@ -579,6 +605,7 @@ select {
   color: #fff;
   font-weight: 700;
   padding: 14px 18px;
+  min-height: 48px;
   box-shadow: 0 8px 18px rgba(46, 102, 84, 0.16);
   transition: transform 0.25s var(--ease-premium), box-shadow 0.25s ease, background 0.2s ease;
 }
@@ -833,6 +860,7 @@ select {
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
+  min-height: 44px;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.25s var(--ease-premium), color 0.2s ease;
 }
 
@@ -857,6 +885,7 @@ select {
 .mini-button {
   padding: 8px 12px;
   font-size: 12px;
+  min-width: 44px;
 }
 
 .mini-button.danger {
@@ -912,12 +941,15 @@ select {
   background: linear-gradient(160deg, #b7dde7 0%, #d8eef3 35%, #f7f7f2 100%);
   min-height: 620px;
   border: 1px solid #d3e4e7;
+  contain: layout paint;
 }
 
 .map-surface {
   position: relative;
   height: 58%;
   transition: height 0.55s var(--ease-premium);
+  touch-action: pan-y;
+  will-change: height;
 }
 
 .map-stage.mode-map .map-surface {
@@ -1003,6 +1035,13 @@ select {
   box-shadow: 0 20px 28px rgba(26, 47, 54, 0.12);
   cursor: pointer;
   z-index: 2;
+  min-height: 44px;
+  transition: transform 0.28s var(--ease-premium), box-shadow 0.28s ease, border-color 0.2s ease;
+  will-change: transform;
+}
+
+.map-pin:hover {
+  transform: translate(-50%, -50%) scale(1.035);
 }
 
 .map-pin.readonly {
@@ -1012,6 +1051,10 @@ select {
 .map-pin.selected {
   box-shadow: 0 22px 34px rgba(52, 85, 75, 0.18);
   border-color: rgba(46, 102, 84, 0.35);
+}
+
+.map-pin:active {
+  transform: translate(-50%, -50%) scale(0.97);
 }
 
 .map-pin-badge {
@@ -1093,6 +1136,7 @@ select {
   box-shadow: 0 24px 40px rgba(30, 48, 42, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.86);
   transition: height 0.55s var(--ease-premium), box-shadow 0.3s ease;
+  will-change: height;
 }
 
 .map-stage.mode-map .drawer-panel {
@@ -1113,6 +1157,35 @@ select {
   border-radius: 999px;
   background: #d8ded8;
   margin: 0 auto 12px;
+  padding: 18px 36px;
+  margin-top: -18px;
+  margin-bottom: -6px;
+  background: transparent;
+  position: relative;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.drawer-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 5px;
+  border-radius: 999px;
+  background: #d8ded8;
+  transform: translate(-50%, -50%);
+  transition: width 0.25s var(--ease-premium), background 0.2s ease;
+}
+
+.drawer-handle:active {
+  cursor: grabbing;
+}
+
+.drawer-handle:active::after {
+  width: 92px;
+  background: #bdc9bf;
 }
 
 .drawer-tab-row {
@@ -1120,6 +1193,14 @@ select {
   padding-bottom: 8px;
   scrollbar-width: thin;
   overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.drawer-tab {
+  scroll-snap-align: start;
+  white-space: nowrap;
 }
 
 .drawer-body {
@@ -1127,6 +1208,9 @@ select {
   padding-right: 6px;
   display: grid;
   gap: 14px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .summary-grid {
@@ -1173,6 +1257,16 @@ select {
   border-radius: 18px;
   border: 1px solid var(--line);
   background: #fff;
+  transition: transform 0.28s var(--ease-premium), box-shadow 0.28s ease, border-color 0.2s ease;
+}
+
+.item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(40, 68, 57, 0.07);
+}
+
+.item-card:active {
+  transform: scale(0.992);
 }
 
 .item-card.selected {
@@ -1313,6 +1407,7 @@ select {
   border-radius: 16px;
   background: #fcfcf9;
   border: 1px solid var(--line);
+  transition: background 0.35s ease, border-color 0.35s ease, transform 0.35s var(--ease-premium), box-shadow 0.35s ease;
 }
 
 .loading-step span {
@@ -1335,6 +1430,11 @@ select {
 .loading-step.active span {
   background: var(--green);
   color: #fff;
+}
+
+.loading-step.active {
+  transform: translateX(4px);
+  box-shadow: 0 12px 24px rgba(46, 102, 84, 0.08);
 }
 
 .section-title h2 {
@@ -1747,6 +1847,7 @@ select {
     bottom: 8px;
     padding: 12px 12px 14px;
     border-radius: 21px;
+    transition-duration: 0.42s;
   }
 
   .drawer-tab-row {
