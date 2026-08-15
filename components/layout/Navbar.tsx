@@ -8,6 +8,7 @@ import { useCart } from '@/hooks/useCart';
 import { useSession } from '@/hooks/useSession';
 import { DomerLogo } from '@/components/brand/DomerMark';
 import { WavyFlag } from '@/components/ui/WavyFlag';
+import { MobileDrawer } from '@/components/ui/MobileDrawer';
 import { useLang, type DictKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -441,10 +442,12 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="nav-menu-glass mx-auto mt-2 max-w-7xl rounded-card lg:hidden animate-fade-up">
-          <div className="space-y-1 px-4 py-4">
+      <MobileDrawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        label={mobileOpen ? 'Close menu' : 'Open menu'}
+      >
+        <div className="space-y-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-1">
             {navGroups.map((group) => (
               <div key={group.labelKey}>
                 {group.items ? (
@@ -456,7 +459,8 @@ export function Navbar() {
                       <Link
                         key={item.labelKey}
                         href={item.href}
-                        className="block rounded-btn px-3 py-2.5 text-sm font-medium text-white/75 hover:bg-white/10 hover:text-white"
+                        onClick={() => setMobileOpen(false)}
+                        className="mobile-drawer-link block rounded-btn px-3 py-3 text-sm font-medium text-white/75"
                       >
                         {t(item.labelKey)}
                       </Link>
@@ -465,7 +469,8 @@ export function Navbar() {
                 ) : (
                   <Link
                     href={group.href!}
-                    className="block rounded-btn px-3 py-2.5 text-sm font-medium text-white/75 hover:bg-white/10 hover:text-white"
+                    onClick={() => setMobileOpen(false)}
+                    className="mobile-drawer-link block rounded-btn px-3 py-3 text-sm font-medium text-white/75"
                   >
                     {t(group.labelKey)}
                   </Link>
@@ -483,21 +488,24 @@ export function Navbar() {
 
                 <Link
                   href="/dashboard"
-                  className="mt-2 flex items-center gap-2 rounded-btn px-3 py-2.5 text-sm font-medium text-white/75 hover:bg-white/10 hover:text-white"
+                  onClick={() => setMobileOpen(false)}
+                  className="mobile-drawer-link mt-2 flex items-center gap-2 rounded-btn px-3 py-3 text-sm font-medium text-white/75"
                 >
                   <User size={16} aria-hidden="true" />
                   {t('nav.dashboard')}
                 </Link>
                 <Link
                   href="/settings"
-                  className="flex items-center gap-2 rounded-btn px-3 py-2.5 text-sm font-medium text-white/75 hover:bg-white/10 hover:text-white"
+                  onClick={() => setMobileOpen(false)}
+                  className="mobile-drawer-link flex items-center gap-2 rounded-btn px-3 py-3 text-sm font-medium text-white/75"
                 >
                   {t('nav.settings')}
                 </Link>
                 {isAdmin && (
                   <Link
                     href="/admin"
-                    className="flex items-center gap-2 rounded-btn px-3 py-2.5 text-sm font-medium text-gold-light hover:bg-white/10"
+                    onClick={() => setMobileOpen(false)}
+                    className="mobile-drawer-link flex items-center gap-2 rounded-btn px-3 py-3 text-sm font-medium text-gold-light"
                   >
                     <ShieldCheck size={16} aria-hidden="true" />
                     {t('nav.adminPanel')}
@@ -516,21 +524,22 @@ export function Navbar() {
               <div className="flex gap-2 pt-4">
                 <Link
                   href="/sign-in"
-                  className="liquid-glass liquid-press flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold text-white"
+                  onClick={() => setMobileOpen(false)}
+                  className="liquid-glass liquid-press flex min-h-[2.875rem] flex-1 items-center justify-center rounded-full px-4 py-2.5 text-center text-sm font-semibold text-white"
                 >
                   {t('nav.signIn')}
                 </Link>
                 <Link
                   href="/sign-up"
-                  className="liquid-glass-accent liquid-sheen liquid-press flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold text-primary-deep"
+                  onClick={() => setMobileOpen(false)}
+                  className="liquid-glass-accent liquid-sheen liquid-press flex min-h-[2.875rem] flex-1 items-center justify-center rounded-full px-4 py-2.5 text-center text-sm font-semibold text-primary-deep"
                 >
                   {t('nav.getStarted')}
                 </Link>
               </div>
             )}
-          </div>
         </div>
-      )}
+      </MobileDrawer>
     </header>
   );
 }

@@ -1275,6 +1275,9 @@ function RouteMap({
 }) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<import('leaflet').Map | null>(null);
+  const leaflet = useRef<typeof import('leaflet') | null>(null);
+  const layers = useRef<import('leaflet').LayerGroup | null>(null);
+  const [ready, setReady] = useState(false);
 
   const located = useMemo(() => places.filter((item) => hasLocation(item.place)), [places]);
 
@@ -1283,48 +1286,71 @@ function RouteMap({
     void (async () => {
       const L = (await import('leaflet')).default;
       if (cancelled || !node.current) return;
-      map.current?.remove();
-
-      const first = located[0]?.place;
-      const instance = L.map(node.current, { zoomControl: false, scrollWheelZoom: false }).setView(
-        first ? [Number(first.lat), Number(first.lng)] : [13.7563, 100.5018],
-        first ? 12 : 4
-      );
+      const instance = L.map(node.current, {
+        zoomControl: false,
+        scrollWheelZoom: false,
+        zoomAnimation: true,
+        fadeAnimation: true,
+        markerZoomAnimation: true,
+      }).setView([13.7563, 100.5018], 4);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO',
         subdomains: 'abcd',
         maxZoom: 18,
       }).addTo(instance);
-
-      const points: [number, number][] = [];
-      located.forEach((item, index) => {
-        const point: [number, number] = [Number(item.place.lat), Number(item.place.lng)];
-        points.push(point);
-        L.marker(point, {
-          icon: L.divIcon({
-            className: 'itinerary-pin',
-            html: `<span style="display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:#0d1826;color:#e8c887;border:2px solid #e8c887;font:700 12px sans-serif">${index + 1}</span>`,
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-          }),
-        })
-          .addTo(instance)
-          .bindTooltip(item.place.name);
-      });
-
-      if (points.length > 1) {
-        L.polyline(points, { color: '#e8c887', weight: 3, opacity: 0.75 }).addTo(instance);
-        instance.fitBounds(points, { padding: [34, 34] });
-      }
       map.current = instance;
+      leaflet.current = L as typeof import('leaflet');
+      layers.current = L.layerGroup().addTo(instance);
+      setReady(true);
     })();
 
     return () => {
       cancelled = true;
       map.current?.remove();
       map.current = null;
+      leaflet.current = null;
+      layers.current = null;
+      setReady(false);
     };
-  }, [located]);
+  }, []);
+
+  // The map remains mounted while the route layer changes. Recreating Leaflet
+  // for every day tab caused tile flashes and a long-feeling pause on mobile;
+  // now the camera travels to the selected route instead.
+  useEffect(() => {
+    const instance = map.current;
+    const L = leaflet.current;
+    const layer = layers.current;
+    if (!ready || !instance || !L || !layer) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motion = reducedMotion ? { duration: 0 } : { duration: 0.65, easeLinearity: 0.35 };
+
+    layer.clearLayers();
+    const points: [number, number][] = [];
+    located.forEach((item, index) => {
+      const point: [number, number] = [Number(item.place.lat), Number(item.place.lng)];
+      points.push(point);
+      L.marker(point, {
+        icon: L.divIcon({
+          className: 'itinerary-pin',
+          html: `<span style="display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:#0d1826;color:#e8c887;border:2px solid #e8c887;font:700 12px sans-serif">${index + 1}</span>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        }),
+      })
+        .addTo(layer)
+        .bindTooltip(item.place.name);
+    });
+
+    if (points.length > 1) {
+      L.polyline(points, { color: '#e8c887', weight: 3, opacity: 0.75 }).addTo(layer);
+      instance.flyToBounds(points, { padding: [34, 34], ...motion });
+    } else if (points[0]) {
+      instance.flyTo(points[0], 12, motion);
+    } else {
+      instance.flyTo([13.7563, 100.5018], 4, motion);
+    }
+  }, [located, ready]);
 
   return (
     <div

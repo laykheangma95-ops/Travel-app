@@ -48,7 +48,7 @@ export function TripCard({
   return (
     <Link
       href={`/trips/${trip.id}`}
-      className={cn('night-card deck-item group block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light', className)}
+      className={cn('night-card deck-item interaction-card group block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light', className)}
       style={{ '--deck-index': index } as React.CSSProperties}
     >
       <div className="flex items-start justify-between gap-3">
