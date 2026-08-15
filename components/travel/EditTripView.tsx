@@ -13,6 +13,7 @@ import { Compass, Map } from 'lucide-react';
 import type { TripSummary } from '@/lib/travel/state';
 import type { TripDraft } from '@/lib/travel/trips';
 import { TripForm } from './TripForm';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 
 function toDraft(trip: TripSummary): TripDraft {
@@ -74,12 +75,12 @@ export function EditTripView({ tripId }: { tripId: string }) {
             <h1 className="mt-3 font-display text-xl text-white">
               {lang === 'km' ? 'ចូលគណនីដើម្បីកែសម្រួល' : 'Sign in to edit this trip'}
             </h1>
-            <Link
-              href={`/sign-in?returnTo=/trips/${tripId}/edit`}
+            <SignInLink
+              returnTo={`/trips/${tripId}/edit`}
               className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
             >
               {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-            </Link>
+            </SignInLink>
           </div>
         ) : (
           <div className="night-card p-8 text-center">

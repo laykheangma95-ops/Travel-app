@@ -33,6 +33,7 @@ import { readinessPercent } from '@/lib/travel/state';
 import { TripProgress } from './TripProgress';
 import { WeatherCapsule } from './capsules';
 import { StatusBadge } from './StatusBadge';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { PermissionPrompt } from '@/components/notifications/PermissionPrompt';
 import { useLang } from '@/lib/i18n';
@@ -138,18 +139,21 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
                 ? 'វាអាចត្រូវបានលុប ឬជាកម្មសិទ្ធិគណនីផ្សេង។'
                 : 'It may have been deleted, or it belongs to another account.'}
           </p>
-          <Link
-            href={status === 'guest' ? `/sign-in?returnTo=/trips/${tripId}` : '/trips'}
-            className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
-          >
-            {status === 'guest'
-              ? lang === 'km'
-                ? 'ចូលគណនី'
-                : 'Sign in'
-              : lang === 'km'
-                ? 'ដំណើរទាំងអស់'
-                : 'All trips'}
-          </Link>
+          {status === 'guest' ? (
+            <SignInLink
+              returnTo={`/trips/${tripId}`}
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+            >
+              {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
+            </SignInLink>
+          ) : (
+            <Link
+              href="/trips"
+              className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
+            >
+              {lang === 'km' ? 'ដំណើរទាំងអស់' : 'All trips'}
+            </Link>
+          )}
         </div>
       </Shell>
     );

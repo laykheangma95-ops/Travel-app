@@ -33,6 +33,7 @@ import {
 import { useSession } from '@/hooks/useSession';
 import { useLang } from '@/lib/i18n';
 import { StatusBadge } from '@/components/travel/StatusBadge';
+import { SignInLink } from '@/components/ui/SignInLink';
 
 interface Row {
   href: string;
@@ -191,12 +192,12 @@ export default function YouPage() {
 
         {!user && !loading && (
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link
-              href="/sign-in?returnTo=/you"
+            <SignInLink
+              returnTo="/you"
               className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
             >
               {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-            </Link>
+            </SignInLink>
             <Link
               href="/sign-up"
               className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40"

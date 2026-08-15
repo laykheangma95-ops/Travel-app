@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Compass, Map, Plus } from 'lucide-react';
 import type { TripSummary } from '@/lib/travel/state';
 import { TripCard } from './TripCard';
+import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 
 export function TripsView() {
@@ -106,12 +107,12 @@ export function TripsView() {
                 : 'You can explore without an account. One is only needed to keep a trip and sync it between devices.'}
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/sign-in?returnTo=/trips"
+              <SignInLink
+                returnTo="/trips"
                 className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
               >
                 {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-              </Link>
+              </SignInLink>
               <Link
                 href="/explore"
                 className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40"

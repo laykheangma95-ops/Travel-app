@@ -27,6 +27,7 @@ import type { PreferenceKey } from '@/lib/notifications/catalog';
 import { useSession } from '@/hooks/useSession';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { SignInLink } from '@/components/ui/SignInLink';
 
 export default function NotificationPreferencesPage() {
   const { lang } = useLang();
@@ -102,12 +103,12 @@ export default function NotificationPreferencesPage() {
               ? 'ការកំណត់ការជូនដំណឹងត្រូវការគណនី ដើម្បីអនុវត្តលើគ្រប់ឧបករណ៍។'
               : 'Notification settings are tied to your account so they apply on every device.'}
           </p>
-          <Link
-            href="/sign-in?returnTo=/you/notifications"
+          <SignInLink
+            returnTo="/you/notifications"
             className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep"
           >
             {lang === 'km' ? 'ចូលគណនី' : 'Sign in'}
-          </Link>
+          </SignInLink>
         </div>
       </div>
     );
