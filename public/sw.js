@@ -19,7 +19,7 @@
 //                        absent; a stale gate number is worse than no gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const STATIC_CACHE = `domner-static-${VERSION}`;
 const PAGES_CACHE = `domner-pages-${VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -40,9 +40,15 @@ self.addEventListener('install', (event) => {
       const pages = await caches.open(PAGES_CACHE);
       await Promise.allSettled(OFFLINE_CRITICAL.map((url) => pages.add(url)));
 
-      await self.skipWaiting();
     })()
   );
+});
+
+// A new worker waits by default so a deployment cannot replace JavaScript while
+// someone is completing checkout or editing a trip. The client only sends this
+// message after the traveler chooses “Update”.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -69,6 +75,10 @@ function isStaticAsset(url) {
   );
 }
 
+function isOfflineCriticalPath(pathname) {
+  return OFFLINE_CRITICAL.includes(pathname);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -90,13 +100,16 @@ self.addEventListener('fetch', (event) => {
         try {
           const fresh = await fetch(request);
           // Only cache pages that are safe to show offline later.
-          if (fresh.ok && OFFLINE_CRITICAL.some((path) => url.pathname.startsWith(path))) {
+          if (fresh.ok && isOfflineCriticalPath(url.pathname)) {
             const cache = await caches.open(PAGES_CACHE);
-            cache.put(request, fresh.clone());
+            await cache.put(request, fresh.clone());
           }
           return fresh;
         } catch {
-          const cached = await caches.match(request);
+          const pages = await caches.open(PAGES_CACHE);
+          const cached = isOfflineCriticalPath(url.pathname)
+            ? await pages.match(url.pathname, { ignoreSearch: true })
+            : undefined;
           if (cached) return cached;
           const offline = await caches.match(OFFLINE_URL);
           return (
