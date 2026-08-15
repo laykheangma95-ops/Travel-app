@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { ApiError, ok, readJson, requireParam, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
-import { nextDayDate, type ItineraryCategory } from '@/lib/travel/itinerary';
+import {
+  nextDayDate,
+  PLACE_DESCRIPTION_MAX,
+  PLACE_NAME_MAX,
+  type ItineraryCategory,
+} from '@/lib/travel/itinerary';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +22,22 @@ const mutation = z.discriminatedUnion('action', [
   z.object({ action: z.literal('update'), placeId: z.string().uuid(), timeStart: z.string().nullable(), timeEnd: z.string().nullable(), notes: z.string().max(1000).nullable(), category: category }).strict(),
   z.object({ action: z.literal('delete'), placeId: z.string().uuid() }).strict(),
   z.object({ action: z.literal('share') }).strict(),
+  z.object({ action: z.literal('unshare') }).strict(),
+  // A place the traveler adds themselves. Without this, every destination with
+  // no editorial seed — 217 of the 242 the trip form offers — had an itinerary
+  // builder with nothing to put in it.
+  z
+    .object({
+      action: z.literal('addCustom'),
+      name: z.string().trim().min(1).max(PLACE_NAME_MAX),
+      description: z.string().trim().max(PLACE_DESCRIPTION_MAX).default(''),
+      category: category.default('other'),
+      lat: z.number().min(-90).max(90).nullable().default(null),
+      lng: z.number().min(-180).max(180).nullable().default(null),
+      /** Where to put it: a day id, or 'ideas' for the unscheduled list. */
+      target: z.union([z.string().uuid(), z.literal('ideas')]).default('ideas'),
+    })
+    .strict(),
 ]);
 
 async function ownedTrip(request: Request, tripId: string) {
@@ -73,7 +94,7 @@ export const GET = route(async (request, context) => {
 
 export const PATCH = route(async (request, context) => {
   if (!getSupabase()) throw new ApiError('SERVICE_UNAVAILABLE', 'Itinerary is unavailable right now.');
-  await requireUser(request);
+  const user = await requireUser(request);
   const tripId = requireParam(context, 'tripId');
   const body = mutation.safeParse(await readJson<unknown>(request));
   if (!body.success) throw new ApiError('BAD_REQUEST', 'That itinerary change is not valid.');
@@ -146,9 +167,85 @@ export const PATCH = route(async (request, context) => {
     if (error) throw new ApiError('INTERNAL', 'Could not remove that place.');
   }
 
+  if (body.data.action === 'addCustom') {
+    // Stamped with the caller's id, so migration 009's policies scope it to
+    // them: nobody else can read it, and it can never be mistaken for part of
+    // the editorial catalogue.
+    const { data: place, error: placeError } = await supabase
+      .from('destination_places')
+      .insert({
+        destination: trip.destination,
+        name: body.data.name,
+        category: body.data.category,
+        // A place with no coordinates simply does not get a map pin. Asking a
+        // traveler for a latitude before they can note down their hotel would
+        // be the wrong trade.
+        lat: body.data.lat ?? 0,
+        lng: body.data.lng ?? 0,
+        description: body.data.description,
+        source: 'editorial',
+        created_by: user.id,
+      })
+      .select('id, category')
+      .single();
+
+    if (placeError || !place) {
+      throw new ApiError('INTERNAL', 'Could not save that place. It may already be on your list.');
+    }
+
+    let dayId: string | null = null;
+    if (body.data.target === 'ideas') {
+      const { data: existing } = await supabase
+        .from('itinerary_days')
+        .select('id')
+        .eq('trip_id', tripId)
+        .eq('day_index', 0)
+        .maybeSingle();
+      if (existing) {
+        dayId = existing.id;
+      } else {
+        const { data: created, error: createError } = await supabase
+          .from('itinerary_days')
+          .insert({ trip_id: tripId, day_index: 0, date: null })
+          .select('id')
+          .single();
+        if (createError || !created) throw new ApiError('INTERNAL', 'Could not prepare your Ideas list.');
+        dayId = created.id;
+      }
+    } else {
+      const { data: day } = await supabase
+        .from('itinerary_days')
+        .select('id')
+        .eq('id', body.data.target)
+        .eq('trip_id', tripId)
+        .maybeSingle();
+      if (!day) throw new ApiError('NOT_FOUND', 'That day could not be found.');
+      dayId = day.id;
+    }
+
+    const { count } = await supabase
+      .from('itinerary_places')
+      .select('*', { count: 'exact', head: true })
+      .eq('itinerary_day_id', dayId);
+    const { error } = await supabase.from('itinerary_places').insert({
+      itinerary_day_id: dayId,
+      place_id: place.id,
+      category: place.category as ItineraryCategory,
+      sort_order: count ?? 0,
+    });
+    if (error) throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
+  }
+
   if (body.data.action === 'share') {
     const { error } = await supabase.from('trip_plans').update({ is_public: true }).eq('id', tripId);
     if (error) throw new ApiError('INTERNAL', 'Could not create the share link.');
+  }
+
+  // Sharing has to be reversible. The share action only ever set is_public
+  // true, so a link, once created, was permanent.
+  if (body.data.action === 'unshare') {
+    const { error } = await supabase.from('trip_plans').update({ is_public: false }).eq('id', tripId);
+    if (error) throw new ApiError('INTERNAL', 'Could not turn off the share link.');
   }
 
   return ok(await snapshot(request, tripId));
