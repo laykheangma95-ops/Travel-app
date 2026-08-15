@@ -1805,8 +1805,61 @@ button.capsule:active {
   padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
 }
 
+/* The update notice belongs above the phone tab bar, including the iPhone home
+   indicator. It is owned by the PWA layer so feature pages never have to know
+   about service-worker lifecycle state. */
+.pwa-update-notice {
+  position: fixed;
+  z-index: 60;
+  right: 0.75rem;
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid rgba(230, 203, 139, 0.3);
+  border-radius: 0.875rem;
+  padding: 0.75rem;
+  background: rgba(14, 27, 48, 0.96);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 40px rgba(4, 11, 24, 0.36);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  font-size: 0.8125rem;
+}
+
+.pwa-update-action,
+.pwa-update-dismiss {
+  min-height: 2.5rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+}
+
+.pwa-update-action {
+  background: var(--color-gold-light);
+  color: var(--color-primary-deep);
+}
+
+.pwa-update-dismiss {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pwa-update-action:focus-visible,
+.pwa-update-dismiss:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
 @media (min-width: 1024px) {
   .has-tabbar { padding-bottom: 0; }
+  .pwa-update-notice {
+    right: 1rem;
+    bottom: 1rem;
+    left: auto;
+    width: min(28rem, calc(100vw - 2rem));
+  }
 }
 
 /* ── Travel deck (the personalised band at the top of Home) ──────────────── */

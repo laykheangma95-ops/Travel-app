@@ -24,6 +24,7 @@
     "intents:generate": "node scripts/generate-questions.mjs",
     "intents:train": "node scripts/train-intent.mjs",
     "branch:check": "node scripts/branch-hygiene.mjs",
+    "pwa:check": "node scripts/pwa-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "mock": "tsx mock-gohub/src/server.ts",

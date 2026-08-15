@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Share, Sparkles, X } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { useDevicePresentation } from '@/components/layout/DevicePresentation';
 
 /** What the traveler just did. Only used to word the offer. */
 export type InstallTrigger = 'order' | 'trip' | 'alerts' | 'itinerary';
@@ -53,15 +54,6 @@ const COPY: Record<InstallTrigger, { en: string; km: string }> = {
   },
 };
 
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // iOS Safari's own flag, which predates the standard media query.
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
 function isIos(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -75,12 +67,16 @@ export function InstallPrompt({
   className?: string;
 }) {
   const { lang } = useLang();
+  const { isStandalone } = useDevicePresentation();
   const [visible, setVisible] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [ios, setIos] = useState(false);
 
   useEffect(() => {
-    if (isStandalone()) return;
+    if (isStandalone) {
+      setVisible(false);
+      return;
+    }
     try {
       if (window.localStorage.getItem(DISMISS_KEY)) return;
     } catch {
@@ -106,7 +102,7 @@ export function InstallPrompt({
 
     window.addEventListener('beforeinstallprompt', onPrompt);
     return () => window.removeEventListener('beforeinstallprompt', onPrompt);
-  }, []);
+  }, [isStandalone]);
 
   const dismiss = useCallback(() => {
     setVisible(false);

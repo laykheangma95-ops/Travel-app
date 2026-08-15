@@ -4,6 +4,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { Footer } from '@/components/layout/Footer';
 import { ReferralTracker } from '@/components/layout/ReferralTracker';
+import { DevicePresentationProvider } from '@/components/layout/DevicePresentation';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 import { LiquidTouchController } from '@/components/pwa/LiquidTouchController';
 import { DomerSplash } from '@/components/brand/DomerLoader';
@@ -77,6 +78,7 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: '#14263F',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -93,7 +95,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${display.variable} ${body.variable} ${khmerSerif.variable} ${khmerSans.variable}`}
     >
       <body className={`flex min-h-screen flex-col${lang === 'km' ? ' lang-km' : ''}`}>
-        <LanguageProvider initialLang={lang}>
+        <DevicePresentationProvider>
+          <LanguageProvider initialLang={lang}>
           {/* Keyboard skip link — first tab stop, visible only on focus. */}
           <a
             href="#main-content"
@@ -117,7 +120,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               payment, authentication and the admin panel. */}
           <BottomNavigation />
           <TripCopilot />
-        </LanguageProvider>
+          </LanguageProvider>
+        </DevicePresentationProvider>
       </body>
     </html>
   );

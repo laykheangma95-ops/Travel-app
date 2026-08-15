@@ -223,7 +223,15 @@ export function Navbar() {
         {/* Brand — the one circle in a bar of capsules, so it reads as the way
             home without needing a label to say so. */}
         <Link href="/" className="nav-brand shrink-0">
-          <DomerLogo surface={onLight ? 'light' : 'navy'} badge size={44} />
+          <DomerLogo
+            surface={onLight ? 'light' : 'navy'}
+            badge
+            size={44}
+            // At 320px the full bilingual lockup competes with the language,
+            // cart, and menu controls. Keep the recognisable mark and restore
+            // the wordmark at 360px+, where it has room to breathe.
+            className="max-[359px]:[&>span:last-child]:hidden"
+          />
         </Link>
 
         {/* Desktop nav */}
