@@ -73,5 +73,26 @@ export function LiquidTouchController() {
     };
   }, []);
 
+  useEffect(() => {
+    const preventGestureZoom = (event: Event) => {
+      event.preventDefault();
+    };
+    const preventMultiTouchZoom = (event: TouchEvent) => {
+      if (event.touches.length > 1) event.preventDefault();
+    };
+
+    document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+    document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+    document.addEventListener('gestureend', preventGestureZoom, { passive: false });
+    document.addEventListener('touchmove', preventMultiTouchZoom, { passive: false });
+
+    return () => {
+      document.removeEventListener('gesturestart', preventGestureZoom);
+      document.removeEventListener('gesturechange', preventGestureZoom);
+      document.removeEventListener('gestureend', preventGestureZoom);
+      document.removeEventListener('touchmove', preventMultiTouchZoom);
+    };
+  }, []);
+
   return null;
 }
