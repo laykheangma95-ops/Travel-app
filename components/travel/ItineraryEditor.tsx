@@ -1,227 +1,1339 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, BedDouble, CalendarDays, ChevronDown, ChevronUp, FilePlus2, Link2, Map as MapIcon, MapPin, MessageCircle, Plus, Share2, Sparkles, Star, TrainFront, Trash2, X } from 'lucide-react';
-import type { CuratedPlace, ItineraryDay, ItineraryPayload, ItineraryPlace } from '@/lib/travel/itinerary';
+// ─────────────────────────────────────────────────────────────────────────────
+// THE ITINERARY EDITOR — the days of a trip, and what is actually in them.
+//
+// What this screen used to do that it no longer does:
+//
+//   • Invent times. Every card with no stored time was given one from a
+//     four-slot array cycled by position, so the first stop of every day read
+//     "10:00 – 12:00" whether or not anyone had said so.
+//   • Invent distances. The gap between two stops always read "Walk · 11 min",
+//     a hardcoded string, regardless of where the two places actually are.
+//     straightLineKm() existed in lib/travel/itinerary.ts and was never called.
+//   • Carry six buttons with no click handler at all — including the two
+//     largest controls on the screen, "Ask anything…" and "Edit".
+//   • Refuse to edit a time, a note or the day a place sits on, although the
+//     API has accepted `update` and `move` since it was written.
+//   • Reorder by HTML5 drag-and-drop only, which does not fire on touch. On the
+//     phone this product is built for, a day's order was fixed at whatever
+//     order things were added in.
+//   • Share by writing to the clipboard with no toast, no visible link and no
+//     way to un-share.
+//
+// The rule this file now follows: if we do not know something, the screen does
+// not say it. A place with no time shows no time and offers to set one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  BedDouble,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Copy,
+  Link2,
+  MapPin,
+  Pencil,
+  Plus,
+  Share2,
+  Star,
+  TrainFront,
+  Trash2,
+  X,
+} from 'lucide-react';
+import {
+  CATEGORY_LABEL,
+  PLACE_DESCRIPTION_MAX,
+  PLACE_NAME_MAX,
+  straightLineKm,
+  type CuratedPlace,
+  type ItineraryCategory,
+  type ItineraryDay,
+  type ItineraryPayload,
+  type ItineraryPlace,
+} from '@/lib/travel/itinerary';
+import { useLang } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 type Tab = 'summary' | 'ideas' | string;
-type PickerFilter = 'all' | 'stay' | 'transport' | 'saved' | 'custom';
+type PickerFilter = 'all' | 'stay' | 'transport' | 'mine';
 
-const labels: Record<string, string> = { spot: 'Attraction', food: 'Food', shopping: 'Shopping', transport: 'Transit', other: 'Place' };
-const pickerOptions: { value: PickerFilter; label: string; icon: typeof Link2; tone: string }[] = [
-  { value: 'all', label: 'Import from', icon: Link2, tone: 'bg-white' },
-  { value: 'stay', label: 'Stay', icon: BedDouble, tone: 'bg-blue-50' },
-  { value: 'transport', label: 'Transit', icon: TrainFront, tone: 'bg-purple-50' },
-  { value: 'saved', label: 'My saved', icon: Star, tone: 'bg-white' },
-  { value: 'custom', label: 'Custom', icon: FilePlus2, tone: 'bg-white' },
-];
+const CATEGORIES: ItineraryCategory[] = ['spot', 'food', 'shopping', 'transport', 'stay', 'other'];
+
+/**
+ * A place added by hand with no coordinates is stored at 0,0 — a real point in
+ * the Gulf of Guinea. Treat that as "no location" rather than pinning the map
+ * off the coast of Africa.
+ */
+function hasLocation(place: CuratedPlace): boolean {
+  return Number(place.lat) !== 0 || Number(place.lng) !== 0;
+}
 
 export function ItineraryEditor({ tripId }: { tripId: string }) {
+  const { lang } = useLang();
   const [data, setData] = useState<ItineraryPayload | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [tab, setTab] = useState<Tab>('summary');
   const [picker, setPicker] = useState(false);
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<PickerFilter>('all');
+  const [editing, setEditing] = useState<ItineraryPlace | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dragged, setDragged] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const request = async (body?: Record<string, unknown>) => {
-    const response = await fetch('/api/travel/itinerary/' + tripId, {
-      method: body ? 'PATCH' : 'GET',
-      credentials: 'include',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error?.message ?? 'Could not save itinerary.');
-    setData(result);
-    return result as ItineraryPayload;
-  };
+  const request = useCallback(
+    async (body?: Record<string, unknown>) => {
+      const response = await fetch(`/api/travel/itinerary/${tripId}`, {
+        method: body ? 'PATCH' : 'GET',
+        credentials: 'include',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error?.message ??
+            (lang === 'km' ? 'រក្សាទុកមិនបាន។' : 'Could not save that change.')
+        );
+      }
+      setData(result as ItineraryPayload);
+      return result as ItineraryPayload;
+    },
+    [tripId, lang]
+  );
+
+  const load = useCallback(() => {
+    setLoadState('loading');
+    request()
+      .then((result) => {
+        setTab(result.days[0]?.id ?? 'ideas');
+        setLoadState('ready');
+      })
+      .catch((cause) => {
+        setError(cause instanceof Error ? cause.message : null);
+        setLoadState('error');
+      });
+  }, [request]);
 
   useEffect(() => {
-    void request()
-      .then((result) => setTab(result.days[0]?.id ?? 'ideas'))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load itinerary.'));
-  }, [tripId]);
+    load();
+  }, [load]);
 
-  const active = data?.days.find((day) => day.id === tab);
-  const places = tab === 'ideas' ? data?.ideas ?? [] : active?.places ?? [];
-  const openPicker = (nextTab?: Tab) => {
-    if (nextTab) setTab(nextTab);
-    setFilter('all');
-    setQuery('');
-    setPicker(true);
-  };
-  const add = async (place: CuratedPlace) => {
-    try {
-      if (tab === 'ideas') await request({ action: 'addIdea', placeId: place.id });
-      else if (active) await request({ action: 'addPlace', dayId: active.id, placeId: place.id });
-      else throw new Error('Choose a day first.');
-      setPicker(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not add that place.');
-    }
-  };
-  const remove = (placeId: string) => {
-    void request({ action: 'delete', placeId }).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not remove that place.'));
-  };
-  const reorder = (targetId: string) => {
-    if (!active || !dragged || dragged === targetId) return;
-    const ids = places.map((place) => place.id);
-    const from = ids.indexOf(dragged);
-    const to = ids.indexOf(targetId);
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    void request({ action: 'reorder', dayId: active.id, placeIds: ids }).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not reorder places.'));
-    setDragged(null);
-  };
-  const share = async () => {
-    try {
-      const next = await request({ action: 'share' });
-      await navigator.clipboard?.writeText(window.location.origin + '/share/trip/' + next.trip.share_token);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create the share link.');
-    }
+  /** Run a mutation, surfacing failure instead of leaving the screen frozen. */
+  const mutate = useCallback(
+    async (body: Record<string, unknown>) => {
+      setBusy(true);
+      setError(null);
+      try {
+        return await request(body);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : null);
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [request]
+  );
+
+  if (loadState === 'loading') return <EditorSkeleton />;
+
+  if (loadState === 'error' || !data) {
+    return (
+      <div className="night-canvas relative grid min-h-screen place-items-center px-4">
+        <div className="night-stars" aria-hidden="true" />
+        <div className="night-card relative max-w-sm p-8 text-center">
+          <h1 className="font-display text-xl text-white">
+            {lang === 'km' ? 'បើកកម្មវិធីដំណើរមិនបាន' : "We couldn't open this itinerary"}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-white/65">
+            {error ??
+              (lang === 'km'
+                ? 'សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។'
+                : 'Check your connection and try again.')}
+          </p>
+          <button
+            type="button"
+            onClick={load}
+            className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+          >
+            {lang === 'km' ? 'ព្យាយាមម្ដងទៀត' : 'Try again'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const active = data.days.find((day) => day.id === tab) ?? null;
+  const visible = tab === 'ideas' ? data.ideas : (active?.places ?? []);
+  // On Summary the map shows the whole trip rather than going blank, which is
+  // what it did before when no single day was selected.
+  const mapPlaces = tab === 'summary' ? data.days.flatMap((day) => day.places) : visible;
+  const dayLabel = (day: ItineraryDay) => formatDay(day.date, day.day_index, lang);
+  const targetLabel = tab === 'ideas' ? (lang === 'km' ? 'គំនិត' : 'Ideas') : active ? dayLabel(active) : '';
+
+  const addExisting = async (place: CuratedPlace) => {
+    const result =
+      tab === 'ideas' || !active
+        ? await mutate({ action: 'addIdea', placeId: place.id })
+        : await mutate({ action: 'addPlace', dayId: active.id, placeId: place.id });
+    if (result) setPicker(false);
   };
 
-  if (!data) return <div className="min-h-screen bg-[#f7f8fa] p-6 text-[#111318]">{error ?? 'Loading itinerary…'}</div>;
+  const addCustom = async (draft: CustomDraft) => {
+    const result = await mutate({
+      action: 'addCustom',
+      name: draft.name,
+      description: draft.description,
+      category: draft.category,
+      target: tab === 'ideas' || !active ? 'ideas' : active.id,
+    });
+    if (result) setPicker(false);
+  };
 
-  const visiblePlaces = data.curatedPlaces.filter((place) => {
-    const text = (place.name + ' ' + place.description).toLowerCase();
-    if (!text.includes(query.toLowerCase())) return false;
-    if (filter === 'transport') return place.category === 'transport';
-    if (filter === 'stay') return place.category === 'other';
-    if (filter === 'saved') return place.source === 'editorial';
-    return true;
-  });
-  const dayLabel = (day: ItineraryDay) => formatDay(day.date, day.day_index);
-  const targetLabel = tab === 'ideas' ? 'Ideas' : active ? dayLabel(active) : 'your day';
+  /** Move a place one step up or down within its day. Touch and keyboard safe. */
+  const nudge = async (list: ItineraryPlace[], index: number, direction: -1 | 1) => {
+    const to = index + direction;
+    if (!active || to < 0 || to >= list.length) return;
+    const ids = list.map((item) => item.id);
+    [ids[index], ids[to]] = [ids[to], ids[index]];
+    await mutate({ action: 'reorder', dayId: active.id, placeIds: ids });
+  };
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] pb-24 text-[#101114]">
-      <div className="relative h-[44svh] min-h-[300px] bg-[#dfeef1]">
-        <RouteMap places={places} destination={data.trip.destination} />
-        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 pt-6 sm:px-6">
-          <button aria-label="Back" onClick={() => window.history.back()} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 shadow-sm backdrop-blur"><ArrowLeft size={20} /></button>
-          <div className="flex gap-2">
-            <button aria-label="Share itinerary" onClick={() => void share()} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 shadow-sm backdrop-blur"><Share2 size={18} /></button>
-            <button aria-label="Map options" className="grid h-10 w-10 place-items-center rounded-full bg-white/80 shadow-sm backdrop-blur"><MapIcon size={18} /></button>
-          </div>
+    <div className="night-canvas has-tabbar relative min-h-screen pb-28">
+      <div className="night-stars" aria-hidden="true" />
+
+      <div className="relative h-[38svh] min-h-[240px] overflow-hidden">
+        <RouteMap places={mapPlaces} destination={data.trip.destination} lang={lang} />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 pt-6 sm:px-6">
+          <Link
+            href={`/trips/${tripId}`}
+            aria-label={lang === 'km' ? 'ត្រឡប់ទៅដំណើរ' : 'Back to trip'}
+            className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full bg-primary-deep/70 text-white backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <ArrowLeft size={20} aria-hidden="true" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setSharing(true)}
+            aria-label={lang === 'km' ? 'ចែករំលែកកម្មវិធីដំណើរ' : 'Share itinerary'}
+            className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full bg-primary-deep/70 text-white backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <Share2 size={18} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      <main className="relative z-20 mx-auto -mt-7 max-w-3xl rounded-t-[28px] bg-white shadow-[0_-12px_40px_rgba(40,55,65,.08)]">
-        <div className="mx-auto mt-3 h-1 w-11 rounded-full bg-black/20" />
-        <div className="px-5 pb-5 pt-4 sm:px-8">
-          <h1 className="text-[25px] font-bold tracking-[-.04em]">{data.trip.title}</h1>
-          <div className="mt-2 flex items-center gap-2 text-sm font-medium text-black/45"><CalendarDays size={19} /><span>{tripDates(data.trip.start_date, data.trip.end_date, data.days.length)} {data.days.length || 1} Days</span><ChevronDown size={16} className="ml-1 text-black/30" /></div>
+      <main className="relative z-20 mx-auto -mt-8 max-w-3xl rounded-t-[28px] border-t border-white/10 bg-primary-deep/95 backdrop-blur-xl">
+        <div className="mx-auto mt-3 h-1 w-11 rounded-full bg-white/20" aria-hidden="true" />
+        <div className="px-5 pb-8 pt-4 sm:px-8">
+          <h1 className="font-display text-2xl text-white sm:text-3xl">{data.trip.title}</h1>
+          <p className="mt-1.5 flex items-center gap-2 font-mono text-sm text-white/55">
+            <CalendarDays size={16} aria-hidden="true" />
+            {tripDates(data.trip.start_date, data.trip.end_date, lang)}
+            <span aria-hidden="true">·</span>
+            {data.days.length || 1} {lang === 'km' ? 'ថ្ងៃ' : data.days.length === 1 ? 'day' : 'days'}
+          </p>
 
-          <nav className="mt-6 -mx-1 flex items-end gap-6 overflow-x-auto border-b border-black/[.06] text-[15px] font-semibold text-black/35" aria-label="Itinerary days">
-            <button onClick={() => setTab('summary')} className={tab === 'summary' ? 'relative shrink-0 pb-4 text-[#101114]' : 'shrink-0 pb-4'}>Summary{tab === 'summary' && <TabMarker />}</button>
-            {data.days.map((day) => <button key={day.id} onClick={() => setTab(day.id)} className={tab === day.id ? 'relative shrink-0 pb-4 text-[#101114]' : 'shrink-0 pb-4'}>{dayLabel(day)}{tab === day.id && <TabMarker />}</button>)}
-            <button onClick={() => setTab('ideas')} className={tab === 'ideas' ? 'relative shrink-0 pb-4 text-[#101114]' : 'shrink-0 pb-4'}>Ideas{tab === 'ideas' && <TabMarker />}</button>
-            <button aria-label="Add day" onClick={() => void request({ action: 'addDay' }).then((next) => setTab(next.days[next.days.length - 1]?.id ?? tab)).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not add a day.'))} className="mb-2 grid h-7 w-7 shrink-0 place-items-center text-2xl font-light text-black/45">+</button>
+          <nav
+            className="mt-6 -mx-1 flex items-end gap-5 overflow-x-auto border-b border-white/10 px-1 text-[15px] font-semibold"
+            aria-label={lang === 'km' ? 'ថ្ងៃនៃកម្មវិធី' : 'Itinerary days'}
+          >
+            <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>
+              {lang === 'km' ? 'សង្ខេប' : 'Summary'}
+            </TabButton>
+            {data.days.map((day) => (
+              <TabButton key={day.id} active={tab === day.id} onClick={() => setTab(day.id)}>
+                {dayLabel(day)}
+              </TabButton>
+            ))}
+            <TabButton active={tab === 'ideas'} onClick={() => setTab('ideas')}>
+              {lang === 'km' ? 'គំនិត' : 'Ideas'}
+            </TabButton>
+            <button
+              type="button"
+              aria-label={lang === 'km' ? 'បន្ថែមថ្ងៃ' : 'Add a day'}
+              disabled={busy}
+              onClick={async () => {
+                const next = await mutate({ action: 'addDay' });
+                if (next) setTab(next.days[next.days.length - 1]?.id ?? tab);
+              }}
+              className="mb-2 grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 text-lg font-light text-white/70 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            >
+              +
+            </button>
           </nav>
 
-          {error && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-          {tab === 'summary' ? <SummaryView data={data} dayLabel={dayLabel} onAdd={openPicker} onRemove={remove} onDragStart={setDragged} onDrop={reorder} /> : <DaySection title={tab === 'ideas' ? 'Ideas' : active ? dayLabel(active) : 'Ideas'} day={active} places={places} onAdd={() => openPicker()} onRemove={remove} onDragStart={setDragged} onDrop={reorder} />}
+          {error && (
+            <p role="alert" className="mt-4 rounded-btn border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-red-200">
+              {error}
+            </p>
+          )}
+
+          {tab === 'summary' ? (
+            <div className="mt-7 space-y-7">
+              {data.days.map((day) => (
+                <DaySection
+                  key={day.id}
+                  title={dayLabel(day)}
+                  theme={day.theme}
+                  places={day.places}
+                  reorderable={false}
+                  onAdd={() => {
+                    setTab(day.id);
+                    setPicker(true);
+                  }}
+                  onEdit={setEditing}
+                  onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
+                  onNudge={() => undefined}
+                  busy={busy}
+                />
+              ))}
+              <DaySection
+                title={lang === 'km' ? 'គំនិត' : 'Ideas'}
+                theme={null}
+                places={data.ideas}
+                reorderable={false}
+                onAdd={() => {
+                  setTab('ideas');
+                  setPicker(true);
+                }}
+                onEdit={setEditing}
+                onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
+                onNudge={() => undefined}
+                busy={busy}
+              />
+            </div>
+          ) : (
+            <div className="mt-7">
+              <DaySection
+                title={targetLabel}
+                theme={active?.theme ?? null}
+                places={visible}
+                reorderable={tab !== 'ideas'}
+                onAdd={() => setPicker(true)}
+                onEdit={setEditing}
+                onRemove={(id) => void mutate({ action: 'delete', placeId: id })}
+                onNudge={(index, direction) => void nudge(visible, index, direction)}
+                busy={busy}
+              />
+            </div>
+          )}
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-center gap-3 border-t border-black/[.05] bg-white/95 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur lg:bottom-0">
-        <button className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#65c7f2] px-5 text-sm font-semibold text-white shadow-sm"><MessageCircle size={18} />Ask anything…</button>
-        <button className="inline-flex min-h-12 items-center gap-2 rounded-full border border-black/[.04] bg-white px-6 text-sm font-semibold shadow-[0_5px_18px_rgba(0,0,0,.06)]"><Sparkles size={17} />Edit</button>
-        <button aria-label="Add place" onClick={() => openPicker()} className="grid h-14 w-14 place-items-center rounded-full bg-[#111] text-white shadow-lg"><Plus size={30} strokeWidth={2.5} /></button>
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-center gap-3 border-t border-white/10 bg-primary-deep/95 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setPicker(true)}
+          disabled={busy}
+          className="liquid-glass-accent liquid-press inline-flex min-h-[3rem] items-center gap-2 rounded-btn px-6 text-sm font-semibold text-primary-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+        >
+          <Plus size={18} aria-hidden="true" />
+          {lang === 'km' ? 'បន្ថែមទីតាំង' : 'Add a place'}
+        </button>
       </div>
 
-      {picker && <AddPlaceSheet targetLabel={targetLabel} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery} places={visiblePlaces} onAdd={add} onClose={() => setPicker(false)} onCustom={() => setError('Custom places can be added after selecting a destination from Explore.')} />}
+      {picker && (
+        <AddPlaceSheet
+          targetLabel={targetLabel || (lang === 'km' ? 'គំនិត' : 'Ideas')}
+          places={data.curatedPlaces}
+          busy={busy}
+          onAdd={addExisting}
+          onAddCustom={addCustom}
+          onClose={() => setPicker(false)}
+        />
+      )}
+
+      {editing && (
+        <EditPlaceSheet
+          item={editing}
+          days={data.days}
+          busy={busy}
+          onClose={() => setEditing(null)}
+          onSave={async (patch) => {
+            const saved = await mutate({ action: 'update', placeId: editing.id, ...patch });
+            if (saved) setEditing(null);
+          }}
+          onMove={async (dayId) => {
+            const moved = await mutate({ action: 'move', placeId: editing.id, dayId });
+            if (moved) setEditing(null);
+          }}
+        />
+      )}
+
+      {sharing && (
+        <ShareSheet
+          isPublic={data.trip.is_public}
+          token={data.trip.share_token}
+          busy={busy}
+          onClose={() => setSharing(false)}
+          onToggle={(next) => void mutate({ action: next ? 'share' : 'unshare' })}
+        />
+      )}
     </div>
   );
 }
 
-function TabMarker() {
-  return <span className="absolute -bottom-px left-1/2 h-[3px] w-7 -translate-x-1/2 rounded-full bg-[#21a9df]" />;
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'true' : undefined}
+      className={cn(
+        'relative shrink-0 pb-3.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
+        active ? 'text-white' : 'text-white/45 hover:text-white/75'
+      )}
+    >
+      {children}
+      {active && (
+        <span
+          className="absolute -bottom-px left-1/2 h-[3px] w-7 -translate-x-1/2 rounded-full bg-gold-light"
+          aria-hidden="true"
+        />
+      )}
+    </button>
+  );
 }
 
-function SummaryView({ data, dayLabel, onAdd, onRemove, onDragStart, onDrop }: { data: ItineraryPayload; dayLabel: (day: ItineraryDay) => string; onAdd: (tab: Tab) => void; onRemove: (id: string) => void; onDragStart: (id: string) => void; onDrop: (id: string) => void }) {
-  return <div className="mt-7 space-y-6">{data.days.map((day) => <DaySection key={day.id} title={dayLabel(day)} day={day} places={day.places} onAdd={() => onAdd(day.id)} onRemove={onRemove} onDragStart={onDragStart} onDrop={onDrop} />)}<DaySection title="Ideas" places={data.ideas} onAdd={() => onAdd('ideas')} onRemove={onRemove} onDragStart={onDragStart} onDrop={onDrop} /></div>;
+// ── A day ────────────────────────────────────────────────────────────────────
+
+function DaySection({
+  title,
+  theme,
+  places,
+  reorderable,
+  onAdd,
+  onEdit,
+  onRemove,
+  onNudge,
+  busy,
+}: {
+  title: string;
+  theme: string | null;
+  places: ItineraryPlace[];
+  reorderable: boolean;
+  onAdd: () => void;
+  onEdit: (item: ItineraryPlace) => void;
+  onRemove: (id: string) => void;
+  onNudge: (index: number, direction: -1 | 1) => void;
+  busy: boolean;
+}) {
+  const { lang } = useLang();
+  const [collapsed, setCollapsed] = useState(false);
+  const headingId = `day-${title.replace(/\W+/g, '-')}`;
+
+  return (
+    <section aria-labelledby={headingId}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 id={headingId} className="font-display text-xl text-white">
+            {title}
+          </h2>
+          {theme && <p className="mt-0.5 text-sm text-gold-light">{theme}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-expanded={!collapsed}
+          aria-label={
+            collapsed
+              ? lang === 'km'
+                ? `បង្ហាញ ${title}`
+                : `Expand ${title}`
+              : lang === 'km'
+                ? `បង្រួម ${title}`
+                : `Collapse ${title}`
+          }
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/45 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+        >
+          {collapsed ? <ChevronDown size={20} aria-hidden="true" /> : <ChevronUp size={20} aria-hidden="true" />}
+        </button>
+      </div>
+
+      {!collapsed && (
+        <div className="mt-4 space-y-1">
+          {places.map((item, index) => (
+            <div key={item.id}>
+              <PlaceCard
+                item={item}
+                index={index}
+                total={places.length}
+                reorderable={reorderable}
+                busy={busy}
+                onEdit={() => onEdit(item)}
+                onRemove={() => onRemove(item.id)}
+                onNudge={(direction) => onNudge(index, direction)}
+              />
+              {index < places.length - 1 && <TravelGap from={item} to={places[index + 1]} />}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex min-h-[3rem] w-full items-center gap-4 rounded-btn px-2 text-left text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <span className="text-2xl font-light leading-none" aria-hidden="true">
+              +
+            </span>
+            <span className="text-sm">{lang === 'km' ? 'បន្ថែម' : 'Add'}</span>
+          </button>
+        </div>
+      )}
+    </section>
+  );
 }
 
-function DaySection({ title, day, places, onAdd, onRemove, onDragStart, onDrop }: { title: string; day?: ItineraryDay; places: ItineraryPlace[]; onAdd: () => void; onRemove: (id: string) => void; onDragStart: (id: string) => void; onDrop: (id: string) => void }) {
-  return <section className="border-b border-black/[.04] pb-5 last:border-0">
-    <div className="flex items-start">
-      <div><h2 className="text-[22px] font-bold tracking-[-.03em]">{title}</h2>{day?.theme && <p className="mt-1 text-sm font-semibold text-black/55">{day.theme}</p>}</div>
-      <button className="ml-3 mt-1 text-sm text-black/25">Add remarks</button>
-      <button aria-label="Collapse section" className="ml-auto mt-1 text-black/35"><ChevronUp size={22} /></button>
+function PlaceCard({
+  item,
+  index,
+  total,
+  reorderable,
+  busy,
+  onEdit,
+  onRemove,
+  onNudge,
+}: {
+  item: ItineraryPlace;
+  index: number;
+  total: number;
+  reorderable: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+  onNudge: (direction: -1 | 1) => void;
+}) {
+  const { lang } = useLang();
+
+  // Only a time somebody actually set. The old card filled this in from a
+  // rotating array, so every first stop claimed to start at 10:00.
+  const time =
+    item.time_start && item.time_end
+      ? `${item.time_start.slice(0, 5)} – ${item.time_end.slice(0, 5)}`
+      : item.time_start
+        ? item.time_start.slice(0, 5)
+        : null;
+
+  return (
+    <article className="flex items-start gap-3 rounded-card p-2 transition-colors hover:bg-white/[0.03]">
+      <span
+        className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-gold-light/40 font-mono text-xs font-bold text-gold-bright"
+        aria-hidden="true"
+      >
+        {index + 1}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-light">
+          {CATEGORY_LABEL[item.category]?.[lang] ?? CATEGORY_LABEL.other[lang]}
+        </p>
+        <h3 className="mt-0.5 font-semibold leading-tight text-white">{item.place.name}</h3>
+
+        <div className="mt-2 rounded-btn border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          {time ? (
+            <p className="flex items-center gap-1.5 font-mono text-sm font-semibold text-white/85">
+              <Clock size={13} aria-hidden="true" />
+              {time}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-1.5 text-sm text-white/45 transition-colors hover:text-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            >
+              <Clock size={13} aria-hidden="true" />
+              {lang === 'km' ? 'កំណត់ពេលវេលា' : 'Set a time'}
+            </button>
+          )}
+          {(item.notes || item.place.description) && (
+            <p className="mt-1.5 text-sm leading-snug text-white/60">
+              {item.notes ?? item.place.description}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-1.5 flex items-center gap-1">
+          {reorderable && (
+            <>
+              <IconButton
+                label={lang === 'km' ? `ផ្លាស់ ${item.place.name} ឡើងលើ` : `Move ${item.place.name} earlier`}
+                onClick={() => onNudge(-1)}
+                disabled={busy || index === 0}
+              >
+                <ChevronUp size={15} aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                label={lang === 'km' ? `ផ្លាស់ ${item.place.name} ចុះក្រោម` : `Move ${item.place.name} later`}
+                onClick={() => onNudge(1)}
+                disabled={busy || index === total - 1}
+              >
+                <ChevronDown size={15} aria-hidden="true" />
+              </IconButton>
+            </>
+          )}
+          <IconButton
+            label={lang === 'km' ? `កែ ${item.place.name}` : `Edit ${item.place.name}`}
+            onClick={onEdit}
+            disabled={busy}
+          >
+            <Pencil size={14} aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            label={lang === 'km' ? `លុប ${item.place.name}` : `Remove ${item.place.name}`}
+            onClick={onRemove}
+            disabled={busy}
+            danger
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </IconButton>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function IconButton({
+  label,
+  onClick,
+  disabled,
+  danger,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={cn(
+        'grid h-9 w-9 place-items-center rounded-full text-white/35 transition-colors disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2',
+        danger ? 'hover:text-danger focus-visible:ring-danger' : 'hover:text-white focus-visible:ring-gold-light'
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * The distance between two consecutive stops, derived from their coordinates.
+ *
+ * Renders nothing at all when either place has no location — which is the
+ * honest answer, and the one the previous hardcoded "Walk · 11 min" refused to
+ * give. Presented as approximate because it is a straight line, not a route.
+ */
+function TravelGap({ from, to }: { from: ItineraryPlace; to: ItineraryPlace }) {
+  const { lang } = useLang();
+  if (!hasLocation(from.place) || !hasLocation(to.place)) return null;
+
+  const km = straightLineKm(from.place, to.place);
+  if (km < 0.05) return null;
+
+  // 4.5 km/h is an unhurried city walking pace.
+  const walkable = km <= 1.5;
+  const minutes = Math.max(1, Math.round((km / 4.5) * 60));
+
+  return (
+    <p className="ml-[52px] flex items-center gap-2 py-2 text-xs font-medium text-white/35">
+      <span aria-hidden="true">↓</span>
+      {walkable
+        ? lang === 'km'
+          ? `ដើរ ប្រហែល ${minutes} នាទី`
+          : `Walk · about ${minutes} min`
+        : lang === 'km'
+          ? `ប្រហែល ${km.toFixed(1)} គ.ម ដាច់ដោយផ្ទាល់`
+          : `About ${km.toFixed(1)} km apart`}
+    </p>
+  );
+}
+
+// ── Add a place ──────────────────────────────────────────────────────────────
+
+interface CustomDraft {
+  name: string;
+  description: string;
+  category: ItineraryCategory;
+}
+
+function AddPlaceSheet({
+  targetLabel,
+  places,
+  busy,
+  onAdd,
+  onAddCustom,
+  onClose,
+}: {
+  targetLabel: string;
+  places: CuratedPlace[];
+  busy: boolean;
+  onAdd: (place: CuratedPlace) => void;
+  onAddCustom: (draft: CustomDraft) => void;
+  onClose: () => void;
+}) {
+  const { lang } = useLang();
+  const [filter, setFilter] = useState<PickerFilter>('all');
+  const [query, setQuery] = useState('');
+  const [custom, setCustom] = useState(false);
+  const [draft, setDraft] = useState<CustomDraft>({ name: '', description: '', category: 'other' });
+
+  // The old filters lied: "Stay" filtered to category 'other' (a catch-all) and
+  // "My saved" filtered to source 'editorial' — Domner's own picks, the exact
+  // opposite of anything the traveler saved.
+  const options: { value: PickerFilter; label: { en: string; km: string }; icon: typeof Link2 }[] = [
+    { value: 'all', label: { en: 'All', km: 'ទាំងអស់' }, icon: Link2 },
+    { value: 'stay', label: { en: 'Stay', km: 'ស្នាក់នៅ' }, icon: BedDouble },
+    { value: 'transport', label: { en: 'Transit', km: 'ធ្វើដំណើរ' }, icon: TrainFront },
+    { value: 'mine', label: { en: 'Mine', km: 'របស់ខ្ញុំ' }, icon: Star },
+  ];
+
+  const matching = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return places.filter((place) => {
+      if (needle && !`${place.name} ${place.description}`.toLowerCase().includes(needle)) return false;
+      if (filter === 'stay') return place.category === 'stay';
+      if (filter === 'transport') return place.category === 'transport';
+      if (filter === 'mine') return place.created_by !== null;
+      return true;
+    });
+  }, [places, query, filter]);
+
+  const submitCustom = (event: FormEvent) => {
+    event.preventDefault();
+    if (!draft.name.trim()) return;
+    onAddCustom(draft);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={lang === 'km' ? 'បន្ថែមទីតាំង' : 'Add a place'}
+    >
+      <button
+        type="button"
+        aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <section className="night-card relative max-h-[85vh] w-full overflow-y-auto rounded-b-none rounded-t-[28px] px-4 pb-8 pt-4 sm:mx-auto sm:mb-6 sm:max-w-2xl sm:rounded-[28px]">
+        <div className="mx-auto h-1 w-10 rounded-full bg-white/20" aria-hidden="true" />
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-white">
+            {lang === 'km' ? `បន្ថែមទៅ ${targetLabel}` : `Add to ${targetLabel}`}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+            className="grid h-9 w-9 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        {custom ? (
+          <form onSubmit={submitCustom} className="mt-5 space-y-3">
+            <div>
+              <label htmlFor="custom-name" className="block text-sm font-medium text-white/80">
+                {lang === 'km' ? 'ឈ្មោះទីតាំង' : 'Place name'}
+              </label>
+              <input
+                id="custom-name"
+                autoFocus
+                required
+                maxLength={PLACE_NAME_MAX}
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                placeholder={lang === 'km' ? 'សណ្ឋាគាររបស់យើង' : 'Our hotel'}
+                className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/35 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+              />
+            </div>
+            <div>
+              <label htmlFor="custom-category" className="block text-sm font-medium text-white/80">
+                {lang === 'km' ? 'ប្រភេទ' : 'Kind'}
+              </label>
+              <select
+                id="custom-category"
+                value={draft.category}
+                onChange={(event) =>
+                  setDraft({ ...draft, category: event.target.value as ItineraryCategory })
+                }
+                className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+              >
+                {CATEGORIES.map((category) => (
+                  <option key={category} value={category} className="bg-[#142238]">
+                    {CATEGORY_LABEL[category][lang]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="custom-note" className="block text-sm font-medium text-white/80">
+                {lang === 'km' ? 'កំណត់ចំណាំ (ជាជម្រើស)' : 'Note (optional)'}
+              </label>
+              <textarea
+                id="custom-note"
+                rows={2}
+                maxLength={PLACE_DESCRIPTION_MAX}
+                value={draft.description}
+                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                placeholder={
+                  lang === 'km' ? 'អាសយដ្ឋាន លេខទូរស័ព្ទ ឬលេខកក់…' : 'Address, phone, booking reference…'
+                }
+                className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+              />
+            </div>
+            <p className="text-xs text-white/40">
+              {lang === 'km'
+                ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
+                : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={busy || !draft.name.trim()}
+                className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-btn px-5 text-sm font-semibold text-primary-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+              >
+                {lang === 'km' ? 'បន្ថែម' : 'Add it'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustom(false)}
+                className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              >
+                {lang === 'km' ? 'ត្រឡប់' : 'Back'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+              {options.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  aria-pressed={filter === value}
+                  className={cn(
+                    'flex min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border px-3 py-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light',
+                    filter === value
+                      ? 'border-gold-light/50 bg-gold-light/15 text-gold-bright'
+                      : 'border-white/12 text-white/65 hover:border-white/25 hover:text-white'
+                  )}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {label[lang]}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCustom(true)}
+                className="flex min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border border-dashed border-gold-light/40 px-3 py-3 text-xs font-semibold text-gold-bright transition-colors hover:border-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              >
+                <Plus size={18} aria-hidden="true" />
+                {lang === 'km' ? 'ផ្ទាល់ខ្លួន' : 'Custom'}
+              </button>
+            </div>
+
+            <label className="mt-4 flex items-center gap-3 rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5">
+              <MapPin size={18} className="shrink-0 text-white/40" aria-hidden="true" />
+              <span className="sr-only">{lang === 'km' ? 'ស្វែងរកទីតាំង' : 'Search places'}</span>
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={lang === 'km' ? 'ស្វែងរកទីតាំង' : 'Search places'}
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+              />
+            </label>
+
+            <div className="mt-4 space-y-2">
+              {matching.map((place) => (
+                <button
+                  key={place.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onAdd(place)}
+                  className="flex w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                >
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card bg-gold-light/12 text-gold-light">
+                    <MapPin size={18} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-sm font-semibold text-white">{place.name}</b>
+                    <span className="block truncate text-xs text-white/50">{place.description}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/35">
+                    {CATEGORY_LABEL[place.category]?.[lang] ?? CATEGORY_LABEL.other[lang]}
+                  </span>
+                </button>
+              ))}
+
+              {matching.length === 0 && (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-white/55">
+                    {places.length === 0
+                      ? lang === 'km'
+                        ? 'យើងមិនទាន់បានសរសេរអំពីគោលដៅនេះទេ។'
+                        : "We haven't written this destination up yet."
+                      : lang === 'km'
+                        ? 'រកមិនឃើញទីតាំងត្រូវនឹងការស្វែងរកនេះទេ។'
+                        : 'Nothing matches that search.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCustom(true)}
+                    className="mt-3 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-gold-light/40 px-4 text-sm font-semibold text-gold-bright transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                  >
+                    <Plus size={15} aria-hidden="true" />
+                    {lang === 'km' ? 'បន្ថែមទីតាំងផ្ទាល់ខ្លួន' : 'Add your own place'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </section>
     </div>
-    <div className="mt-4 space-y-1">
-      {places.map((item, index) => <div key={item.id}><PlaceCard item={item} index={index} onDelete={() => onRemove(item.id)} onDragStart={() => onDragStart(item.id)} onDrop={() => onDrop(item.id)} />{index < places.length - 1 && <TravelGap item={item} next={places[index + 1]} />}</div>)}
-      <button type="button" onClick={onAdd} className="flex w-full items-center gap-5 rounded-xl py-4 text-left text-[17px] text-black/25 transition-colors hover:bg-black/[.02]"><span className="text-[31px] font-light leading-none">+</span><span>Add</span></button>
+  );
+}
+
+// ── Edit a place ─────────────────────────────────────────────────────────────
+
+function EditPlaceSheet({
+  item,
+  days,
+  busy,
+  onClose,
+  onSave,
+  onMove,
+}: {
+  item: ItineraryPlace;
+  days: ItineraryDay[];
+  busy: boolean;
+  onClose: () => void;
+  onSave: (patch: {
+    timeStart: string | null;
+    timeEnd: string | null;
+    notes: string | null;
+    category: ItineraryCategory;
+  }) => void;
+  onMove: (dayId: string) => void;
+}) {
+  const { lang } = useLang();
+  const [timeStart, setTimeStart] = useState(item.time_start?.slice(0, 5) ?? '');
+  const [timeEnd, setTimeEnd] = useState(item.time_end?.slice(0, 5) ?? '');
+  const [notes, setNotes] = useState(item.notes ?? '');
+  const [category, setCategory] = useState<ItineraryCategory>(item.category);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-place-title"
+    >
+      <button
+        type="button"
+        aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <section className="night-card relative max-h-[85vh] w-full overflow-y-auto rounded-b-none rounded-t-[28px] px-5 pb-8 pt-4 sm:mx-auto sm:mb-6 sm:max-w-lg sm:rounded-[28px]">
+        <div className="mx-auto h-1 w-10 rounded-full bg-white/20" aria-hidden="true" />
+
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <h2 id="edit-place-title" className="font-display text-xl text-white">
+            {item.place.name}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="edit-start" className="block text-sm font-medium text-white/80">
+              {lang === 'km' ? 'ចាប់ផ្តើម' : 'From'}
+            </label>
+            <input
+              id="edit-start"
+              type="time"
+              value={timeStart}
+              onChange={(event) => setTimeStart(event.target.value)}
+              className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+            />
+          </div>
+          <div>
+            <label htmlFor="edit-end" className="block text-sm font-medium text-white/80">
+              {lang === 'km' ? 'បញ្ចប់' : 'To'}
+            </label>
+            <input
+              id="edit-end"
+              type="time"
+              value={timeEnd}
+              onChange={(event) => setTimeEnd(event.target.value)}
+              className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+            />
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <label htmlFor="edit-category" className="block text-sm font-medium text-white/80">
+            {lang === 'km' ? 'ប្រភេទ' : 'Kind'}
+          </label>
+          <select
+            id="edit-category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value as ItineraryCategory)}
+            className="mt-1.5 min-h-[2.75rem] w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+          >
+            {CATEGORIES.map((value) => (
+              <option key={value} value={value} className="bg-[#142238]">
+                {CATEGORY_LABEL[value][lang]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-3">
+          <label htmlFor="edit-notes" className="block text-sm font-medium text-white/80">
+            {lang === 'km' ? 'កំណត់ចំណាំ' : 'Your note'}
+          </label>
+          <textarea
+            id="edit-notes"
+            rows={3}
+            maxLength={1000}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder={item.place.description}
+            className="mt-1.5 w-full rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+          />
+        </div>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            onSave({
+              timeStart: timeStart || null,
+              timeEnd: timeEnd || null,
+              notes: notes.trim() || null,
+              category,
+            })
+          }
+          className="liquid-glass-accent liquid-press mt-5 inline-flex min-h-[3rem] w-full items-center justify-center rounded-btn px-5 text-sm font-semibold text-primary-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+        >
+          {lang === 'km' ? 'រក្សាទុក' : 'Save'}
+        </button>
+
+        {days.length > 0 && (
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+              {lang === 'km' ? 'ផ្លាស់ទៅថ្ងៃផ្សេង' : 'Move to another day'}
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {days.map((day) => (
+                <button
+                  key={day.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onMove(day.id)}
+                  className="inline-flex min-h-[2.5rem] items-center rounded-btn border border-white/15 px-3.5 text-sm font-medium text-white/75 transition-colors hover:border-gold-light/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                >
+                  {formatDay(day.date, day.day_index, lang)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
     </div>
-  </section>;
+  );
 }
 
-function PlaceCard({ item, index, onDelete, onDragStart, onDrop }: { item: ItineraryPlace; index: number; onDelete: () => void; onDragStart: () => void; onDrop: () => void }) {
-  const timeSlots = ['10:00 - 12:00', '12:00 - 13:30', '14:00 - 15:30', '16:00 - 17:30'];
-  const time = item.time_start && item.time_end ? item.time_start.slice(0, 5) + ' - ' + item.time_end.slice(0, 5) : timeSlots[index % timeSlots.length];
-  const description = item.notes ?? item.place.description;
-  return <article draggable onDragStart={onDragStart} onDragOver={(event) => event.preventDefault()} onDrop={onDrop} className="group flex items-start gap-3">
-    <div className="mt-1 h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-[#dceff3] to-[#b2c8ca]" style={item.place.photo_url ? { backgroundImage: 'url(' + item.place.photo_url + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-      {!item.place.photo_url && <MapPin size={19} className="mx-auto mt-3 text-[#159dca]" />}
+// ── Share ────────────────────────────────────────────────────────────────────
+
+function ShareSheet({
+  isPublic,
+  token,
+  busy,
+  onClose,
+  onToggle,
+}: {
+  isPublic: boolean;
+  token: string;
+  busy: boolean;
+  onClose: () => void;
+  onToggle: (next: boolean) => void;
+}) {
+  const { lang } = useLang();
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  const url = typeof window === 'undefined' ? '' : `${window.location.origin}/share/trip/${token}`;
+
+  const copy = async () => {
+    setCopyFailed(false);
+    try {
+      // navigator.clipboard is undefined outside a secure context. The previous
+      // code optional-chained that away, so on plain HTTP nothing happened and
+      // nothing said so.
+      if (!navigator.clipboard) throw new Error('no clipboard');
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopyFailed(true);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-title"
+    >
+      <button
+        type="button"
+        aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <section className="night-card relative w-full rounded-b-none rounded-t-[28px] px-5 pb-8 pt-4 sm:mx-auto sm:mb-6 sm:max-w-lg sm:rounded-[28px]">
+        <div className="mx-auto h-1 w-10 rounded-full bg-white/20" aria-hidden="true" />
+
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <h2 id="share-title" className="font-display text-xl text-white">
+            {lang === 'km' ? 'ចែករំលែកកម្មវិធីដំណើរ' : 'Share this itinerary'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={lang === 'km' ? 'បិទ' : 'Close'}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        {isPublic ? (
+          <>
+            <p className="mt-2 text-sm leading-relaxed text-white/65">
+              {lang === 'km'
+                ? 'អ្នកណាក៏មានតំណនេះអាចមើលកម្មវិធីដំណើររបស់អ្នកបាន។ ពួកគេមិនអាចកែវាទេ។'
+                : 'Anyone with this link can see your days. They cannot change anything.'}
+            </p>
+            <p className="mt-3 break-all rounded-btn border border-white/10 bg-white/[0.04] px-3.5 py-2.5 font-mono text-xs text-white/70">
+              {url}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={copy}
+                className="liquid-glass-accent liquid-press inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+              >
+                {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                {copied
+                  ? lang === 'km'
+                    ? 'បានចម្លង'
+                    : 'Copied'
+                  : lang === 'km'
+                    ? 'ចម្លងតំណ'
+                    : 'Copy link'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onToggle(false)}
+                className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-danger/60 hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              >
+                {lang === 'km' ? 'ឈប់ចែករំលែក' : 'Stop sharing'}
+              </button>
+            </div>
+            {copyFailed && (
+              <p role="alert" className="mt-2 text-xs text-white/60">
+                {lang === 'km'
+                  ? 'ចម្លងដោយស្វ័យប្រវត្តិមិនបាន។ សូមចម្លងតំណខាងលើដោយដៃ។'
+                  : 'Automatic copy is unavailable here — select the link above and copy it.'}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-sm leading-relaxed text-white/65">
+              {lang === 'km'
+                ? 'បង្កើតតំណដែលអាចមើលបាន ដើម្បីចែករំលែកជាមួយអ្នករួមដំណើរ។ អ្នកអាចបិទវាពេលណាក៏បាន។'
+                : 'Create a read-only link to send to whoever you are travelling with. You can turn it off at any time.'}
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onToggle(true)}
+              className="liquid-glass-accent liquid-press mt-4 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-btn px-5 text-sm font-semibold text-primary-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+            >
+              <Share2 size={16} aria-hidden="true" />
+              {lang === 'km' ? 'បង្កើតតំណ' : 'Create a link'}
+            </button>
+          </>
+        )}
+      </section>
     </div>
-    <div className="min-w-0 flex-1">
-      <span className="text-sm font-semibold text-[#73ae8e]">{labels[item.category] ?? 'Place'}</span>
-      <div className="flex items-start gap-2"><h3 className="text-[18px] font-bold leading-tight">{index + 1}.{item.place.name}</h3><button aria-label="Edit place" className="ml-auto shrink-0 text-black/30">⌕</button></div>
-      <div className="mt-2 rounded-2xl bg-[#f8f8f8] px-3 py-2.5"><p className="font-bold text-black/65">{time}</p><p className="mt-1 line-clamp-2 text-[15px] leading-snug text-black/60">{description}</p><span className="text-sm text-black/25">Show more</span></div>
-      <button aria-label="Remove place" onClick={onDelete} className="mt-1 p-1 text-black/25 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"><Trash2 size={15} /></button>
+  );
+}
+
+// ── Chrome ───────────────────────────────────────────────────────────────────
+
+function EditorSkeleton() {
+  return (
+    <div className="night-canvas has-tabbar relative min-h-screen" aria-busy="true">
+      <div className="night-stars" aria-hidden="true" />
+      <div className="relative h-[38svh] min-h-[240px] animate-pulse bg-white/[0.04] motion-reduce:animate-none" />
+      <div className="relative z-20 mx-auto -mt-8 max-w-3xl rounded-t-[28px] border-t border-white/10 bg-primary-deep/95 px-5 pt-8 sm:px-8">
+        <div className="h-8 w-2/3 animate-pulse rounded-btn bg-white/[0.06] motion-reduce:animate-none" />
+        <div className="mt-3 h-4 w-1/3 animate-pulse rounded-btn bg-white/[0.05] motion-reduce:animate-none" />
+        <div className="mt-8 space-y-3">
+          {[0, 1, 2].map((key) => (
+            <div
+              key={key}
+              className="h-24 animate-pulse rounded-card border border-white/8 bg-white/[0.03] motion-reduce:animate-none"
+            />
+          ))}
+        </div>
+      </div>
     </div>
-  </article>;
+  );
 }
 
-function TravelGap({ item, next }: { item: ItineraryPlace; next: ItineraryPlace }) {
-  return <div className="ml-[60px] flex items-center gap-2 py-3 text-xs font-semibold text-[#9aaab1]"><span>♧</span><span>{item.category === 'transport' || next.category === 'transport' ? 'Transit' : 'Walk'} · 11 min</span><span>›</span></div>;
+function formatDay(value: string | null, index: number, lang: 'en' | 'km'): string {
+  if (!value) return lang === 'km' ? `ថ្ងៃទី ${index}` : `Day ${index}`;
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.toLocaleDateString(lang === 'km' ? 'km-KH' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'short',
+    timeZone: 'UTC',
+  });
 }
 
-function AddPlaceSheet({ targetLabel, filter, setFilter, query, setQuery, places, onAdd, onClose, onCustom }: { targetLabel: string; filter: PickerFilter; setFilter: (value: PickerFilter) => void; query: string; setQuery: (value: string) => void; places: CuratedPlace[]; onAdd: (place: CuratedPlace) => void; onClose: () => void; onCustom: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-end bg-black/25 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label="Add a place"><button aria-label="Close add place panel" className="absolute inset-0 cursor-default" onClick={onClose} /><section className="relative max-h-[82vh] w-full overflow-y-auto rounded-t-[28px] bg-[#fafafa] px-4 pb-8 pt-4 shadow-[0_-16px_40px_rgba(18,26,32,.18)] sm:mx-auto sm:mb-6 sm:max-w-2xl sm:rounded-[28px]"><div className="mx-auto h-1 w-10 rounded-full bg-black/20" /><div className="mt-4 flex items-center justify-between"><span className="rounded-full bg-white px-4 py-2 text-sm font-semibold shadow-sm">Add to {targetLabel} <ChevronDown size={15} className="ml-1 inline" /></span><button onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full bg-white text-black/50"><X size={18} /></button></div><div className="mt-4 flex gap-2 overflow-x-auto pb-1">{pickerOptions.map(({ value, label, icon: Icon, tone }) => <button key={value} onClick={() => value === 'custom' ? onCustom() : setFilter(value)} className={filter === value ? 'flex min-w-[92px] shrink-0 flex-col items-center gap-1 rounded-2xl border-2 border-[#2eafd9] bg-white px-3 py-3 text-xs font-semibold' : 'flex min-w-[92px] shrink-0 flex-col items-center gap-1 rounded-2xl border border-black/[.06] ' + tone + ' px-3 py-3 text-xs font-semibold text-black/70'}><Icon size={20} className={value === 'stay' ? 'text-blue-500' : value === 'transport' ? 'text-purple-500' : 'text-black/65'} />{label}{(value === 'stay' || value === 'transport') && <span className="h-1.5 w-1.5 rounded-full bg-[#f3b624]" />}</button>)}</div><label className="mt-4 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/[.03]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#f6f8d9]"><MapPin size={21} /></span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places" className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-black/30" /></label><div className="mt-4 space-y-2">{places.map((place) => <button key={place.id} onClick={() => onAdd(place)} className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-black/[.04] transition hover:ring-[#2eafd9]"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf7fa] text-[#159dca]"><MapPin size={18} /></span><span className="min-w-0 flex-1"><b className="block truncate">{place.name}</b><span className="block truncate text-sm text-black/45">{place.description}</span></span><span className="shrink-0 text-xs text-black/35">{labels[place.category] ?? 'Place'}</span></button>)}{!places.length && <p className="py-8 text-center text-sm text-black/40">No places found for this search yet.</p>}</div></section></div>;
+function tripDates(start: string | null, end: string | null, lang: 'en' | 'km'): string {
+  if (!start) return lang === 'km' ? 'មិនទាន់កំណត់ថ្ងៃ' : 'Dates not set';
+  const locale = lang === 'km' ? 'km-KH' : 'en-GB';
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', timeZone: 'UTC' };
+  const from = new Date(`${start}T00:00:00Z`).toLocaleDateString(locale, options);
+  if (!end || end === start) return from;
+  const to = new Date(`${end}T00:00:00Z`).toLocaleDateString(locale, options);
+  return `${from} → ${to}`;
 }
 
-function formatDay(value: string | null, index: number) {
-  if (!value) return 'Day ' + index;
-  const date = new Date(value + 'T00:00:00Z');
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return month + '.' + day + ' ' + date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-}
-
-function tripDates(start: string | null, end: string | null, dayCount: number) {
-  if (!start) return String(dayCount || 1) + ' day';
-  const from = formatDay(start, 1).slice(0, 5);
-  const to = end ? formatDay(end, dayCount || 1).slice(0, 5) : from;
-  return from + '-' + to;
-}
-
-function RouteMap({ places, destination }: { places: ItineraryPlace[]; destination: string }) {
+/**
+ * The day's stops on a map, in order.
+ *
+ * Only places that have coordinates are plotted — a hand-added place stored at
+ * 0,0 would otherwise drop a pin in the Gulf of Guinea and drag the bounds with
+ * it.
+ */
+function RouteMap({
+  places,
+  destination,
+  lang,
+}: {
+  places: ItineraryPlace[];
+  destination: string;
+  lang: 'en' | 'km';
+}) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<import('leaflet').Map | null>(null);
+
+  const located = useMemo(() => places.filter((item) => hasLocation(item.place)), [places]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const L = (await import('leaflet')).default;
       if (cancelled || !node.current) return;
       map.current?.remove();
-      const first = places[0]?.place;
-      const instance = L.map(node.current, { zoomControl: false, scrollWheelZoom: false }).setView(first ? [Number(first.lat), Number(first.lng)] : [13.7563, 100.5018], first ? 12 : 4);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 18 }).addTo(instance);
+
+      const first = located[0]?.place;
+      const instance = L.map(node.current, { zoomControl: false, scrollWheelZoom: false }).setView(
+        first ? [Number(first.lat), Number(first.lng)] : [13.7563, 100.5018],
+        first ? 12 : 4
+      );
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        subdomains: 'abcd',
+        maxZoom: 18,
+      }).addTo(instance);
+
       const points: [number, number][] = [];
-      places.forEach((item, index) => {
+      located.forEach((item, index) => {
         const point: [number, number] = [Number(item.place.lat), Number(item.place.lng)];
         points.push(point);
-        L.marker(point, { icon: L.divIcon({ className: 'itinerary-pin', html: '<span style="display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:#111;color:#fff;border:3px solid #fff;font:700 12px sans-serif">' + (index + 1) + '</span>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(instance).bindTooltip(item.place.name);
+        L.marker(point, {
+          icon: L.divIcon({
+            className: 'itinerary-pin',
+            html: `<span style="display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:#0d1826;color:#e8c887;border:2px solid #e8c887;font:700 12px sans-serif">${index + 1}</span>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+          }),
+        })
+          .addTo(instance)
+          .bindTooltip(item.place.name);
       });
-      if (points.length > 1) { L.polyline(points, { color: '#22a8d9', weight: 4, opacity: 0.8 }).addTo(instance); instance.fitBounds(points, { padding: [30, 30] }); }
+
+      if (points.length > 1) {
+        L.polyline(points, { color: '#e8c887', weight: 3, opacity: 0.75 }).addTo(instance);
+        instance.fitBounds(points, { padding: [34, 34] });
+      }
       map.current = instance;
     })();
-    return () => { cancelled = true; map.current?.remove(); map.current = null; };
-  }, [places, destination]);
-  return <div ref={node} className="h-full w-full" aria-label={'Map for ' + destination} />;
+
+    return () => {
+      cancelled = true;
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [located]);
+
+  return (
+    <div
+      ref={node}
+      className="h-full w-full"
+      role="img"
+      aria-label={
+        lang === 'km' ? `ផែនទីសម្រាប់ ${destination}` : `Map of your stops in ${destination}`
+      }
+    />
+  );
 }
