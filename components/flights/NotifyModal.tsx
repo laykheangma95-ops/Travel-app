@@ -25,8 +25,10 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
   const [prefs, setPrefs] = useState<FlightAlertPreferences>(defaultAlertPreferences);
   const { saving, registerAlerts } = useNotifications();
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const handleSave = async () => {
+    setFailed(false);
     const ok = await registerAlerts(flightNumber, date, prefs);
     if (ok) {
       setDone(true);
@@ -34,7 +36,13 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
         setDone(false);
         onClose();
       }, 1400);
+      return;
     }
+    // There was no else branch here. If push permission was denied, push was
+    // unconfigured, or the request failed, the button simply stopped spinning
+    // and nothing was said — leaving the traveller reasonably certain we would
+    // tell them about the gate change.
+    setFailed(true);
   };
 
   return (
@@ -104,6 +112,16 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
             </div>
           </div>
 
+          {failed && (
+            <p
+              role="alert"
+              className="rounded-btn border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-ink-secondary"
+            >
+              We could not set these alerts. Check that notifications are allowed for Domner in your
+              browser settings, then try again — or track this flight on the flight page instead.
+            </p>
+          )}
+
           <button
             type="button"
             onClick={handleSave}
@@ -111,7 +129,7 @@ export function NotifyModal({ open, onClose, flightNumber, date }: NotifyModalPr
             className="liquid-glass-accent liquid-sheen inline-flex w-full items-center justify-center gap-2 rounded-btn px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <BellRing size={16} />}
-            Set Alert
+            {failed ? 'Try again' : 'Set Alert'}
           </button>
         </div>
       )}

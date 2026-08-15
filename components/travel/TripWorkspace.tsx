@@ -50,7 +50,7 @@ function isWet(code: number): boolean {
 
 export function TripWorkspace({ tripId }: { tripId: string }) {
   const { lang } = useLang();
-  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'offline' | 'ready'>('loading');
   const [trip, setTrip] = useState<TripSummary | null>(null);
   const [weather, setWeather] = useState<Weather | null>(null);
 
@@ -62,7 +62,8 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           if (!cancelled) setStatus('guest');
           return null;
         }
-        return res.ok ? res.json() : null;
+        if (!res.ok) throw new Error('unavailable');
+        return res.json();
       })
       .then((body: { trips?: TripSummary[] } | null) => {
         if (cancelled || !body) return;
@@ -71,7 +72,10 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
         setStatus(found ? 'ready' : 'missing');
       })
       .catch(() => {
-        if (!cancelled) setStatus('missing');
+        // Not 'missing'. A dropped connection used to render "It may have been
+        // deleted, or it belongs to another account" — an accusation, at the
+        // moment a traveler is most likely to be offline.
+        if (!cancelled) setStatus('offline');
       });
     return () => {
       cancelled = true;
@@ -117,7 +121,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     );
   }
 
-  if (status === 'guest' || status === 'missing') {
+  if (status === 'guest' || status === 'missing' || status === 'offline') {
     return (
       <Shell>
         <div className="night-card p-8 text-center">
@@ -126,18 +130,26 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               ? lang === 'km'
                 ? 'ចូលគណនីដើម្បីមើលដំណើរនេះ'
                 : 'Sign in to open this trip'
-              : lang === 'km'
-                ? 'រកមិនឃើញដំណើរនេះទេ'
-                : "We can't find that trip"}
+              : status === 'offline'
+                ? lang === 'km'
+                  ? 'មិនអាចទាញយកដំណើរនេះបានទេ'
+                  : "We couldn't load this trip"
+                : lang === 'km'
+                  ? 'រកមិនឃើញដំណើរនេះទេ'
+                  : "We can't find that trip"}
           </h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/65">
             {status === 'guest'
               ? lang === 'km'
                 ? 'ដំណើរត្រូវបានរក្សាទុកក្នុងគណនីរបស់អ្នក។'
                 : 'Trips are saved to your account.'
-              : lang === 'km'
-                ? 'វាអាចត្រូវបានលុប ឬជាកម្មសិទ្ធិគណនីផ្សេង។'
-                : 'It may have been deleted, or it belongs to another account.'}
+              : status === 'offline'
+                ? lang === 'km'
+                  ? 'ដំណើររបស់អ្នកនៅតែមាន។ សូមព្យាយាមម្ដងទៀតពេលមានអ៊ីនធឺណិត។'
+                  : 'Your trip is still there — we just cannot reach it right now.'
+                : lang === 'km'
+                  ? 'វាអាចត្រូវបានលុប ឬជាកម្មសិទ្ធិគណនីផ្សេង។'
+                  : 'It may have been deleted, or it belongs to another account.'}
           </p>
           {status === 'guest' ? (
             <SignInLink
@@ -238,7 +250,9 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               : "Domner doesn't book hotels yet. You can note where you're staying in your itinerary."
           }
           actionLabel={lang === 'km' ? 'បើកកម្មវិធី' : 'Open itinerary'}
-          actionHref="#itinerary"
+          // Was "#itinerary", which scrolled a few hundred pixels down the same
+          // page to another gap card rather than opening anything.
+          actionHref={`/trips/${trip.id}/itinerary`}
         />
 
         <Section

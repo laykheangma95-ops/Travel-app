@@ -78,6 +78,8 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [destinationOpen, setDestinationOpen] = useState(false);
+  /** Which suggestion the arrow keys are on. -1 means none. */
+  const [highlighted, setHighlighted] = useState(-1);
 
   // Whether the traveler has taken ownership of the title. Once they have, a
   // later change of destination must not overwrite what they typed.
@@ -116,6 +118,41 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
     const query = draft.destination.trim().toLocaleLowerCase();
     return suggestions.filter((name) => !query || name.toLocaleLowerCase().includes(query)).slice(0, 8);
   }, [draft.destination, suggestions]);
+
+  /** Arrow keys walk the list, Enter takes the highlighted one, Escape closes. */
+  function onDestinationKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      setDestinationOpen(false);
+      setHighlighted(-1);
+      return;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!destinationOpen) {
+        setDestinationOpen(true);
+        return;
+      }
+      if (matchingDestinations.length === 0) return;
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setHighlighted((current) => {
+        const next = current + step;
+        if (next < 0) return matchingDestinations.length - 1;
+        if (next >= matchingDestinations.length) return 0;
+        return next;
+      });
+      return;
+    }
+
+    // Enter only steals the keypress when a suggestion is actually highlighted;
+    // otherwise it submits the form, which is what it should do.
+    if (event.key === 'Enter' && destinationOpen && highlighted >= 0) {
+      event.preventDefault();
+      onDestination(matchingDestinations[highlighted]);
+      setDestinationOpen(false);
+      setHighlighted(-1);
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -226,6 +263,10 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
         </header>
 
         <form onSubmit={onSubmit} noValidate className="night-card mt-6 space-y-5 p-5 sm:p-6">
+          {/* The combobox carried the right ARIA — role, aria-expanded,
+              aria-controls, a listbox of options — but had no key handling and
+              no aria-activedescendant, so a keyboard or screen-reader user was
+              told a listbox was open and could not reach it. */}
           <div className="relative">
             <Input
               dark
@@ -238,43 +279,58 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
               aria-autocomplete="list"
               aria-expanded={destinationOpen}
               aria-controls="trip-destination-options"
+              aria-activedescendant={
+                destinationOpen && highlighted >= 0
+                  ? `trip-destination-option-${highlighted}`
+                  : undefined
+              }
               value={draft.destination}
               error={errors.destination}
               onFocus={() => setDestinationOpen(true)}
               onBlur={() => window.setTimeout(() => setDestinationOpen(false), 120)}
+              onKeyDown={onDestinationKeyDown}
               onChange={(event) => {
                 onDestination(event.target.value);
                 setDestinationOpen(true);
+                setHighlighted(-1);
               }}
             />
             {destinationOpen && (
-              <div
+              <ul
                 id="trip-destination-options"
                 role="listbox"
+                aria-label={lang === 'km' ? 'ប្រទេស' : 'Countries'}
                 className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-btn border border-white/15 bg-[#142238] p-1 shadow-2xl"
               >
-                {matchingDestinations.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    role="option"
-                    aria-selected={draft.destination === name}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      onDestination(name);
-                      setDestinationOpen(false);
-                    }}
-                    className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                  >
-                    {name}
-                  </button>
+                {matchingDestinations.map((name, index) => (
+                  <li key={name}>
+                    <button
+                      type="button"
+                      id={`trip-destination-option-${index}`}
+                      role="option"
+                      aria-selected={index === highlighted}
+                      onMouseEnter={() => setHighlighted(index)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        onDestination(name);
+                        setDestinationOpen(false);
+                        setHighlighted(-1);
+                      }}
+                      className={cn(
+                        'block min-h-11 w-full rounded-lg px-3 text-left text-sm transition-colors',
+                        index === highlighted ? 'bg-white/12 text-white' : 'text-white/80'
+                      )}
+                    >
+                      {name}
+                    </button>
+                  </li>
                 ))}
                 {!matchingDestinations.length && (
-                  <p className="px-3 py-3 text-sm text-white/55">
+                  <li className="px-3 py-3 text-sm text-white/55">
                     {lang === 'km' ? 'រកមិនឃើញប្រទេសនេះទេ។' : 'No country found.'}
-                  </p>
+                  </li>
                 )}
-              </div>
+              </ul>
             )}
           </div>
 

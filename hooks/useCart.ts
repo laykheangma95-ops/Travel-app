@@ -3,6 +3,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CartItem } from '@/types';
+// The server's cap, imported rather than repeated, so the browser can never
+// build a basket lib/pricing.ts will refuse to price.
+import { MAX_QUANTITY_PER_PLAN } from '@/lib/pricing';
 
 interface CartState {
   items: CartItem[];
@@ -11,6 +14,7 @@ interface CartState {
   discountPct: number;
   addItem: (item: CartItem) => void;
   removeItem: (planId: string) => void;
+  setQuantity: (planId: string, quantity: number) => void;
   clear: () => void;
   setReferralCode: (code: string) => void;
   applyDiscount: (code: string) => boolean;
@@ -40,7 +44,12 @@ export const useCart = create<CartState>()(
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.planId === item.planId ? { ...i, quantity: i.quantity + 1 } : i
+                // Capped here as well as on the server. Without this the cart
+                // happily accepted an eleventh unit and the customer only
+                // discovered the catalogue limit after choosing how to pay.
+                i.planId === item.planId
+                  ? { ...i, quantity: Math.min(MAX_QUANTITY_PER_PLAN, i.quantity + 1) }
+                  : i
               ),
             };
           }
@@ -49,6 +58,16 @@ export const useCart = create<CartState>()(
 
       removeItem: (planId) =>
         set((state) => ({ items: state.items.filter((i) => i.planId !== planId) })),
+
+      /** Zero removes the line, so the stepper's minus is also the delete. */
+      setQuantity: (planId, quantity) =>
+        set((state) => {
+          const next = Math.min(MAX_QUANTITY_PER_PLAN, Math.max(0, Math.trunc(quantity)));
+          if (next === 0) return { items: state.items.filter((i) => i.planId !== planId) };
+          return {
+            items: state.items.map((i) => (i.planId === planId ? { ...i, quantity: next } : i)),
+          };
+        }),
 
       clear: () => set({ items: [], discountCode: null, discountPct: 0 }),
 

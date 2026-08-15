@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Compass,
   FileText,
+  HandCoins,
   LifeBuoy,
   ListChecks,
   LogOut,
@@ -42,6 +43,8 @@ interface Row {
   hint?: { en: string; km: string };
   /** Only shown to a signed-in traveler. */
   private?: boolean;
+  /** Opens off-site, so it renders as an anchor rather than a route link. */
+  external?: boolean;
 }
 
 const GROUPS: { title: { en: string; km: string }; rows: Row[] }[] = [
@@ -109,7 +112,22 @@ const GROUPS: { title: { en: string; km: string }; rows: Row[] }[] = [
         label: { en: 'Emergency', km: 'បន្ទាន់' },
         hint: { en: 'Works with no connection', km: 'ដំណើរការដោយគ្មានអ៊ីនធឺណិត' },
       },
-      { href: '/affiliate', icon: LifeBuoy, label: { en: 'Get help', km: 'ទទួលជំនួយ' } },
+      {
+        // Was '/affiliate' — a page headed "Earn 30% on every eSIM you refer".
+        // Someone whose eSIM will not activate taps Get help and was invited to
+        // become a reseller.
+        href: 'https://t.me/domnerapp',
+        icon: LifeBuoy,
+        label: { en: 'Get help', km: 'ទទួលជំនួយ' },
+        hint: { en: 'Message us on Telegram', km: 'សរសេរមកយើងតាម Telegram' },
+        external: true,
+      },
+      {
+        href: '/affiliate',
+        icon: HandCoins,
+        label: { en: 'Refer and earn', km: 'ណែនាំ និងរកចំណូល' },
+        hint: { en: 'Commission on every eSIM you refer', km: 'កម្រៃលើ eSIM នីមួយៗដែលអ្នកណែនាំ' },
+      },
       {
         href: '/settings',
         icon: Settings,
@@ -221,22 +239,38 @@ export default function YouPage() {
               <ul className="mt-2.5 overflow-hidden rounded-card border border-white/10 bg-white/[0.03]">
                 {rows.map((row) => (
                   <li key={row.href} className="border-b border-white/8 last:border-b-0">
-                    <Link
-                      href={row.href}
-                      className="flex min-h-[3.5rem] items-center gap-3 px-4 py-3 transition-colors duration-200 ease-smooth hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-light"
-                    >
-                      <row.icon size={18} className="shrink-0 text-white/55" aria-hidden="true" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-white">{row.label[lang]}</span>
-                        {row.hint && (
-                          <span className="block truncate text-xs text-white/50">{row.hint[lang]}</span>
-                        )}
-                      </span>
-                      {row.href === '/updates' && unread > 0 && (
-                        <StatusBadge tone="urgent">{unread > 9 ? '9+' : unread}</StatusBadge>
-                      )}
-                      <ChevronRight size={16} className="shrink-0 text-white/35" aria-hidden="true" />
-                    </Link>
+                    {(() => {
+                      const inner = (
+                        <>
+                          <row.icon size={18} className="shrink-0 text-white/55" aria-hidden="true" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-white">
+                              {row.label[lang]}
+                            </span>
+                            {row.hint && (
+                              <span className="block truncate text-xs text-white/50">
+                                {row.hint[lang]}
+                              </span>
+                            )}
+                          </span>
+                          {row.href === '/updates' && unread > 0 && (
+                            <StatusBadge tone="urgent">{unread > 9 ? '9+' : unread}</StatusBadge>
+                          )}
+                          <ChevronRight size={16} className="shrink-0 text-white/35" aria-hidden="true" />
+                        </>
+                      );
+                      const className =
+                        'flex min-h-[3.5rem] items-center gap-3 px-4 py-3 transition-colors duration-200 ease-smooth hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-light';
+                      return row.external ? (
+                        <a href={row.href} target="_blank" rel="noopener noreferrer" className={className}>
+                          {inner}
+                        </a>
+                      ) : (
+                        <Link href={row.href} className={className}>
+                          {inner}
+                        </Link>
+                      );
+                    })()}
                   </li>
                 ))}
               </ul>

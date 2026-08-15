@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Trash2, ShoppingCart, Tag } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, Tag } from 'lucide-react';
+import { MAX_QUANTITY_PER_PLAN } from '@/lib/pricing';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -64,16 +65,43 @@ export default function CartPage() {
                       {item.quantity > 1 && ` · ×${item.quantity}`}
                     </p>
                   </div>
-                  <p className="font-display font-bold text-white font-mono">
+                  {/* The cart showed "×2" and offered no way to change it —
+                      only remove and start again. */}
+                  <div className="flex items-center gap-1 rounded-btn border border-white/12">
+                    <button
+                      type="button"
+                      onClick={() => cart.setQuantity(item.planId, item.quantity - 1)}
+                      aria-label={`One fewer ${item.countryName} ${item.planName}`}
+                      className="grid h-10 w-10 place-items-center rounded-btn text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                    >
+                      <Minus size={15} aria-hidden="true" />
+                    </button>
+                    <span
+                      className="min-w-[1.5rem] text-center font-mono text-sm tabular-nums text-white"
+                      aria-live="polite"
+                    >
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => cart.setQuantity(item.planId, item.quantity + 1)}
+                      disabled={item.quantity >= MAX_QUANTITY_PER_PLAN}
+                      aria-label={`One more ${item.countryName} ${item.planName}`}
+                      className="grid h-10 w-10 place-items-center rounded-btn text-white/70 transition-colors hover:text-white disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className="w-20 text-right font-mono font-bold text-white">
                     {formatUsd(item.priceUsd * item.quantity)}
                   </p>
                   <button
                     type="button"
                     onClick={() => cart.removeItem(item.planId)}
                     aria-label={`Remove ${item.countryName} ${item.planName} from cart`}
-                    className="rounded-btn p-2 text-white/50 transition-colors hover:bg-danger/15 hover:text-red-300"
+                    className="rounded-btn p-2 text-white/50 transition-colors hover:bg-danger/15 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={18} aria-hidden="true" />
                   </button>
                 </div>
               ))}

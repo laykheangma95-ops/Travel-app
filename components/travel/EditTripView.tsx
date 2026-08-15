@@ -29,7 +29,7 @@ function toDraft(trip: TripSummary): TripDraft {
 
 export function EditTripView({ tripId }: { tripId: string }) {
   const { lang } = useLang();
-  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'guest' | 'missing' | 'offline' | 'ready'>('loading');
   const [draft, setDraft] = useState<TripDraft | null>(null);
 
   useEffect(() => {
@@ -40,7 +40,8 @@ export function EditTripView({ tripId }: { tripId: string }) {
           if (!cancelled) setStatus('guest');
           return null;
         }
-        return response.ok ? response.json() : null;
+        if (!response.ok) throw new Error('unavailable');
+        return response.json();
       })
       .then((body: { trips?: TripSummary[] } | null) => {
         if (cancelled || !body) return;
@@ -49,7 +50,8 @@ export function EditTripView({ tripId }: { tripId: string }) {
         setStatus(found ? 'ready' : 'missing');
       })
       .catch(() => {
-        if (!cancelled) setStatus('missing');
+        // A dropped connection is not a deleted trip.
+        if (!cancelled) setStatus('offline');
       });
     return () => {
       cancelled = true;
@@ -86,7 +88,13 @@ export function EditTripView({ tripId }: { tripId: string }) {
           <div className="night-card p-8 text-center">
             <Map size={22} className="mx-auto text-white/45" aria-hidden="true" />
             <h1 className="mt-3 font-display text-xl text-white">
-              {lang === 'km' ? 'រកដំណើរនេះមិនឃើញ' : 'That trip could not be found'}
+              {status === 'offline'
+                ? lang === 'km'
+                  ? 'មិនអាចទាញយកដំណើរនេះបានទេ'
+                  : "We couldn't load this trip"
+                : lang === 'km'
+                  ? 'រកដំណើរនេះមិនឃើញ'
+                  : 'That trip could not be found'}
             </h1>
             <Link
               href="/trips"

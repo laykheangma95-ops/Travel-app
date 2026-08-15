@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -366,6 +367,25 @@ export default function CheckoutPage() {
                 </button>
                 <p className="mt-3 text-center text-xs text-white/50">
                   Secure payment · QR delivered within 15 minutes
+                </p>
+                {/* All three of these pages existed and were reachable only
+                    from the footer and the You page. For a prepaid digital
+                    good with a country-restricted refund position, they belong
+                    beside the pay button. */}
+                <p className="mt-2 text-center text-xs leading-relaxed text-white/40">
+                  By paying you agree to our{' '}
+                  <Link href="/terms" className="underline hover:text-white/70">
+                    terms
+                  </Link>
+                  ,{' '}
+                  <Link href="/refunds" className="underline hover:text-white/70">
+                    refund policy
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" className="underline hover:text-white/70">
+                    privacy notice
+                  </Link>
+                  .
                 </p>
               </div>
             </div>
