@@ -161,7 +161,17 @@ export default function CheckoutPage() {
         );
       }
 
-      cart.clear();
+      // The cart is NOT cleared here.
+      //
+      // It used to be, on this line — several lines before the ABA form-post
+      // and the Stripe redirect below. Anyone who abandoned at the gateway,
+      // whose card was declined, or who simply pressed back came home to an
+      // empty cart and had to rebuild the whole order. Creating a payment
+      // intent is not the same event as being paid.
+      //
+      // Every route out of here — in-page, redirect and form-post alike — ends
+      // at /order-confirmation/<orderNumber>, which reads the real status and
+      // clears the cart once, and only once, the order is actually paid.
 
       // Hand the deep link to the confirmation page. Kept in sessionStorage
       // rather than the URL so the one-time token never lands in browser
