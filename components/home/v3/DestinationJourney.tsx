@@ -279,6 +279,23 @@ export function DestinationJourney({
             {t('v3.trust.policy')}
           </Link>
         </div>
+
+        {/* The other thing you can do from here.
+            A guide used to end on a single call to action — buy an eSIM — while
+            /trips/new was linked from exactly one button in the entire product,
+            on /trips itself. Reading about a place and deciding to go are the
+            same moment, so the trip starts here, with the destination already
+            filled in. */}
+        <div className="v3-trust">
+          <p className="v3-card-label">{t('v3.planTrip.title')}</p>
+          <p>{t('v3.planTrip.body')}</p>
+          <Link
+            href={`/trips/new?destination=${encodeURIComponent(bi(guide.country))}`}
+            className="v3-btn v3-btn-ghost"
+          >
+            {t('v3.planTrip.cta')}
+          </Link>
+        </div>
       </Chapter>
 
       {/* ── Everything else, folded ── */}
@@ -658,11 +675,21 @@ export function UnwrittenDestination({
           <strong>{t('v3.noGuideTitle')}</strong>
         </p>
         <p className="v3-prose">{t('v3.noGuideBody')}</p>
-        {esimSlug && (
-          <Link href={`/esim/${esimSlug}`} className="v3-btn v3-btn-primary">
-            {t('v3.noGuideCta')}
+        <div className="v3-cta-row">
+          {esimSlug && (
+            <Link href={`/esim/${esimSlug}`} className="v3-btn v3-btn-primary">
+              {t('v3.noGuideCta')}
+            </Link>
+          )}
+          {/* Not writing a guide for somewhere is no reason to refuse to help
+              someone plan a trip there. */}
+          <Link
+            href={`/trips/new?destination=${encodeURIComponent(name)}`}
+            className="v3-btn v3-btn-ghost"
+          >
+            {t('v3.planTrip.cta')}
           </Link>
-        )}
+        </div>
       </section>
     </div>
   );

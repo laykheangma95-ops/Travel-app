@@ -145,6 +145,12 @@ const dicts = {
     'v3.noGuideBody':
       "We write each destination properly or not at all, and this one isn't ready. If we sell an eSIM for it, you can still get connected today.",
     'v3.noGuideCta': 'See eSIM plans',
+    // The path from reading about a place to actually planning to go. Until
+    // this existed, /trips/new was linked from exactly one button in the whole
+    // product, and a destination guide's only call to action was to buy.
+    'v3.planTrip.title': 'Going here?',
+    'v3.planTrip.body': 'Start a trip and Domner keeps track of the rest — flight, stay, eSIM and the days in between.',
+    'v3.planTrip.cta': 'Plan a trip here',
     // Chapters
     'v3.ch1.eyebrow': 'Arrival',
     'v3.ch2.eyebrow': 'The basics',
@@ -361,6 +367,9 @@ const dicts = {
     'v3.noGuideBody':
       'យើងសរសេរគោលដៅនីមួយៗឲ្យបានត្រឹមត្រូវ ឬមិនសរសេរទាល់តែសោះ ហើយគោលដៅនេះមិនទាន់រួចរាល់។ ប្រសិនបើយើងលក់ eSIM សម្រាប់ទីនោះ អ្នកនៅតែអាចតភ្ជាប់បានថ្ងៃនេះ។',
     'v3.noGuideCta': 'មើលគម្រោង eSIM',
+    'v3.planTrip.title': 'នឹងទៅទីនេះមែនទេ?',
+    'v3.planTrip.body': 'ចាប់ផ្តើមដំណើរមួយ ហើយ Domner នឹងតាមដានផ្នែកដែលនៅសល់ — ជើងហោះហើរ កន្លែងស្នាក់នៅ eSIM និងថ្ងៃនានា។',
+    'v3.planTrip.cta': 'រៀបចំដំណើរទៅទីនេះ',
     // Chapters
     'v3.ch1.eyebrow': 'ការមកដល់',
     'v3.ch2.eyebrow': 'មូលដ្ឋានគ្រឹះ',

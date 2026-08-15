@@ -1406,6 +1406,29 @@ body[data-v3='first'] button.fixed.bottom-5.right-5 {
   filter: brightness(1.05);
   transform: translateY(-1px);
 }
+.v3-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+/* The secondary action on a guide — "plan a trip here" sits beside the eSIM
+   purchase, and only one of the two should carry the gold. */
+.v3-btn-ghost {
+  color: #f2e4c2;
+  border: 1px solid rgba(230, 203, 139, 0.42);
+  background: rgba(230, 203, 139, 0.08);
+}
+.v3-btn-ghost:hover {
+  border-color: rgba(230, 203, 139, 0.75);
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .v3-btn-primary:hover,
+  .v3-btn-ghost:hover {
+    transform: none;
+  }
+}
 .v3-rec-days {
   display: flex;
   align-items: center;

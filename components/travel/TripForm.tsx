@@ -42,16 +42,36 @@ interface TripFormProps {
   /** Absent when creating. Present when editing an existing trip. */
   tripId?: string;
   initial?: TripDraft;
+  /**
+   * A destination handed over by Explore or a destination guide, so someone who
+   * has just finished reading about a place does not have to type its name
+   * again. Only matched against the known country list — an unrecognised value
+   * is ignored rather than trusted into the form.
+   */
+  presetDestination?: string | null;
 }
 
 type Errors = Partial<Record<TripField, string>>;
 
-export function TripForm({ tripId, initial }: TripFormProps) {
+/** The country list is the vocabulary; anything else is discarded. */
+function knownCountry(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const needle = value.trim().toLocaleLowerCase();
+  if (!needle) return null;
+  return countries.find((country) => country.name.toLocaleLowerCase() === needle)?.name ?? null;
+}
+
+export function TripForm({ tripId, initial, presetDestination }: TripFormProps) {
   const { lang } = useLang();
   const router = useRouter();
   const editing = Boolean(tripId);
 
-  const [draft, setDraft] = useState<TripDraft>(initial ?? emptyTripDraft());
+  const [draft, setDraft] = useState<TripDraft>(() => {
+    if (initial) return initial;
+    const preset = knownCountry(presetDestination);
+    if (!preset) return emptyTripDraft();
+    return { ...emptyTripDraft(), destination: preset, title: suggestTripTitle(preset, lang) };
+  });
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);

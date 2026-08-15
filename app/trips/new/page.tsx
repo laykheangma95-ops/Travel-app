@@ -9,6 +9,16 @@ export const metadata: Metadata = {
 
 // The destination of the "New trip" button, which until now pointed at the
 // packing checklist because no trip creator existed.
-export default function NewTripPage() {
-  return <TripForm />;
+//
+// `?destination=` lets Explore and the destination guides hand the place over,
+// so reading about somewhere and deciding to go is one step rather than two.
+export default function NewTripPage({
+  searchParams,
+}: {
+  searchParams: { destination?: string | string[] };
+}) {
+  const raw = Array.isArray(searchParams.destination)
+    ? searchParams.destination[0]
+    : searchParams.destination;
+  return <TripForm presetDestination={raw ?? null} />;
 }
