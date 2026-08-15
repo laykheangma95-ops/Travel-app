@@ -93,6 +93,9 @@ export function MobileDrawer({
         onPointerDown={(event) => {
           start.current = { x: event.clientX, y: event.clientY };
         }}
+        onPointerCancel={() => {
+          start.current = null;
+        }}
         onPointerUp={(event) => {
           if (!start.current) return;
           const dx = event.clientX - start.current.x;

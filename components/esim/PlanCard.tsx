@@ -115,7 +115,7 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
         type="button"
         onClick={handleAdd}
         className={cn(
-          'mt-2.5 inline-flex min-h-[2.5rem] w-full items-center justify-center gap-2 rounded-btn px-5 py-2 text-sm font-medium transition-colors duration-200',
+          'mt-2.5 inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-btn px-5 py-2 text-sm font-medium transition-colors duration-200',
           added
             ? 'text-success'
             : dark

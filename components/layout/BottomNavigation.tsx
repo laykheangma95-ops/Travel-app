@@ -110,12 +110,16 @@ const HIDDEN_ON = [
   '/apsara-hero',
 ];
 
+const HIDDEN_PATTERNS = [/^\/trips\/[^/]+\/itinerary(?:\/)?$/];
+
 export function BottomNavigation() {
   const pathname = usePathname() ?? '/';
   const { lang } = useLang();
   const [unread, setUnread] = useState(0);
 
-  const hidden = HIDDEN_ON.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const hidden =
+    HIDDEN_ON.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
+    HIDDEN_PATTERNS.some((pattern) => pattern.test(pathname));
 
   // The unread count is the one number worth carrying in the chrome. Fetched
   // once per mount, not polled: a badge that updates every ten seconds costs

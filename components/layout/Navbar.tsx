@@ -303,7 +303,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-            className={`${pillClass} flex items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
+            className={`${pillClass} flex min-h-[2.75rem] items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
             // WCAG 2.5.3 — the accessible name has to contain the visible text
             // ("EN" / "KM"), or voice-control users cannot say what they see.
             aria-label={lang === 'en' ? 'EN — ប្តូរទៅភាសាខ្មែរ' : 'KM — Switch to English'}
@@ -318,7 +318,7 @@ export function Navbar() {
 
           <Link
             href="/cart"
-            className={`${pillClass} relative rounded-full p-2.5 transition-colors ${inkClass}`}
+            className={`${pillClass} relative grid min-h-[2.75rem] min-w-[2.75rem] place-items-center rounded-full p-2.5 transition-colors ${inkClass}`}
             aria-label={`Cart with ${cartCount} items`}
           >
             <ShoppingCart size={20} />
@@ -339,7 +339,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setAccountOpen((open) => !open)}
-                className={`${pillClass} flex items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
+                className={`${pillClass} flex min-h-[2.75rem] items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium transition-colors ${inkClass}`}
                 aria-expanded={accountOpen}
                 data-open={accountOpen}
                 aria-haspopup="menu"
@@ -417,13 +417,13 @@ export function Navbar() {
             <>
               <Link
                 href="/sign-in"
-                className={`${pillClass} hidden rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${inkClass} md:block`}
+                className={`${pillClass} hidden min-h-[2.75rem] items-center rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${inkClass} md:inline-flex`}
               >
                 {t('nav.signIn')}
               </Link>
               <Link
                 href="/sign-up"
-                className="liquid-glass-accent liquid-sheen liquid-press hidden rounded-full px-4 py-2 text-sm font-semibold text-primary-deep transition-all duration-200 ease-smooth hover:brightness-110 md:block"
+                className="liquid-glass-accent liquid-sheen liquid-press hidden min-h-[2.75rem] items-center rounded-full px-4 py-2 text-sm font-semibold text-primary-deep transition-all duration-200 ease-smooth hover:brightness-110 md:inline-flex"
               >
                 {t('nav.getStarted')}
               </Link>
@@ -432,7 +432,7 @@ export function Navbar() {
 
           <button
             type="button"
-            className={`${pillClass} rounded-full p-2.5 transition-colors ${inkClass} lg:hidden`}
+            className={`${pillClass} grid min-h-[2.75rem] min-w-[2.75rem] place-items-center rounded-full p-2.5 transition-colors ${inkClass} lg:hidden`}
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
