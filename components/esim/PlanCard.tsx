@@ -7,6 +7,7 @@ import { useCart } from '@/hooks/useCart';
 import { describeAllowance } from '@/data/esimPlans';
 import { cn, formatUsd } from '@/lib/utils';
 import { useState } from 'react';
+import { useLang } from '@/lib/i18n';
 
 interface PlanCardProps {
   plan: EsimPlan;
@@ -15,6 +16,7 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
+  const { t } = useLang();
   const router = useRouter();
   const addItem = useCart((s) => s.addItem);
   const [added, setAdded] = useState(false);
@@ -103,7 +105,7 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
               : 'bg-secondary text-white hover:bg-secondary-high'
         )}
       >
-        Buy now
+        {t('plan.buyNow')}
         <ArrowRight size={16} aria-hidden="true" />
       </button>
 
@@ -126,11 +128,11 @@ export function PlanCard({ plan, destination, dark = false }: PlanCardProps) {
       >
         {added ? (
           <>
-            <Check size={16} aria-hidden="true" /> Added to cart
+            <Check size={16} aria-hidden="true" /> {t('plan.added')}
           </>
         ) : (
           <>
-            <ShoppingCart size={16} aria-hidden="true" /> Add to cart
+            <ShoppingCart size={16} aria-hidden="true" /> {t('plan.addToCart')}
           </>
         )}
       </button>

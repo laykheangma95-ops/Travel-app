@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PhoneField } from '@/components/auth/PhoneField';
 import { DeliveryOptions } from '@/components/esim/DeliveryOptions';
 import { toE164, validatePhone } from '@/lib/phone';
+import { useLang } from '@/lib/i18n';
 import { cn, formatKhr, formatUsd } from '@/lib/utils';
 
 const checkoutSchema = z
@@ -59,6 +60,7 @@ function postToGateway(url: string, fields: Record<string, string>): void {
 }
 
 export default function CheckoutPage() {
+  const { t } = useLang();
   const cart = useCart();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -101,9 +103,9 @@ export default function CheckoutPage() {
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
           <EmptyState
             icon={ShoppingCart}
-            title="Nothing to check out"
-            description="Add an eSIM plan to your cart first."
-            ctaLabel="Browse eSIM plans"
+            title={t('checkout.empty.title')}
+            description={t('checkout.empty.body')}
+            ctaLabel={t('cart.empty.cta')}
             ctaHref="/esim"
             dark
           />
@@ -158,7 +160,7 @@ export default function CheckoutPage() {
 
       if (!res.ok || !data?.orderNumber) {
         throw new Error(
-          data?.error?.message ?? 'Payment could not be started. Please try again.'
+          data?.error?.message ?? t('checkout.failed')
         );
       }
 
@@ -207,18 +209,18 @@ export default function CheckoutPage() {
     <div className="night-canvas min-h-screen">
       <div className="night-stars" aria-hidden="true" />
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">Almost there</p>
-        <h1 className="mb-8 font-display text-3xl font-bold text-white">Checkout</h1>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-accent">{t('checkout.eyebrow')}</p>
+        <h1 className="mb-8 font-display text-3xl font-bold text-white">{t('checkout.title')}</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-8 lg:grid-cols-5">
           {/* Customer form */}
           <div className="space-y-5 lg:col-span-3">
             <div className="night-card p-7">
-              <h2 className="mb-5 font-display text-lg font-bold text-white">Your details</h2>
+              <h2 className="mb-5 font-display text-lg font-bold text-white">{t('checkout.details')}</h2>
               <div className="space-y-4">
                 <Input
                   id="fullName"
-                  label="Full Name"
+                  label={t('checkout.fullName')}
                   required
                   dark
                   placeholder="e.g. Sokha Prak"
@@ -227,7 +229,7 @@ export default function CheckoutPage() {
                 />
                 <Input
                   id="email"
-                  label="Email Address"
+                  label={t('checkout.email')}
                   type="email"
                   required
                   dark
@@ -241,7 +243,7 @@ export default function CheckoutPage() {
                 <div className="night-locked-surface">
                   <PhoneField
                     label={
-                      deliveryChannel === 'email' ? 'Phone number (optional)' : 'Phone number'
+                      deliveryChannel === 'email' ? t('checkout.phoneOptional') : t('checkout.phone')
                     }
                     required={deliveryChannel !== 'email'}
                     country={phoneCountry}
@@ -251,28 +253,28 @@ export default function CheckoutPage() {
                     error={errors.phone?.message}
                     hint={
                       deliveryChannel === 'email'
-                        ? 'Only used if we need to reach you about this order.'
-                        : 'Used to confirm your Telegram chat belongs to you.'
+                        ? t('checkout.phoneHintEmail')
+                        : t('checkout.phoneHintTelegram')
                     }
                   />
                 </div>
-                <Select id="deviceType" label="Device Type" dark {...register('deviceType')}>
+                <Select id="deviceType" label={t('checkout.device')} dark {...register('deviceType')}>
                   <option value="iphone">iPhone</option>
                   <option value="android">Android</option>
-                  <option value="not-sure">Not sure</option>
+                  <option value="not-sure">{t('checkout.device.notSure')}</option>
                 </Select>
                 <Textarea
                   id="notes"
-                  label="Special Notes (optional)"
+                  label={t('checkout.notes')}
                   dark
-                  placeholder="Anything we should know?"
+                  placeholder={t('checkout.notesPlaceholder')}
                   {...register('notes')}
                 />
               </div>
             </div>
 
             <div className="night-card night-locked-surface p-7">
-              <h2 className="mb-5 font-display text-lg font-bold text-white">QR code delivery</h2>
+              <h2 className="mb-5 font-display text-lg font-bold text-white">{t('checkout.delivery')}</h2>
               <DeliveryOptions
                 value={deliveryChannel}
                 onChange={(value) => setValue('deliveryChannel', value, { shouldValidate: true })}
@@ -284,7 +286,7 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2">
             <div className="sticky top-24 space-y-5">
               <div className="night-card p-6">
-                <h2 className="font-display text-lg font-bold text-white">Order summary</h2>
+                <h2 className="font-display text-lg font-bold text-white">{t('checkout.summary')}</h2>
                 <ul className="mt-4 space-y-2 border-b border-white/10 pb-4 text-sm text-white/70">
                   {cart.items.map((i) => (
                     <li key={i.planId} className="flex justify-between">
@@ -297,14 +299,14 @@ export default function CheckoutPage() {
                   ))}
                 </ul>
                 <div className="mt-4 flex justify-between font-display text-lg font-bold text-white">
-                  <span>Total</span>
+                  <span>{t('checkout.total')}</span>
                   <span className="font-mono">{formatUsd(total)}</span>
                 </div>
                 <p className="text-right text-xs text-white/50">≈ {formatKhr(total)} KHR</p>
               </div>
 
               <div className="night-card p-6">
-                <h2 className="mb-4 font-display text-lg font-bold text-white">Payment method</h2>
+                <h2 className="mb-4 font-display text-lg font-bold text-white">{t('checkout.payment')}</h2>
 
                 <div className="space-y-3">
                   <button
@@ -320,8 +322,8 @@ export default function CheckoutPage() {
                   >
                     <CreditCard size={22} className="shrink-0 text-gold-light" aria-hidden="true" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">International Cards</p>
-                      <p className="text-xs text-white/55">Visa · Mastercard · Amex — via Stripe</p>
+                      <p className="text-sm font-semibold text-white">{t('checkout.pay.cards')}</p>
+                      <p className="text-xs text-white/55">{t('checkout.pay.cardsHint')}</p>
                     </div>
                   </button>
 
@@ -339,7 +341,7 @@ export default function CheckoutPage() {
                     <Landmark size={22} className="shrink-0 text-gold-light" aria-hidden="true" />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-white">ABA PayWay (Cambodia)</p>
-                      <p className="text-xs text-white/55">KHQR · ABA Mobile · local cards</p>
+                      <p className="text-xs text-white/55">{t('checkout.pay.abaHint')}</p>
                     </div>
                   </button>
                 </div>
@@ -357,16 +359,16 @@ export default function CheckoutPage() {
                 >
                   {processing ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" /> Processing…
+                      <Loader2 size={16} className="animate-spin" /> {t('checkout.processing')}
                     </>
                   ) : payMethod === 'stripe' ? (
-                    'Pay with Card'
+                    t('checkout.payCard')
                   ) : (
-                    'Pay with ABA / KHQR'
+                    t('checkout.payAba')
                   )}
                 </button>
                 <p className="mt-3 text-center text-xs text-white/50">
-                  Secure payment · QR delivered within 15 minutes
+                  {t('checkout.reassurance')}
                 </p>
                 {/* All three of these pages existed and were reachable only
                     from the footer and the You page. For a prepaid digital
