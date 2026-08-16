@@ -105,10 +105,10 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
     };
   }, [view.kind]);
 
-  // Keep the first frame quiet on desktop, then let the visitor's first pointer
-  // or keyboard gesture bring the welcome/search block in. The listener is
-  // intentionally global: the globe canvas is deferred and should not be the
-  // thing responsible for making the primary action reachable.
+  // Keep the first frame quiet on desktop, then let the visitor's first cursor,
+  // click, touch, focus or keyboard gesture bring the welcome/search block in.
+  // The listener is intentionally global: the globe canvas is deferred and
+  // should not be the thing responsible for making the primary action reachable.
   useEffect(() => {
     const reveal = () => {
       setHasInteracted(true);
@@ -117,14 +117,26 @@ export function HomepageV3({ initialSlug }: { initialSlug?: string }) {
       // fixed, so keep the document at its top edge for every reveal path.
       window.requestAnimationFrame(() => window.scrollTo(0, 0));
     };
-    const options: AddEventListenerOptions = { once: true, passive: true };
+    const options: AddEventListenerOptions = { once: true, passive: true, capture: true };
     window.addEventListener('pointermove', reveal, options);
+    window.addEventListener('pointerover', reveal, options);
     window.addEventListener('pointerdown', reveal, options);
+    window.addEventListener('mousemove', reveal, options);
+    window.addEventListener('mousedown', reveal, options);
+    window.addEventListener('click', reveal, options);
+    window.addEventListener('touchstart', reveal, options);
     window.addEventListener('keydown', reveal, options);
+    window.addEventListener('focusin', reveal, options);
     return () => {
-      window.removeEventListener('pointermove', reveal);
-      window.removeEventListener('pointerdown', reveal);
-      window.removeEventListener('keydown', reveal);
+      window.removeEventListener('pointermove', reveal, options);
+      window.removeEventListener('pointerover', reveal, options);
+      window.removeEventListener('pointerdown', reveal, options);
+      window.removeEventListener('mousemove', reveal, options);
+      window.removeEventListener('mousedown', reveal, options);
+      window.removeEventListener('click', reveal, options);
+      window.removeEventListener('touchstart', reveal, options);
+      window.removeEventListener('keydown', reveal, options);
+      window.removeEventListener('focusin', reveal, options);
     };
   }, []);
 

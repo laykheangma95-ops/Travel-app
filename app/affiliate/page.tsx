@@ -96,15 +96,16 @@ export default function AffiliatePage() {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-[#fbfaf7]">
       {/* Hero */}
-      <section className="bg-primary py-16 text-center">
-        <div className="mx-auto max-w-2xl px-4 sm:px-6">
-          <p className="text-sm font-semibold uppercase tracking-widest text-accent">Affiliate Program</p>
+      <section className="relative overflow-hidden bg-[#0e1b30] py-16 text-center text-white shadow-[0_18px_50px_rgba(14,27,48,0.18)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(87,200,255,0.22),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(230,203,139,0.12),transparent_36%)]" aria-hidden="true" />
+        <div className="relative mx-auto max-w-2xl px-4 sm:px-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#e6cb8b]">Affiliate Program</p>
           <h1 className="mt-3 font-display text-3xl font-bold text-white sm:text-5xl">
             Earn 30% on every eSIM you refer
           </h1>
-          <p className="mt-4 text-white/70">
+          <p className="mt-4 text-[#d9e9f5]">
             Share Domner with your friends, followers, or tour groups — get paid in USD via ABA every
             month.
           </p>
@@ -115,8 +116,8 @@ export default function AffiliatePage() {
         <div className="grid gap-10 lg:grid-cols-2">
           {/* Apply form */}
           <div>
-            <h2 className="mb-5 font-display text-xl font-bold text-ink">Apply to join</h2>
-            <Card className="p-7">
+            <h2 className="mb-5 font-display text-xl font-bold text-[#0e1b30]">Apply to join</h2>
+            <Card className="border-[#d9e9f5] bg-white/95 p-7 shadow-[0_18px_50px_rgba(20,38,63,0.10)]">
               {submitted ? (
                 <div className="flex flex-col items-center py-8 text-center animate-fade-up">
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
@@ -171,7 +172,7 @@ export default function AffiliatePage() {
                       {submitError}
                     </p>
                   )}
-                  <Button type="submit" disabled={submitting} className="w-full">
+                  <Button type="submit" variant="secondary" disabled={submitting} className="w-full bg-[#0e2a52] hover:bg-[#123b70]">
                     {submitting && <Loader2 size={16} className="animate-spin" />}
                     Submit application
                   </Button>
@@ -183,8 +184,8 @@ export default function AffiliatePage() {
           {/* The affiliate's own numbers. Nothing here is rendered unless it
               came back from /api/affiliate/me for this caller. */}
           <div>
-            <h2 className="mb-5 font-display text-xl font-bold text-ink">Your dashboard</h2>
-            <Card className="p-7">
+            <h2 className="mb-5 font-display text-xl font-bold text-[#0e1b30]">Your dashboard</h2>
+            <Card className="border-[#d9e9f5] bg-white/95 p-7 shadow-[0_18px_50px_rgba(20,38,63,0.10)]">
               {self.kind === 'loading' && (
                 <div className="space-y-3" aria-busy="true">
                   <div className="h-10 animate-pulse rounded-btn bg-surface-3 motion-reduce:animate-none" />
@@ -200,7 +201,7 @@ export default function AffiliatePage() {
                   </p>
                   <SignInLink
                     returnTo="/affiliate"
-                    className="mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+                    className="mt-5 inline-flex min-h-[2.75rem] items-center rounded-btn bg-[#0e2a52] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#123b70] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#57c8ff]"
                   >
                     Sign in
                   </SignInLink>
@@ -259,8 +260,8 @@ export default function AffiliatePage() {
                         value: `$${self.affiliate.earnedUsd.toFixed(2)}`,
                       },
                     ].map((stat) => (
-                      <div key={stat.label} className="rounded-card border border-line bg-surface-2 p-4 text-center">
-                        <stat.icon size={18} className="mx-auto text-accent" aria-hidden="true" />
+                      <div key={stat.label} className="rounded-card border border-[#d9e9f5] bg-[#f4faff] p-4 text-center shadow-[0_8px_24px_rgba(87,200,255,0.10)]">
+                        <stat.icon size={18} className="mx-auto text-[#168bd1]" aria-hidden="true" />
                         <p className="mt-2 font-display text-lg font-bold text-ink tabular-nums">{stat.value}</p>
                         <p className="mt-0.5 text-[11px] leading-tight text-ink-muted">{stat.label}</p>
                       </div>
@@ -286,8 +287,8 @@ export default function AffiliatePage() {
               { n: 2, title: 'Share your link', body: 'Your unique link gives friends 5% off — and you 30% commission.' },
               { n: 3, title: 'Get paid monthly', body: 'Commissions are paid in USD to your ABA account every month.' },
             ].map((s) => (
-              <Card key={s.n} className="p-7 text-center">
-                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-secondary font-display font-bold text-white">
+              <Card key={s.n} className="border-[#d9e9f5] bg-white/95 p-7 text-center shadow-[0_18px_50px_rgba(20,38,63,0.08)]">
+                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#168bd1] font-display font-bold text-white shadow-[0_8px_18px_rgba(22,139,209,0.25)]">
                   {s.n}
                 </span>
                 <h3 className="mt-4 font-display font-bold text-ink">{s.title}</h3>
@@ -297,6 +298,6 @@ export default function AffiliatePage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

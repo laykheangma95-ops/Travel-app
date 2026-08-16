@@ -72,6 +72,35 @@ body[data-v3-scroll='locked'] {
     linear-gradient(180deg, #050b2e 0%, #08163a 34%, #0a1a4a 62%, #0b1c40 100%);
 }
 
+.v3-space::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: clamp(5.5rem, 20svh, 11rem);
+  width: clamp(15rem, 34vw, 29rem);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(159, 228, 255, 0.72) 0 0.45rem, transparent 0.55rem),
+    radial-gradient(circle at 62% 38%, rgba(230, 203, 139, 0.62) 0 0.34rem, transparent 0.44rem),
+    radial-gradient(circle at 47% 61%, rgba(87, 200, 255, 0.54) 0 0.38rem, transparent 0.5rem),
+    radial-gradient(circle at 50% 43%, rgba(72, 166, 218, 0.48), transparent 58%),
+    linear-gradient(145deg, rgba(35, 91, 151, 0.96), rgba(9, 24, 63, 0.98) 54%, rgba(4, 11, 36, 1));
+  box-shadow:
+    inset -34px -42px 62px rgba(2, 7, 27, 0.72),
+    inset 18px 20px 42px rgba(159, 228, 255, 0.16),
+    0 0 0 1px rgba(159, 228, 255, 0.16),
+    0 0 64px rgba(87, 200, 255, 0.24),
+    0 32px 88px rgba(3, 8, 30, 0.62);
+  opacity: calc(0.9 * (1 - var(--v3-arrival)));
+  transition: opacity 700ms var(--ease-smooth), transform 1.2s var(--ease-signature);
+}
+
+.v3-root.is-landed .v3-space::before {
+  opacity: 0;
+}
+
 /* The background travels with the camera: as the flight nears the ground, the
    page itself becomes the destination's sky. */
 .v3-space::after {
@@ -226,7 +255,7 @@ body[data-v3='first'][data-v3-interaction='idle'] .v3-sound {
    the frosted bar. Mirrors .has-tabbar in globals.css. */
 @media (max-width: 1023px) {
   .v3-stage {
-    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    padding: 34svh 1rem calc(5.6rem + env(safe-area-inset-bottom));
   }
 }
 .v3-stage.is-hidden {
@@ -283,6 +312,11 @@ body[data-v3='first'][data-v3-interaction='idle'] .v3-sound {
 /* The bar is present from the first mobile frame, then lifts a few pixels with
    the same first-touch gesture so it feels anchored rather than pasted on. */
 @media (max-width: 1023px) {
+  .v3-space::before {
+    top: clamp(4.25rem, 16svh, 7.75rem);
+    width: clamp(12rem, 62vw, 18.5rem);
+  }
+
   body[data-v3='first'] .tabbar {
     opacity: 0.94;
     transform: translateY(0.2rem);
@@ -304,6 +338,25 @@ body[data-v3='first'][data-v3-interaction='idle'] .v3-sound {
     transform: none;
     filter: none;
     pointer-events: auto;
+    max-width: 28rem;
+  }
+
+  .v3-greeting {
+    font-size: 0.78rem;
+  }
+
+  .v3-first-title {
+    margin-top: 0.65rem;
+    font-size: clamp(1.8rem, 9vw, 2.55rem);
+    line-height: 1.04;
+  }
+
+  .v3-search {
+    margin-top: 1rem;
+  }
+
+  .v3-search-field {
+    min-height: 3.125rem;
   }
 }
 
