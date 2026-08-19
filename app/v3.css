@@ -73,7 +73,16 @@ body[data-v3-scroll='locked'] {
 }
 
 .v3-space::before {
-  content: '';
+  /* Disabled: this stand-in circle (a gradient blob with a few soft dots) sits
+     on screen for as long as the real globe takes to load, and on a slow
+     connection or throttled phone it is the first thing a visitor sees —
+     reading as a broken/undersized globe rather than the real one that
+     replaces it later. Rather than a second, lesser "globe" appearing before
+     the hero globe, the night sky (.v3-space gradient + .v3-stars) is now the
+     whole first paint on its own. content: none stops the pseudo-element from
+     generating a box at all; the rule is left in place rather than deleted so
+     the original design intent stays visible if this needs revisiting. */
+  content: none;
   position: absolute;
   left: 50%;
   top: clamp(5.5rem, 20svh, 11rem);
@@ -349,6 +358,12 @@ body[data-v3='first'][data-v3-interaction='idle'] .v3-sound {
     margin-top: 0.65rem;
     font-size: clamp(1.8rem, 9vw, 2.55rem);
     line-height: 1.04;
+  }
+
+  /* Same Khmer size correction as the desktop rule below, scaled from this
+     breakpoint's clamp instead of the base one. */
+  body.lang-km .v3-first-title {
+    font-size: clamp(calc(1.8rem * 0.88), calc(9vw * 0.88), calc(2.55rem * 0.88));
   }
 
   .v3-search {
@@ -1745,6 +1760,14 @@ body.lang-km :is(
   font-family: var(--font-display), var(--font-khmer), sans-serif;
   line-height: 1.45;
   letter-spacing: 0;
+}
+/* Noto Serif Khmer's characters sit closer to the full em-box than
+   Marcellus's, so at an identical font-size the homepage headline reads
+   noticeably heavier/larger in Khmer than in English — enough to feel like
+   an unintended size change when switching language. Scale it down to match
+   (mobile breakpoint has its own copy of this in the media query above). */
+body.lang-km .v3-first-title {
+  font-size: clamp(calc(2.125rem * 0.88), calc(6.4vw * 0.88), calc(4rem * 0.88));
 }
 body.lang-km :is(.v3-eyebrow, .v3-strip-city, .v3-card-label, .v3-visa-kind, .v3-rec-kicker) {
   letter-spacing: 0.04em;
