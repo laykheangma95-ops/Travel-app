@@ -28,6 +28,10 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    labelKey: 'nav.trips',
+    href: '/trips',
+  },
+  {
     labelKey: 'nav.flights',
     items: [
       { labelKey: 'nav.flightTracker', href: '/flights' },
