@@ -22,6 +22,22 @@ const ADMIN_PREFIX = '/admin';
 const CUSTOMER_PREFIXES = ['/dashboard', '/my-esims', '/my-trips', '/settings'];
 
 /**
+ * Whether this runtime instance has already reported the missing Supabase
+ * configuration.
+ *
+ * The warning below used to fire on EVERY request. Vercel's runtime error
+ * dashboard recorded 3,081 copies of it from 7 users over one week — the top
+ * "error" on the project by three orders of magnitude, and pure noise: it is
+ * one condition, not 3,081 events. It buried every other error under it and
+ * spent log quota to do so.
+ *
+ * Module scope lives for the life of the isolate, so this reports once per cold
+ * start: often enough that a new deploy still surfaces the problem promptly,
+ * rare enough that it cannot drown the log again.
+ */
+let reportedMissingConfig = false;
+
+/**
  * Supabase stores the session in cookies named `sb-<project-ref>-auth-token`
  * (chunked as `.0`, `.1` when large) plus a PKCE verifier during OAuth.
  */
@@ -63,11 +79,15 @@ export async function middleware(request: NextRequest) {
   if (!url || !anonKey) {
     if (demoModeAllowed) return response;
 
-    console.error(
-      '[middleware] Supabase is not configured on a production deploy. ' +
-        'Denying gated routes. Set NEXT_PUBLIC_SUPABASE_URL and ' +
-        'NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy.'
-    );
+    if (!reportedMissingConfig) {
+      reportedMissingConfig = true;
+      console.error(
+        '[middleware] Supabase is not configured on a production deploy. ' +
+          'Denying gated routes. Set NEXT_PUBLIC_SUPABASE_URL and ' +
+          'NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy. ' +
+          '(Reported once per runtime instance.)'
+      );
+    }
 
     if (isAdminRoute) {
       return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });

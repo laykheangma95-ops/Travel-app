@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { getSupabase } from '@/lib/supabase';
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
+import { logSupabaseError } from '@/lib/supabaseError';
 import { NOTIFICATION_CATEGORIES } from '@/lib/notifications/catalog';
 
 export const runtime = 'nodejs';
@@ -47,7 +48,18 @@ export const GET = route(
     if (category) query = query.eq('category', category);
 
     const { data, error } = await query;
-    if (error) throw new ApiError('INTERNAL', 'Could not load your updates.');
+    if (error) {
+      // The reason used to be dropped on the floor. Vercel's runtime dashboard
+      // carried ~45 copies of "Could not load your updates." with nothing to
+      // say why — the same opaque line whether the notifications table was
+      // missing, RLS refused the read, or Supabase timed out. The customer-safe
+      // message is unchanged; the cause now reaches the log beside it.
+      logSupabaseError('notifications.inbox_read_failed', error, {
+        userId: user.id,
+        category,
+      });
+      throw new ApiError('INTERNAL', 'Could not load your updates.');
+    }
 
     const notifications = data ?? [];
     const unread = notifications.filter((row) => row.read_at === null).length;
@@ -81,7 +93,10 @@ export const PATCH = route(
     if ('id' in parsed.data) query = query.eq('id', parsed.data.id);
 
     const { error } = await query;
-    if (error) throw new ApiError('INTERNAL', 'Could not update your updates.');
+    if (error) {
+      logSupabaseError('notifications.mark_read_failed', error, { userId: user.id });
+      throw new ApiError('INTERNAL', 'Could not update your updates.');
+    }
 
     return ok({ ok: true, readAt });
   },
