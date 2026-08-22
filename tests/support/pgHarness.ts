@@ -122,8 +122,22 @@ export interface Harness {
   close(): Promise<void>;
 }
 
+// PostgREST hands everything back as JSON, so a date reaches the app as the
+// string "2026-04-10" and a numeric as a number. PGlite, being a database
+// driver, decodes dates into JS Date objects and numerics into strings — both
+// of which the application code would never see in production and does not
+// handle. Pinning the parsers is what keeps this harness honest; without it,
+// nextDayDate() receives a Date and throws RangeError on a value that works
+// perfectly against the real stack.
+const POSTGREST_SHAPED_PARSERS = {
+  1082: (value: string) => value, // date        → "2026-04-10"
+  1114: (value: string) => value, // timestamp   → ISO-ish string
+  1184: (value: string) => value, // timestamptz → ISO-ish string
+  1700: (value: string) => Number(value), // numeric → number
+};
+
 export async function createHarness(): Promise<Harness> {
-  const db = new PGlite();
+  const db = new PGlite({ parsers: POSTGREST_SHAPED_PARSERS });
   await db.exec(ROLES);
   await db.exec(PREREQUISITE);
 
@@ -173,15 +187,56 @@ export async function createHarness(): Promise<Harness> {
 // comes back as `{ data: null, error }`, it does not throw.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One `.eq()` / `.in()` / `.or()` etc, as a SQL fragment with `?` placeholders. */
 interface Filter {
   sql: string;
   params: unknown[];
 }
 
+/** A PostgREST embedded resource: `place:destination_places(*)`. */
+interface Embed {
+  alias: string;
+  table: string;
+  columns: string;
+}
+
+/**
+ * Split a PostgREST select list on top-level commas, so the comma inside
+ * `place:destination_places(id,name)` does not split the embed in half.
+ */
+function splitSelect(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const character of list) {
+    if (character === '(') depth += 1;
+    if (character === ')') depth -= 1;
+    if (character === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function parseSelect(list: string): { columns: string; embeds: Embed[] } {
+  const columns: string[] = [];
+  const embeds: Embed[] = [];
+  for (const part of splitSelect(list)) {
+    const embed = /^(\w+):(\w+)\((.*)\)$/.exec(part);
+    if (embed) {
+      embeds.push({ alias: embed[1], table: embed[2], columns: embed[3] || '*' });
+      continue;
+    }
+    columns.push(part);
+  }
+  return { columns: columns.length ? columns.join(', ') : '*', embeds };
+}
+
 function supabaseLike(db: PGlite, userId: string): SupabaseClient {
-  // Every statement runs as `authenticated`, carrying this traveler's JWT
-  // claims, which is what auth.uid() reads. This is the whole point: the
-  // database decides what is allowed, not the test.
   //
   // SET ROLE, not SET LOCAL ROLE: outside an explicit transaction `SET LOCAL` is
   // silently a no-op, which would leave every statement running as the superuser
@@ -197,34 +252,65 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
 
   function from(table: string) {
     const filters: Filter[] = [];
-    let columns = '*';
+    const orderBy: string[] = [];
+    let selection = parseSelect('*');
     let head = false;
     let wantCount = false;
-    let write: { sql: string; params: unknown[] } | null = null;
+    let limit: number | null = null;
+    // Writes are deferred rather than built at call time, because .update() and
+    // .delete() take their filters AFTER the verb.
+    let pending: { kind: 'insert' | 'update' | 'delete'; row?: Record<string, unknown> } | null =
+      null;
+    let returning: string | null = null;
 
-    const where = (offset: number) => {
+    const where = () => {
       if (!filters.length) return { clause: '', params: [] as unknown[] };
       const parts: string[] = [];
       const params: unknown[] = [];
-      let index = offset;
+      let index = 0;
       for (const filter of filters) {
-        parts.push(filter.sql.replace(/\?/g, () => `$${++index}`));
+        parts.push(filter.sql.replace(/\?/g, () => `$${(index += 1)}`));
         params.push(...filter.params);
       }
       return { clause: ` WHERE ${parts.join(' AND ')}`, params };
     };
 
+    /** Attach each embedded resource by its `<alias>_id` foreign key. */
+    const withEmbeds = async (rows: Record<string, unknown>[]) => {
+      for (const embed of selection.embeds) {
+        for (const row of rows) {
+          const key = row[`${embed.alias}_id`];
+          if (key === undefined || key === null) {
+            row[embed.alias] = null;
+            continue;
+          }
+          const joined = await run(
+            `SELECT ${embed.columns} FROM ${embed.table} WHERE id = $1`,
+            [key]
+          );
+          row[embed.alias] = joined.rows[0] ?? null;
+        }
+      }
+      return rows;
+    };
+
     const api = {
-      select(cols?: string, options?: { count?: string; head?: boolean }) {
-        if (cols) columns = cols;
+      select(columns?: string, options?: { count?: string; head?: boolean }) {
         if (options?.head) head = true;
         if (options?.count) wantCount = true;
-        // A select after insert/upsert is a RETURNING clause, not a new query.
-        if (write) write.sql = `${write.sql} RETURNING ${cols ?? '*'}`;
+        if (pending) {
+          returning = columns ?? '*';
+          return api;
+        }
+        if (columns) selection = parseSelect(columns);
         return api;
       },
       eq(column: string, value: unknown) {
         filters.push({ sql: `${column} = ?`, params: [value] });
+        return api;
+      },
+      in(column: string, values: unknown[]) {
+        filters.push({ sql: `${column} = ANY(?)`, params: [values] });
         return api;
       },
       ilike(column: string, value: string) {
@@ -245,41 +331,39 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         filters.push({ sql: `(${parts.join(' OR ')})`, params });
         return api;
       },
-      insert(row: Record<string, unknown>) {
-        const keys = Object.keys(row);
-        const placeholders = keys.map((_, index) => `$${index + 1}`);
-        write = {
-          sql: `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`,
-          params: keys.map((key) => row[key]),
-        };
+      order(column: string, options?: { ascending?: boolean }) {
+        orderBy.push(`${column} ${options?.ascending === false ? 'DESC' : 'ASC'}`);
         return api;
       },
-      upsert(
-        row: Record<string, unknown>,
-        options: { onConflict: string; ignoreDuplicates?: boolean }
-      ) {
-        if (!options.ignoreDuplicates) {
-          throw new Error('pgHarness: only ON CONFLICT DO NOTHING is modelled');
-        }
-        const keys = Object.keys(row);
-        const placeholders = keys.map((_, index) => `$${index + 1}`);
-        write = {
-          sql:
-            `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})` +
-            ` ON CONFLICT (${options.onConflict}) DO NOTHING`,
-          params: keys.map((key) => row[key]),
-        };
+      limit(count: number) {
+        limit = count;
+        return api;
+      },
+      insert(row: Record<string, unknown>) {
+        pending = { kind: 'insert', row };
+        return api;
+      },
+      update(row: Record<string, unknown>) {
+        pending = { kind: 'update', row };
+        return api;
+      },
+      delete() {
+        pending = { kind: 'delete' };
         return api;
       },
       async maybeSingle() {
-        const result = await api.then((value: unknown) => value);
-        const { data, error } = result as { data: unknown[]; error: unknown };
+        const { data, error } = (await api.then((value: unknown) => value)) as {
+          data: Record<string, unknown>[] | null;
+          error: unknown;
+        };
         if (error) return { data: null, error };
         return { data: (data ?? [])[0] ?? null, error: null };
       },
       async single() {
-        const result = await api.then((value: unknown) => value);
-        const { data, error } = result as { data: unknown[]; error: unknown };
+        const { data, error } = (await api.then((value: unknown) => value)) as {
+          data: Record<string, unknown>[] | null;
+          error: unknown;
+        };
         if (error) return { data: null, error };
         const list = data ?? [];
         if (list.length !== 1) {
@@ -290,22 +374,54 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
       then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) {
         const execute = async () => {
           try {
-            if (write) {
-              const result = await run(write.sql, write.params);
+            if (pending?.kind === 'insert') {
+              const keys = Object.keys(pending.row ?? {});
+              const placeholders = keys.map((_, index) => `$${index + 1}`);
+              const sql =
+                `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})` +
+                (returning ? ` RETURNING ${returning}` : '');
+              const result = await run(sql, keys.map((key) => pending!.row![key]));
               return { data: result.rows ?? [], count: null, error: null };
             }
+
+            if (pending?.kind === 'update') {
+              const keys = Object.keys(pending.row ?? {});
+              const assignments = keys.map((key, index) => `${key} = $${index + 1}`);
+              const { clause, params } = where();
+              const shifted = clause.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + keys.length}`);
+              const sql =
+                `UPDATE ${table} SET ${assignments.join(', ')}${shifted}` +
+                (returning ? ` RETURNING ${returning}` : '');
+              const result = await run(sql, [...keys.map((key) => pending!.row![key]), ...params]);
+              return { data: result.rows ?? [], count: null, error: null };
+            }
+
+            if (pending?.kind === 'delete') {
+              const { clause, params } = where();
+              const sql =
+                `DELETE FROM ${table}${clause}` + (returning ? ` RETURNING ${returning}` : '');
+              const result = await run(sql, params);
+              return { data: result.rows ?? [], count: null, error: null };
+            }
+
+            const { clause, params } = where();
             if (head && wantCount) {
-              const { clause, params } = where(0);
               const result = await run(`SELECT count(*)::int AS count FROM ${table}${clause}`, params);
               const first = (result.rows[0] ?? { count: 0 }) as { count: number };
               return { data: null, count: first.count, error: null };
             }
-            const { clause, params } = where(0);
-            const result = await run(`SELECT ${columns} FROM ${table}${clause}`, params);
-            return { data: result.rows ?? [], count: result.rows?.length ?? 0, error: null };
+
+            const order = orderBy.length ? ` ORDER BY ${orderBy.join(', ')}` : '';
+            const cap = limit === null ? '' : ` LIMIT ${limit}`;
+            const result = await run(
+              `SELECT ${selection.columns} FROM ${table}${clause}${order}${cap}`,
+              params
+            );
+            const rows = await withEmbeds((result.rows ?? []) as Record<string, unknown>[]);
+            return { data: rows, count: rows.length, error: null };
           } catch (cause) {
             // supabase-js reports a policy violation in the envelope, not by
-            // throwing. Matching that is what lets the module under test behave
+            // throwing. Matching that is what lets the code under test behave
             // here exactly as it would in production.
             return { data: null, count: null, error: { message: (cause as Error).message } };
           }
