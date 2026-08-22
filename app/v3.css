@@ -101,6 +101,18 @@ body[data-v3-scroll='locked'] {
   opacity: 0;
 }
 
+/* This circle is a flat placeholder for the real WebGL globe — meant to be
+   seen only before the canvas is ready (or never, on a device that can't run
+   WebGL at all). It only had a landed-state handoff, not a ready-state one, so
+   for the whole idle "Where are you traveling next?" screen it sat at 90%
+   opacity directly behind the real globe, showing through as a second, flatter
+   sphere. `.v3-globe-on` is added to `.v3-globe-layer` the moment the real
+   canvas starts rendering (GlobeCanvas.tsx) — hide the placeholder from that
+   point on, same as the failure/static-tier fallback still working correctly. */
+.v3-root:has(.v3-globe-layer.v3-globe-on) .v3-space::before {
+  opacity: 0;
+}
+
 /* The background travels with the camera: as the flight nears the ground, the
    page itself becomes the destination's sky. */
 .v3-space::after {
