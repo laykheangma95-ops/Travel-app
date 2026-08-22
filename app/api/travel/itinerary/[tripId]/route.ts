@@ -9,6 +9,7 @@ import {
   PLACE_NAME_MAX,
   type ItineraryCategory,
 } from '@/lib/travel/itinerary';
+import { addIdeaToTrip } from '@/lib/travel/savedPlaces';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,18 +122,10 @@ export const PATCH = route(async (request, context) => {
     if (error) throw new ApiError('INTERNAL', 'Could not add that place.');
   }
 
+  // Lives in lib/travel/savedPlaces.ts because saving a place from a
+  // destination guide runs the identical steps from a different entry point.
   if (body.data.action === 'addIdea') {
-    let { data: ideasDay } = await supabase.from('itinerary_days').select('id').eq('trip_id', tripId).eq('day_index', 0).maybeSingle();
-    if (!ideasDay) {
-      const { data, error } = await supabase.from('itinerary_days').insert({ trip_id: tripId, day_index: 0, date: null }).select('id').single();
-      if (error || !data) throw new ApiError('INTERNAL', 'Could not prepare your Ideas list.');
-      ideasDay = data;
-    }
-    const { data: place } = await supabase.from('destination_places').select('id,category').eq('id', body.data.placeId).eq('destination', trip.destination).maybeSingle();
-    if (!place) throw new ApiError('NOT_FOUND', 'That place could not be found.');
-    const { count } = await supabase.from('itinerary_places').select('*', { count: 'exact', head: true }).eq('itinerary_day_id', ideasDay.id);
-    const { error } = await supabase.from('itinerary_places').insert({ itinerary_day_id: ideasDay.id, place_id: place.id, category: place.category as ItineraryCategory, sort_order: count ?? 0 });
-    if (error) throw new ApiError('INTERNAL', 'Could not add that idea.');
+    await addIdeaToTrip(supabase, tripId, body.data.placeId);
   }
 
   if (body.data.action === 'reorder') {
