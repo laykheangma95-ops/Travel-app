@@ -216,6 +216,7 @@ export const bangkok: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'thailand:wat-pho',
         name: { en: 'Wat Pho and the reclining Buddha', km: 'វត្ត Pho និងព្រះពុទ្ធផ្ទំ' },
         why: {
           en: 'Quieter and older than the Grand Palace next door, and the massage school inside is the real thing.',
@@ -227,6 +228,7 @@ export const bangkok: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'thailand:chatuchak-weekend-market',
         name: { en: 'Chatuchak weekend market', km: 'ផ្សារចុងសប្តាហ៍ Chatuchak' },
         why: {
           en: 'Fifteen thousand stalls. Go early, agree the price before anything is wrapped, and keep your phone in a front pocket.',
@@ -238,6 +240,7 @@ export const bangkok: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'thailand:bang-krachao',
         name: { en: 'Bang Krachao', km: 'កោះ Bang Krachao' },
         why: {
           en: "A green island in the river loop, five minutes by boat from the city. Rent a bicycle and the traffic noise just stops.",

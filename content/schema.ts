@@ -95,6 +95,20 @@ export interface TravelApp {
 
 export interface Place {
   kind: 'landmark' | 'hidden-gem' | 'popular-with-cambodians';
+  /**
+   * The catalogue row this entry saves to — `destination_places.content_slug`,
+   * seeded from supabase/seeds/destination_places.csv (migration 011).
+   *
+   * Required, and deliberately not derived from `name`. A guide heading is
+   * editorial prose that should be free to change — "Wat Pho and the reclining
+   * Buddha", "Gardens by the Bay after dark" — while the catalogue key stays
+   * canonical and stable. Deriving one from the other would mean a copy edit
+   * silently forked a new place, or broke saving for an existing one.
+   *
+   * tests/guideCatalogue.test.ts fails the build if a slug here has no matching
+   * seed row, so a guide entry can never ship un-saveable.
+   */
+  contentSlug: string;
   name: Bi;
   why: Bi;
   area: Bi;

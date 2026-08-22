@@ -1789,3 +1789,143 @@ body.lang-km :is(.v3-visa-facts span, .v3-req-tag, .v3-place-kind, .v3-flag) {
     justify-content: space-between;
   }
 }
+
+/* ── Saving a place onto a trip ────────────────────────────────────────────
+   Neutral glass on purpose. The Places fold already spends its gold on the
+   hidden-gem badges, and a guide can show four of these at once — four gold
+   buttons would read as a toolbar, not as something precious. The confirmed
+   state uses starlight blue, the cool accent, so "done" reads as system state
+   rather than as a second gold moment. */
+
+.v3-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1rem;
+}
+.v3-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  /* 44px minimum touch target. */
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  transition: background var(--d-micro) var(--ease-smooth),
+    border-color var(--d-micro) var(--ease-smooth), transform var(--d-micro) var(--ease-signature);
+}
+.v3-save:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+.v3-save:disabled {
+  /* Never a target that looks dead: it says "Saving…" while it waits. */
+  opacity: 0.75;
+  cursor: progress;
+}
+.v3-save-signin {
+  text-decoration: none;
+}
+
+.v3-save-done {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+.v3-save-tick {
+  color: #8fd8ff;
+  flex: none;
+}
+/* A pill rather than an inline underline: as a link inside a sentence it read
+   at about 20px tall, well under the 44px target this is tapped at on a phone. */
+.v3-save-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #8fd8ff;
+  text-decoration: none;
+  background: rgba(87, 200, 255, 0.1);
+  border: 1px solid rgba(143, 216, 255, 0.32);
+  transition: background var(--d-micro) var(--ease-smooth),
+    border-color var(--d-micro) var(--ease-smooth);
+}
+.v3-save-link:hover {
+  background: rgba(87, 200, 255, 0.18);
+  border-color: rgba(143, 216, 255, 0.6);
+}
+.v3-save-error {
+  font-size: 0.8125rem;
+  /* Not colour alone: the text says what went wrong and what to do. */
+  color: #ffb4a2;
+}
+
+.v3-save-choose {
+  margin-top: 1rem;
+  padding: 0.875rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.v3-save-choose-title {
+  font-family: var(--font-display), serif;
+  font-size: 1rem;
+  color: #fff;
+}
+.v3-save-choose-hint {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.v3-save-choose-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.v3-save-option {
+  max-width: 100%;
+}
+.v3-save-cancel {
+  margin-top: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.v3-save-spin {
+  animation: v3-save-spin 900ms linear infinite;
+}
+@keyframes v3-save-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v3-save:hover:not(:disabled) {
+    transform: none;
+  }
+  /* The spinner is the only thing telling you the tap registered, so it stays —
+     but as a calm pulse rather than continuous rotation. */
+  .v3-save-spin {
+    animation: v3-save-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes v3-save-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+}

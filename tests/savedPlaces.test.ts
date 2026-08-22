@@ -44,6 +44,10 @@ function fakeSupabase(seed: Record<string, Row[]> = {}) {
         filters.push((row) => row[column] === value);
         return api;
       },
+      in(column: string, values: unknown[]) {
+        filters.push((row) => values.includes(row[column]));
+        return api;
+      },
       ilike(column: string, value: string) {
         filters.push((row) => String(row[column] ?? '').toLowerCase() === value.toLowerCase());
         return api;
@@ -151,13 +155,16 @@ describe('savePlaceForTraveler', () => {
     const first = await savePlaceForTraveler(client, USER, WAT_PHO);
     const second = await savePlaceForTraveler(client, USER, WAT_PHO);
 
-    expect(first).toEqual({ status: 'saved', tripId: 'trip-1', tripTitle: 'Thailand trip', createdTrip: false });
-    expect(second).toMatchObject({ status: 'saved', createdTrip: false });
-    // One guide entry, one catalogue row, however many times it is saved — and
-    // saving never adds one.
+    expect(first).toEqual({
+      status: 'saved', tripId: 'trip-1', tripTitle: 'Thailand trip',
+      createdTrip: false, alreadySaved: false,
+    });
+    // Saving twice is a no-op, not a second copy — a save button on a phone
+    // gets double-tapped.
+    expect(second).toMatchObject({ status: 'saved', createdTrip: false, alreadySaved: true });
     expect(tables.destination_places).toHaveLength(1);
-    expect(tables.itinerary_places).toHaveLength(2);
-    expect(tables.itinerary_places.map((row) => row.place_id)).toEqual(['place-1', 'place-1']);
+    expect(tables.itinerary_places).toHaveLength(1);
+    expect(tables.itinerary_places[0].place_id).toBe('place-1');
   });
 
   it('creates a wishlist trip when the traveler has none for that country', async () => {
@@ -197,6 +204,7 @@ describe('savePlaceForTraveler', () => {
       tripId: 'trip-1',
       tripTitle: 'Songkran',
       createdTrip: false,
+      alreadySaved: false,
     });
     expect(tables.trip_plans).toHaveLength(3);
     expect(tables.itinerary_days[0].trip_id).toBe('trip-1');

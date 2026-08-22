@@ -107,10 +107,23 @@ export interface SavePlaceInput {
    * into the catalogue by scripts/csv-to-seed-sql.mjs.
    */
   contentSlug: string;
+  /**
+   * The trip to save onto, when the traveler has already answered a
+   * `needsChoice`. Omitted on a first attempt, which is what lets this function
+   * decide — or ask.
+   */
+  tripId?: string;
 }
 
 export type SavePlaceResult =
-  | { status: 'saved'; tripId: string; tripTitle: string; createdTrip: boolean }
+  | {
+      status: 'saved';
+      tripId: string;
+      tripTitle: string;
+      createdTrip: boolean;
+      /** True when it was already on this trip, so nothing was written. */
+      alreadySaved: boolean;
+    }
   | { status: 'needsChoice'; candidates: { id: string; title: string }[] };
 
 interface CatalogueRow {
@@ -167,12 +180,30 @@ export async function savePlaceForTraveler(
   // 2. Resolve the trip: theirs, this country, not already over. Matching uses
   //    the CATALOGUE's spelling of the country, because that is the string
   //    addIdeaToTrip will compare the place against.
-  const trip = await resolveTrip(supabase, userId, place.destination);
+  //
+  //    A tripId means the traveler has already answered a needsChoice, so the
+  //    question is settled and asking again would be a loop. RLS still decides
+  //    whether that trip is theirs to write to.
+  const trip = input.tripId
+    ? await chosenTrip(supabase, input.tripId)
+    : await resolveTrip(supabase, userId, place.destination);
   if (trip.status === 'ambiguous') {
     return { status: 'needsChoice', candidates: trip.candidates };
   }
 
-  // 3. A single trip — existing or just created. This is the only write.
+  // 3. Saving twice is a no-op, not a second copy. A save button on a phone gets
+  //    double-tapped, and a traveler who saves a place they saved last week
+  //    means "make sure this is on my trip", not "put it there twice".
+  if (await isAlreadyOnTrip(supabase, trip.id, place.id)) {
+    return {
+      status: 'saved',
+      tripId: trip.id,
+      tripTitle: trip.title,
+      createdTrip: trip.created,
+      alreadySaved: true,
+    };
+  }
+
   await addIdeaToTrip(supabase, trip.id, place.id);
 
   return {
@@ -180,7 +211,43 @@ export async function savePlaceForTraveler(
     tripId: trip.id,
     tripTitle: trip.title,
     createdTrip: trip.created,
+    alreadySaved: false,
   };
+}
+
+/** The trip the traveler picked. RLS hides anyone else's, so this 404s. */
+async function chosenTrip(supabase: SupabaseClient, tripId: string): Promise<ResolvedTrip> {
+  const { data, error } = await supabase
+    .from('trip_plans')
+    .select('id,title')
+    .eq('id', tripId)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL', 'Could not load that trip.');
+  if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  return { status: 'single', id: data.id as string, title: data.title as string, created: false };
+}
+
+/**
+ * Is this place already anywhere on this trip?
+ *
+ * Anywhere, not just Ideas: a traveler who has already scheduled this place on
+ * day two does not want it reappearing in Ideas as though it were new.
+ */
+async function isAlreadyOnTrip(
+  supabase: SupabaseClient,
+  tripId: string,
+  placeId: string
+): Promise<boolean> {
+  const { data: days } = await supabase.from('itinerary_days').select('id').eq('trip_id', tripId);
+  const dayIds = (days ?? []).map((day) => day.id as string);
+  if (!dayIds.length) return false;
+
+  const { count } = await supabase
+    .from('itinerary_places')
+    .select('*', { count: 'exact', head: true })
+    .eq('place_id', placeId)
+    .in('itinerary_day_id', dayIds);
+  return (count ?? 0) > 0;
 }
 
 type ResolvedTrip =

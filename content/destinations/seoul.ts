@@ -172,6 +172,7 @@ export const seoul: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'south-korea:gyeongbokgung-palace',
         name: { en: 'Gyeongbokgung, in hanbok', km: 'ព្រះបរមរាជវាំង Gyeongbokgung ក្នុងសំលៀកបំពាក់ hanbok' },
         why: {
           en: 'Rent a hanbok outside the gate and entry to the palace is free. That is the actual rule, not a trick.',
@@ -183,6 +184,7 @@ export const seoul: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'south-korea:myeongdong-shopping-street',
         name: { en: 'Myeongdong at night', km: 'Myeongdong ពេលយប់' },
         why: {
           en: 'Skincare, street food and the crowd. Prices are better one street back from the main drag.',
@@ -194,6 +196,7 @@ export const seoul: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'south-korea:ihwa-mural-village',
         name: { en: 'Ihwa Mural Village', km: 'ភូមិគំនូរជញ្ជាំង Ihwa' },
         why: {
           en: 'A steep hillside neighbourhood painted by artists, with the best free view over the old city. People live here — go quietly.',

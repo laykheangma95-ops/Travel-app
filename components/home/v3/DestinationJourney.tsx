@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import type { DestinationGuide, Bi, Source } from '@/content/schema';
 import { useBi, useLang } from '@/lib/i18n';
+import { SavePlaceButton } from '@/components/travel/SavePlaceButton';
 import { formatRate } from '@/lib/live/rates';
 import { DestinationScene } from './destinationScene';
 import { Recommendation } from './Recommendation';
@@ -646,6 +647,15 @@ export function DestinationJourney({
                 {p.roughCostUsd != null &&
                   ` · ${p.roughCostUsd === 0 ? bi({ en: 'free', km: 'ឥតគិតថ្លៃ' }) : `~$${p.roughCostUsd}`}`}
               </p>
+              {/* Reading about a place and doing something about it should not be
+                  two separate errands. tests/guideCatalogue.test.ts guarantees
+                  every contentSlug here resolves to a catalogue row. */}
+              <SavePlaceButton
+                contentSlug={p.contentSlug}
+                destination={guide.country.en}
+                placeName={p.name.en}
+                returnTo={`/destination/${guide.slug}`}
+              />
             </li>
           ))}
         </ul>

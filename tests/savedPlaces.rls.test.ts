@@ -136,21 +136,21 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
     expect(filed[0].sort_order).toBe(0);
   });
 
-  it('reuses one catalogue row and one trip when the same place is saved twice', async () => {
+  it('files a place once however many times it is saved', async () => {
     await seedEditorialPlace('thailand:wat-pho');
     const client = harness.clientFor(ALICE);
 
     const first = await savePlaceForTraveler(client, ALICE, WAT_PHO);
     const second = await savePlaceForTraveler(client, ALICE, WAT_PHO);
 
-    expect(first).toMatchObject({ status: 'saved', createdTrip: true });
-    expect(second).toMatchObject({ status: 'saved', createdTrip: false });
+    expect(first).toMatchObject({ status: 'saved', createdTrip: true, alreadySaved: false });
+    expect(second).toMatchObject({ status: 'saved', createdTrip: false, alreadySaved: true });
     if (first.status !== 'saved' || second.status !== 'saved') throw new Error('unreachable');
     expect(second.tripId).toBe(first.tripId);
 
     expect(await harness.rows('destination_places')).toHaveLength(1);
     expect(await harness.rows('trip_plans')).toHaveLength(1);
-    expect((await harness.rows('itinerary_places')).map((row) => row.sort_order)).toEqual([0, 1]);
+    expect((await harness.rows('itinerary_places')).map((row) => row.sort_order)).toEqual([0]);
   });
 
   it('gives two travelers separate trips off the one shared catalogue row', async () => {

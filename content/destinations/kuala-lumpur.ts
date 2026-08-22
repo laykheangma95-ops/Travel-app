@@ -173,6 +173,7 @@ export const kualaLumpur: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'malaysia:batu-caves',
         name: { en: 'Batu Caves', km: 'រូងភ្នំ Batu' },
         why: {
           en: '272 painted steps to a limestone cave temple, free to enter, and forty minutes on the commuter train from KL Sentral.',
@@ -184,6 +185,7 @@ export const kualaLumpur: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'malaysia:petronas-twin-towers',
         name: { en: 'Petronas Towers from KLCC Park', km: 'អគារ Petronas ពីសួន KLCC' },
         why: {
           en: 'The photograph is free from the park, and the fountain show runs in the evening. The Skybridge ticket sells out days ahead.',
@@ -195,6 +197,7 @@ export const kualaLumpur: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'malaysia:kampung-baru',
         name: { en: 'Kampung Baru on a Sunday morning', km: 'Kampung Baru ព្រឹកថ្ងៃអាទិត្យ' },
         why: {
           en: 'Wooden Malay houses and a village breakfast market, standing in the shadow of the towers. It is the oldest part of the city and almost nobody visits.',

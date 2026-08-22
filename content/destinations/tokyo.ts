@@ -199,6 +199,7 @@ export const tokyo: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'japan:sensoji-temple',
         name: { en: 'Senso-ji at dawn', km: 'វត្ត Senso-ji ពេលព្រឹកព្រលឹម' },
         why: {
           en: 'The oldest temple in Tokyo, and empty before seven. By ten it is shoulder to shoulder.',
@@ -210,6 +211,7 @@ export const tokyo: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'japan:shibuya-crossing',
         name: { en: 'Shibuya Crossing and Shibuya Sky', km: 'ផ្លូវឆ្លងកាត់ Shibuya និង Shibuya Sky' },
         why: {
           en: 'The photograph everyone comes home with. Book Shibuya Sky for sunset a few days ahead — it sells out.',
@@ -221,6 +223,7 @@ export const tokyo: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'japan:yanaka-ginza',
         name: { en: 'Yanaka Ginza', km: 'ផ្លូវ Yanaka Ginza' },
         why: {
           en: 'A low wooden shopping street that survived the war and the bubble. Cats, croquettes, no tour buses.',
@@ -231,6 +234,7 @@ export const tokyo: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'japan:todoroki-valley',
         name: { en: 'Todoroki Valley', km: 'ជ្រលង Todoroki' },
         why: {
           en: 'A cool green ravine inside the city limits, ten minutes from a train station and almost never in a guidebook.',

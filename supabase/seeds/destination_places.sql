@@ -1,5 +1,5 @@
 -- Generated from supabase/seeds/destination_places.csv by scripts/csv-to-seed-sql.mjs -- do not edit directly.
--- 75 rows in 1 batch(es) of up to 500.
+-- 85 rows in 1 batch(es) of up to 500.
 
 insert into public.destination_places
   (destination, name, category, lat, lng, description, photo_url, source, content_slug)
@@ -78,6 +78,16 @@ values
   ('China', 'Dongmen Pedestrian Street', 'shopping', 22.5450, 114.1200, 'Shenzhen''s oldest shopping quarter, cheap clothing and electronics.', '', 'editorial', 'china:dongmen-pedestrian-street'),
   ('China', 'Shenzhen Bao''an International Airport', 'transport', 22.6393, 113.8107, 'Shenzhen''s airport, a common connection point for southern China.', '', 'editorial', 'china:shenzhen-baoan-international-airport'),
   ('China', 'Chengdu Research Base of Giant Panda Breeding', 'spot', 30.7333, 104.1500, 'Go at opening time — the pandas are active early and asleep by midday.', '', 'editorial', 'china:chengdu-research-base-of-giant-panda-breeding'),
-  ('China', 'Jinli Ancient Street', 'food', 30.6420, 104.0430, 'Chengdu lane of Sichuan street food, tea houses and evening lanterns.', '', 'editorial', 'china:jinli-ancient-street')
+  ('China', 'Jinli Ancient Street', 'food', 30.6420, 104.0430, 'Chengdu lane of Sichuan street food, tea houses and evening lanterns.', '', 'editorial', 'china:jinli-ancient-street'),
+  ('Thailand', 'Bang Krachao', 'spot', 0, 0, 'A green river peninsula across from Bangkok, reached by ferry and best seen by bicycle.', '', 'editorial', 'thailand:bang-krachao'),
+  ('Vietnam', '42 Nguyen Hue', 'spot', 0, 0, 'A 1960s Saigon apartment block whose flats are now small cafes, one per balcony.', '', 'editorial', 'vietnam:42-nguyen-hue'),
+  ('Vietnam', 'Marble Mountains', 'spot', 0, 0, 'Limestone and marble hills south of Da Nang, with cave shrines and lookout steps.', '', 'editorial', 'vietnam:marble-mountains'),
+  ('Vietnam', 'Hai Van Pass', 'spot', 0, 0, 'The coastal mountain pass between Da Nang and Hue, usually ridden or driven for the views.', '', 'editorial', 'vietnam:hai-van-pass'),
+  ('Singapore', 'Mustafa Centre', 'shopping', 0, 0, 'A 24-hour Little India department store known for electronics, gold and groceries.', '', 'editorial', 'singapore:mustafa-centre'),
+  ('Singapore', 'Pulau Ubin', 'spot', 0, 0, 'An undeveloped island off the north-east coast, reached by bumboat from Changi Point.', '', 'editorial', 'singapore:pulau-ubin'),
+  ('South Korea', 'Ihwa Mural Village', 'spot', 0, 0, 'A hillside Seoul neighbourhood painted with murals and stairways, still residential.', '', 'editorial', 'south-korea:ihwa-mural-village'),
+  ('Japan', 'Yanaka Ginza', 'shopping', 0, 0, 'An old-Tokyo shopping street of small independent shops and street-food stalls.', '', 'editorial', 'japan:yanaka-ginza'),
+  ('Japan', 'Todoroki Valley', 'spot', 0, 0, 'A short wooded ravine walk inside Tokyo, following a stream below street level.', '', 'editorial', 'japan:todoroki-valley'),
+  ('Malaysia', 'Kampung Baru', 'spot', 0, 0, 'A Malay village quarter inside central Kuala Lumpur, busiest for its morning market.', '', 'editorial', 'malaysia:kampung-baru')
 on conflict (destination, name) where created_by is null
 do update set content_slug = excluded.content_slug;
