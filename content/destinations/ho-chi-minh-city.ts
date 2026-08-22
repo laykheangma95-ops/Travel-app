@@ -89,6 +89,7 @@ export const hoChiMinhCity: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'vietnam:war-remnants-museum',
         name: { en: 'War Remnants Museum', km: 'សារមន្ទីរដាននៃសង្គ្រាម' },
         why: {
           en: 'Hard, and the most honest hour you will spend in the city. Go in the morning while you still have the energy for it.',
@@ -99,6 +100,7 @@ export const hoChiMinhCity: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'vietnam:ben-thanh-market',
         name: { en: 'Ben Thanh market and the night street', km: 'ផ្សារ Ben Thanh និងផ្លូវពេលយប់' },
         why: {
           en: 'Bargain to about half the first price inside the market. The night stalls outside are cheaper and better for food.',
@@ -110,6 +112,7 @@ export const hoChiMinhCity: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'vietnam:42-nguyen-hue',
         name: { en: 'The apartment block at 42 Nguyen Hue', km: 'អគារផ្ទះល្វែងលេខ ៤២ Nguyen Hue' },
         why: {
           en: 'A 1960s apartment building where every flat is now a tiny café or bookshop. Ride the old lift up and work your way down.',

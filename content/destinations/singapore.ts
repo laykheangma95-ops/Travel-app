@@ -179,6 +179,7 @@ export const singapore: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'singapore:gardens-by-the-bay',
         name: { en: 'Gardens by the Bay after dark', km: 'Gardens by the Bay ពេលយប់' },
         why: {
           en: 'The outdoor gardens and the Supertree light show are free. The two conservatories are the part you pay for, and the Cloud Forest is worth it.',
@@ -190,6 +191,7 @@ export const singapore: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'singapore:mustafa-centre',
         name: { en: 'Mustafa Centre', km: 'មជ្ឈមណ្ឌល Mustafa' },
         why: {
           en: 'Open around the clock, and the reason half the suitcases leaving Changi are overweight. Electronics, gold, medicine, everything.',
@@ -201,6 +203,7 @@ export const singapore: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'singapore:pulau-ubin',
         name: { en: 'Pulau Ubin', km: 'កោះ Pulau Ubin' },
         why: {
           en: 'A ten-minute bumboat from Changi Village to the Singapore of the 1960s — dirt tracks, wild boar, rented bicycles, no skyline.',

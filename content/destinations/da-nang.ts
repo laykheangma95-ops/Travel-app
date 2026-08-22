@@ -88,6 +88,7 @@ export const daNang: DestinationGuide = {
     list: [
       {
         kind: 'landmark',
+        contentSlug: 'vietnam:marble-mountains',
         name: { en: 'Marble Mountains at opening time', km: 'ភ្នំថ្មម៉ាប៉ែលពេលបើកទ្វារ' },
         why: {
           en: 'Caves, pagodas and a lift to the top for the people who do not want the stairs. It empties by nine because the tour buses go elsewhere.',
@@ -99,6 +100,7 @@ export const daNang: DestinationGuide = {
       },
       {
         kind: 'popular-with-cambodians',
+        contentSlug: 'vietnam:hoi-an-ancient-town',
         name: { en: 'Hoi An old town after the day trippers leave', km: 'ទីក្រុងចាស់ហូយអានក្រោយពេលទេសចរចេញ' },
         why: {
           en: 'The lanterns come on around six and the coach parties leave around seven. That hour in between is the whole reason to come.',
@@ -110,6 +112,7 @@ export const daNang: DestinationGuide = {
       },
       {
         kind: 'hidden-gem',
+        contentSlug: 'vietnam:hai-van-pass',
         name: { en: 'Hai Van Pass by the back of a bike', km: 'ផ្លូវឆ្លងភ្នំ Hai Van តាមក្រោយម៉ូតូ' },
         why: {
           en: 'The mountain road north out of the city, with the sea on one side the whole way. Hire a driver rather than riding it yourself if you have never ridden in Vietnam.',
