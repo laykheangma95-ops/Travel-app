@@ -67,20 +67,6 @@ function fakeSupabase(seed: Record<string, Row[]> = {}) {
         written = [created];
         return api;
       },
-      upsert(row: Row, options: { onConflict: string; ignoreDuplicates?: boolean }) {
-        const key = options.onConflict;
-        const clash = rows().some(
-          (existing) => existing[key] != null && existing[key] === row[key]
-        );
-        if (clash && options.ignoreDuplicates) {
-          written = [];
-          return api;
-        }
-        const created = { id: nextId(), ...row };
-        rows().push(created);
-        written = [created];
-        return api;
-      },
       maybeSingle() {
         return Promise.resolve({ data: matched()[0] ?? null, error: null });
       },
@@ -108,12 +94,17 @@ function fakeSupabase(seed: Record<string, Row[]> = {}) {
 
 const USER = 'user-1';
 
-const WAT_PHO = {
+const WAT_PHO = { destination: 'Thailand', contentSlug: 'thailand:wat-pho' };
+
+/** The catalogue row the generated seed file puts there ahead of any save. */
+const SEEDED_WAT_PHO = {
+  id: 'place-1',
   destination: 'Thailand',
-  contentSlug: 'bangkok:wat-pho',
   name: 'Wat Pho',
-  description: 'Reclining Buddha.',
-  category: 'spot' as const,
+  category: 'spot',
+  content_slug: 'thailand:wat-pho',
+  created_by: null,
+  source: 'editorial',
 };
 
 describe('addIdeaToTrip', () => {
@@ -149,8 +140,9 @@ describe('addIdeaToTrip', () => {
 });
 
 describe('savePlaceForTraveler', () => {
-  it('reuses the catalogue row on a second save of the same slug', async () => {
+  it('files the seeded catalogue row without ever writing to the catalogue', async () => {
     const { client, tables } = fakeSupabase({
+      destination_places: [SEEDED_WAT_PHO],
       trip_plans: [
         { id: 'trip-1', user_id: USER, title: 'Thailand trip', destination: 'Thailand', end_date: null },
       ],
@@ -159,19 +151,17 @@ describe('savePlaceForTraveler', () => {
     const first = await savePlaceForTraveler(client, USER, WAT_PHO);
     const second = await savePlaceForTraveler(client, USER, WAT_PHO);
 
-    expect(first.status).toBe('saved');
-    expect(second.status).toBe('saved');
-    // The point of content_slug: one guide entry, one catalogue row, however
-    // many times it is saved.
+    expect(first).toEqual({ status: 'saved', tripId: 'trip-1', tripTitle: 'Thailand trip', createdTrip: false });
+    expect(second).toMatchObject({ status: 'saved', createdTrip: false });
+    // One guide entry, one catalogue row, however many times it is saved — and
+    // saving never adds one.
     expect(tables.destination_places).toHaveLength(1);
-    expect(tables.destination_places[0].content_slug).toBe('bangkok:wat-pho');
-    expect(tables.destination_places[0].created_by).toBeNull();
-    expect(tables.destination_places[0].source).toBe('editorial');
     expect(tables.itinerary_places).toHaveLength(2);
+    expect(tables.itinerary_places.map((row) => row.place_id)).toEqual(['place-1', 'place-1']);
   });
 
   it('creates a wishlist trip when the traveler has none for that country', async () => {
-    const { client, tables } = fakeSupabase();
+    const { client, tables } = fakeSupabase({ destination_places: [SEEDED_WAT_PHO] });
 
     const result = await savePlaceForTraveler(client, USER, WAT_PHO);
 
@@ -190,11 +180,12 @@ describe('savePlaceForTraveler', () => {
     expect(tables.itinerary_places).toHaveLength(1);
   });
 
-  it('reuses the one open trip it finds, ignoring case and finished trips', async () => {
+  it('reuses the one open trip, ignoring finished trips and other travelers', async () => {
     const { client, tables } = fakeSupabase({
+      destination_places: [SEEDED_WAT_PHO],
       trip_plans: [
         { id: 'trip-old', user_id: USER, title: 'Last year', destination: 'Thailand', end_date: '2020-01-05' },
-        { id: 'trip-1', user_id: USER, title: 'Songkran', destination: 'thailand', end_date: '2099-04-20' },
+        { id: 'trip-1', user_id: USER, title: 'Songkran', destination: 'Thailand', end_date: '2099-04-20' },
         { id: 'trip-other', user_id: 'user-2', title: 'Not mine', destination: 'Thailand', end_date: null },
       ],
     });
@@ -209,14 +200,29 @@ describe('savePlaceForTraveler', () => {
     });
     expect(tables.trip_plans).toHaveLength(3);
     expect(tables.itinerary_days[0].trip_id).toBe('trip-1');
-    // Stamped with the trip's stored casing, not the caller's, or the exact
-    // destination match in addIdeaToTrip would refuse its own new row.
-    expect(tables.destination_places[0].destination).toBe('thailand');
-    expect(tables.itinerary_places).toHaveLength(1);
+  });
+
+  it('does not reuse a trip whose destination differs in case', async () => {
+    // trip_plans.destination is free text, and the whole itinerary feature
+    // compares it exactly. A "thailand" trip cannot hold a "Thailand" place, so
+    // the traveler gets a trip that actually works instead of a broken one.
+    const { client, tables } = fakeSupabase({
+      destination_places: [SEEDED_WAT_PHO],
+      trip_plans: [
+        { id: 'trip-lower', user_id: USER, title: 'songkran', destination: 'thailand', end_date: null },
+      ],
+    });
+
+    const result = await savePlaceForTraveler(client, USER, WAT_PHO);
+
+    expect(result).toMatchObject({ status: 'saved', createdTrip: true });
+    expect(tables.trip_plans).toHaveLength(2);
+    expect(tables.trip_plans[1].destination).toBe('Thailand');
   });
 
   it('asks which trip when there are two, and writes nothing at all', async () => {
     const { client, tables } = fakeSupabase({
+      destination_places: [SEEDED_WAT_PHO],
       trip_plans: [
         { id: 'trip-1', user_id: USER, title: 'Songkran', destination: 'Thailand', end_date: '2099-04-20' },
         { id: 'trip-2', user_id: USER, title: 'Islands', destination: 'Thailand', end_date: null },
@@ -232,16 +238,22 @@ describe('savePlaceForTraveler', () => {
         { id: 'trip-2', title: 'Islands' },
       ],
     });
-    // A no-op means a no-op: no catalogue row, no third trip, no Ideas day.
-    expect(tables.destination_places).toHaveLength(0);
+    // A no-op means a no-op: no third trip, no Ideas day, nothing filed.
     expect(tables.trip_plans).toHaveLength(2);
     expect(tables.itinerary_days).toHaveLength(0);
     expect(tables.itinerary_places).toHaveLength(0);
   });
+
+  it('refuses a slug the seed has not put in the catalogue', async () => {
+    const { client, tables } = fakeSupabase();
+
+    await expect(savePlaceForTraveler(client, USER, WAT_PHO)).rejects.toThrow(
+      'That place is not in our guide yet.'
+    );
+    expect(tables.trip_plans).toHaveLength(0);
+  });
 });
 
-// NOTE: this fake grants every write. It proves the control flow, not that the
-// database will accept it. `createPlace` inserts with created_by NULL, and the
-// only INSERT policy on destination_places is `destination_places_insert_own`
-// — WITH CHECK (created_by = auth.uid()) — which NULL fails. Against a real
-// Supabase project that insert is rejected until a policy migration allows it.
+// NOTE: this fake grants every write, so it proves control flow and nothing
+// about what the database will allow. tests/savedPlaces.rls.test.ts runs the
+// same functions against a real Postgres with the real policies applied.

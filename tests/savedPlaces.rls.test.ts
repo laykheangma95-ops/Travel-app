@@ -7,11 +7,14 @@
 // as the `authenticated` role carrying a real JWT claim, and Row Level Security
 // decides what is allowed. Nothing here is mocked away.
 //
-// Two of these tests assert a FAILURE. That is deliberate — they pin down the
-// two things that block this feature from working in production, so the day
-// someone fixes a policy the test turns red and tells them to update it.
+// It also applies the real generated seed file, supabase/seeds/destination_places.sql,
+// so the catalogue this feature depends on is checked end to end: it applies, it
+// re-runs without duplicating, and it backfills slugs onto rows that were seeded
+// before migration 011 existed.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { addIdeaToTrip, savePlaceForTraveler, type SavePlaceInput } from '@/lib/travel/savedPlaces';
 import { createHarness, type Harness } from './support/pgHarness';
@@ -19,13 +22,7 @@ import { createHarness, type Harness } from './support/pgHarness';
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
 
-const WAT_PHO: SavePlaceInput = {
-  destination: 'Thailand',
-  contentSlug: 'bangkok:wat-pho',
-  name: 'Wat Pho',
-  description: 'Reclining Buddha.',
-  category: 'spot',
-};
+const WAT_PHO: SavePlaceInput = { destination: 'Thailand', contentSlug: 'thailand:wat-pho' };
 
 let harness: Harness;
 
@@ -43,7 +40,7 @@ afterAll(async () => {
   await harness.close();
 });
 
-/** What a guide-content seed migration would put in the catalogue up front. */
+/** One catalogue row, as the generated seed file would have written it. */
 async function seedEditorialPlace(slug: string, destination = 'Thailand') {
   const rows = await harness.asAdmin(
     `INSERT INTO destination_places
@@ -91,7 +88,7 @@ describe('the database itself', () => {
   });
 
   it('shows the editorial catalogue to everyone and private places to nobody else', async () => {
-    await seedEditorialPlace('bangkok:wat-pho');
+    await seedEditorialPlace('thailand:wat-pho');
     await harness.asAdmin(
       `INSERT INTO destination_places
          (destination,name,category,lat,lng,description,source,created_by,content_slug)
@@ -112,7 +109,7 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
   // the catalogue up front, so saving only ever reads them.
 
   it('creates a wishlist trip and files the place, under real RLS', async () => {
-    const placeId = await seedEditorialPlace('bangkok:wat-pho');
+    const placeId = await seedEditorialPlace('thailand:wat-pho');
 
     const result = await savePlaceForTraveler(harness.clientFor(ALICE), ALICE, WAT_PHO);
 
@@ -140,7 +137,7 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
   });
 
   it('reuses one catalogue row and one trip when the same place is saved twice', async () => {
-    await seedEditorialPlace('bangkok:wat-pho');
+    await seedEditorialPlace('thailand:wat-pho');
     const client = harness.clientFor(ALICE);
 
     const first = await savePlaceForTraveler(client, ALICE, WAT_PHO);
@@ -157,7 +154,7 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
   });
 
   it('gives two travelers separate trips off the one shared catalogue row', async () => {
-    await seedEditorialPlace('bangkok:wat-pho');
+    await seedEditorialPlace('thailand:wat-pho');
 
     const forAlice = await savePlaceForTraveler(harness.clientFor(ALICE), ALICE, WAT_PHO);
     const forBob = await savePlaceForTraveler(harness.clientFor(BOB), BOB, WAT_PHO);
@@ -171,7 +168,7 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
   });
 
   it('asks which trip when two are open, and writes nothing', async () => {
-    await seedEditorialPlace('bangkok:wat-pho');
+    await seedEditorialPlace('thailand:wat-pho');
     const client = harness.clientFor(ALICE);
     await client.from('trip_plans').insert({ user_id: ALICE, title: 'Songkran', destination: 'Thailand', end_date: '2099-04-20' });
     await client.from('trip_plans').insert({ user_id: ALICE, title: 'Islands', destination: 'Thailand', end_date: null });
@@ -187,16 +184,32 @@ describe('savePlaceForTraveler, catalogue already seeded', () => {
     expect(await harness.rows('itinerary_places')).toHaveLength(0);
   });
 
-  it('ignores a trip that has already ended, and matches destination case-insensitively', async () => {
-    await seedEditorialPlace('bangkok:wat-pho', 'thailand');
+  it('ignores a trip that has already ended', async () => {
+    await seedEditorialPlace('thailand:wat-pho');
     const client = harness.clientFor(ALICE);
     await client.from('trip_plans').insert({ user_id: ALICE, title: 'Last year', destination: 'Thailand', end_date: '2020-01-05' });
-    await client.from('trip_plans').insert({ user_id: ALICE, title: 'Songkran', destination: 'thailand', end_date: '2099-04-20' });
+    await client.from('trip_plans').insert({ user_id: ALICE, title: 'Songkran', destination: 'Thailand', end_date: '2099-04-20' });
 
-    const result = await savePlaceForTraveler(client, ALICE, { ...WAT_PHO, destination: 'THAILAND' });
+    const result = await savePlaceForTraveler(client, ALICE, WAT_PHO);
 
     expect(result).toMatchObject({ status: 'saved', tripTitle: 'Songkran', createdTrip: false });
     expect(await harness.rows('trip_plans')).toHaveLength(2);
+  });
+
+  it('leaves a case-mismatched trip alone and makes one that works', async () => {
+    await seedEditorialPlace('thailand:wat-pho');
+    const client = harness.clientFor(ALICE);
+    await client.from('trip_plans').insert({ user_id: ALICE, title: 'songkran', destination: 'thailand', end_date: null });
+
+    const result = await savePlaceForTraveler(client, ALICE, WAT_PHO);
+
+    expect(result).toMatchObject({ status: 'saved', createdTrip: true });
+    const trips = await harness.rows('trip_plans');
+    expect(trips).toHaveLength(2);
+    // The place is filed against the canonical trip, the one whose add-place
+    // sheet will actually list this country's catalogue.
+    const filed = await harness.rows('itinerary_places');
+    expect(filed).toHaveLength(1);
   });
 });
 
@@ -206,7 +219,7 @@ describe("addIdeaToTrip keeps the itinerary route's guarantees", () => {
       `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'Alice trip','Thailand') RETURNING id`,
       [ALICE]
     );
-    const placeId = await seedEditorialPlace('bangkok:wat-pho');
+    const placeId = await seedEditorialPlace('thailand:wat-pho');
 
     // Bob cannot even see Alice's trip, so this stops at the trip lookup.
     await expect(
@@ -220,7 +233,7 @@ describe("addIdeaToTrip keeps the itinerary route's guarantees", () => {
       `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'Thailand trip','Thailand') RETURNING id`,
       [ALICE]
     );
-    const placeId = await seedEditorialPlace('tokyo:senso-ji', 'Japan');
+    const placeId = await seedEditorialPlace('japan:senso-ji', 'Japan');
 
     await expect(
       addIdeaToTrip(harness.clientFor(ALICE), trips[0].id as string, placeId)
@@ -228,16 +241,16 @@ describe("addIdeaToTrip keeps the itinerary route's guarantees", () => {
   });
 });
 
-describe('BLOCKED until a decision is made', () => {
-  // ── Blocker 1 ──────────────────────────────────────────────────────────────
-  // createPlace() inserts with created_by NULL. The only INSERT policy on the
-  // table is destination_places_insert_own — WITH CHECK (created_by = auth.uid())
-  // — and NULL fails it. Delete this test once a policy allows the insert.
-  it('rejects a traveler creating an editorial catalogue row', async () => {
+describe('the catalogue stays closed to travelers', () => {
+  // Under option B nobody but the seed writes the catalogue. This is no longer
+  // a blocker, it is the property being relied on: a traveler who tried to add
+  // an editorial-looking row that every other traveler would see is refused by
+  // the database, not by a check in application code that could be bypassed.
+  it('refuses a traveler creating an editorial catalogue row', async () => {
     const client = harness.clientFor(ALICE);
     const { error } = await client.from('destination_places').insert({
       destination: 'Thailand', name: 'Wat Pho', category: 'spot', lat: 0, lng: 0,
-      description: '', source: 'editorial', created_by: null, content_slug: 'bangkok:wat-pho',
+      description: '', source: 'editorial', created_by: null, content_slug: 'thailand:wat-pho',
     });
 
     expect(error).not.toBeNull();
@@ -245,41 +258,66 @@ describe('BLOCKED until a decision is made', () => {
     expect(await harness.rows('destination_places')).toHaveLength(0);
   });
 
-  it('cannot save a place that is not already in the catalogue', async () => {
-    // The end-to-end consequence of blocker 1: with nothing seeded, the save
-    // fails outright. Note the trip is still created first — see the report.
+  it('refuses an unseeded slug without creating a stray trip', async () => {
     await expect(savePlaceForTraveler(harness.clientFor(ALICE), ALICE, WAT_PHO)).rejects.toThrow(
-      'Could not save that place.'
+      'That place is not in our guide yet.'
     );
+    // The lookup happens before anything is written, so a guide entry that was
+    // published without its seed row cannot litter the account with empty trips.
+    expect(await harness.rows('trip_plans')).toHaveLength(0);
+    expect(await harness.rows('itinerary_days')).toHaveLength(0);
   });
 
-  // ── Blocker 2 ──────────────────────────────────────────────────────────────
-  // Migration 011's unique index is PARTIAL (WHERE content_slug IS NOT NULL).
-  // Postgres will only infer a partial index if the statement repeats that
-  // predicate, and supabase-js's .upsert({ onConflict }) cannot emit one — so
-  // the "idempotent under concurrent calls" behaviour does not work today.
-  it('cannot infer the partial unique index from ON CONFLICT (content_slug)', async () => {
-    await seedEditorialPlace('bangkok:wat-pho');
-
+  it('refuses a slug that belongs to a different country', async () => {
+    await seedEditorialPlace('japan:senso-ji', 'Japan');
     await expect(
-      harness.asAdmin(
-        `INSERT INTO destination_places
-           (destination,name,category,lat,lng,description,source,created_by,content_slug)
-         VALUES ('Thailand','Wat Pho','spot',0,0,'','editorial',NULL,'bangkok:wat-pho')
-         ON CONFLICT (content_slug) DO NOTHING`
-      )
-    ).rejects.toThrow(/no unique or exclusion constraint matching the ON CONFLICT/);
+      savePlaceForTraveler(harness.clientFor(ALICE), ALICE, {
+        destination: 'Thailand',
+        contentSlug: 'japan:senso-ji',
+      })
+    ).rejects.toThrow('That place does not belong to that destination.');
+    expect(await harness.rows('trip_plans')).toHaveLength(0);
+  });
+});
 
-    // Spelling the predicate out works — which is what a fix would have to do.
-    await expect(
-      harness.asAdmin(
-        `INSERT INTO destination_places
-           (destination,name,category,lat,lng,description,source,created_by,content_slug)
-         VALUES ('Thailand','Wat Pho','spot',0,0,'','editorial',NULL,'bangkok:wat-pho')
-         ON CONFLICT (content_slug) WHERE content_slug IS NOT NULL DO NOTHING`
-      )
-    ).resolves.toBeDefined();
+describe('the generated seed file', () => {
+  const seedPath = join(process.cwd(), 'supabase', 'seeds', 'destination_places.sql');
 
-    expect(await harness.rows('destination_places')).toHaveLength(1);
+  it('applies, is re-runnable, and gives every row a slug', async () => {
+    const seed = await readFile(seedPath, 'utf8');
+
+    await harness.asAdmin(seed);
+    const first = await harness.rows('destination_places');
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.every((row) => typeof row.content_slug === 'string' && row.content_slug)).toBe(true);
+
+    // Applying it twice must not duplicate the catalogue.
+    await harness.asAdmin(seed);
+    expect(await harness.rows('destination_places')).toHaveLength(first.length);
+  });
+
+  it('backfills the slug onto rows that were seeded before migration 011', async () => {
+    // Production already holds these rows with content_slug NULL. The seed has
+    // to fill them in rather than fail or insert a second copy.
+    await harness.asAdmin(
+      `INSERT INTO destination_places (destination,name,category,lat,lng,description,photo_url,source)
+       VALUES ('Thailand','Wat Pho','spot',13.7465,100.4927,'edited by hand','','editorial')`
+    );
+
+    await harness.asAdmin(await readFile(seedPath, 'utf8'));
+
+    const watPho = (await harness.rows('destination_places')).filter((row) => row.name === 'Wat Pho');
+    expect(watPho).toHaveLength(1);
+    expect(watPho[0].content_slug).toBe('thailand:wat-pho');
+    // Only content_slug is written on conflict, so a description someone edited
+    // in the database is not silently reverted by re-running the seed.
+    expect(watPho[0].description).toBe('edited by hand');
+  });
+
+  it('carries a slug for every row, all distinct', async () => {
+    await harness.asAdmin(await readFile(seedPath, 'utf8'));
+    const rows = await harness.rows('destination_places');
+    const slugs = rows.map((row) => row.content_slug);
+    expect(new Set(slugs).size).toBe(rows.length);
   });
 });

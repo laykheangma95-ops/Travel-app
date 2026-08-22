@@ -91,15 +91,22 @@ export async function addIdeaToTrip(
   return added.id as string;
 }
 
+/**
+ * What a save needs to know.
+ *
+ * The place's name, description and category are deliberately absent. The
+ * seeded catalogue row is the source of truth for all three; accepting them
+ * from the caller would invite the belief that editing them has an effect, or
+ * let one traveler rename a place for everybody else.
+ */
 export interface SavePlaceInput {
   /** Country name, matching `trip_plans.destination`. */
   destination: string;
-  /** Stable identifier for the guide entry, e.g. "bangkok:wat-pho". */
+  /**
+   * Stable identifier for the guide entry, e.g. "thailand:wat-pho", generated
+   * into the catalogue by scripts/csv-to-seed-sql.mjs.
+   */
   contentSlug: string;
-  name: string;
-  /** May be empty — a guide entry is not required to carry prose. */
-  description: string;
-  category: ItineraryCategory;
 }
 
 export type SavePlaceResult =
@@ -109,16 +116,17 @@ export type SavePlaceResult =
 interface CatalogueRow {
   id: string;
   category: ItineraryCategory;
+  destination: string;
 }
 
-/** The catalogue row a slug names, or null the first time it is ever saved. */
+/** The catalogue row a slug names, or null when the guide entry is not seeded. */
 async function placeBySlug(
   supabase: SupabaseClient,
   contentSlug: string
 ): Promise<CatalogueRow | null> {
   const { data, error } = await supabase
     .from('destination_places')
-    .select('id,category')
+    .select('id,category,destination')
     .eq('content_slug', contentSlug)
     .maybeSingle();
   if (error) throw new ApiError('INTERNAL', 'Could not look up that place.');
@@ -138,23 +146,33 @@ export async function savePlaceForTraveler(
   userId: string,
   input: SavePlaceInput
 ): Promise<SavePlaceResult> {
-  // 1. Resolve the catalogue row. Read only, for now: if the trip turns out to
-  //    be ambiguous this function must leave no trace, so the INSERT that backs
-  //    a first-ever save is deferred until we know the save will complete.
-  const existingPlace = await placeBySlug(supabase, input.contentSlug);
+  // 1. Resolve the catalogue row. This is a read, and only a read. The
+  //    catalogue is seeded from guide content by
+  //    supabase/seeds/destination_places.sql, so a slug that is not there is a
+  //    content problem — a guide entry published without its seed row — and
+  //    inventing a row here would paper over it with a place that has no
+  //    coordinates and no description.
+  const place = await placeBySlug(supabase, input.contentSlug);
+  if (!place) {
+    throw new ApiError('NOT_FOUND', 'That place is not in our guide yet.');
+  }
 
-  // 2. Resolve the trip: theirs, this country, not already over.
-  const trip = await resolveTrip(supabase, userId, input.destination);
+  // The caller names the country as well as the slug. If the two disagree the
+  // guide is pointing at the wrong place, and filing it would put, say, a Tokyo
+  // temple on a Thailand trip.
+  if (place.destination.trim().toLowerCase() !== input.destination.trim().toLowerCase()) {
+    throw new ApiError('BAD_REQUEST', 'That place does not belong to that destination.');
+  }
+
+  // 2. Resolve the trip: theirs, this country, not already over. Matching uses
+  //    the CATALOGUE's spelling of the country, because that is the string
+  //    addIdeaToTrip will compare the place against.
+  const trip = await resolveTrip(supabase, userId, place.destination);
   if (trip.status === 'ambiguous') {
     return { status: 'needsChoice', candidates: trip.candidates };
   }
 
-  // 3. A single trip — existing or just created. Now the writes can happen.
-  //    The catalogue row is stamped with the TRIP'S destination string, not the
-  //    caller's: addIdeaToTrip matches the two exactly, so a trip stored as
-  //    "thailand" and an input of "Thailand" would otherwise create a place the
-  //    trip is not allowed to hold.
-  const place = existingPlace ?? (await createPlace(supabase, input, trip.destination));
+  // 3. A single trip — existing or just created. This is the only write.
   await addIdeaToTrip(supabase, trip.id, place.id);
 
   return {
@@ -166,7 +184,7 @@ export async function savePlaceForTraveler(
 }
 
 type ResolvedTrip =
-  | { status: 'single'; id: string; title: string; destination: string; created: boolean }
+  | { status: 'single'; id: string; title: string; created: boolean }
   | { status: 'ambiguous'; candidates: { id: string; title: string }[] };
 
 async function resolveTrip(
@@ -185,12 +203,19 @@ async function resolveTrip(
     .or(`end_date.is.null,end_date.gte.${today}`);
   if (error) throw new ApiError('INTERNAL', 'Could not load your trips.');
 
-  // ilike treats `_` and `%` as wildcards, so the exact lower()=lower() match
-  // the caller asked for is settled here rather than left to the pattern.
-  const wanted = destination.trim().toLowerCase();
-  const matches = (data ?? []).filter(
-    (row) => String(row.destination ?? '').trim().toLowerCase() === wanted
-  );
+  // ilike narrows the round trip; the decision is made here, on an EXACT match.
+  //
+  // Not lower()=lower(), deliberately. `trip_plans.destination` is free text
+  // (tripWrites.ts validates length, not vocabulary) so a trip can be stored as
+  // "thailand" while the catalogue says "Thailand" — and every other part of the
+  // itinerary feature compares destinations exactly: snapshot() loads
+  // curatedPlaces with .eq, and so does addPlace. A case-insensitive match here
+  // would hand back a trip that addIdeaToTrip then refuses, and whose add-place
+  // sheet is empty anyway. Treating it as "no trip for this country" gives the
+  // traveler a trip that works, rather than filing a place into one that does
+  // not. See the note in the report about validating destination properly.
+  const wanted = destination.trim();
+  const matches = (data ?? []).filter((row) => String(row.destination ?? '').trim() === wanted);
 
   if (matches.length > 1) {
     return {
@@ -204,7 +229,6 @@ async function resolveTrip(
       status: 'single',
       id: matches[0].id as string,
       title: matches[0].title as string,
-      destination: matches[0].destination as string,
       created: false,
     };
   }
@@ -235,39 +259,6 @@ async function resolveTrip(
     status: 'single',
     id: created.id as string,
     title: (created.title as string) ?? title,
-    destination: columns.destination,
     created: true,
   };
-}
-
-async function createPlace(
-  supabase: SupabaseClient,
-  input: SavePlaceInput,
-  destination: string
-): Promise<CatalogueRow> {
-  // INSERT ... ON CONFLICT (content_slug) DO NOTHING, then re-select. Two
-  // travelers tapping save on the same guide entry at the same moment must land
-  // on one catalogue row; migration 011's partial unique index is what decides
-  // that, not a check-then-insert race in here.
-  const { error } = await supabase.from('destination_places').upsert(
-    {
-      destination,
-      name: input.name,
-      category: input.category,
-      // A place with no coordinates simply does not get a map pin — the same
-      // trade the addCustom branch of the itinerary route already makes.
-      lat: 0,
-      lng: 0,
-      description: input.description,
-      source: 'editorial',
-      created_by: null,
-      content_slug: input.contentSlug,
-    },
-    { onConflict: 'content_slug', ignoreDuplicates: true }
-  );
-  if (error) throw new ApiError('INTERNAL', 'Could not save that place.');
-
-  const place = await placeBySlug(supabase, input.contentSlug);
-  if (!place) throw new ApiError('INTERNAL', 'Could not save that place.');
-  return place;
 }
