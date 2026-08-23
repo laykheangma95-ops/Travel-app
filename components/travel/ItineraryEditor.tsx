@@ -148,7 +148,10 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
         setBusy(false);
       }
     },
-    [request]
+    // `lang` is listed even though `request` already depends on it: the success
+    // notice is worded here, so the dependency is real rather than inherited,
+    // and it must not go stale if `request` ever stops depending on it.
+    [request, lang]
   );
 
   const routeDay = data?.days.find((day) => day.id === tab) ?? null;

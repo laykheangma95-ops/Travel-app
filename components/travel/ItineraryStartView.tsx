@@ -18,7 +18,7 @@
 //      and points at the path that does work.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, CalendarDays, Check, Loader2, MapPinned, Sparkles, TriangleAlert } from 'lucide-react';
 import type { ItineraryPayload } from '@/lib/travel/itinerary';
 import type { DraftPace, DraftPreferences } from '@/lib/travel/smartDraft';
@@ -27,6 +27,12 @@ import { useLang } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual' | 'generating';
 type GenerationStage = 'reading' | 'building' | 'verifying';
+/**
+ * Whether this screen actually knows what is in the trip. 'failed' is the state
+ * that used to be indistinguishable from 'ready', and the reason a healthy trip
+ * could report itself as missing.
+ */
+type SnapshotState = 'loading' | 'ready' | 'failed';
 
 interface Snapshot {
   curatedCount: number;
@@ -47,6 +53,9 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
   const [mode, setMode] = useState<Mode>('choose');
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [snapshotState, setSnapshotState] = useState<SnapshotState>('loading');
+  /** The server's own words, when it gave any. Far better than a generic retry. */
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [stage, setStage] = useState<GenerationStage>('reading');
   const [preferences, setPreferences] = useState<DraftPreferences>({
@@ -55,24 +64,49 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
 
   // Read the trip once so this screen knows what it is about to overwrite and
   // whether there is anything to generate from.
-  useEffect(() => {
+  //
+  // THE BUG THIS FIXES: every failure here used to be swallowed — a non-ok
+  // response became null, and .catch() became undefined — so `snapshot` stayed
+  // null and `empty` evaluated false. A screen that had failed to load looked
+  // identical to one that had loaded fine, and it left "Build a smart draft"
+  // ENABLED. Pressing it then surfaced a raw server error ("That trip could not
+  // be found", "Could not read the latest trip details") on a trip that was
+  // perfectly healthy. The screen never offers an action it cannot confirm.
+  const loadSnapshot = useCallback(() => {
     let cancelled = false;
+    setSnapshotState('loading');
     fetch(`/api/travel/itinerary/${tripId}`, { credentials: 'include' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: ItineraryPayload | null) => {
-        if (cancelled || !body) return;
+      .then(async (response) => {
+        if (cancelled) return;
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: { message?: string } }
+            | null;
+          setSnapshotError(body?.error?.message ?? null);
+          setSnapshotState('failed');
+          return;
+        }
+        const body = (await response.json()) as ItineraryPayload;
         const scheduled = body.days.reduce((total, day) => total + day.places.length, 0);
         setSnapshot({
           curatedCount: body.curatedPlaces.length,
           existingCount: scheduled,
           savedCount: body.ideas.length,
         });
+        setSnapshotError(null);
+        setSnapshotState('ready');
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (cancelled) return;
+        setSnapshotError(null);
+        setSnapshotState('failed');
+      });
     return () => {
       cancelled = true;
     };
   }, [tripId]);
+
+  useEffect(() => loadSnapshot(), [loadSnapshot]);
 
   async function generate() {
     setError(null);
@@ -132,6 +166,10 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
   if (mode === 'generating') return <GeneratingView stage={stage} />;
 
   const empty = snapshot !== null && snapshot.curatedCount === 0;
+  // A smart draft needs places the server has confirmed. "We could not read the
+  // trip" and "we have not looked yet" are both reasons to withhold the button
+  // — not to offer it and let the traveler discover the failure by pressing it.
+  const canGenerate = snapshotState === 'ready' && !empty;
 
   return (
     <div className="night-canvas has-tabbar relative min-h-screen pb-20 text-white">
@@ -153,6 +191,30 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
           <p role="alert" className="mt-5 rounded-btn border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
           </p>
+        )}
+
+        {snapshotState === 'failed' && (
+          <div
+            role="alert"
+            className="mt-5 rounded-btn border border-danger/30 bg-danger/10 px-4 py-3.5"
+          >
+            <p className="flex items-start gap-2 text-sm leading-relaxed text-red-100">
+              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-red-200" aria-hidden="true" />
+              <span>
+                {snapshotError ??
+                  (lang === 'km'
+                    ? 'មិនអាចអានព័ត៌មានដំណើររបស់អ្នកបានទេ។ ដំណើររបស់អ្នកនៅដដែល — គ្រាន់តែយើងមិនអាចទាញវាឥឡូវនេះ។'
+                    : 'We could not read this trip just now. Your trip is safe — we simply could not load it. Check your connection and try again.')}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => loadSnapshot()}
+              className="mt-3 inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/20 px-4 text-sm font-semibold text-white transition-colors hover:border-gold-light/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+            >
+              {lang === 'km' ? 'ព្យាយាមម្ដងទៀត' : 'Try again'}
+            </button>
+          </div>
         )}
 
         {empty && (
@@ -202,7 +264,7 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
           <button
             type="button"
             onClick={startGenerate}
-            disabled={empty}
+            disabled={!canGenerate}
             className="group night-card text-left transition duration-200 hover:-translate-y-1 hover:border-gold-light/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:border-white/8 motion-reduce:hover:translate-y-0"
           >
             <div className="relative flex h-44 items-end justify-between overflow-hidden rounded-t-card bg-gradient-to-br from-[#282b52] via-[#644d78] to-[#d47e68] p-5">
@@ -219,7 +281,11 @@ export function ItineraryStartView({ tripId }: { tripId: string }) {
                 {lang === 'km' ? 'បង្កើតសេចក្តីព្រាងឆ្លាតវៃ' : 'Build a smart draft'}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-white/60">
-                {empty
+                {snapshotState === 'failed'
+                  ? lang === 'km'
+                    ? 'មិនអាចអានដំណើរបានទេ។ សូមព្យាយាមម្ដងទៀតខាងលើ។'
+                    : 'We could not read this trip. Try again above.'
+                  : empty
                   ? lang === 'km'
                     ? 'មិនអាចប្រើបានសម្រាប់គោលដៅនេះនៅឡើយទេ។'
                     : 'Not available for this destination yet.'

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
+import { firstUrlIn, parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
 
 // The three shapes Google's own Share button produces. Coordinates are read
 // out of the URL string; nothing here touches the network, which is the whole
@@ -254,5 +254,53 @@ describe('resolveFinalUrl — the allowlist is re-checked at every hop', () => {
     ).rejects.toThrow(/too many times/);
     expect(spy.mock.calls.length).toBeLessThanOrEqual(6);
     spy.mockRestore();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// firstUrlIn — what the OS share sheet actually hands /share/maps-link.
+//
+// Android's share sheet delivers a shared item as `url`, as `text`, or both.
+// Google Maps specifically shares as `text`: the place name and the link
+// together in one blob, not as a discrete `url` param. Reading only `url`
+// would receive nothing in the most common real case.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('firstUrlIn', () => {
+  it('pulls the link out of the text blob Google Maps shares', () => {
+    const shared = 'Wat Pho\nhttps://maps.app.goo.gl/BxT7q2mNc4vK1qEo8';
+    expect(firstUrlIn(shared)).toBe('https://maps.app.goo.gl/BxT7q2mNc4vK1qEo8');
+  });
+
+  it('takes the first link when the blob carries more than one', () => {
+    expect(firstUrlIn('see https://maps.app.goo.gl/aaa and https://example.com/bbb')).toBe(
+      'https://maps.app.goo.gl/aaa'
+    );
+  });
+
+  it('stops at whitespace rather than swallowing trailing words', () => {
+    expect(firstUrlIn('https://maps.app.goo.gl/aaa shared via Maps')).toBe(
+      'https://maps.app.goo.gl/aaa'
+    );
+  });
+
+  it('handles a bare link with no surrounding text', () => {
+    expect(firstUrlIn('https://www.google.com/maps/place/Wat+Pho/@13.7465,100.4927,17z')).toBe(
+      'https://www.google.com/maps/place/Wat+Pho/@13.7465,100.4927,17z'
+    );
+  });
+
+  it('returns null when the shared text carries no link at all', () => {
+    expect(firstUrlIn('Wat Pho')).toBeNull();
+    expect(firstUrlIn('')).toBeNull();
+  });
+
+  it('feeds the parser end to end, the way the share route does', () => {
+    const shared = 'Angkor Wat\nhttps://www.google.com/maps/place/Angkor+Wat/@13.4125,103.8670,15z';
+    const link = firstUrlIn(shared);
+    expect(link).not.toBeNull();
+    const parsed = parseGoogleMapsUrl(link as string);
+    expect(parsed?.name).toBe('Angkor Wat');
+    expect(parsed?.lat).toBeCloseTo(13.4125);
   });
 });
