@@ -266,6 +266,8 @@ const dicts = {
     'v3.save.cancel': 'Cancel',
     'v3.save.error': 'Could not save that. Try again.',
     'v3.save.offline': 'You are offline. Try again when you have signal.',
+    'v3.save.unavailable': 'Saving is not available right now. Try again soon.',
+    'v3.save.busy': 'Too many taps. Wait a moment, then try again.',
     'v3.fold.show': 'Show',
     'v3.fold.hide': 'Hide',
     // Field labels
@@ -565,6 +567,8 @@ const dicts = {
     'v3.save.cancel': 'បោះបង់',
     'v3.save.error': 'រក្សាទុកមិនបាន។ សូមព្យាយាមម្តងទៀត។',
     'v3.save.offline': 'អ្នកគ្មានអ៊ីនធឺណិត។ សូមព្យាយាមពេលមានសញ្ញា។',
+    'v3.save.unavailable': 'រក្សាទុកមិនអាចប្រើបានឥឡូវនេះ។ សូមព្យាយាមម្តងទៀតឆាប់ៗ។',
+    'v3.save.busy': 'អ្នកចុចញឹកញាប់ពេក។ សូមរង់ចាំបន្តិច រួចព្យាយាមម្តងទៀត។',
     'v3.fold.show': 'បង្ហាញ',
     'v3.fold.hide': 'លាក់',
     // Field labels
