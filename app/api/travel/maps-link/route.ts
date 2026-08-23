@@ -94,7 +94,14 @@ export function allowedMapsUrl(candidate: string): URL | null {
  * function: letting fetch follow the chain itself would surrender exactly the
  * check this route exists to perform.
  */
-export async function resolveFinalUrl(start: URL, deadline: number): Promise<URL> {
+export interface ResolvedChain {
+  url: URL;
+  /** Status of the final, non-redirect response. Lets a caller tell a real
+   *  Google page apart from a 403 egress denial or a dead short link. */
+  status: number;
+}
+
+export async function resolveFinalUrl(start: URL, deadline: number): Promise<ResolvedChain> {
   let current = start;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
@@ -120,10 +127,12 @@ export async function resolveFinalUrl(start: URL, deadline: number): Promise<URL
     }
 
     // Not a redirect: this is the end of the chain, wherever it landed.
-    if (response.status < 300 || response.status >= 400) return current;
+    if (response.status < 300 || response.status >= 400) {
+      return { url: current, status: response.status };
+    }
 
     const location = response.headers.get('location');
-    if (!location) return current;
+    if (!location) return { url: current, status: response.status };
 
     // Relative Location headers are legal, so resolve against the current URL
     // before validating — then validate the *result*, which is the only thing
@@ -195,14 +204,36 @@ export const POST = route(async (request, context) => {
     );
   }
 
-  const finalUrl = await resolveFinalUrl(start, Date.now() + TOTAL_TIMEOUT_MS);
-  const place = parseGoogleMapsUrl(finalUrl.toString());
+  const chain = await resolveFinalUrl(start, Date.now() + TOTAL_TIMEOUT_MS);
+  const place = parseGoogleMapsUrl(chain.url.toString());
 
   if (!place) {
+    // Two very different failures land here and they must not look the same in
+    // the log. A traveler pasting a Maps *search* has simply pasted something
+    // with no place in it. But a link that Google answered normally and that
+    // still yields no coordinates means the URL shape changed under us — that
+    // is our bug, it breaks the feature for everyone, and we want to hear about
+    // it from telemetry rather than from a traveler. Never log the URL itself.
+    log.warn(chain.status < 400 ? 'maps_link.unparsed' : 'maps_link.upstream_error', {
+      requestId: context.requestId,
+      host: chain.url.hostname,
+      status: chain.status,
+      expanded: chain.url.toString() !== start.toString(),
+    });
     throw new ApiError(
       'BAD_REQUEST',
       'We could not read a location from that link. Try the Share button on the place itself, or fill the form in below.'
     );
+  }
+
+  // Coordinates came out of a URL Google did not actually serve us — the link
+  // still parsed, so the traveler is fine, but the fetch half is not healthy.
+  if (chain.status >= 400) {
+    log.warn('maps_link.upstream_error', {
+      requestId: context.requestId,
+      host: chain.url.hostname,
+      status: chain.status,
+    });
   }
 
   return ok({ place }, { requestId: context.requestId });

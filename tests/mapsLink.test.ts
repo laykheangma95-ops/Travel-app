@@ -211,7 +211,8 @@ describe('resolveFinalUrl — the allowlist is re-checked at every hop', () => {
     });
 
     const final = await resolveFinalUrl(new URL('https://maps.app.goo.gl/abc123'), Date.now() + 8_000);
-    expect(final.toString()).toContain('/maps/place/Wat+Pho/@13.7465,100.4927,17z/');
+    expect(final.url.toString()).toContain('/maps/place/Wat+Pho/@13.7465,100.4927,17z/');
+    expect(final.status).toBe(200);
     spy.mockRestore();
   });
 
