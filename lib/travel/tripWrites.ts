@@ -88,6 +88,15 @@ export async function tripById(request: Request, tripId: string): Promise<TripSu
   // outside it and this threw NOT_FOUND on a trip that had just been created.
   const context = await loadTravelerContext(request, { ensureTripId: tripId });
   const trip = context.trips.find((candidate) => candidate.id === tripId);
-  if (!trip) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  // The row was written a moment ago and we simply could not read it back, so
+  // saying it "could not be found" told the traveler their trip had failed when
+  // it had not — and they pressed create again, leaving a duplicate behind. Say
+  // what is actually true: it is saved, we just cannot open it right now.
+  if (!trip) {
+    throw new ApiError(
+      'INTERNAL',
+      'Your trip was saved, but we could not open it just now. You will find it in your Trips list.'
+    );
+  }
   return trip;
 }

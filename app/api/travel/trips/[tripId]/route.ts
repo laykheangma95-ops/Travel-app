@@ -66,7 +66,7 @@ export const PATCH = route(
       .maybeSingle();
 
     if (error) throw new ApiError('INTERNAL', 'Could not save your changes. Please try again.');
-    if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+    if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be updated — it may have been deleted.');
 
     return ok({ trip: await tripById(request, tripId) });
   },
@@ -95,7 +95,7 @@ export const DELETE = route(
       .maybeSingle();
 
     if (error) throw new ApiError('INTERNAL', 'Could not delete that trip. Please try again.');
-    if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+    if (!data) throw new ApiError('NOT_FOUND', 'That trip has already been deleted.');
 
     return ok({ deleted: tripId });
   },
