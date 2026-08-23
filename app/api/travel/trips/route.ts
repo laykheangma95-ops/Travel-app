@@ -15,7 +15,7 @@
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
-import { loadTravelerContext } from '@/lib/travel/context';
+import { FULL_TRIP_LIMIT, loadTravelerContext } from '@/lib/travel/context';
 import { deriveTravelState } from '@/lib/travel/state';
 import { parseTripDraft, tripById } from '@/lib/travel/tripWrites';
 import { normalizeTripDraft } from '@/lib/travel/trips';
@@ -31,7 +31,9 @@ export const GET = route(
     // endpoint, there is no meaningful guest answer to "show me my trips".
     await requireUser(request);
 
-    const context = await loadTravelerContext(request);
+    // The traveler's own list, so it loads their whole history rather than
+    // Home's window. Truncating someone's trips page reads as data loss.
+    const context = await loadTravelerContext(request, { tripLimit: FULL_TRIP_LIMIT });
     if (!context.signedIn) throw new ApiError('UNAUTHORIZED', 'Sign in to see your trips.');
 
     const snapshot = deriveTravelState(context);

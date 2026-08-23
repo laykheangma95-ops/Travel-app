@@ -190,6 +190,36 @@ function deriveReadiness(
   return readiness;
 }
 
+export interface TravelerContextOptions {
+  /**
+   * A trip that MUST be in the result, whatever the ordering window holds.
+   *
+   * The trip query is capped at 20 and ordered by start_date, which is right
+   * for Home — nobody needs their 40th trip on a dashboard. It is wrong for a
+   * caller that has just written a specific row and needs to read it back:
+   * past twenty trips the new one falls outside the window, and tripById()
+   * reported NOT_FOUND on a trip that had been created successfully moments
+   * earlier. The traveler saw a failure, pressed create again, and left another
+   * committed row behind on every retry.
+   *
+   * Rather than raising the cap — which only moves the cliff — the caller names
+   * the row it cares about and it is fetched explicitly and merged in.
+   */
+  ensureTripId?: string;
+  /**
+   * How many trips to load. The default suits Home, which shows a handful and
+   * should not drag a long history into every render. The trips page is the
+   * traveler's own list and must not silently truncate it — a trip that exists
+   * but is not shown reads as data loss.
+   */
+  tripLimit?: number;
+}
+
+/** Home's window: enough to personalise, small enough to stay cheap. */
+const DEFAULT_TRIP_LIMIT = 20;
+/** What a traveler's own list loads. Well past any realistic history. */
+export const FULL_TRIP_LIMIT = 200;
+
 /**
  * Everything Home needs about the caller, in one round of queries.
  *
@@ -197,7 +227,10 @@ function deriveReadiness(
  * browse Domner freely (§26 of the brief), they just have nothing to
  * personalise against yet.
  */
-export async function loadTravelerContext(request: Request): Promise<TravelerContext> {
+export async function loadTravelerContext(
+  request: Request,
+  options: TravelerContextOptions = {}
+): Promise<TravelerContext> {
   const now = new Date();
   const empty: TravelerContext = {
     signedIn: false,
@@ -227,7 +260,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
       .from('trip_plans')
       .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist')
       .order('start_date', { ascending: true, nullsFirst: false })
-      .limit(20),
+      .limit(options.tripLimit ?? DEFAULT_TRIP_LIMIT),
     supabase
       .from('saved_flights')
       .select('flight_number, flight_date, departure_airport, arrival_airport')
@@ -253,6 +286,21 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   }
 
   const tripRows = (tripsResult.data ?? []) as TripRow[];
+
+  // A trip the caller named but the ordering window did not reach. One extra
+  // query on a write, never on a read, and it keeps every row on the single
+  // mapping path below — the reason tripById goes through this loader at all.
+  // RLS still decides whether it is theirs; a stranger's id simply finds
+  // nothing, exactly as before.
+  if (options.ensureTripId && !tripRows.some((trip) => trip.id === options.ensureTripId)) {
+    const { data: named, error: namedError } = await supabase
+      .from('trip_plans')
+      .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist')
+      .eq('id', options.ensureTripId)
+      .maybeSingle();
+    if (namedError) log.warn('travel.context_query_failed', { error: namedError.message });
+    if (named) tripRows.push(named as TripRow);
+  }
   const flightRows = (flightsResult.data ?? []) as FlightRow[];
   const orderRows = (ordersResult.data ?? []) as OrderRow[];
   const signals = itinerarySignals(

@@ -91,6 +91,39 @@ CREATE TABLE trip_plans (
 ALTER TABLE trip_plans ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "trips_all_own"     ON trip_plans FOR ALL    USING (auth.uid() = user_id);
 CREATE POLICY "trips_public_read" ON trip_plans FOR SELECT USING (is_public = TRUE);
+
+-- The two other tables lib/travel/context.ts reads on every traveler load.
+-- Only the columns it selects, shaped as in supabase/schema.sql. Without them
+-- any suite exercising a route built on loadTravelerContext fails on a missing
+-- relation rather than on the behaviour under test.
+CREATE TABLE saved_flights (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  flight_number TEXT NOT NULL,
+  flight_date DATE NOT NULL,
+  departure_airport TEXT,
+  arrival_airport TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE saved_flights ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "saved_flights_all_own" ON saved_flights FOR ALL USING (auth.uid() = user_id);
+
+CREATE TABLE esim_orders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  order_number TEXT UNIQUE NOT NULL,
+  country TEXT NOT NULL,
+  plan_name TEXT NOT NULL,
+  duration_days INTEGER NOT NULL,
+  data_gb_daily DECIMAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  fulfilled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE esim_orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "esim_orders_read_own" ON esim_orders FOR SELECT USING (auth.uid() = user_id);
 `;
 
 // Supabase's API roles. `authenticated` must not be a superuser or a table
@@ -171,7 +204,7 @@ export async function createHarness(): Promise<Harness> {
     asAdmin,
     async reset() {
       await asAdmin(
-        `TRUNCATE itinerary_places, itinerary_days, trip_plans, destination_places, profiles, auth.users CASCADE`
+        `TRUNCATE itinerary_places, itinerary_days, trip_plans, destination_places, saved_flights, esim_orders, profiles, auth.users CASCADE`
       );
     },
     close: () => db.close(),
@@ -317,6 +350,10 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         filters.push({ sql: `${column} ILIKE ?`, params: [value] });
         return api;
       },
+      gte(column: string, value: unknown) {
+        filters.push({ sql: `${column} >= ?`, params: [value] });
+        return api;
+      },
       or(expression: string) {
         const parts: string[] = [];
         const params: unknown[] = [];
@@ -331,8 +368,17 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         filters.push({ sql: `(${parts.join(' OR ')})`, params });
         return api;
       },
-      order(column: string, options?: { ascending?: boolean }) {
-        orderBy.push(`${column} ${options?.ascending === false ? 'DESC' : 'ASC'}`);
+      order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) {
+        const direction = options?.ascending === false ? 'DESC' : 'ASC';
+        // PostgREST's nullsFirst maps to Postgres's NULLS FIRST/LAST. It has to
+        // be honoured rather than ignored: lib/travel/context.ts orders trips
+        // `nullsFirst: false`, which is what puts undated wishlist trips at the
+        // very end — and therefore first out of a LIMIT window. A harness that
+        // dropped the clause would order them the opposite way and quietly fail
+        // to reproduce that.
+        const nulls =
+          options?.nullsFirst === undefined ? '' : options.nullsFirst ? ' NULLS FIRST' : ' NULLS LAST';
+        orderBy.push(`${column} ${direction}${nulls}`);
         return api;
       },
       limit(count: number) {

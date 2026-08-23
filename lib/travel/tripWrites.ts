@@ -83,7 +83,10 @@ export function parseTripDraft(body: unknown): TripDraft {
  * depends on flights and eSIM orders this row knows nothing about.
  */
 export async function tripById(request: Request, tripId: string): Promise<TripSummary> {
-  const context = await loadTravelerContext(request);
+  // `ensureTripId` matters here: the context's trip query is capped at 20 and
+  // ordered by start_date, so past twenty trips a freshly written row fell
+  // outside it and this threw NOT_FOUND on a trip that had just been created.
+  const context = await loadTravelerContext(request, { ensureTripId: tripId });
   const trip = context.trips.find((candidate) => candidate.id === tripId);
   if (!trip) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
   return trip;

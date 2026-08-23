@@ -25,6 +25,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./', import.meta.url)),
+      // `server-only` is resolved by Next.js itself and has no npm package, so
+      // any suite importing a server module (lib/travel/context.ts and the
+      // routes built on it) fails at import time without this. The stub is a
+      // no-op; the real guard still runs in the production build.
+      'server-only': fileURLToPath(new URL('./tests/support/serverOnlyStub.ts', import.meta.url)),
     },
   },
 });
