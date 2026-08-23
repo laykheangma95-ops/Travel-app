@@ -75,7 +75,7 @@ China,Shenzhen Bao'an International Airport,transport,22.6393,113.8107,"Shenzhen
 China,Chengdu Research Base of Giant Panda Breeding,spot,30.7333,104.1500,"Go at opening time — the pandas are active early and asleep by midday.",,editorial
 China,Jinli Ancient Street,food,30.6420,104.0430,"Chengdu lane of Sichuan street food, tea houses and evening lanterns.",,editorial
 Thailand,Bang Krachao,spot,0,0,"A green river peninsula across from Bangkok, reached by ferry and best seen by bicycle.",,editorial
-Vietnam,42 Nguyen Hue,spot,0,0,"A 1960s Saigon apartment block whose flats are now small cafes, one per balcony.",,editorial
+Vietnam,42 Nguyen Hue,spot,10.7738,106.7040,"A 1960s Saigon apartment block whose flats are now small cafes, one per balcony.",,editorial
 Vietnam,Marble Mountains,spot,0,0,"Limestone and marble hills south of Da Nang, with cave shrines and lookout steps.",,editorial
 Vietnam,Hai Van Pass,spot,0,0,"The coastal mountain pass between Da Nang and Hue, usually ridden or driven for the views.",,editorial
 Singapore,Mustafa Centre,shopping,0,0,"A 24-hour Little India department store known for electronics, gold and groceries.",,editorial
@@ -83,4 +83,33 @@ Singapore,Pulau Ubin,spot,0,0,"An undeveloped island off the north-east coast, r
 South Korea,Ihwa Mural Village,spot,0,0,"A hillside Seoul neighbourhood painted with murals and stairways, still residential.",,editorial
 Japan,Yanaka Ginza,shopping,0,0,"An old-Tokyo shopping street of small independent shops and street-food stalls.",,editorial
 Japan,Todoroki Valley,spot,0,0,"A short wooded ravine walk inside Tokyo, following a stream below street level.",,editorial
-Malaysia,Kampung Baru,spot,0,0,"A Malay village quarter inside central Kuala Lumpur, busiest for its morning market.",,editorial
+Malaysia,Kampung Baru,spot,3.1636,101.7017,"A Malay village quarter inside central Kuala Lumpur, busiest for its morning market.",,editorial
+Vietnam,Independence Palace,spot,10.7772,106.6958,"The 1960s presidential palace, kept as it was left in 1975, war bunker included.",,editorial
+Vietnam,Notre-Dame Cathedral Saigon,spot,10.7797,106.6990,"French-built brick cathedral on the old central square; check restoration works before going.",,editorial
+Vietnam,Saigon Central Post Office,spot,10.7799,106.6996,"A working colonial post office with a vaulted hall and hand-painted wall maps.",,editorial
+Vietnam,Bitexco Financial Tower,spot,10.7717,106.7043,"Saigon Skydeck on the 49th floor, looking down the bend of the river.",,editorial
+Vietnam,Nguyen Hue Walking Street,spot,10.7743,106.7038,"Wide pedestrian boulevard up to the old city hall, at its busiest after dark.",,editorial
+Vietnam,Jade Emperor Pagoda,spot,10.7920,106.6926,"Dim, incense-thick Taoist temple with carved wood panels, north of District 1.",,editorial
+Vietnam,Tan Dinh Church,spot,10.7897,106.6906,"The pink church on Hai Ba Trung; the photograph is from across the road.",,editorial
+Vietnam,Landmark 81 SkyView,spot,10.7950,106.7218,"Vietnam's tallest tower, with an observation deck over the river and the city.",,editorial
+Vietnam,Cu Chi Tunnels,spot,11.1425,106.4640,"The wartime tunnel network north-west of the city, a half-day trip each way.",,editorial
+Vietnam,Binh Tay Market,shopping,10.7500,106.6503,"Cholon's wholesale market hall, the centre of Saigon's Chinatown.",,editorial
+Vietnam,Thien Hau Temple,spot,10.7533,106.6580,"Cantonese sea-goddess temple in Cholon, hung with slow-burning incense coils.",,editorial
+Vietnam,Saigon Opera House,spot,10.7770,106.7030,"French colonial theatre on Dong Khoi, still staging the AO Show most nights.",,editorial
+Vietnam,Museum of Vietnamese History,spot,10.7880,106.7045,"Cham sculpture and dynastic collections, next to the zoo and botanical garden.",,editorial
+Vietnam,Saigon Railway Station,transport,10.7823,106.6775,"Ga Sai Gon, terminus of the Reunification line running north to Hanoi.",,editorial
+Malaysia,KL Tower,spot,3.1528,101.7038,"Menara KL, whose deck sits higher than the Petronas skybridge and is easier to book.",,editorial
+Malaysia,Merdeka Square,spot,3.1478,101.6935,"The colonial padang where independence was declared in 1957.",,editorial
+Malaysia,Sultan Abdul Samad Building,spot,3.1489,101.6944,"Moorish-style clocktower facing Merdeka Square, floodlit after dark.",,editorial
+Malaysia,Masjid Jamek,spot,3.1489,101.6958,"The old mosque at the river confluence; robes are lent free at the gate.",,editorial
+Malaysia,Petaling Street,shopping,3.1436,101.6980,"Chinatown's covered market street — bargaining expected, counterfeits everywhere.",,editorial
+Malaysia,Sri Mahamariamman Temple,spot,3.1436,101.6963,"KL's oldest Hindu temple, its gateway tower crowded with painted figures.",,editorial
+Malaysia,National Mosque of Malaysia,spot,3.1420,101.6917,"Masjid Negara, a 1960s modernist mosque under a folded blue roof.",,editorial
+Malaysia,Islamic Arts Museum Malaysia,spot,3.1418,101.6893,"Manuscripts, textiles and architectural models, beside the Lake Gardens.",,editorial
+Malaysia,Perdana Botanical Garden,spot,3.1425,101.6869,"The Lake Gardens, the city's oldest park, with the bird park inside it.",,editorial
+Malaysia,KL Bird Park,spot,3.1435,101.6869,"Walk-through aviary in the Lake Gardens, billed as the world's largest.",,editorial
+Malaysia,Thean Hou Temple,spot,3.1220,101.6870,"Six-tiered Chinese temple on a hill south of the centre, hung with lanterns.",,editorial
+Malaysia,Chow Kit Market,food,3.1633,101.6980,"KL's largest wet market, north of the centre and busiest early morning.",,editorial
+Malaysia,KL Sentral,transport,3.1343,101.6865,"The main rail interchange and the KLIA Ekspres city terminus.",,editorial
+Malaysia,Suria KLCC,shopping,3.1580,101.7118,"The mall under the Petronas Towers, sitting on top of the LRT station.",,editorial
+Malaysia,Putra Mosque Putrajaya,spot,2.9364,101.6890,"The pink lakeside mosque at Putrajaya, an easy half-day out of the city.",,editorial

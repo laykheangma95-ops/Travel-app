@@ -1,5 +1,5 @@
 -- Generated from supabase/seeds/destination_places.csv by scripts/csv-to-seed-sql.mjs -- do not edit directly.
--- 85 rows in 1 batch(es) of up to 500.
+-- 114 rows in 1 batch(es) of up to 500.
 
 insert into public.destination_places
   (destination, name, category, lat, lng, description, photo_url, source, content_slug)
@@ -80,7 +80,7 @@ values
   ('China', 'Chengdu Research Base of Giant Panda Breeding', 'spot', 30.7333, 104.1500, 'Go at opening time — the pandas are active early and asleep by midday.', '', 'editorial', 'china:chengdu-research-base-of-giant-panda-breeding'),
   ('China', 'Jinli Ancient Street', 'food', 30.6420, 104.0430, 'Chengdu lane of Sichuan street food, tea houses and evening lanterns.', '', 'editorial', 'china:jinli-ancient-street'),
   ('Thailand', 'Bang Krachao', 'spot', 0, 0, 'A green river peninsula across from Bangkok, reached by ferry and best seen by bicycle.', '', 'editorial', 'thailand:bang-krachao'),
-  ('Vietnam', '42 Nguyen Hue', 'spot', 0, 0, 'A 1960s Saigon apartment block whose flats are now small cafes, one per balcony.', '', 'editorial', 'vietnam:42-nguyen-hue'),
+  ('Vietnam', '42 Nguyen Hue', 'spot', 10.7738, 106.7040, 'A 1960s Saigon apartment block whose flats are now small cafes, one per balcony.', '', 'editorial', 'vietnam:42-nguyen-hue'),
   ('Vietnam', 'Marble Mountains', 'spot', 0, 0, 'Limestone and marble hills south of Da Nang, with cave shrines and lookout steps.', '', 'editorial', 'vietnam:marble-mountains'),
   ('Vietnam', 'Hai Van Pass', 'spot', 0, 0, 'The coastal mountain pass between Da Nang and Hue, usually ridden or driven for the views.', '', 'editorial', 'vietnam:hai-van-pass'),
   ('Singapore', 'Mustafa Centre', 'shopping', 0, 0, 'A 24-hour Little India department store known for electronics, gold and groceries.', '', 'editorial', 'singapore:mustafa-centre'),
@@ -88,6 +88,35 @@ values
   ('South Korea', 'Ihwa Mural Village', 'spot', 0, 0, 'A hillside Seoul neighbourhood painted with murals and stairways, still residential.', '', 'editorial', 'south-korea:ihwa-mural-village'),
   ('Japan', 'Yanaka Ginza', 'shopping', 0, 0, 'An old-Tokyo shopping street of small independent shops and street-food stalls.', '', 'editorial', 'japan:yanaka-ginza'),
   ('Japan', 'Todoroki Valley', 'spot', 0, 0, 'A short wooded ravine walk inside Tokyo, following a stream below street level.', '', 'editorial', 'japan:todoroki-valley'),
-  ('Malaysia', 'Kampung Baru', 'spot', 0, 0, 'A Malay village quarter inside central Kuala Lumpur, busiest for its morning market.', '', 'editorial', 'malaysia:kampung-baru')
+  ('Malaysia', 'Kampung Baru', 'spot', 3.1636, 101.7017, 'A Malay village quarter inside central Kuala Lumpur, busiest for its morning market.', '', 'editorial', 'malaysia:kampung-baru'),
+  ('Vietnam', 'Independence Palace', 'spot', 10.7772, 106.6958, 'The 1960s presidential palace, kept as it was left in 1975, war bunker included.', '', 'editorial', 'vietnam:independence-palace'),
+  ('Vietnam', 'Notre-Dame Cathedral Saigon', 'spot', 10.7797, 106.6990, 'French-built brick cathedral on the old central square; check restoration works before going.', '', 'editorial', 'vietnam:notre-dame-cathedral-saigon'),
+  ('Vietnam', 'Saigon Central Post Office', 'spot', 10.7799, 106.6996, 'A working colonial post office with a vaulted hall and hand-painted wall maps.', '', 'editorial', 'vietnam:saigon-central-post-office'),
+  ('Vietnam', 'Bitexco Financial Tower', 'spot', 10.7717, 106.7043, 'Saigon Skydeck on the 49th floor, looking down the bend of the river.', '', 'editorial', 'vietnam:bitexco-financial-tower'),
+  ('Vietnam', 'Nguyen Hue Walking Street', 'spot', 10.7743, 106.7038, 'Wide pedestrian boulevard up to the old city hall, at its busiest after dark.', '', 'editorial', 'vietnam:nguyen-hue-walking-street'),
+  ('Vietnam', 'Jade Emperor Pagoda', 'spot', 10.7920, 106.6926, 'Dim, incense-thick Taoist temple with carved wood panels, north of District 1.', '', 'editorial', 'vietnam:jade-emperor-pagoda'),
+  ('Vietnam', 'Tan Dinh Church', 'spot', 10.7897, 106.6906, 'The pink church on Hai Ba Trung; the photograph is from across the road.', '', 'editorial', 'vietnam:tan-dinh-church'),
+  ('Vietnam', 'Landmark 81 SkyView', 'spot', 10.7950, 106.7218, 'Vietnam''s tallest tower, with an observation deck over the river and the city.', '', 'editorial', 'vietnam:landmark-81-skyview'),
+  ('Vietnam', 'Cu Chi Tunnels', 'spot', 11.1425, 106.4640, 'The wartime tunnel network north-west of the city, a half-day trip each way.', '', 'editorial', 'vietnam:cu-chi-tunnels'),
+  ('Vietnam', 'Binh Tay Market', 'shopping', 10.7500, 106.6503, 'Cholon''s wholesale market hall, the centre of Saigon''s Chinatown.', '', 'editorial', 'vietnam:binh-tay-market'),
+  ('Vietnam', 'Thien Hau Temple', 'spot', 10.7533, 106.6580, 'Cantonese sea-goddess temple in Cholon, hung with slow-burning incense coils.', '', 'editorial', 'vietnam:thien-hau-temple'),
+  ('Vietnam', 'Saigon Opera House', 'spot', 10.7770, 106.7030, 'French colonial theatre on Dong Khoi, still staging the AO Show most nights.', '', 'editorial', 'vietnam:saigon-opera-house'),
+  ('Vietnam', 'Museum of Vietnamese History', 'spot', 10.7880, 106.7045, 'Cham sculpture and dynastic collections, next to the zoo and botanical garden.', '', 'editorial', 'vietnam:museum-of-vietnamese-history'),
+  ('Vietnam', 'Saigon Railway Station', 'transport', 10.7823, 106.6775, 'Ga Sai Gon, terminus of the Reunification line running north to Hanoi.', '', 'editorial', 'vietnam:saigon-railway-station'),
+  ('Malaysia', 'KL Tower', 'spot', 3.1528, 101.7038, 'Menara KL, whose deck sits higher than the Petronas skybridge and is easier to book.', '', 'editorial', 'malaysia:kl-tower'),
+  ('Malaysia', 'Merdeka Square', 'spot', 3.1478, 101.6935, 'The colonial padang where independence was declared in 1957.', '', 'editorial', 'malaysia:merdeka-square'),
+  ('Malaysia', 'Sultan Abdul Samad Building', 'spot', 3.1489, 101.6944, 'Moorish-style clocktower facing Merdeka Square, floodlit after dark.', '', 'editorial', 'malaysia:sultan-abdul-samad-building'),
+  ('Malaysia', 'Masjid Jamek', 'spot', 3.1489, 101.6958, 'The old mosque at the river confluence; robes are lent free at the gate.', '', 'editorial', 'malaysia:masjid-jamek'),
+  ('Malaysia', 'Petaling Street', 'shopping', 3.1436, 101.6980, 'Chinatown''s covered market street — bargaining expected, counterfeits everywhere.', '', 'editorial', 'malaysia:petaling-street'),
+  ('Malaysia', 'Sri Mahamariamman Temple', 'spot', 3.1436, 101.6963, 'KL''s oldest Hindu temple, its gateway tower crowded with painted figures.', '', 'editorial', 'malaysia:sri-mahamariamman-temple'),
+  ('Malaysia', 'National Mosque of Malaysia', 'spot', 3.1420, 101.6917, 'Masjid Negara, a 1960s modernist mosque under a folded blue roof.', '', 'editorial', 'malaysia:national-mosque-of-malaysia'),
+  ('Malaysia', 'Islamic Arts Museum Malaysia', 'spot', 3.1418, 101.6893, 'Manuscripts, textiles and architectural models, beside the Lake Gardens.', '', 'editorial', 'malaysia:islamic-arts-museum-malaysia'),
+  ('Malaysia', 'Perdana Botanical Garden', 'spot', 3.1425, 101.6869, 'The Lake Gardens, the city''s oldest park, with the bird park inside it.', '', 'editorial', 'malaysia:perdana-botanical-garden'),
+  ('Malaysia', 'KL Bird Park', 'spot', 3.1435, 101.6869, 'Walk-through aviary in the Lake Gardens, billed as the world''s largest.', '', 'editorial', 'malaysia:kl-bird-park'),
+  ('Malaysia', 'Thean Hou Temple', 'spot', 3.1220, 101.6870, 'Six-tiered Chinese temple on a hill south of the centre, hung with lanterns.', '', 'editorial', 'malaysia:thean-hou-temple'),
+  ('Malaysia', 'Chow Kit Market', 'food', 3.1633, 101.6980, 'KL''s largest wet market, north of the centre and busiest early morning.', '', 'editorial', 'malaysia:chow-kit-market'),
+  ('Malaysia', 'KL Sentral', 'transport', 3.1343, 101.6865, 'The main rail interchange and the KLIA Ekspres city terminus.', '', 'editorial', 'malaysia:kl-sentral'),
+  ('Malaysia', 'Suria KLCC', 'shopping', 3.1580, 101.7118, 'The mall under the Petronas Towers, sitting on top of the LRT station.', '', 'editorial', 'malaysia:suria-klcc'),
+  ('Malaysia', 'Putra Mosque Putrajaya', 'spot', 2.9364, 101.6890, 'The pink lakeside mosque at Putrajaya, an easy half-day out of the city.', '', 'editorial', 'malaysia:putra-mosque-putrajaya')
 on conflict (destination, name) where created_by is null
 do update set content_slug = excluded.content_slug;
