@@ -91,7 +91,20 @@ export function SavePlaceButton({
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          setState({ kind: 'error', message: payload?.error?.message ?? t('v3.save.error') });
+          // Switch on the CODE, never echo `error.message`. Those messages are
+          // written in English for the log and for whoever is on call; this UI
+          // is Khmer-first, so a raw one would drop a Khmer reader into English
+          // at the only moment something has gone wrong.
+          const code = payload?.error?.code;
+          setState({
+            kind: 'error',
+            message:
+              code === 'SERVICE_UNAVAILABLE'
+                ? t('v3.save.unavailable')
+                : code === 'RATE_LIMITED'
+                  ? t('v3.save.busy')
+                  : t('v3.save.error'),
+          });
           return;
         }
 

@@ -1,29 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The maps-link resolver route — the SSRF guard, specifically.
+// The maps-link resolver route — the full POST cycle, integration-level.
 //
-// WHY THIS EXISTS:
-//   tests/mapsLink.test.ts covers the parser, which is pure and harmless. This
-//   file covers the part that is neither: an endpoint that takes a URL from a
-//   user and asks our server to fetch it. Without the hostname allowlist that
-//   is a server-side request forgery hole — anyone could point it at an
-//   internal address, a cloud metadata endpoint, or a service only reachable
-//   from our egress IP, and read the result through us.
+// WHY THIS EXISTS ALONGSIDE tests/mapsLink.test.ts:
+//   That file is thorough at the unit level — it calls the route's exported
+//   `allowedMapsUrl` and `resolveFinalUrl` directly, bypassing `route()`,
+//   `requireUser`, the rate limiter and the JSON envelope entirely. Nothing
+//   there proves the actual exported POST handler — the thing a real request
+//   hits — wires auth, rate limiting, body parsing and the response shape
+//   together correctly. This file is that seam: it calls POST as a browser
+//   would, with requireUser mocked, and asserts on the real HTTP response.
 //
-//   The guard is four lines of code and nothing outside this file proves it is
-//   still there. A refactor that "simplified" assertAllowedHost away would
-//   leave every other test green.
+//   The response shape matters concretely: ItineraryEditor.tsx reads
+//   `body.place.lat` / `body.place.lng` / `body.place.name`, so a change that
+//   silently flattened or renamed that envelope would break the UI while
+//   every unit test stayed green. This file is what would catch that.
 //
-// WHAT IS ASSERTED, AND WHY IT IS ASSERTED THIS WAY:
-//   Rejection is proved by spying on global fetch and asserting it was NEVER
-//   CALLED. A 400 alone would not be enough — the danger is the request going
-//   out, not the status coming back, and a guard placed after the fetch would
-//   still return 400 while having already leaked.
+// WHY REJECTION IS ASSERTED THE WAY IT IS:
+//   Every blocked-host case spies on global fetch and asserts it was NEVER
+//   CALLED, not just that the status was 400. A guard placed after the fetch
+//   would still return 400 while having already leaked the request — the
+//   danger is the outbound connection, not the response code.
 //
 // WHAT THIS CANNOT COVER:
 //   A real network round-trip to Google. This environment has no egress to
-//   google.com, so the redirect chain is mocked. The shapes used below are the
-//   real ones documented in lib/travel/mapsLink.ts; a live link still deserves
-//   one manual check before this ships.
+//   google.com, so the redirect chain is mocked. tests/contract/mapsLink.test.ts
+//   is the live check against that risk (npm run test:maps-link).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -138,10 +139,13 @@ describe('redirect chain', () => {
     const response = await post('https://maps.app.goo.gl/abc123');
     const body = await response.json();
 
+    // Nested under `place` — this is the exact shape ItineraryEditor.tsx reads
+    // (`body.place.lat`, `.lng`, `.name`). A flattened response would break the
+    // UI silently while the parser's own unit tests stayed green.
     expect(response.status).toBe(200);
-    expect(body.name).toBe('Wat Pho');
-    expect(body.lat).toBeCloseTo(13.7465);
-    expect(body.lng).toBeCloseTo(100.4927);
+    expect(body.place.name).toBe('Wat Pho');
+    expect(body.place.lat).toBeCloseTo(13.7465);
+    expect(body.place.lng).toBeCloseTo(100.4927);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -187,12 +191,16 @@ describe('reading the resolved link', () => {
     expect(body.error.message).toMatch(/could not read a location/i);
   });
 
-  it('surfaces a network failure as unavailable rather than a crash', async () => {
+  it('surfaces a network failure as a clear error rather than a crash', async () => {
+    // Timeout, DNS failure, connection refused are indistinguishable to the
+    // caller, so the route folds them into one message rather than a 500.
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
     const response = await post('https://maps.app.goo.gl/abc123');
+    const body = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe('BAD_REQUEST');
   });
 
   it('accepts every host on the allowlist', async () => {

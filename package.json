@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Domner App — Cambodia's first Khmer-language travel super app",
+  "description": "Domner App \u2014 Cambodia's first Khmer-language travel super app",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -29,6 +29,7 @@
     "test:watch": "vitest",
     "mock": "tsx mock-gohub/src/server.ts",
     "test:contract": "vitest run --config vitest.contract.mts",
+    "test:maps-link": "vitest run --config vitest.mapsLink.mts",
     "audit:check": "node scripts/audit-check.mjs",
     "supabase:check": "node scripts/supabase-check.mjs",
     "env:check": "node scripts/env-capability.mjs",

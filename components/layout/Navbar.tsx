@@ -28,6 +28,10 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    labelKey: 'nav.trips',
+    href: '/trips',
+  },
+  {
     labelKey: 'nav.flights',
     items: [
       { labelKey: 'nav.flightTracker', href: '/flights' },
@@ -50,6 +54,25 @@ const navGroups: NavGroup[] = [
   // 'Support' pointed at /affiliate — the reseller signup, not help.
   { labelKey: 'nav.support', href: 'https://t.me/domnerapp' },
 ];
+
+// The 🇰🇭 emoji is missing from several widespread emoji fonts (confirmed on
+// this deployment's own renderer) and shows as a blurred, illegible glyph
+// instead of a flag — the language toggle is the one place a broken Cambodia
+// flag is guaranteed to be seen, so it gets a small inline SVG instead.
+function CambodiaFlagGlyph() {
+  return (
+    <svg viewBox="0 0 900 600" style={{ width: '1em', height: '1em', display: 'block' }} aria-hidden="true">
+      <rect width="900" height="600" fill="#032ea1" />
+      <rect y="150" width="900" height="300" fill="#e00025" />
+      <g fill="#fff">
+        <rect x="330" y="345" width="240" height="45" />
+        <path d="M420,345 L420,300 Q420,275 435,265 L450,230 L465,265 Q480,275 480,300 L480,345 Z" />
+        <path d="M345,345 L345,310 Q345,290 358,282 L372,255 L386,282 Q399,290 399,310 L399,345 Z" />
+        <path d="M501,345 L501,310 Q501,290 514,282 L528,255 L542,282 Q555,290 555,310 L555,345 Z" />
+      </g>
+    </svg>
+  );
+}
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -317,7 +340,7 @@ export function Navbar() {
             aria-label={lang === 'en' ? 'EN — ប្តូរទៅភាសាខ្មែរ' : 'KM — Switch to English'}
           >
             <WavyFlag
-              flag={lang === 'en' ? '🇬🇧' : '🇰🇭'}
+              flag={lang === 'en' ? '🇬🇧' : <CambodiaFlagGlyph />}
               label={lang === 'en' ? 'English' : 'ភាសាខ្មែរ'}
               size={26}
             />

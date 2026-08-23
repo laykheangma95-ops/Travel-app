@@ -53,21 +53,29 @@ export function TripsView() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const { now, upcoming, past } = useMemo(() => {
+  const { now, wishlist, upcoming, past } = useMemo(() => {
     const nowList: TripSummary[] = [];
+    const wishlistList: TripSummary[] = [];
     const upcomingList: TripSummary[] = [];
     const pastList: TripSummary[] = [];
 
     for (const trip of trips) {
-      const end = trip.endDate ?? trip.startDate;
-      if (!trip.startDate) {
-        // Undated trips are wishes, and a wish is still ahead of you.
-        upcomingList.push(trip);
-      } else if (end && end < today) {
-        pastList.push(trip);
-      } else if (trip.startDate <= today) {
-        nowList.push(trip);
+      // Dates decide first, always. A saved-place trip that has since been
+      // given real dates is a trip like any other, so it files under
+      // now/upcoming/past and never lands in "Saved for later".
+      if (trip.startDate) {
+        const end = trip.endDate ?? trip.startDate;
+        if (end < today) {
+          pastList.push(trip);
+        } else if (trip.startDate <= today) {
+          nowList.push(trip);
+        } else {
+          upcomingList.push(trip);
+        }
+      } else if (trip.isWishlist) {
+        wishlistList.push(trip);
       } else {
+        // Undated trips are wishes, and a wish is still ahead of you.
         upcomingList.push(trip);
       }
     }
@@ -75,7 +83,7 @@ export function TripsView() {
     upcomingList.sort((a, b) => (a.startDate ?? '9999').localeCompare(b.startDate ?? '9999'));
     pastList.sort((a, b) => (b.endDate ?? b.startDate ?? '').localeCompare(a.endDate ?? a.startDate ?? ''));
 
-    return { now: nowList, upcoming: upcomingList, past: pastList };
+    return { now: nowList, wishlist: wishlistList, upcoming: upcomingList, past: pastList };
   }, [trips, today]);
 
   return (
@@ -184,6 +192,12 @@ export function TripsView() {
               activeId={activeId}
             />
             <TripSection
+              title={lang === 'km' ? 'រក្សាទុកសម្រាប់ពេលក្រោយ' : 'Saved for later'}
+              trips={wishlist}
+              phase="wishlist"
+              activeId={activeId}
+            />
+            <TripSection
               title={lang === 'km' ? 'ខាងមុខ' : 'Upcoming'}
               trips={upcoming}
               phase="upcoming"
@@ -210,9 +224,12 @@ function TripSection({
 }: {
   title: string;
   trips: TripSummary[];
-  phase: 'now' | 'upcoming' | 'past';
+  phase: 'now' | 'wishlist' | 'upcoming' | 'past';
   activeId: string | null;
 }) {
+  // TripCard knows three phases; a saved-place trip is simply an undated
+  // upcoming one to it, so only the section heading differs.
+  const cardPhase = phase === 'wishlist' ? 'upcoming' : phase;
   if (trips.length === 0) return null;
   return (
     <section aria-labelledby={`trips-${phase}`}>
@@ -224,7 +241,7 @@ function TripSection({
           <TripCard
             key={trip.id}
             trip={trip}
-            phase={trip.id === activeId && phase === 'upcoming' ? 'upcoming' : phase}
+            phase={trip.id === activeId && cardPhase === 'upcoming' ? 'upcoming' : cardPhase}
             index={index}
           />
         ))}

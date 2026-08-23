@@ -47,6 +47,12 @@ export interface TripSummary {
   interests: TripInterest[];
   readiness: Readiness;
   coverImageUrl: string | null;
+  /**
+   * True when the trip was auto-created by saving a place rather than filled
+   * out on the New trip form (trip_plans.is_wishlist, migration 011). Set by
+   * the server only — never edited by the traveler.
+   */
+  isWishlist: boolean;
 }
 
 export interface FlightSummary {
