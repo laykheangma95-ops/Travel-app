@@ -276,10 +276,26 @@ try {
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
   if (!configured) {
+    // Precision matters in both directions. An earlier version of this line
+    // said only "authenticated journey — not covered", which read as though
+    // nothing about saving a place had ever been proven. That is wrong, and
+    // understating coverage is the same reporting failure as overstating it.
+    //
+    // What IS proven, by tests/savedPlaces.rls.test.ts against real Postgres
+    // with the real policies applied: saving creates the wishlist trip, files
+    // the place into day_index 0 (the Ideas bucket) at sort_order 0, is
+    // idempotent, is scoped by RLS to the traveler, and refuses another
+    // traveler's trip. The data layer — where correctness actually lives — is
+    // covered.
+    //
+    // What is NOT proven anywhere, and is what this skip is really about:
+    // the Supabase auth handshake itself, and how the result RENDERS.
     record(
       'skip',
-      'Authenticated journey (sign in → save → trip → itinerary)',
-      'No Supabase configured, so no sign-in can succeed. NOT covered by a green run.'
+      'Sign-in handshake and the rendered result of a save',
+      'No Supabase configured. Data layer IS covered by tests/savedPlaces.rls.test.ts ' +
+        '(real Postgres + RLS: wishlist trip, place in Ideas, idempotent). Unproven here: ' +
+        'the auth token exchange, and what the traveler SEES after saving.'
     );
   }
 } catch (error) {

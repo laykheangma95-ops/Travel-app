@@ -60,6 +60,16 @@ flows are unprovable, then every report from that session says so too, up front.
 | "A traveler can do X" | runtime | the journey executed end to end |
 | Anything not executed | — | **`unverified`, with the reason** |
 
+**Understating coverage is the same failure, inverted.** A skip line that hides
+real coverage misleads exactly as much as a pass that hides a gap. Say which
+layer is proven and which is not, rather than writing off a whole journey. The
+save-a-place flow is the worked example: its data layer is proven against real
+Postgres with real policies in `tests/savedPlaces.rls.test.ts` (the wishlist
+trip is created, the place lands in `day_index` 0 at `sort_order` 0, repeat
+saves are idempotent, RLS scopes it to the traveler). What is unproven without
+Supabase is narrower and specific — the auth handshake, and what the traveler
+sees afterwards.
+
 Two habits that keep this honest:
 
 1. **No number without a falsifiable artifact** — an observed HTTP status,
