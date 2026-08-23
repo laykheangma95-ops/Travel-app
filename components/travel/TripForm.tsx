@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Check, Loader2, Trash2 } from 'lucide-react';
 import { countries } from '@/data/countries';
+import { tripDestinations, type TripDestination } from '@/data/cities';
 import { useLang } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Input, Select } from '@/components/ui/Input';
@@ -109,15 +110,56 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
     }));
   };
 
-  // A full country list means a traveler can begin a trip anywhere in the world.
+  // Every country in the world AND every city we index — deliberately not
+  // filtered by eSIM coverage. Nobody says "I'm going to Malaysia"; they say
+  // Kuala Lumpur, and someone planning Athens should be able to plan Athens
+  // whether or not we can sell them a Greek eSIM yet.
   const suggestions = useMemo(
-    () => countries.map((country) => country.name).sort((a, b) => a.localeCompare(b)),
+    () =>
+      [...tripDestinations].sort(
+        (a, b) => b.weight - a.weight || a.label.localeCompare(b.label)
+      ),
     []
   );
+
   const matchingDestinations = useMemo(() => {
     const query = draft.destination.trim().toLocaleLowerCase();
-    return suggestions.filter((name) => !query || name.toLocaleLowerCase().includes(query)).slice(0, 8);
+    if (!query) return suggestions.filter((item) => item.kind === 'country').slice(0, 8);
+
+    const scored: { item: TripDestination; rank: number }[] = [];
+    for (const item of suggestions) {
+      const label = item.label.toLocaleLowerCase();
+      // A prefix match is what the traveler is most likely reaching for, so it
+      // outranks a match buried mid-string ("Ho Chi Minh" before "Quezon City").
+      let rank = 0;
+      if (label === query) rank = 400;
+      else if (label.startsWith(query)) rank = 300;
+      else if (item.labelKm?.includes(draft.destination.trim())) rank = 250;
+      else if (label.includes(query)) rank = 150;
+      else if (item.aliases.some((alias) => alias.toLocaleLowerCase().startsWith(query))) rank = 100;
+      if (rank) scored.push({ item, rank: rank + item.weight });
+    }
+    return scored
+      .sort((a, b) => b.rank - a.rank || a.item.label.localeCompare(b.item.label))
+      .slice(0, 8)
+      .map((entry) => entry.item);
   }, [draft.destination, suggestions]);
+
+  /**
+   * Take a suggestion. The COUNTRY is what gets stored — trip_plans.destination
+   * is what the itinerary catalogue, resolveTrip and matchDestination all key
+   * on, so storing "Kuala Lumpur" would leave the trip unreachable by every one
+   * of them. The city survives in the suggested title, which is the part the
+   * traveler actually reads back.
+   */
+  const chooseDestination = (item: TripDestination) => {
+    setDraft((current) => ({
+      ...current,
+      destination: item.country,
+      title: titleTouched.current ? current.title : suggestTripTitle(item.label, lang),
+    }));
+    setErrors((current) => ({ ...current, destination: undefined, title: undefined }));
+  };
 
   /** Arrow keys walk the list, Enter takes the highlighted one, Escape closes. */
   function onDestinationKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -148,7 +190,7 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
     // otherwise it submits the form, which is what it should do.
     if (event.key === 'Enter' && destinationOpen && highlighted >= 0) {
       event.preventDefault();
-      onDestination(matchingDestinations[highlighted]);
+      chooseDestination(matchingDestinations[highlighted]);
       setDestinationOpen(false);
       setHighlighted(-1);
     }
@@ -272,7 +314,7 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
               dark
               id="trip-destination"
               label={lang === 'km' ? 'គោលដៅ' : 'Destination'}
-              placeholder={lang === 'km' ? 'ជ្រើសរើសប្រទេស…' : 'Search a country…'}
+              placeholder={lang === 'km' ? 'ទីក្រុង ឬប្រទេស…' : 'City or country…'}
               required
               autoComplete="off"
               role="combobox"
@@ -299,11 +341,11 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
               <ul
                 id="trip-destination-options"
                 role="listbox"
-                aria-label={lang === 'km' ? 'ប្រទេស' : 'Countries'}
+                aria-label={lang === 'km' ? 'ទីក្រុង និងប្រទេស' : 'Cities and countries'}
                 className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-btn border border-white/15 bg-[#142238] p-1 shadow-2xl"
               >
-                {matchingDestinations.map((name, index) => (
-                  <li key={name}>
+                {matchingDestinations.map((item, index) => (
+                  <li key={`${item.kind}-${item.label}-${item.country}`}>
                     <button
                       type="button"
                       id={`trip-destination-option-${index}`}
@@ -312,16 +354,21 @@ export function TripForm({ tripId, initial, presetDestination }: TripFormProps) 
                       onMouseEnter={() => setHighlighted(index)}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
-                        onDestination(name);
+                        chooseDestination(item);
                         setDestinationOpen(false);
                         setHighlighted(-1);
                       }}
                       className={cn(
-                        'block min-h-11 w-full rounded-lg px-3 text-left text-sm transition-colors',
+                        'flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm transition-colors',
                         index === highlighted ? 'bg-white/12 text-white' : 'text-white/80'
                       )}
                     >
-                      {name}
+                      <span className="min-w-0 truncate">
+                        {lang === 'km' ? (item.labelKm ?? item.label) : item.label}
+                      </span>
+                      {item.kind === 'city' && (
+                        <span className="shrink-0 text-xs text-white/45">{item.country}</span>
+                      )}
                     </button>
                   </li>
                 ))}
