@@ -234,6 +234,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
       name: draft.name,
       description: draft.description,
       category: draft.category,
+      lat: draft.lat,
+      lng: draft.lng,
       openingStart: draft.openingStart,
       openingEnd: draft.openingEnd,
       target: tab === 'ideas' || !active ? 'ideas' : active.id,
@@ -797,6 +799,8 @@ interface CustomDraft {
   name: string;
   description: string;
   category: ItineraryCategory;
+  lat: number | null;
+  lng: number | null;
   openingStart: string | null;
   openingEnd: string | null;
 }
@@ -823,8 +827,51 @@ function AddPlaceSheet({
   const [query, setQuery] = useState('');
   const [custom, setCustom] = useState(false);
   const [draft, setDraft] = useState<CustomDraft>({
-    name: '', description: '', category: 'other', openingStart: null, openingEnd: null,
+    name: '', description: '', category: 'other', lat: null, lng: null, openingStart: null, openingEnd: null,
   });
+  const [mapsLink, setMapsLink] = useState('');
+  const [mapsLinkState, setMapsLinkState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [mapsLinkError, setMapsLinkError] = useState<string | null>(null);
+
+  // A pure enhancement: resolving the pasted link only ever pre-fills fields
+  // the traveler can still edit, and a failure never blocks manual entry.
+  const resolveMapsLink = async () => {
+    const url = mapsLink.trim();
+    if (!url) return;
+    setMapsLinkState('loading');
+    setMapsLinkError(null);
+    try {
+      const response = await fetch('/api/travel/maps-link', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error?.message ??
+            (lang === 'km' ? 'អានតំណនេះមិនបានទេ។' : 'Could not read that link.')
+        );
+      }
+      setDraft((current) => ({
+        ...current,
+        name: current.name.trim() ? current.name : (result.name ?? current.name),
+        lat: result.lat,
+        lng: result.lng,
+      }));
+      setMapsLinkState('idle');
+    } catch (cause) {
+      setMapsLinkState('error');
+      setMapsLinkError(
+        cause instanceof Error
+          ? cause.message
+          : lang === 'km'
+            ? 'អានតំណនេះមិនបានទេ។'
+            : 'Could not read that link.'
+      );
+    }
+  };
 
   // The old filters lied: "Stay" filtered to category 'other' (a catch-all) and
   // "My saved" filtered to source 'editorial' — Domner's own picks, the exact
@@ -889,6 +936,47 @@ function AddPlaceSheet({
 
         {custom ? (
           <form onSubmit={submitCustom} className="mt-5 space-y-3">
+            <div>
+              <label htmlFor="custom-maps-link" className="block text-sm font-medium text-white/80">
+                {lang === 'km' ? 'បិទភ្ជាប់តំណ Google Maps (ជាជម្រើស)' : 'Paste a Google Maps link (optional)'}
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="custom-maps-link"
+                  type="url"
+                  inputMode="url"
+                  value={mapsLink}
+                  onChange={(event) => setMapsLink(event.target.value)}
+                  onBlur={resolveMapsLink}
+                  placeholder="https://maps.app.goo.gl/..."
+                  className="min-h-[2.75rem] min-w-0 flex-1 rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                />
+                <button
+                  type="button"
+                  onClick={resolveMapsLink}
+                  disabled={!mapsLink.trim() || mapsLinkState === 'loading'}
+                  className="inline-flex min-h-[2.75rem] shrink-0 items-center rounded-btn border border-white/15 px-3.5 text-sm font-semibold text-white transition-colors hover:border-gold-light/50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                >
+                  {mapsLinkState === 'loading'
+                    ? lang === 'km'
+                      ? 'កំពុងអាន…'
+                      : 'Reading…'
+                    : lang === 'km'
+                      ? 'ប្រើតំណនេះ'
+                      : 'Use this link'}
+                </button>
+              </div>
+              {mapsLinkState === 'error' && mapsLinkError && (
+                <p role="alert" className="mt-1.5 text-xs text-amber-200">
+                  {mapsLinkError}
+                </p>
+              )}
+              {draft.lat !== null && draft.lng !== null && mapsLinkState !== 'error' && (
+                <p className="mt-1.5 text-xs text-white/55">
+                  {lang === 'km' ? 'បានកំណត់ទីតាំងពីតំណ។' : 'Location set from that link.'}
+                </p>
+              )}
+            </div>
             <div>
               <label htmlFor="custom-name" className="block text-sm font-medium text-white/80">
                 {lang === 'km' ? 'ឈ្មោះទីតាំង' : 'Place name'}
@@ -966,9 +1054,13 @@ function AddPlaceSheet({
               )}
             </fieldset>
             <p className="text-xs text-white/60">
-              {lang === 'km'
-                ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
-                : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
+              {draft.lat !== null && draft.lng !== null
+                ? lang === 'km'
+                  ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ប៉ុន្តែឥឡូវនេះនឹងបង្ហាញលើផែនទី។'
+                  : 'Your own places are visible only to you — this one will show on the map now that it has a location.'
+                : lang === 'km'
+                  ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
+                  : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <button
