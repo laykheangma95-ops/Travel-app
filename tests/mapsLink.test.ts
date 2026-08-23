@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
+import { firstUrlIn, parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
 
 describe('parseGoogleMapsUrl', () => {
   it('parses the @lat,lng,zoom segment', () => {
@@ -70,5 +70,46 @@ describe('parseGoogleMapsUrl', () => {
     expect(result).not.toBeNull();
     expect(result?.lat).toBeCloseTo(13.0);
     expect(result?.name).toBeNull();
+  });
+});
+
+// What the OS share sheet actually hands the /share/maps-link route.
+describe('firstUrlIn', () => {
+  it('pulls the link out of the text blob Google Maps shares', () => {
+    // The real shape: a place name, a newline, then the short link.
+    const shared = 'Wat Pho\nhttps://maps.app.goo.gl/BxT7q2mNc4vK1qEo8';
+    expect(firstUrlIn(shared)).toBe('https://maps.app.goo.gl/BxT7q2mNc4vK1qEo8');
+  });
+
+  it('takes the first link when the blob carries more than one', () => {
+    expect(firstUrlIn('see https://maps.app.goo.gl/aaa and https://example.com/bbb')).toBe(
+      'https://maps.app.goo.gl/aaa'
+    );
+  });
+
+  it('stops at whitespace rather than swallowing trailing words', () => {
+    expect(firstUrlIn('https://maps.app.goo.gl/aaa shared via Maps')).toBe(
+      'https://maps.app.goo.gl/aaa'
+    );
+  });
+
+  it('handles a bare link with no surrounding text', () => {
+    expect(firstUrlIn('https://www.google.com/maps/place/Wat+Pho/@13.7465,100.4927,17z')).toBe(
+      'https://www.google.com/maps/place/Wat+Pho/@13.7465,100.4927,17z'
+    );
+  });
+
+  it('returns null when the shared text carries no link at all', () => {
+    expect(firstUrlIn('Wat Pho')).toBeNull();
+    expect(firstUrlIn('')).toBeNull();
+  });
+
+  it('feeds the parser end to end, the way the share route does', () => {
+    const shared = 'Angkor Wat\nhttps://www.google.com/maps/place/Angkor+Wat/@13.4125,103.8670,15z';
+    const link = firstUrlIn(shared);
+    expect(link).not.toBeNull();
+    const parsed = parseGoogleMapsUrl(link as string);
+    expect(parsed?.name).toBe('Angkor Wat');
+    expect(parsed?.lat).toBeCloseTo(13.4125);
   });
 });

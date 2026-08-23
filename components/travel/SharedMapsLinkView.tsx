@@ -20,12 +20,6 @@ import Link from 'next/link';
 import { Check, Copy, MapPin } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 
-/** The first http(s) link in a shared text blob, or null. */
-export function firstUrlIn(text: string): string | null {
-  const match = text.match(/https?:\/\/[^\s<>"']+/);
-  return match ? match[0] : null;
-}
-
 export function SharedMapsLinkView({ sharedLink }: { sharedLink: string | null }) {
   const { lang } = useLang();
   const [copied, setCopied] = useState(false);

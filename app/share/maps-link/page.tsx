@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { SharedMapsLinkView, firstUrlIn } from '@/components/travel/SharedMapsLinkView';
+import { SharedMapsLinkView } from '@/components/travel/SharedMapsLinkView';
+import { firstUrlIn } from '@/lib/travel/mapsLink';
 
 export const metadata: Metadata = {
   title: 'Shared link',

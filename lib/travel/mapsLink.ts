@@ -12,6 +12,19 @@ export interface ParsedMapsLink {
   name: string | null;
 }
 
+/**
+ * The first http(s) link inside a blob of shared text, or null.
+ *
+ * The OS share sheet hands an item over as a `url`, as `text`, or as both.
+ * Google Maps on Android shares the place name and the link together as one
+ * text blob, so reading only `url` would receive nothing in the most common
+ * case this exists for.
+ */
+export function firstUrlIn(text: string): string | null {
+  const match = text.match(/https?:\/\/[^\s<>"']+/);
+  return match ? match[0] : null;
+}
+
 function inRange(lat: number, lng: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
