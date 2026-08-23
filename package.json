@@ -31,7 +31,9 @@
     "test:contract": "vitest run --config vitest.contract.mts",
     "audit:check": "node scripts/audit-check.mjs",
     "supabase:check": "node scripts/supabase-check.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "env:check": "node scripts/env-capability.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "verify:runtime": "node scripts/smoke-runtime.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

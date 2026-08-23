@@ -330,8 +330,18 @@ npm run dev:ops               # staff console on :3001
 npm run dev:worker            # fulfilment worker
 ```
 
-There is no test suite for the root app; `npm run build` and `npm run typecheck`
-are the gates.
+```bash
+npm run env:check       # what THIS machine can and cannot prove — run first
+npm run verify          # static gate: typecheck + lint + unit tests
+npm run verify:runtime  # runtime gate: real dev server + real browser
+```
+
+**Two gates, reported separately.** `npm run verify` proves the code is
+self-consistent; it does not prove the app runs. `npm run verify:runtime` boots
+the app and drives a browser, and prints a `SKIP` for anything it could not
+cover — a skip is an unproven claim, never a passing one. Run `npm run env:check`
+**before** planning, so a report states its limits up front rather than after
+being challenged. See [`docs/VERIFICATION.md`](docs/VERIFICATION.md).
 
 ## 10. Platform boundary rules
 
@@ -381,6 +391,7 @@ guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 
 | Doc | Contents |
 | --- | --- |
+| `docs/VERIFICATION.md` | The two gates, what "done" may mean, and why a skip is not a pass |
 | `docs/INVENTORY.md` | Step A report — what exists, rule violations, Step 1–9 gaps |
 | `docs/TRAVEL-OS.md` | Travel states, capsules, the notification priority engine, web push, PWA |
 | `docs/STAFF-ROLES.md` | Staff accounts, the five roles, and the permission matrix |
