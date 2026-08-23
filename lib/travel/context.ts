@@ -33,6 +33,7 @@ interface TripRow {
   travelers: number | null;
   interests: string[] | null;
   cover_image_url: string | null;
+  is_wishlist: boolean | null;
 }
 
 interface FlightRow {
@@ -224,7 +225,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   const [tripsResult, flightsResult, ordersResult, daysResult, placesResult] = await Promise.all([
     supabase
       .from('trip_plans')
-      .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url')
+      .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist')
       .order('start_date', { ascending: true, nullsFirst: false })
       .limit(20),
     supabase
@@ -273,6 +274,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
       interests: knownInterests(trip.interests),
       readiness: deriveReadiness(trip, flightRows, orderRows, signals.get(trip.id) ?? NO_ITINERARY),
       coverImageUrl: trip.cover_image_url,
+      isWishlist: trip.is_wishlist ?? false,
     };
   });
 

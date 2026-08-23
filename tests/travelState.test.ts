@@ -32,6 +32,7 @@ function trip(overrides: Partial<TripSummary> = {}): TripSummary {
     interests: [],
     readiness: emptyReadiness(),
     coverImageUrl: null,
+    isWishlist: false,
     ...overrides,
   };
 }
