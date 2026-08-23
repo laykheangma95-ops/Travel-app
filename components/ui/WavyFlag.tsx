@@ -4,7 +4,12 @@
 // gold branding. Pure CSS/SVG — no image assets or extra dependencies.
 
 interface WavyFlagProps {
-  flag: string;
+  /**
+   * Usually the flag emoji. Some flags (Cambodia's among them) are missing
+   * from several widespread emoji fonts and render as a blurred, illegible
+   * glyph instead of a flag — pass a small inline SVG for those instead.
+   */
+  flag: React.ReactNode;
   label: string;
   size?: number;
   className?: string;
