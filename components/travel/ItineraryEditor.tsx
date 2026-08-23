@@ -234,6 +234,8 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
       name: draft.name,
       description: draft.description,
       category: draft.category,
+      lat: draft.lat,
+      lng: draft.lng,
       openingStart: draft.openingStart,
       openingEnd: draft.openingEnd,
       target: tab === 'ideas' || !active ? 'ideas' : active.id,
@@ -799,6 +801,13 @@ interface CustomDraft {
   category: ItineraryCategory;
   openingStart: string | null;
   openingEnd: string | null;
+  /**
+   * Filled in by resolving a pasted Google Maps link, never typed. The backend
+   * has accepted both since the addCustom action was written; until now the
+   * form had no way to produce them, so every custom place landed without a pin.
+   */
+  lat: number | null;
+  lng: number | null;
 }
 
 function AddPlaceSheet({
@@ -824,7 +833,57 @@ function AddPlaceSheet({
   const [custom, setCustom] = useState(false);
   const [draft, setDraft] = useState<CustomDraft>({
     name: '', description: '', category: 'other', openingStart: null, openingEnd: null,
+    lat: null, lng: null,
   });
+
+  // Pasting a Google Maps link is a shortcut, never a step. Every failure below
+  // leaves the manual form exactly as it was so the traveler can just type.
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+
+  const resolveLink = async () => {
+    const url = linkUrl.trim();
+    // Blur fires when the traveler clicks "Use this link", so without this the
+    // same URL would be resolved twice against a deliberately tight limit.
+    if (!url || linkBusy || url === resolvedUrl) return;
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const response = await fetch('/api/travel/maps-link', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { place?: { lat: number; lng: number; name: string | null }; error?: { message?: string } }
+        | null;
+      if (!response.ok || !body?.place) {
+        throw new Error(body?.error?.message ?? '');
+      }
+      const place = body.place;
+      setDraft((current) => ({
+        ...current,
+        lat: place.lat,
+        lng: place.lng,
+        // Only pre-fill a name the traveler has not written themselves.
+        name: current.name.trim() ? current.name : place.name ?? current.name,
+      }));
+      setResolvedUrl(url);
+    } catch (error) {
+      setLinkError(
+        error instanceof Error && error.message
+          ? error.message
+          : lang === 'km'
+            ? 'មិនអាចអានតំណនោះបានទេ។ សូមបំពេញទម្រង់ខាងក្រោមដោយផ្ទាល់។'
+            : 'We could not read that link. Fill the form in below instead.'
+      );
+    } finally {
+      setLinkBusy(false);
+    }
+  };
 
   // The old filters lied: "Stay" filtered to category 'other' (a catch-all) and
   // "My saved" filtered to source 'editorial' — Domner's own picks, the exact
@@ -889,6 +948,62 @@ function AddPlaceSheet({
 
         {custom ? (
           <form onSubmit={submitCustom} className="mt-5 space-y-3">
+            <div>
+              <label htmlFor="custom-maps-link" className="block text-sm font-medium text-white/80">
+                {lang === 'km' ? 'បិទភ្ជាប់តំណ Google Maps (ជាជម្រើស)' : 'Paste a Google Maps link (optional)'}
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="custom-maps-link"
+                  type="url"
+                  inputMode="url"
+                  value={linkUrl}
+                  onChange={(event) => {
+                    setLinkUrl(event.target.value);
+                    setLinkError(null);
+                  }}
+                  onBlur={() => void resolveLink()}
+                  onKeyDown={(event) => {
+                    // Enter inside this field means "use this link", not
+                    // "submit the whole form with an empty name".
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void resolveLink();
+                    }
+                  }}
+                  placeholder="https://maps.app.goo.gl/…"
+                  aria-describedby="custom-maps-link-hint"
+                  className="min-h-[2.75rem] w-full min-w-0 flex-1 rounded-btn border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/45 focus:border-gold-light/50 focus:outline-none focus:ring-2 focus:ring-gold-light/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => void resolveLink()}
+                  disabled={linkBusy || !linkUrl.trim()}
+                  className="inline-flex min-h-[2.75rem] shrink-0 items-center rounded-btn border border-white/15 px-3.5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                >
+                  {linkBusy
+                    ? lang === 'km' ? 'កំពុងអាន…' : 'Reading…'
+                    : lang === 'km' ? 'ប្រើតំណនេះ' : 'Use this link'}
+                </button>
+              </div>
+              {linkError ? (
+                <p role="alert" className="mt-1.5 text-xs text-amber-200">
+                  {linkError}
+                </p>
+              ) : draft.lat !== null && draft.lng !== null ? (
+                <p id="custom-maps-link-hint" className="mt-1.5 text-xs text-emerald-200">
+                  {lang === 'km'
+                    ? `បានរកឃើញទីតាំង (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)}) — នឹងបង្ហាញលើផែនទី។`
+                    : `Location found (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)}) — it will show on your map.`}
+                </p>
+              ) : (
+                <p id="custom-maps-link-hint" className="mt-1.5 text-xs text-white/50">
+                  {lang === 'km'
+                    ? 'ចែករំលែកពី Google Maps ដើម្បីបំពេញឈ្មោះ និងទីតាំងដោយស្វ័យប្រវត្តិ។'
+                    : 'Share from Google Maps to fill in the name and put it on your map.'}
+                </p>
+              )}
+            </div>
             <div>
               <label htmlFor="custom-name" className="block text-sm font-medium text-white/80">
                 {lang === 'km' ? 'ឈ្មោះទីតាំង' : 'Place name'}
@@ -966,9 +1081,13 @@ function AddPlaceSheet({
               )}
             </fieldset>
             <p className="text-xs text-white/60">
-              {lang === 'km'
-                ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
-                : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
+              {draft.lat !== null && draft.lng !== null
+                ? lang === 'km'
+                  ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ។ ទីតាំងនេះមានកូអរដោនេ ដូច្នេះវានឹងបង្ហាញលើផែនទី។'
+                  : 'Your own places are visible only to you. This one has coordinates, so it will appear on your map.'
+                : lang === 'km'
+                  ? 'ទីតាំងផ្ទាល់ខ្លួនមើលឃើញតែអ្នកប៉ុណ្ណោះ ហើយមិនបង្ហាញលើផែនទីទេ ព្រោះយើងមិនដឹងកូអរដោនេ។'
+                  : 'Your own places are visible only to you, and stay off the map — we have no coordinates for them.'}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <button
