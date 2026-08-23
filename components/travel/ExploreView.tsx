@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Search, Sparkles } from 'lucide-react';
 import { guides } from '@/content/destinations';
 import { destinations } from '@/data/destinations';
+import { servedCountries } from '@/data/coverage';
 import { ExploreCard } from './ExploreCard';
 import { DestinationScene } from '@/components/home/v3/destinationScene';
 import { useLang } from '@/lib/i18n';
@@ -210,6 +211,20 @@ export function ExploreView() {
               {lang === 'km'
                 ? 'យើងលក់ eSIM សម្រាប់ប្រទេសទាំងនេះ ប៉ុន្តែមិនទាន់សរសេរមគ្គុទ្ទេសក៍ពេញលេញទេ។'
                 : 'We sell an eSIM for these, but have not written the full guide yet.'}
+            </p>
+            {/* These chips are the countries we hold our own SKU for. Coverage
+                is far wider — a regional bundle reaches countries with no SKU
+                of their own — and this strip used to be the only place we said
+                anything, so those countries were sold nowhere at all. */}
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-white/60">
+              <Link
+                href="/coverage"
+                className="font-semibold text-gold-light underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              >
+                {lang === 'km'
+                  ? `មើលទាំង ${servedCountries.length} ប្រទេស និងទីក្រុងទាំងអស់`
+                  : `See all ${servedCountries.length} countries and their cities`}
+              </Link>
             </p>
             <ul className="mt-4 flex flex-wrap gap-2">
               {esimOnly.map((country) => (
