@@ -16,7 +16,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Search, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Link2, Search, Sparkles } from 'lucide-react';
 import { guides } from '@/content/destinations';
 import { destinations } from '@/data/destinations';
 import { servedCountries } from '@/data/coverage';
@@ -86,6 +86,19 @@ export function ExploreView() {
           >
             <Sparkles size={15} aria-hidden="true" />
             {lang === 'km' ? 'ចាប់ផ្តើមដំណើរថ្មី' : 'Start a trip'}
+          </Link>
+
+          {/* The other way in. Explore answers "where should I go?" from what we
+              have written; this answers it from what the traveler has already
+              been sent on TikTok — which for most of them is where the decision
+              actually gets made. Secondary styling deliberately: one accent CTA
+              per viewport (§5 of the UI standard). */}
+          <Link
+            href="/import"
+            className="ml-2 mt-4 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-white/15 px-4 text-sm font-semibold text-white transition-colors duration-200 ease-smooth hover:border-gold-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            <Link2 size={15} aria-hidden="true" />
+            {lang === 'km' ? 'នាំចូលពីតំណ' : 'Import from a link'}
           </Link>
         </header>
 

@@ -128,12 +128,9 @@ export function parseGoogleMapsUrl(resolvedUrl: string): MapsLinkPlace | null {
 /**
  * The first http(s) link inside a blob of shared text, or null.
  *
- * The OS share sheet hands an item over as a `url`, as `text`, or as both.
- * Google Maps on Android shares the place name and the link together as one
- * text blob, so reading only `url` would receive nothing in the most common
- * case this exists for.
+ * MOVED to lib/travel/socialLink.ts, which needs the same reading for pasted
+ * TikTok and Instagram shares and does it with the trailing-punctuation trim
+ * this version lacked. Re-exported here so every existing caller keeps working
+ * rather than two copies of the same regex drifting apart (rule 11).
  */
-export function firstUrlIn(text: string): string | null {
-  const match = text.match(/https?:\/\/[^\s<>"']+/);
-  return match ? match[0] : null;
-}
+export { firstUrlIn } from './socialLink';

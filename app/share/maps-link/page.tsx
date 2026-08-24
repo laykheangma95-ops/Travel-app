@@ -1,31 +1,31 @@
-import type { Metadata } from 'next';
-import { SharedMapsLinkView } from '@/components/travel/SharedMapsLinkView';
-import { firstUrlIn } from '@/lib/travel/mapsLink';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Shared link',
-  description: 'A place link shared into Domner.',
-  robots: { index: false, follow: false },
-};
-
-/** A repeated query param arrives as an array; take the first. */
-function one(value: string | string[] | undefined): string | null {
-  const single = Array.isArray(value) ? value[0] : value;
-  return single?.trim() || null;
-}
-
-// The landing point of the manifest's share_target. Android hands a shared
-// item over as `url`, `text`, or both — Google Maps in particular puts the
-// link inside `text` alongside the place name, so `text` is searched for a
-// link when `url` is absent.
+/**
+ * The OLD share-target address. Kept, and forwarding.
+ *
+ * The manifest now points share_target at /import, but a traveler who installed
+ * Domner before that still has the old manifest on their phone — an installed
+ * PWA does not re-read it on demand — so their share sheet keeps landing here
+ * for as long as that install lives. Deleting this route would break sharing
+ * for exactly the people who had already set it up.
+ *
+ * What used to render here was a page that put the link on the clipboard and
+ * told the traveler to go and paste it into their trip themselves. The importer
+ * does that whole job now, so this hands the shared item straight over rather
+ * than restating a workaround that is no longer needed.
+ */
 export default function SharedMapsLinkPage({
   searchParams,
 }: {
-  searchParams: { url?: string | string[]; text?: string | string[] };
+  searchParams: { url?: string | string[]; text?: string | string[]; title?: string | string[] };
 }) {
-  const url = one(searchParams.url);
-  const text = one(searchParams.text);
-  const sharedLink = url ?? (text ? firstUrlIn(text) : null);
+  const query = new URLSearchParams();
+  for (const key of ['title', 'text', 'url'] as const) {
+    const value = searchParams[key];
+    const single = Array.isArray(value) ? value[0] : value;
+    if (single?.trim()) query.set(key, single);
+  }
 
-  return <SharedMapsLinkView sharedLink={sharedLink} />;
+  const suffix = query.toString();
+  redirect(suffix ? `/import?${suffix}` : '/import');
 }

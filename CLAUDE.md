@@ -394,6 +394,7 @@ guessing. Full evidence in [`docs/INVENTORY.md`](docs/INVENTORY.md).
 | `docs/VERIFICATION.md` | The two gates, what "done" may mean, and why a skip is not a pass |
 | `docs/INVENTORY.md` | Step A report — what exists, rule violations, Step 1–9 gaps |
 | `docs/TRIP-CREATION.md` | Why trip creation reported "could not be found", what changed, and the proposed next steps |
+| `docs/PLACE-IMPORT.md` | Importing places from a TikTok/Instagram/Maps link — the pipeline, the SSRF allowlists, what degrades without a key |
 | `docs/TRAVEL-OS.md` | Travel states, capsules, the notification priority engine, web push, PWA |
 | `docs/STAFF-ROLES.md` | Staff accounts, the five roles, and the permission matrix |
 | `docs/OPS-CONSOLE.md` | Staff support lookup and the Excel sales statement |

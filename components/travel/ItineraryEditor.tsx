@@ -414,6 +414,7 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
       {picker && (
         <AddPlaceSheet
           targetLabel={targetLabel || (lang === 'km' ? 'គំនិត' : 'Ideas')}
+          tripId={tripId}
           places={data.curatedPlaces}
           savedPlaceIds={data.ideas.map((item) => item.place_id)}
           busy={busy}
@@ -815,6 +816,7 @@ interface CustomDraft {
 
 function AddPlaceSheet({
   targetLabel,
+  tripId,
   places,
   savedPlaceIds,
   busy,
@@ -823,6 +825,7 @@ function AddPlaceSheet({
   onClose,
 }: {
   targetLabel: string;
+  tripId: string;
   places: CuratedPlace[];
   savedPlaceIds: string[];
   busy: boolean;
@@ -1137,6 +1140,20 @@ function AddPlaceSheet({
                 <Plus size={18} aria-hidden="true" />
                 {lang === 'km' ? 'ផ្ទាល់ខ្លួន' : 'Custom'}
               </button>
+
+              {/* The third way to add a place, beside the catalogue and the
+                  manual form: paste a TikTok / Instagram / Google Maps link and
+                  let the importer read it. It is a link rather than a fourth
+                  in-sheet mode because the importer is a flow of its own —
+                  parse, review, choose a trip — and cramming that into a
+                  bottom sheet would make all three worse. */}
+              <Link
+                href={`/import?trip=${tripId}`}
+                className="flex min-h-[2.75rem] min-w-[86px] shrink-0 flex-col items-center gap-1 rounded-card border border-dashed border-gold-light/40 px-3 py-3 text-center text-xs font-semibold text-gold-bright transition-colors hover:border-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+              >
+                <Link2 size={18} aria-hidden="true" />
+                {lang === 'km' ? 'នាំចូល' : 'Import'}
+              </Link>
             </div>
 
             <label className="mt-4 flex items-center gap-3 rounded-btn border border-white/12 bg-white/[0.04] px-3.5 py-2.5">
