@@ -190,17 +190,24 @@ function deriveReadiness(
   return readiness;
 }
 
+/**
+ * Options for one context load.
+ *
+ * Both halves of this were arrived at independently on two branches fixing the
+ * same production failure; this is the reconciliation, keeping what each got
+ * right rather than whichever landed second.
+ */
 export interface TravelerContextOptions {
   /**
    * A trip that MUST be in the result, whatever the ordering window holds.
    *
-   * The trip query is capped at 20 and ordered by start_date, which is right
-   * for Home — nobody needs their 40th trip on a dashboard. It is wrong for a
-   * caller that has just written a specific row and needs to read it back:
-   * past twenty trips the new one falls outside the window, and tripById()
-   * reported NOT_FOUND on a trip that had been created successfully moments
-   * earlier. The traveler saw a failure, pressed create again, and left another
-   * committed row behind on every retry.
+   * The trip query is capped and ordered by start_date, which is right for Home
+   * — nobody needs their 40th trip on a dashboard. It is wrong for a caller that
+   * has just written a specific row and needs to read it back: past the cap the
+   * new one falls outside the window, and tripById() reported NOT_FOUND on a
+   * trip that had been created successfully moments earlier. The traveler saw a
+   * failure, pressed create again, and left another committed row behind on
+   * every retry.
    *
    * Rather than raising the cap — which only moves the cliff — the caller names
    * the row it cares about and it is fetched explicitly and merged in.
@@ -246,6 +253,49 @@ const DEFAULT_TRIP_LIMIT = 20;
 export const FULL_TRIP_LIMIT = 200;
 
 /**
+ * The trips query — the list, or one named row — in one place.
+ *
+ * Two failures are distinguished, because they mean opposite things to the
+ * person reading the screen:
+ *
+ *   a missing COLUMN  → retry without it. They lose the wishlist flag and keep
+ *                       every trip.
+ *   anything else, or a retry that also fails → `unavailable`. The table could
+ *                       not be read, which is an outage, NOT an empty account.
+ *                       Telling someone with ten trips that they have none is a
+ *                       worse answer than an error, and it is the answer that
+ *                       made a freshly created trip report itself missing.
+ */
+async function selectTrips(
+  supabase: SupabaseClient,
+  target: { limit: number } | { id: string }
+): Promise<{ rows: TripRow[]; unavailable: boolean }> {
+  const build = (columns: string) => {
+    const query = supabase.from('trip_plans').select(columns);
+    return 'id' in target
+      ? query.eq('id', target.id).limit(1)
+      : query.order('start_date', { ascending: true, nullsFirst: false }).limit(target.limit);
+  };
+
+  const rowsOf = (data: unknown) => ({ rows: (data ?? []) as unknown as TripRow[], unavailable: false });
+
+  const attempt = await build(TRIP_COLUMNS_WITH_WISHLIST);
+  if (!attempt.error) return rowsOf(attempt.data);
+
+  if (!isMissingColumn(attempt.error)) {
+    log.error('travel.trips_select_failed', { error: attempt.error.message });
+    return { rows: [], unavailable: true };
+  }
+
+  log.warn('travel.trips_without_wishlist', { reason: attempt.error.message });
+  const narrowed = await build(TRIP_COLUMNS);
+  if (!narrowed.error) return rowsOf(narrowed.data);
+
+  log.error('travel.trips_select_failed', { error: narrowed.error.message });
+  return { rows: [], unavailable: true };
+}
+
+/**
  * Everything Home needs about the caller, in one round of queries.
  *
  * A signed-out visitor gets an empty context rather than an error — guests
@@ -280,24 +330,8 @@ export async function loadTravelerContext(
   // traveler's whole history into every homepage render.
   const since = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const tripLimit = options.tripLimit ?? DEFAULT_TRIP_LIMIT;
-  const loadTrips = async () => {
-    const attempt = await supabase
-      .from('trip_plans')
-      .select(TRIP_COLUMNS_WITH_WISHLIST)
-      .order('start_date', { ascending: true, nullsFirst: false })
-      .limit(tripLimit);
-    if (!isMissingColumn(attempt.error)) return attempt;
-    log.warn('travel.trips_without_wishlist', { reason: attempt.error?.message });
-    return supabase
-      .from('trip_plans')
-      .select(TRIP_COLUMNS)
-      .order('start_date', { ascending: true, nullsFirst: false })
-      .limit(tripLimit);
-  };
-
   const [tripsResult, flightsResult, ordersResult, daysResult, placesResult] = await Promise.all([
-    loadTrips(),
+    selectTrips(supabase, { limit: options.tripLimit ?? DEFAULT_TRIP_LIMIT }),
     supabase
       .from('saved_flights')
       .select('flight_number, flight_date, departure_airport, arrival_airport')
@@ -316,38 +350,29 @@ export async function loadTravelerContext(
     supabase.from('itinerary_places').select('category, itinerary_day_id').limit(1000),
   ]);
 
-  for (const result of [tripsResult, flightsResult, ordersResult, daysResult, placesResult]) {
+  for (const result of [flightsResult, ordersResult, daysResult, placesResult]) {
     // A missing table on a partly-migrated project must degrade to "no data",
     // not to a broken homepage.
     if (result.error) log.warn('travel.context_query_failed', { error: result.error.message });
   }
 
-  const tripRows = (tripsResult.data ?? []) as TripRow[];
+  const tripRows = tripsResult.rows;
+  let tripsUnavailable = tripsResult.unavailable;
 
   // A trip the caller named but the ordering window did not reach. One extra
   // query on a write, never on a read, and it keeps every row on the single
   // mapping path below — the reason tripById goes through this loader at all.
   // RLS still decides whether it is theirs; a stranger's id simply finds
   // nothing, exactly as before.
+  //
+  // A list that failed does not rule the row out: a lookup by primary key can
+  // still succeed where a scan of the whole window did not.
   if (options.ensureTripId && !tripRows.some((trip) => trip.id === options.ensureTripId)) {
-    let named = await supabase
-      .from('trip_plans')
-      .select(TRIP_COLUMNS_WITH_WISHLIST)
-      .eq('id', options.ensureTripId)
-      .maybeSingle();
-    // Same fallback as the list above: this re-fetch selects the same columns,
-    // so on a partly-migrated database it failed for the same reason and the
-    // 20-trip fix it exists for never got a chance to work.
-    if (isMissingColumn(named.error)) {
-      named = await supabase
-        .from('trip_plans')
-        .select(TRIP_COLUMNS)
-        .eq('id', options.ensureTripId)
-        .maybeSingle();
-    }
-    if (named.error) log.warn('travel.context_query_failed', { error: named.error.message });
-    if (named.data) tripRows.push(named.data as TripRow);
+    const named = await selectTrips(supabase, { id: options.ensureTripId });
+    tripRows.push(...named.rows);
+    tripsUnavailable = tripsUnavailable && named.unavailable;
   }
+
   const flightRows = (flightsResult.data ?? []) as FlightRow[];
   const orderRows = (ordersResult.data ?? []) as OrderRow[];
   const signals = itinerarySignals(
@@ -390,5 +415,5 @@ export async function loadTravelerContext(
     fulfilledAt: order.fulfilled_at,
   }));
 
-  return { signedIn: true, displayName, trips, flights, esims, now };
+  return { signedIn: true, displayName, trips, flights, esims, now, tripsUnavailable };
 }

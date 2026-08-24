@@ -2,8 +2,15 @@ import { z } from 'zod';
 import { ApiError, ok, readJson, requireParam, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
-import { nextDayDate, type ItineraryCategory } from '@/lib/travel/itinerary';
+import { nextDayDate, tripDayCount, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { buildSmartDraft, type DraftPlace } from '@/lib/travel/smartDraft';
+
+/**
+ * The smart draft plans a week at most, however long the trip is. Seeding the
+ * grid follows the trip itself — see MAX_SEEDED_DAYS — so the two ceilings are
+ * named separately rather than sharing one number that means both.
+ */
+const DRAFT_MAX_DAYS = 7;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,12 +22,6 @@ const preferencesSchema = z.object({
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('09:00'),
   includeSaved: z.boolean().default(true),
 }).strict();
-
-function tripDayCount(start: string | null, end: string | null): number | null {
-  if (!start || !end) return null;
-  const difference = Math.floor((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86_400_000);
-  return Math.min(7, Math.max(1, difference + 1));
-}
 
 export const POST = route(async (request, context) => {
   if (!getSupabase()) throw new ApiError('SERVICE_UNAVAILABLE', 'Itinerary is unavailable right now.');
@@ -57,7 +58,7 @@ export const POST = route(async (request, context) => {
     : { data: [] };
   const savedPlaceIds = (savedRows ?? []).map((row) => row.place_id as string);
   const numberedDays = (existingDays ?? []).filter((day) => day.day_index > 0);
-  const wantedDayCount = Math.max(numberedDays.length, tripDayCount(trip.start_date, trip.end_date) ?? 3);
+  const wantedDayCount = Math.max(numberedDays.length, tripDayCount(trip.start_date, trip.end_date, DRAFT_MAX_DAYS) ?? 3);
   let days = numberedDays;
   if (days.length < wantedDayCount) {
     const firstNewIndex = days.length + 1;

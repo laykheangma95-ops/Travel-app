@@ -342,6 +342,17 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         filters.push({ sql: `${column} = ?`, params: [value] });
         return api;
       },
+      /**
+       * `.is(column, null)` — the null test, which `.eq()` cannot express:
+       * `column = NULL` is never true in SQL. lib/travel/tripSeed.ts uses it to
+       * find a wishlist trip that has not been given dates yet, so a harness
+       * without it turns that query into a TypeError rather than a result.
+       */
+      is(column: string, value: unknown) {
+        if (value === null) filters.push({ sql: `${column} IS NULL`, params: [] });
+        else filters.push({ sql: `${column} IS ?`, params: [value] });
+        return api;
+      },
       in(column: string, values: unknown[]) {
         filters.push({ sql: `${column} = ANY(?)`, params: [values] });
         return api;

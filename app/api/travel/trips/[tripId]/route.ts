@@ -13,7 +13,8 @@
 import { ApiError, ok, readJson, requireParam, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
-import { parseTripDraft, tripById } from '@/lib/travel/tripWrites';
+import { parseTripDraft, tripAfterWrite, tripById } from '@/lib/travel/tripWrites';
+import { seedTripDays } from '@/lib/travel/tripSeed';
 import { normalizeTripDraft } from '@/lib/travel/trips';
 
 export const runtime = 'nodejs';
@@ -68,7 +69,14 @@ export const PATCH = route(
     if (error) throw new ApiError('INTERNAL', 'Could not save your changes. Please try again.');
     if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be updated — it may have been deleted.');
 
-    return ok({ trip: await tripById(request, tripId) });
+    // Dates given to a trip that had none bring the day grid into being here,
+    // and dates that moved re-stamp the days that already exist. Nothing is
+    // deleted: a shortened trip keeps the days somebody has planned on.
+    await seedTripDays(supabase, tripId, draft);
+
+    // The update committed. A read-back that fails after that must not tell the
+    // traveler their save was lost — see tripAfterWrite.
+    return ok({ trip: await tripAfterWrite(request, tripId, draft) });
   },
   { rateLimit: 'tripWrite', name: 'travel.trips.update' }
 );
