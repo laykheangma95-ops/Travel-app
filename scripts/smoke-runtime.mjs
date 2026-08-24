@@ -227,7 +227,51 @@ try {
     record(ok ? 'pass' : 'fail', '/trips renders for a signed-out visitor', ok ? undefined : `HTTP ${response.status()}`);
   }
 
-  // ── 6. maps-link refuses a link-local address over the real HTTP stack ────
+  // ── 6. The New trip form — the screen a trip starts on ───────────────────
+  {
+    // Everything here is provable without a backend: the country list is
+    // static, and validation runs client-side through the same module the API
+    // validates with. What is NOT provable is the POST — see the skip below.
+    const response = await open('/trips/new?destination=Malaysia');
+    const destination = page.locator('#trip-destination');
+    const submit = page.locator('form button[type="submit"]');
+
+    const rendered =
+      response.status() === 200 && (await destination.count()) > 0 && (await submit.count()) > 0;
+    // The handoff from Explore and the destination guides: arriving with a
+    // country already chosen must fill the field rather than be ignored.
+    const preset = rendered ? await destination.inputValue() : '';
+
+    if (rendered && preset === 'Malaysia') {
+      record('pass', 'New trip form renders with the destination handed over by Explore', preset);
+    } else {
+      record(
+        'fail',
+        'New trip form renders with the destination handed over by Explore',
+        `HTTP ${response.status()} value=${preset || 'empty'}`
+      );
+    }
+  }
+
+  // ── 7. The form refuses an empty trip in the browser, not at the server ───
+  {
+    await open('/trips/new');
+    const submit = page.locator('form button[type="submit"]').first();
+    await submit.click().catch(() => {});
+    await page.waitForTimeout(400);
+
+    // A field-level role=alert, from the same validateTripDraft the route runs.
+    const alerts = await page.locator('form p[role="alert"]').count();
+    const stillHere = page.url().includes('/trips/new');
+
+    if (alerts > 0 && stillHere) {
+      record('pass', 'Empty trip is refused in the form, before any request is sent', `${alerts} field error(s)`);
+    } else {
+      record('fail', 'Empty trip is refused in the form, before any request is sent', `alerts=${alerts} url=${page.url()}`);
+    }
+  }
+
+  // ── 8. maps-link refuses a link-local address over the real HTTP stack ────
   {
     // CARE IS NEEDED WITH WHAT THIS PROVES. The route calls requireUser BEFORE
     // assertAllowedHost, so on a machine with no Supabase the answer is 401 and
@@ -264,7 +308,7 @@ try {
     }
   }
 
-  // ── 7. No uncaught page errors anywhere above ─────────────────────────────
+  // ── 9. No uncaught page errors anywhere above ─────────────────────────────
   if (pageErrors.length === 0) {
     record('pass', 'No uncaught client-side exceptions on any page visited');
   } else {

@@ -78,9 +78,25 @@ function edit(tripId: string, body: Record<string, unknown>) {
   );
 }
 
+/** The row PostgREST returns for a saved trip, as the context loader selects it. */
+function tripRow(id: string, draft: Record<string, unknown> = DRAFT) {
+  return {
+    id,
+    title: draft.title,
+    destination: draft.destination,
+    start_date: draft.startDate,
+    end_date: draft.endDate,
+    travelers: draft.travelers,
+    interests: draft.interests,
+    cover_image_url: null,
+    is_wishlist: false,
+  };
+}
+
 /**
  * The default world: no wishlist trip to adopt, no days yet, an insert returns
- * a new id, and a read-back finds the row. Each test overrides one part.
+ * a new id, and the read-back finds the row it was pointed at. Each test
+ * overrides one part.
  */
 type Override = (query: FakeQuery) => FakeAnswer | null;
 
@@ -94,6 +110,11 @@ function world(overrides: { trips?: Override; days?: Override } = {}): Answering
     }
     if (query.filters.is_wishlist !== undefined) return okData([]);
     if (query.op === 'insert') return okData({ id: NEW_TRIP });
+    // The read-back: the list comes back empty and `ensureTripId` fetches the
+    // row by id, which is the path a freshly written trip actually takes.
+    if (query.columns.includes('title') && typeof query.filters.id === 'string') {
+      return okData([tripRow(query.filters.id)]);
+    }
     return okData([]);
   };
 }
@@ -193,6 +214,10 @@ describe('adopting the wishlist trip a saved place created', () => {
     const body = await response.json();
 
     expect(body.trip.id).toBe(WISHLIST_TRIP);
+    // Read back through the context loader, not echoed from the request: this
+    // is the same shape every other trip card is derived into.
+    expect(body.trip.title).toBe(DRAFT.title);
+    expect(body.trip.readiness).toBeDefined();
     // No second Malaysia row: the ideas already hanging off the wishlist trip
     // are on the trip because it IS the trip.
     expect(session.fake.seen.some((query) => query.table === 'trip_plans' && query.op === 'insert')).toBe(
