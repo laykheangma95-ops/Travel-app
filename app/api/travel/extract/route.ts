@@ -29,7 +29,7 @@
 import { z } from 'zod';
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
-import { requireUser } from '@/lib/serverAuth';
+import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { log } from '@/lib/logger';
 import { parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
 import { allowedMapsUrl, resolveFinalUrl, TOTAL_TIMEOUT_MS } from '@/lib/travel/mapsResolve';
@@ -45,6 +45,16 @@ import {
   type PlaceCandidate,
 } from '@/lib/travel/placeExtraction';
 import { geocodePlace, geocodingConfigured, MAX_LOOKUPS_PER_IMPORT } from '@/lib/travel/geocode';
+import { importKeyFor } from '@/lib/travel/urlHash';
+import {
+  assertWithinQuota,
+  completeImport,
+  failImport,
+  findReusableImport,
+  startImport,
+  type ImportPlatform,
+} from '@/lib/travel/importJobs';
+import { recordAiUsage, type AiUsage } from '@/lib/travel/aiUsage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,6 +104,14 @@ export interface ExtractResponse {
    * rather than pretending an unconfigured deployment is a smart one.
    */
   capabilities: { model: boolean; geocoding: boolean };
+  /**
+   * The job row this extraction was recorded as, or null when the ledger was
+   * unavailable. The client hands it back on save so a place can be traced to
+   * the post it came from.
+   */
+  importId: string | null;
+  /** True when this answered from an earlier identical import — no model call. */
+  reused: boolean;
 }
 
 export const POST = route(async (request, context) => {
@@ -103,6 +121,10 @@ export const POST = route(async (request, context) => {
   // user's string into outbound connections and, where a key is set, into model
   // tokens. It gets the tightest tier we have, in a bucket of its own so it
   // cannot lock a traveler out of signing in.
+  //
+  // This is the BURST limiter and it is per-instance, so it is a courtesy
+  // rather than a spending cap. The daily cap is assertWithinQuota below, which
+  // counts rows in the database.
   const verdict = checkRateLimit(request, 'auth', `extract:${user.id}`);
   if (!verdict.ok) {
     throw new ApiError('RATE_LIMITED', 'Too many imports at once. Please wait a moment.', {
@@ -119,23 +141,119 @@ export const POST = route(async (request, context) => {
   const { input, destinationHint } = parsed.data;
   const capabilities = { model: placeAgentConfigured(), geocoding: geocodingConfigured() };
 
+  // The reuse key. Null when the traveler pasted text with no link in it —
+  // free text has no stable identity, so that import is recorded but never
+  // replayed. See lib/travel/urlHash.ts.
+  const key = importKeyFor(input);
+
+  // Null with an empty .env, and that is a supported state (CLAUDE.md §11):
+  // every ledger call below accepts null and does nothing. The importer works
+  // without a database, it just stops remembering.
+  const supabase = supabaseFromRequest(request);
+  const platform = platformOf(input);
+
+  // ── 0. Have we already done exactly this? ─────────────────────────────────
+  //
+  // The cheapest model call is the one that is not made. A replay costs one
+  // indexed SELECT and zero tokens.
+  if (supabase && key) {
+    const reusable = await findReusableImport(supabase, user.id, key.urlHash);
+    if (reusable) {
+      const replayId = await startImport(supabase, { userId: user.id, key, platform });
+      await completeImport(supabase, replayId, {
+        outcome: reusable.outcome,
+        candidates: reusable.candidates,
+        usedModel: false,
+        reusedFromImportId: reusable.importId,
+      });
+      log.info('extract.reused', {
+        requestId: context.requestId,
+        platform,
+        found: reusable.candidates.length,
+      });
+      return ok<ExtractResponse>(
+        {
+          outcome: reusable.outcome,
+          platform: platform === 'text' ? null : platform,
+          preview: null,
+          candidates: reusable.candidates,
+          destination: agreedDestination(reusable.candidates),
+          capabilities,
+          importId: replayId,
+          reused: true,
+        },
+        { requestId: context.requestId }
+      );
+    }
+
+    // Only reached when the pipeline is actually about to run, so a traveler is
+    // never refused for imports that cost nothing.
+    await assertWithinQuota(supabase, user.id);
+  }
+
+  const importId = supabase
+    ? await startImport(supabase, { userId: user.id, key, platform })
+    : null;
+
+  try {
+    const result = await runExtraction(input, destinationHint ?? null, context.requestId);
+
+    if (supabase) {
+      if (result.usage) await recordAiUsage(supabase, user.id, 'place_import', result.usage);
+      await completeImport(supabase, importId, {
+        outcome: result.body.outcome,
+        candidates: result.body.candidates,
+        usedModel: result.usage !== null,
+      });
+    }
+
+    return ok<ExtractResponse>(
+      { ...result.body, capabilities, importId, reused: false },
+      { requestId: context.requestId }
+    );
+  } catch (error) {
+    // The row is not left open on a crash: an 'extracting' row that never
+    // completes is indistinguishable from one still in flight.
+    if (supabase) await failImport(supabase, importId);
+    throw error;
+  }
+}, { name: 'travel.extract' });
+
+/** How a job row names where this input came from. */
+function platformOf(input: string): ImportPlatform {
+  const link = firstUrlIn(input);
+  const classified = link ? classifyLink(link) : null;
+  return classified?.platform ?? 'text';
+}
+
+/**
+ * The pipeline itself, unchanged in behaviour and now returning what it cost.
+ *
+ * Split out of the handler so the job-ledger bookkeeping has exactly one place
+ * to hook into, rather than a completeImport() call before each of the three
+ * places this used to return from.
+ */
+async function runExtraction(
+  input: string,
+  destinationHint: string | null,
+  requestId: string
+): Promise<{ body: Omit<ExtractResponse, 'capabilities' | 'importId' | 'reused'>; usage: AiUsage | null }> {
   const link = firstUrlIn(input);
   const classified = link ? classifyLink(link) : null;
 
   // ── 1. A Google Maps link is one exact place. No model, no geocoder. ───────
   if (classified?.platform === 'google-maps') {
-    const resolved = await placeFromMapsLink(link as string, destinationHint);
-    return ok<ExtractResponse>(
-      {
+    const resolved = await placeFromMapsLink(link as string, destinationHint ?? undefined);
+    return {
+      body: {
         outcome: resolved ? 'ok' : 'link-unreadable',
         platform: 'google-maps',
         preview: { title: null, author: null, thumbnailUrl: null, canonicalUrl: classified.canonicalUrl },
         candidates: resolved ? [resolved] : [],
         destination: resolved?.country ?? null,
-        capabilities,
       },
-      { requestId: context.requestId }
-    );
+      usage: null,
+    };
   }
 
   // ── 2. A social link: ask the platform for the caption. ───────────────────
@@ -173,21 +291,20 @@ export const POST = route(async (request, context) => {
           ? 'link-unreadable'
           : 'no-places-found';
     log.info('extract.empty_caption', {
-      requestId: context.requestId,
+      requestId,
       platform: classified?.platform ?? 'text',
       previewOutcome: preview?.outcome ?? 'none',
     });
-    return ok<ExtractResponse>(
-      {
+    return {
+      body: {
         outcome,
         platform: classified?.platform ?? null,
         preview: previewBlock,
         candidates: [],
         destination: null,
-        capabilities,
       },
-      { requestId: context.requestId }
-    );
+      usage: null,
+    };
   }
 
   // ── 3. Read the caption: model first, deterministic extractor as the floor. ─
@@ -201,32 +318,29 @@ export const POST = route(async (request, context) => {
   // through. An empty ARRAY means it read the caption and there is nothing in
   // it — that is an answer, and second-guessing it with regexes would put the
   // fragments it correctly rejected in front of the traveler.
-  const candidates = fromModel ?? extractFromCaption(caption);
+  const candidates = fromModel.candidates ?? extractFromCaption(caption);
 
   // ── 4. Put pins on what we can. ───────────────────────────────────────────
   const located = await addCoordinates(candidates, hint);
 
-  const destination = agreedDestination(located);
-
   log.info('extract.done', {
-    requestId: context.requestId,
+    requestId,
     platform: classified?.platform ?? 'text',
-    usedModel: fromModel !== null,
+    usedModel: fromModel.candidates !== null,
     found: located.length,
   });
 
-  return ok<ExtractResponse>(
-    {
+  return {
+    body: {
       outcome: located.length ? 'ok' : 'no-places-found',
       platform: classified?.platform ?? null,
       preview: previewBlock,
       candidates: located,
-      destination,
-      capabilities,
+      destination: agreedDestination(located),
     },
-    { requestId: context.requestId }
-  );
-}, { name: 'travel.extract' });
+    usage: fromModel.usage,
+  };
+}
 
 /**
  * A Google Maps link as a single candidate.

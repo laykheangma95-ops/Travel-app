@@ -37,9 +37,15 @@ them. This closes that gap: the thing they already have — a link on a clipboar
    shape as a place saved from a guide, so the itinerary editor needs no
    knowledge that the importer exists.
 
-**Nothing is written until step 5.** `POST /api/travel/extract` writes nothing
-at all — not a trip, not a place, not a row. That is what makes a wrong guess
+**No travel content is written until step 5.** `POST /api/travel/extract`
+creates no trip, no place and no itinerary row. That is what makes a wrong guess
 cost a glance instead of a cleanup.
+
+Since migration 012 it does write one row of its own: an import job recording
+what was extracted. That is what makes **pasting the same link twice free** —
+the second paste replays the first result with no caption fetch and no model
+call. It is best-effort; with no database the importer works and simply stops
+remembering. Full design in [`SOCIAL-SAVE.md`](SOCIAL-SAVE.md).
 
 ---
 
@@ -55,6 +61,8 @@ cost a glance instead of a cleanup.
 | Validate everything | `lib/travel/placeExtraction.ts` | `normaliseCandidate` is the only door. |
 | Put pins on it | `lib/travel/geocode.ts` | Nominatim (OpenStreetMap). |
 | Write it | `lib/travel/placeImport.ts` | Reuses `addIdeaToTrip` from `savedPlaces.ts`. |
+| Remember it | `lib/travel/importJobs.ts` | The job row, the replay lookup, the quota, the provenance. |
+| Key it | `lib/travel/urlHash.ts` | Pure. Normalized URL → SHA-256, so a repeat is recognised. |
 
 ---
 
@@ -125,6 +133,8 @@ rather than being deleted.
 | `ANTHROPIC_API_KEY` | unset | Switches on model extraction. |
 | `ANTHROPIC_PLACE_MODEL` | `claude-sonnet-5` | Which model reads captions. |
 | `NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` | Geocoder. Empty string disables. |
+| `ANTHROPIC_PLACE_MODEL_FAST` | unset | Optional cheap first pass. Unset means one call to `ANTHROPIC_PLACE_MODEL`, exactly as before. |
+| `PLACE_IMPORT_DAILY_QUOTA` | `40` | Pipeline runs per traveler per rolling day. Replays are free and never counted. `0` disables. |
 
 **On the geocoder:** OpenStreetMap's public instance permits at most one request
 per second from an application and requires a real User-Agent. Both are enforced

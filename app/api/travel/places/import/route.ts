@@ -50,6 +50,12 @@ const importRequest = z
     tripId: z.string().uuid().optional(),
     title: z.string().trim().max(TRIP_TITLE_MAX).optional(),
     newTrip: z.boolean().optional(),
+    /**
+     * The extraction these places came from, as returned by
+     * /api/travel/extract. Only used to look up provenance the server already
+     * recorded — the source URL itself is never taken from the client.
+     */
+    importId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -70,7 +76,7 @@ export const POST = route(
       throw new ApiError('BAD_REQUEST', 'Those places could not be saved.');
     }
 
-    const { places, destination, tripId, title, newTrip } = parsed.data;
+    const { places, destination, tripId, title, newTrip, importId } = parsed.data;
 
     const result = await importPlacesToTrip(
       supabase,
@@ -82,7 +88,8 @@ export const POST = route(
         lat: entry.lat,
         lng: entry.lng,
       })),
-      { tripId, destination, title, forceNew: newTrip }
+      { tripId, destination, title, forceNew: newTrip },
+      { importId }
     );
 
     // A partial success is still a 200. `added`, `skipped` and `failed` are

@@ -14,7 +14,7 @@
 //   container — it works in CI the same way it works on a laptop.
 //
 // WHAT IS REAL AND WHAT IS A STAND-IN:
-//   REAL      — migrations 007, 009, 010 and 011 are read off disk and executed
+//   REAL      — migrations 007 through 012 are read off disk and executed
 //               verbatim. The policies under test are the SQL in git, so this
 //               harness notices when they drift.
 //   STAND-IN  — `auth.uid()`/`auth.role()` (copied from Supabase's own
@@ -37,6 +37,10 @@ const MIGRATIONS = [
   '009_custom_places.sql',
   '010_place_opening_hours.sql',
   '011_saved_places.sql',
+  // Phase 1 of Social Save: the import ledger. Its policies are what stop one
+  // traveler reading another's imports, and what stop the daily quota from
+  // being reset by deleting the rows it counts.
+  '012_place_imports.sql',
 ];
 
 /**
@@ -204,7 +208,9 @@ export async function createHarness(): Promise<Harness> {
     asAdmin,
     async reset() {
       await asAdmin(
-        `TRUNCATE itinerary_places, itinerary_days, trip_plans, destination_places, saved_flights, esim_orders, profiles, auth.users CASCADE`
+        `TRUNCATE ai_usage_log, place_sources, import_candidates, place_imports,
+                  itinerary_places, itinerary_days, trip_plans, destination_places,
+                  saved_flights, esim_orders, profiles, auth.users CASCADE`
       );
     },
     close: () => db.close(),
@@ -292,8 +298,12 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
     let limit: number | null = null;
     // Writes are deferred rather than built at call time, because .update() and
     // .delete() take their filters AFTER the verb.
-    let pending: { kind: 'insert' | 'update' | 'delete'; row?: Record<string, unknown> } | null =
-      null;
+    let pending: {
+      kind: 'insert' | 'update' | 'delete';
+      row?: Record<string, unknown>;
+      /** supabase-js takes an array for a bulk insert, and so does this. */
+      rows?: Record<string, unknown>[];
+    } | null = null;
     let returning: string | null = null;
 
     const where = () => {
@@ -396,8 +406,12 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         limit = count;
         return api;
       },
-      insert(row: Record<string, unknown>) {
-        pending = { kind: 'insert', row };
+      insert(row: Record<string, unknown> | Record<string, unknown>[]) {
+        // One row or many. lib/travel/importJobs.ts writes a whole extraction's
+        // candidates in one statement, and a harness that only understood a
+        // single row turned that into a syntax error rather than a result.
+        if (Array.isArray(row)) pending = { kind: 'insert', rows: row };
+        else pending = { kind: 'insert', row };
         return api;
       },
       update(row: Record<string, unknown>) {
@@ -432,12 +446,24 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
         const execute = async () => {
           try {
             if (pending?.kind === 'insert') {
-              const keys = Object.keys(pending.row ?? {});
-              const placeholders = keys.map((_, index) => `$${index + 1}`);
+              const rows = pending.rows ?? [pending.row ?? {}];
+              if (rows.length === 0) return { data: [], count: null, error: null };
+              // PostgREST derives the column list from the first object and
+              // fills the rest with NULL where a key is absent, so a bulk
+              // insert of uneven rows behaves the same here as in production.
+              const keys = Object.keys(rows[0]);
+              const params: unknown[] = [];
+              const tuples = rows.map((entry) => {
+                const placeholders = keys.map((key) => {
+                  params.push(entry[key] ?? null);
+                  return `$${params.length}`;
+                });
+                return `(${placeholders.join(', ')})`;
+              });
               const sql =
-                `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})` +
+                `INSERT INTO ${table} (${keys.join(', ')}) VALUES ${tuples.join(', ')}` +
                 (returning ? ` RETURNING ${returning}` : '');
-              const result = await run(sql, keys.map((key) => pending!.row![key]));
+              const result = await run(sql, params);
               return { data: result.rows ?? [], count: null, error: null };
             }
 

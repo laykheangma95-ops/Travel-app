@@ -1,7 +1,8 @@
 # Social Save + AI Place Intelligence — architecture audit & implementation plan
 
-**Status: audit only. No production behaviour is changed by this document.**
-The only files it touches are itself and the docs index in `CLAUDE.md`.
+**Status: Phase 1 delivered. Phases 2–5 are proposals awaiting a decision.**
+Parts 1–4 are the audit; Part 5 carries the phase plan and Part 8 records what
+Phase 1 actually shipped.
 
 Required by CLAUDE.md §6 ("before coding, always report first"). It answers
 three questions: what is actually in this repository, what of it can be reused,
@@ -393,7 +394,7 @@ lib/travel/aiUsage.ts         metering + quota
 
 Each phase is independently shippable, additive, and reversible.
 
-### Phase 1 — Persistence + cost control *(recommended first)*
+### Phase 1 — Persistence + cost control ✅ **shipped — see Part 8**
 
 - Migration `012_place_imports.sql`: `place_imports`, `import_candidates`,
   `place_sources`, `ai_usage_log` + RLS + indexes.
@@ -497,3 +498,88 @@ Each phase is independently shippable, additive, and reversible.
    (e.g. N independent saves + provider verification)?
 5. **Xiaohongshu / RED:** add its hosts to the SSRF allowlist? Same class of
    decision as the `goo.gl` widening already recorded in `docs/PLACE-IMPORT.md`.
+
+
+---
+
+## Part 8 — Phase 1 as built
+
+Approved decisions this was built under: a paid places provider is approved in
+principle but stays behind an abstraction and is **not activated here**; a saved
+place must eventually exist independently of a trip (Phase 4); promotion to
+public must never be AI-only; and the SSRF allowlist is **not widened** — RED is
+prepared for by the `platform` vocabulary and nothing else.
+
+### What it does
+
+```
+paste → normalize URL → sha256 → url_hash
+      → own completed import for this hash?
+            hit  → replay stored candidates      ZERO tokens, ZERO fetches
+            miss → daily quota check (a DB count)
+                 → the existing pipeline, unchanged
+                 → record job + candidates + token cost
+save  → record which post each place came from, and which guess was kept
+```
+
+### Tables (migration `012_place_imports.sql`)
+
+`place_imports` · `import_candidates` · `place_sources` · `ai_usage_log`.
+No existing table is altered. `destination_places`, `trip_plans`,
+`itinerary_days` and `itinerary_places` are untouched, so every existing save
+path behaves exactly as before.
+
+### The quota is enforced in the database, not in the app
+
+The daily cap is a `COUNT` over `place_imports`, and a traveler holds the anon
+key — they can call PostgREST directly. Three holes are closed in SQL rather
+than in code: a trigger stamps `created_at` on insert (no backdating), preserves
+`user_id`/`created_at`/`url_hash` on update (no rewriting), and there is **no
+DELETE policy** (no deleting the evidence). Each one has a test that performs
+the attack.
+
+Replays are excluded from the count. They cost nothing, so charging for them
+would ration exactly the behaviour this phase exists to encourage.
+
+### Privacy
+
+`place_sources` links a person to a place they liked enough to save, so it is
+private: own-row SELECT and INSERT, no UPDATE, no DELETE. Aggregate save counts
+— what a public surface actually needs — are a Phase 4 table computed from this
+one, never this table exposed. `ai_usage_log` has **no** SELECT policy at all;
+model names and cost estimates are read by staff through the service role.
+
+### Environment variables
+
+| Name | Default | Effect |
+|---|---|---|
+| `PLACE_IMPORT_DAILY_QUOTA` | `40` | Pipeline runs per traveler per rolling day. `0` disables the cap. |
+| `ANTHROPIC_PLACE_MODEL_FAST` | unset | Opt-in cheap first pass. **Unset = one call to the same model as before**, so default behaviour is unchanged. |
+
+### Known limitations
+
+1. **Reuse is own-user only.** A viral link imported by many travelers is still
+   extracted once per traveler. Cross-user reuse means reading another user's
+   row, which requires the service role — a decision with a privacy argument
+   attached, not a free win. Phase 2 question.
+2. **The escalation is billed twice.** With `ANTHROPIC_PLACE_MODEL_FAST` set and
+   the cheap pass failing, both calls are paid for. `ai_usage_log` records the
+   stronger model's line; the escalation itself is logged as
+   `place_agent.escalated`.
+3. **The ledger is best-effort.** If Supabase is unavailable the importer works
+   and simply stops remembering — `importId` comes back `null`. That is the
+   empty-`.env` configuration and it is covered by a test.
+4. **The quota fails open.** If the count cannot be read the import proceeds. A
+   database hiccup locking every traveler out of the importer would be a worse
+   outage than the spending it guards against.
+5. **No screenshot/OCR path, no RED classifier, no provider.** Out of scope by
+   instruction.
+
+### One invariant was deliberately narrowed
+
+`tests/extractRoute.test.ts` asserted that the extract endpoint "must never
+touch the database". It now asserts the narrower, true property: the endpoint
+writes **no trip, place or itinerary row** — a wrong guess still costs a glance
+rather than a cleanup — and writes only its own job row. It also may never use
+the unscoped Supabase client; everything runs on the caller's session client so
+RLS applies.

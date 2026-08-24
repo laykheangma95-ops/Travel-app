@@ -33,6 +33,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { log } from '@/lib/logger';
+import type { AiUsage } from './aiUsage';
 import {
   dedupeCandidates,
   guessDestination,
@@ -110,30 +111,86 @@ export interface AgentExtractionInput {
   destinationHint?: string | null;
 }
 
+/** What one model call produced, and what it cost. */
+export interface ModelExtraction {
+  /**
+   * Null and [] are different answers and the caller treats them differently:
+   * null means "fall back to the deterministic extractor", [] means "the model
+   * read this and there are no places in it".
+   */
+  candidates: PlaceCandidate[] | null;
+  /** Token counts for the ledger. Null when no call was made or it failed. */
+  usage: AiUsage | null;
+}
+
 /**
- * The places a model reads out of a caption, or null when it could not be
- * asked (no key) or did not answer usefully (timeout, refusal, unparseable).
+ * The optional cheap first pass.
  *
- * Null and [] are different answers and the caller treats them differently:
- * null means "fall back to the deterministic extractor", [] means "the model
- * read this and there are no places in it".
+ * OFF BY DEFAULT, and deliberately so: with `ANTHROPIC_PLACE_MODEL_FAST` unset
+ * this function returns null, exactly one call is made to exactly the model
+ * that was being called before this existed, and behaviour is unchanged.
+ *
+ * Set it, and a small model reads the caption first. Most captions are a 📍
+ * list with a sentence around them, which is not a hard reading task. The
+ * stronger model is asked only when the cheap one could not answer.
  */
-export async function extractWithModel(
-  input: AgentExtractionInput
-): Promise<PlaceCandidate[] | null> {
+function fastModel(): string | null {
+  return process.env.ANTHROPIC_PLACE_MODEL_FAST?.trim() || null;
+}
+
+/**
+ * The places a model reads out of a caption, with the token cost of finding out.
+ *
+ * Never throws. A model outage must not take the importer down with it: the
+ * caller still has the deterministic extractor, and the traveler still has the
+ * manual form.
+ */
+export async function extractWithModel(input: AgentExtractionInput): Promise<ModelExtraction> {
   const anthropic = client();
-  if (!anthropic) return null;
+  if (!anthropic) return { candidates: null, usage: null };
 
   const caption = input.caption.trim().slice(0, MAX_CAPTION_CHARS);
-  if (!caption) return null;
+  if (!caption) return { candidates: null, usage: null };
 
+  const cheap = fastModel();
+  if (cheap) {
+    const first = await askModel(anthropic, cheap, caption, input);
+    // Escalate only when the cheap pass did not produce an answer at all — it
+    // failed, or it read the caption and found nothing where there plausibly is
+    // something. An empty answer on a short caption is taken at face value,
+    // because paying twice to be told "no places" is the cost this is avoiding.
+    const worthEscalating =
+      first.candidates === null || (first.candidates.length === 0 && caption.length > 400);
+    if (!worthEscalating) return first;
+
+    const second = await askModel(anthropic, model(), caption, input);
+    log.info('place_agent.escalated', {
+      from: cheap,
+      to: model(),
+      found: second.candidates?.length ?? 0,
+    });
+    // Both calls happened, so both are billed. The ledger gets the stronger
+    // model's line; the cheap one is logged above rather than lost.
+    return second;
+  }
+
+  return askModel(anthropic, model(), caption, input);
+}
+
+/** One call to one model. The only place in this file that spends money. */
+async function askModel(
+  anthropic: Anthropic,
+  modelId: string,
+  caption: string,
+  input: AgentExtractionInput
+): Promise<ModelExtraction> {
   const hint = input.destinationHint?.trim();
   const fallback = hint ? guessDestination(hint) : guessDestination(caption);
 
   try {
     const message = await anthropic.messages.create(
       {
-        model: model(),
+        model: modelId,
         max_tokens: 2_000,
         temperature: 0,
         system: SYSTEM,
@@ -157,6 +214,12 @@ export async function extractWithModel(
       { timeout: TIMEOUT_MS }
     );
 
+    const usage: AiUsage = {
+      model: modelId,
+      tokensIn: message.usage?.input_tokens ?? 0,
+      tokensOut: message.usage?.output_tokens ?? 0,
+    };
+
     const text = message.content
       .map((block) => (block.type === 'text' ? block.text : ''))
       .join('')
@@ -164,25 +227,25 @@ export async function extractWithModel(
 
     const parsed = parseModelJson(text);
     if (!parsed) {
-      log.warn('place_agent.unparseable', { model: model(), length: text.length });
-      return null;
+      log.warn('place_agent.unparseable', { model: modelId, length: text.length });
+      // The call still cost money even though it produced nothing usable, so
+      // the usage is returned rather than discarded with the answer.
+      return { candidates: null, usage };
     }
 
     const candidates = parsed
       .map((entry) => normaliseCandidate({ ...entry, source: 'model' }, fallback))
       .filter((entry): entry is PlaceCandidate => entry !== null);
 
-    log.info('place_agent.extracted', { model: model(), count: candidates.length });
-    return dedupeCandidates(candidates);
+    log.info('place_agent.extracted', { model: modelId, count: candidates.length });
+    return { candidates: dedupeCandidates(candidates), usage };
   } catch (error) {
-    // A model outage must not take the importer down with it: the caller still
-    // has the deterministic extractor, and the traveler still has the manual
-    // form. Never log the caption itself — it is someone's content.
+    // Never log the caption itself — it is someone's content.
     log.warn('place_agent.failed', {
-      model: model(),
+      model: modelId,
       reason: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
     });
-    return null;
+    return { candidates: null, usage: null };
   }
 }
 

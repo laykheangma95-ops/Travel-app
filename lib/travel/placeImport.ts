@@ -26,6 +26,7 @@ import { ApiError } from '@/lib/http';
 import type { ItineraryCategory } from './itinerary';
 import { PLACE_DESCRIPTION_MAX, PLACE_NAME_MAX } from './itinerary';
 import { addIdeaToTrip } from './savedPlaces';
+import { loadImportProvenance, markCandidateAccepted, recordPlaceSource } from './importJobs';
 import { normalizeTripDraft, suggestTripTitle } from './trips';
 
 /** One place the traveler ticked. Already normalised by placeExtraction. */
@@ -79,7 +80,13 @@ export async function importPlacesToTrip(
   supabase: SupabaseClient,
   userId: string,
   places: ImportablePlace[],
-  target: ImportTarget
+  target: ImportTarget,
+  /**
+   * The extraction this save came from, when the client has one. Everything
+   * about it is optional and best-effort: provenance is valuable, and never
+   * worth failing a save for.
+   */
+  options: { importId?: string } = {}
 ): Promise<ImportResult> {
   if (places.length === 0) throw new ApiError('BAD_REQUEST', 'Pick at least one place to save.');
   if (places.length > MAX_IMPORT_PLACES) {
@@ -98,6 +105,12 @@ export async function importPlacesToTrip(
 
   const existingNames = await namesAlreadyOnTrip(supabase, trip.id);
 
+  // Read once, outside the loop. Null when there is no import id, the id is not
+  // this traveler's, or the import was a text paste with no link to credit.
+  const provenance = options.importId
+    ? await loadImportProvenance(supabase, options.importId)
+    : null;
+
   const added: string[] = [];
   const skipped: string[] = [];
   const failed: string[] = [];
@@ -114,6 +127,22 @@ export async function importPlacesToTrip(
     try {
       const placeId = await insertPlace(supabase, userId, destination, { ...place, name });
       await addIdeaToTrip(supabase, trip.id, placeId);
+
+      // Provenance and the accepted-candidate mark. Both are ledger writes and
+      // both swallow their own failures — the place is already saved, and a
+      // bookkeeping error must not turn a successful save into a failed one.
+      if (provenance) {
+        await recordPlaceSource(supabase, {
+          placeId,
+          userId,
+          importId: options.importId ?? null,
+          platform: provenance.platform,
+          key: provenance.key,
+        });
+      }
+      if (options.importId) {
+        await markCandidateAccepted(supabase, options.importId, name, placeId);
+      }
       existingNames.add(fold(name));
       added.push(name);
     } catch {
