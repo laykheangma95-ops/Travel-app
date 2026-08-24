@@ -404,3 +404,99 @@ export function countrySlugsForCityQuery(query: string): Set<string> {
 export function bestCityMatch(query: string): CityMatch | undefined {
   return searchCities(query, 1)[0];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRIP-PLANNING DESTINATIONS — deliberately NOT gated by eSIM coverage.
+//
+// Everything above this line answers "what can we sell?", so it resolves
+// through data/coverage.ts and drops any city whose country we do not serve.
+// That is right for the store and wrong for the trip planner: a traveler
+// planning Athens should be able to plan Athens, and be told separately that we
+// have no eSIM for Greece yet. Gating the planner on the supplier's catalogue
+// made the product smaller than the data it already holds.
+//
+// Countries here come from data/countries.ts — all 241 of them, not the 52 we
+// sell — so a city resolves to a country name whether or not a plan exists.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { countries } from './countries';
+
+function countrySlugOf(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * City-index slugs whose spelling differs from the country list's. Four, all
+ * verified against data/countries.ts rather than assumed: the registry says
+ * "macao"/"uae"/"usa"/"czech-republic" where the country list says Macau,
+ * United Arab Emirates, United States and Czechia.
+ */
+const SLUG_ALIASES: Record<string, string> = {
+  macao: 'macau',
+  uae: 'united-arab-emirates',
+  usa: 'united-states',
+  'czech-republic': 'czechia',
+};
+
+const COUNTRY_NAME_BY_SLUG: Map<string, string> = new Map(
+  countries.map((country) => [countrySlugOf(country.name), country.name])
+);
+
+/** The country name a city sits in, for any country in the world. */
+export function countryNameForCitySlug(slug: string): string | undefined {
+  return COUNTRY_NAME_BY_SLUG.get(SLUG_ALIASES[slug] ?? slug);
+}
+
+export interface TripDestination {
+  /** What the traveler reads: a city name, or a country name. */
+  label: string;
+  /** Khmer label where one is settled. */
+  labelKm?: string;
+  /**
+   * The country this resolves to, and the ONLY thing written to
+   * trip_plans.destination. The itinerary catalogue, savedPlaces.resolveTrip
+   * and matchDestination all key on the country name, so a city must resolve to
+   * one or the trip would be unreachable by every one of them.
+   */
+  country: string;
+  kind: 'city' | 'country';
+  /** Sort weight: better-known cities first, countries after their cities. */
+  weight: number;
+  /** Extra strings that should match this entry — IATA codes, old spellings. */
+  aliases: string[];
+}
+
+/**
+ * Every country in the world, plus every city we index, as one searchable list.
+ * eSIM coverage is not consulted; see the note at the top of this section.
+ */
+export const tripDestinations: TripDestination[] = [
+  ...cities.flatMap((city): TripDestination[] => {
+    const country = countryNameForCitySlug(city.countrySlug);
+    // A city we cannot name a country for would write a destination nothing
+    // downstream could match, so it is dropped rather than guessed at.
+    if (!country) return [];
+    return [
+      {
+        label: city.name,
+        labelKm: city.nameKm,
+        country,
+        kind: 'city',
+        weight: (city.weight ?? 0) + 10,
+        aliases: [...(city.aliases ?? []), country],
+      },
+    ];
+  }),
+  ...countries.map((country): TripDestination => ({
+    label: country.name,
+    country: country.name,
+    kind: 'country',
+    weight: 0,
+    aliases: [],
+  })),
+];

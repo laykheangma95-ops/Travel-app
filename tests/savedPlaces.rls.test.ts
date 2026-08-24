@@ -222,9 +222,13 @@ describe("addIdeaToTrip keeps the itinerary route's guarantees", () => {
     const placeId = await seedEditorialPlace('thailand:wat-pho');
 
     // Bob cannot even see Alice's trip, so this stops at the trip lookup.
-    await expect(
-      addIdeaToTrip(harness.clientFor(BOB), trips[0].id as string, placeId)
-    ).rejects.toThrow('That trip could not be found.');
+    const attempt = addIdeaToTrip(harness.clientFor(BOB), trips[0].id as string, placeId);
+    await expect(attempt).rejects.toThrow('We could not find that trip to save this place into.');
+
+    // The wording matters as much as the refusal: RLS hides the row, and the
+    // message must not tell Bob that Alice's trip exists. "Could not find" is
+    // indistinguishable from a trip id that was never real, which is the point.
+    await expect(attempt).rejects.not.toThrow(/permission|denied|not yours|belongs to/i);
     expect(await harness.rows('itinerary_places')).toHaveLength(0);
   });
 

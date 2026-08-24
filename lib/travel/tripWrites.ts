@@ -105,6 +105,10 @@ export async function tripById(request: Request, tripId: string): Promise<TripSu
     throw new ApiError('SERVICE_UNAVAILABLE', 'We could not reach your trips just now.');
   }
 
+  // Reached only by a genuine read now — a trip that is not there, or is
+  // somebody else's. The write paths go through `tripAfterWrite` below, which
+  // is why this can go back to saying plainly that the trip is missing: it can
+  // no longer be the answer to "I just created this".
   throw new ApiError('NOT_FOUND', 'That trip could not be found.');
 }
 

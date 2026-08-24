@@ -14,6 +14,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes: Array<{ path: string; priority: number; freq: 'daily' | 'weekly' | 'monthly' }> = [
     { path: '', priority: 1, freq: 'daily' },
     { path: '/esim', priority: 0.9, freq: 'weekly' },
+    // "Does my eSIM work in X" is a question people search by name, and this
+    // page answers it for all 52 countries at once.
+    { path: '/coverage', priority: 0.8, freq: 'weekly' },
     { path: '/flights', priority: 0.9, freq: 'daily' },
     { path: '/checklist', priority: 0.8, freq: 'monthly' },
     { path: '/airport-guide', priority: 0.8, freq: 'monthly' },
