@@ -880,8 +880,13 @@ Expected: zero rows. A test asserts this after a save/save/unsave sequence.
 
 `saved_places` is own-row only for SELECT, INSERT, UPDATE and DELETE — there is
 no policy under which one traveler's library is visible to another.
-`place_stats` is the only publicly readable table and holds a place id and a
-number; who saved what is never joinable to it.
+
+`place_stats` holds a place id and a number, and **who saved what is never
+joinable to it**. It is *not* publicly readable: reading a count requires a
+signed-in caller **and** a place that caller can already see (published, or
+their own). Anonymous callers get nothing at all — Phase 2 has no surface that
+shows counts to a signed-out visitor, and opening one is a product decision
+rather than a default.
 
 ### One finding, found while testing
 
@@ -900,14 +905,66 @@ still can.
 
 ### Known limitations
 
-1. **`collection_id` is a column with no table.** Nullable, no FK, and the API
-   schema does not accept the field, so nothing can put a value in it until
-   collections ship with their constraint.
+1. **`collection_id` is a column with no table, pinned to NULL.** The API not
+   accepting the field was never the guarantee — a direct PostgREST call could
+   set it to any uuid at all, and rows written that way would become live
+   cross-user collection references the moment collections shipped. It is now
+   held at NULL by the `saved_places_collection_null` CHECK constraint, which
+   the collections migration drops in the same statement that adds the foreign
+   key.
 2. **A `rejected` place drops out of a library.** The save row survives; the
    view stops returning it, because RLS on `places` no longer matches. Correct,
    and tested, but it means a list can shrink without the traveler acting.
+
+   **TECHNICAL DEBT (M1) — rejected places inflate `place_stats.save_count`.**
+   The surviving `saved_places` rows still count. A place we have judged not
+   real therefore keeps its popularity, and every screen that ranks or displays
+   by save count inherits that number. Nothing is exposed by it — the count is
+   already gated on the place being visible, and a rejected place is visible to
+   nobody but its creator — so this is a correctness debt, not a security one.
+
+   It is deliberately NOT fixed in the security pull request that landed the
+   ownership fixes, because that change had to stay reviewable. Fixing it means
+   deciding what `rejected` should do to existing saves: leave them (today),
+   delete them and let the counter trigger settle the number, or exclude
+   rejected places from the counter and reconcile. That is a product decision
+   about somebody else's library, so it needs an owner, not a default. Until it
+   is made, treat `save_count` on a rejected place as stale.
+
+   The reconciliation query in this document detects nothing here, by design:
+   the counter and `saved_places` agree with each other. What disagrees is
+   `save_count` and the intent of `rejected`.
 3. **`getSavedDestinations` tallies in the application** over one page of saves,
    so the country counts describe the first 50. A `GROUP BY` view is the fix
    when a library that large exists.
 4. **The heart is only mounted on `/you/saved`.** There is no public
    canonical-place surface yet to put it on; that arrives with place pages.
+
+
+---
+
+## Part 11 — The Phase 2 ownership review
+
+A security issue found by testing rather than by design is a reason to sweep the
+whole boundary, not to fix one column. The sweep ran every foreign key, policy,
+trigger and route in Phase 2 as an attack. It found **three more instances of
+one mistake**: a foreign key was being asked to do authorization's job.
+
+> A foreign key proves a row EXISTS. It says nothing about who may point at it.
+
+| Finding | Was | Now |
+|---|---|---|
+| **C1** `source_import_id` accepted another traveler's import — and it was reachable **through the documented API**, which accepts `sourceImportId` | provenance could be forged; valid import ids distinguishable from invented ones | RLS `WITH CHECK` on INSERT **and** UPDATE: NULL, or an import owned by `auth.uid()`. The guard trigger also makes it immutable after creation |
+| **H1** `place_stats` was readable for any place by id, and its backfill inserts a row for **every** place — so on a populated database it enumerated every place id in the system, private ones included | existence and popularity leaked; no identities | read policy now requires the place to be visible to the caller: published, or their own |
+| **H2** `collection_id` accepted any uuid through a direct PostgREST call | future cross-user collection references | `CHECK (collection_id IS NULL)`, dropped by the collections migration |
+
+None of the three exposed a user's identity or another traveler's library; the
+own-row policies held throughout. What leaked was existence, provenance and
+aggregates.
+
+**19 adversarial tests** now cover them, each performing the attack rather than
+describing it, and each asserting what the *database* did rather than what a
+route returned. The `place_stats` enumeration test is built in **production
+migration order** — 014 re-applied against a populated `places` table — because
+the ordinary harness runs migrations against an empty database and would have
+reported that leak as blocked.
