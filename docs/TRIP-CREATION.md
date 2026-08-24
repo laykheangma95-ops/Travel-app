@@ -108,12 +108,82 @@ rather than adding a surface beside it.
    destination's monsoon window, the cheapest departure day in that month, and
    the eSIM plan length that matches the trip — turning a data-entry step into
    the first piece of advice the traveler gets.
-4. **The trip as one continuous object.** Creating a trip should immediately
-   seed a day grid from the dates, pull any saved places for that destination
-   into Ideas, and surface the readiness gap (flight · stay · eSIM) as the next
-   action — so inspiration, saving, planning and buying are one thread, not four
-   screens.
+4. ~~**The trip as one continuous object.**~~ **Built — see §6 below.**
 5. **A create screen that cannot lie again.** The class of bug above —
    a successful write reported as a failure — deserves a standing rule, not a
    one-off patch: *no write path may derive its success from a subsequent read.*
    Worth asserting in the test suite for refunds and orders too.
+
+## 6. One continuous trip object (built)
+
+Creating a trip now does two things beyond writing the row. Both are in
+`lib/travel/tripSeed.ts`, called from the create and edit routes.
+
+### The day grid exists as soon as the dates do
+
+`itinerary_days` rows used to appear only when the traveler pressed "Add day" or
+ran the smart draft, so a trip that knew it ran 25–27 August still opened on an
+empty chooser. `seedTripDays` writes day 0 (the private Ideas list) always, and
+one dated day per day of the trip — capped at `MAX_SEEDED_DAYS` (30), which is a
+seeding ceiling, not a limit on the trip.
+
+It runs on edit too, which is what makes "no dates yet" a real answer rather
+than a dead end: the grid comes into being the moment dates are saved. It is
+idempotent by construction —
+
+- a numbered day is inserted only where that index is missing, so an existing
+  plan is never duplicated;
+- existing days are **re-dated** when the trip moves. A day's date is derived
+  from the start date and nothing else — no screen lets anyone set one by hand —
+  so recomputing it corrects a stale stamp rather than overwriting a choice;
+- days beyond a shortened trip are **left alone**. Nothing deletes a day
+  somebody has planned on.
+
+`tripDayCount` moved out of the generate route into `lib/travel/itinerary.ts`
+and took a `cap` argument, because two callers want different ceilings for the
+same number: the grid follows the trip, while the smart draft only ever drafts
+its first week (`DRAFT_MAX_DAYS`).
+
+### The wishlist trip is adopted, not duplicated
+
+Saving a place before a trip exists auto-creates one with `is_wishlist = true`
+(`lib/travel/savedPlaces.ts`). Someone who saved three places in Malaysia and
+then filled in the New Trip form ended up with **two** Malaysia rows: the real
+trip, and a wishlist trip holding every idea they had gathered. The ideas never
+arrived — and the next save saw two matching trips and stopped to ask which one
+was meant, an ambiguity created entirely by this gap.
+
+A create that matches exactly one adoptable wishlist trip now **upgrades that
+row** instead of inserting beside it. Nothing is copied and nothing is left
+behind: the ideas are on the trip because it is the same trip.
+
+Adoption is deliberately narrow, and returns "no" on any doubt. The row must
+
+- belong to the caller — `trips_public_read` (schema.sql:527) means a SELECT can
+  see *other people's* public trips, so the owner filter is load-bearing here,
+  not a duplicate of the policy;
+- be a wishlist trip — a real trip made earlier is never silently overwritten;
+- have no dates — a wishlist trip that has since been given dates has been
+  worked on;
+- be the only match — two candidates is the ambiguity being removed, and
+  picking one at random would be inventing an answer.
+
+A database without migration 011 has no `is_wishlist` column; adoption is
+skipped and the traveler gets a second trip, exactly as before. It is an
+improvement on inserting, never a precondition for it.
+
+### What was already right
+
+**The readiness gap needed no work.** `TripWorkspace` already renders flight ·
+stay · eSIM · places · itinerary as anchored sections, each either done or an
+honest gap with a real action, above a `TripProgress` bar — and creating a trip
+already lands there. Adoption does improve what it says: a trip that arrives
+with ideas attached shows Places as done on its first render.
+
+### The rule these follow
+
+Seeding and adoption are enrichments of a write that has already committed, so
+neither may fail the write. Every failure path logs and continues, and
+`tests/tripSeed.test.ts` asserts the trip is still created when the itinerary
+table is missing entirely. Same rule as `tripAfterWrite`: **no write path may
+derive its success from a subsequent read.**

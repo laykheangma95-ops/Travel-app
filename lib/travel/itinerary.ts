@@ -64,6 +64,35 @@ export interface ItineraryPayload {
   curatedPlaces: CuratedPlace[];
 }
 
+/**
+ * The most days one trip's grid is ever seeded with.
+ *
+ * A cap rather than a limit on the trip: a traveler on a three-month journey
+ * still has a trip, they just do not get ninety day cards written for them
+ * before they have planned anything. "Add day" goes past this by hand.
+ */
+export const MAX_SEEDED_DAYS = 30;
+
+/**
+ * How many days a trip covers, inclusive of both ends. Null when the dates are
+ * not both known.
+ *
+ * `cap` exists because two callers want different ceilings for the same number:
+ * seeding the grid follows the trip (up to MAX_SEEDED_DAYS), while the smart
+ * draft only ever drafts the first week of one.
+ */
+export function tripDayCount(
+  start: string | null,
+  end: string | null,
+  cap: number = MAX_SEEDED_DAYS
+): number | null {
+  if (!start || !end) return null;
+  const difference = Math.floor(
+    (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86_400_000
+  );
+  return Math.min(cap, Math.max(1, difference + 1));
+}
+
 export function nextDayDate(startDate: string | null, dayIndex: number): string | null {
   if (!startDate) return null;
   const date = new Date(`${startDate}T00:00:00Z`);

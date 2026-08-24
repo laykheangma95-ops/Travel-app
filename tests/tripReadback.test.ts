@@ -28,64 +28,28 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetRateLimits } from '@/lib/rateLimit';
+import {
+  createFakeSupabase,
+  failsWith,
+  okData,
+  type Answering,
+  type FakeQuery,
+  type FakeSupabase,
+} from './support/fakeSupabase';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const NEW_TRIP = '33333333-3333-4333-8333-333333333333';
 
-/** One query, as the fake saw it. */
-interface Query {
-  table: string;
-  columns: string;
-  filters: Record<string, unknown>;
-  inserted?: Record<string, unknown>;
-}
-
-type Answer = { data: unknown; error: { message: string; code?: string } | null };
-
-const session = vi.hoisted(() => ({
-  answer: null as unknown as (query: Query) => Answer,
-  seen: [] as Query[],
-}));
-
-/** A Supabase query builder with just the surface this code path uses. */
-function fakeClient() {
-  return {
-    from(table: string) {
-      const query: Query = { table, columns: '', filters: {} };
-      const builder: Record<string, unknown> = {
-        select(columns: string) {
-          query.columns = columns;
-          return builder;
-        },
-        insert(row: Record<string, unknown>) {
-          query.inserted = row;
-          return builder;
-        },
-        eq(column: string, value: unknown) {
-          query.filters[column] = value;
-          return builder;
-        },
-        gte: () => builder,
-        order: () => builder,
-        limit: () => builder,
-        single: () => builder,
-        maybeSingle: () => builder,
-        then(resolve: (value: Answer) => unknown, reject: (reason: unknown) => unknown) {
-          session.seen.push(query);
-          return Promise.resolve(session.answer(query)).then(resolve, reject);
-        },
-      };
-      return builder;
-    },
-  };
-}
+const session = vi.hoisted(() => ({ fake: null as unknown as FakeSupabase }));
 
 vi.mock('@/lib/supabase', () => ({ getSupabase: () => ({}) }));
 vi.mock('@/lib/serverAuth', () => ({
   requireUser: async () => ({ id: ALICE }),
   getUser: async () => ({ id: ALICE, email: 'alice@example.com', user_metadata: {} }),
-  supabaseFromRequest: () => fakeClient(),
+  supabaseFromRequest: () => session.fake.client,
 }));
+
+session.fake = createFakeSupabase(() => okData([]));
 
 const { POST } = await import('@/app/api/travel/trips/route');
 
@@ -109,8 +73,8 @@ function create(body: unknown = DRAFT) {
   );
 }
 
-const ok = (data: unknown): Answer => ({ data, error: null });
-const fails = (code: string, message: string): Answer => ({ data: null, error: { code, message } });
+const ok = okData;
+const fails = failsWith;
 
 /** The row PostgREST would return for a saved trip. */
 function row(id: string, overrides: Record<string, unknown> = {}) {
@@ -129,22 +93,26 @@ function row(id: string, overrides: Record<string, unknown> = {}) {
 }
 
 /** Everything except trip_plans answers empty; trip_plans is per-test. */
-function answering(trips: (query: Query) => Answer) {
-  return (query: Query): Answer => {
+function answering(trips: Answering): Answering {
+  return (query: FakeQuery) => {
     if (query.table !== 'trip_plans') return ok([]);
-    if (query.inserted) return ok({ id: NEW_TRIP });
+    // The adoption probe (lib/travel/tripSeed.ts) is a different question from
+    // the read-back these tests are about: no wishlist trip to adopt, so every
+    // create here goes down the insert path. Adoption has its own suite.
+    if (query.filters.is_wishlist !== undefined) return ok([]);
+    if (query.op === 'insert') return ok({ id: NEW_TRIP });
     return trips(query);
   };
 }
 
 beforeEach(() => {
   __resetRateLimits();
-  session.seen = [];
+  session.fake = createFakeSupabase(() => okData([]));
 });
 
 describe('creating a trip on a database missing migration 011', () => {
   it('still returns the created trip instead of "could not be found"', async () => {
-    session.answer = answering((query) =>
+    session.fake.answer = answering((query) =>
       // Exactly what PostgREST does with an unknown column: the whole select
       // fails, not just that field.
       query.columns.includes('is_wishlist')
@@ -161,7 +129,7 @@ describe('creating a trip on a database missing migration 011', () => {
   });
 
   it('retries with the columns the table has always had', async () => {
-    session.answer = answering((query) =>
+    session.fake.answer = answering((query) =>
       query.columns.includes('is_wishlist')
         ? fails('42703', 'column trip_plans.is_wishlist does not exist')
         : ok([row(NEW_TRIP)])
@@ -169,8 +137,8 @@ describe('creating a trip on a database missing migration 011', () => {
 
     await create();
 
-    const narrow = session.seen.filter(
-      (query) => query.table === 'trip_plans' && !query.inserted && !query.columns.includes('is_wishlist')
+    const narrow = session.fake.seen.filter(
+      (query) => query.table === 'trip_plans' && query.op === 'select' && !query.columns.includes('is_wishlist')
     );
     expect(narrow.length).toBeGreaterThan(0);
     expect(narrow[0].columns).not.toContain('cover_image_url');
@@ -179,7 +147,7 @@ describe('creating a trip on a database missing migration 011', () => {
 
 describe('creating a trip that falls outside the list window', () => {
   it('fetches it by id rather than calling it missing', async () => {
-    session.answer = answering((query) =>
+    session.fake.answer = answering((query) =>
       // The list is full of other people's-worth of older trips; only a lookup
       // filtered to this id returns the new one.
       query.filters.id === NEW_TRIP ? ok([row(NEW_TRIP)]) : ok([row('other-trip')])
@@ -190,13 +158,13 @@ describe('creating a trip that falls outside the list window', () => {
 
     expect(response.status).toBe(201);
     expect(body.trip.id).toBe(NEW_TRIP);
-    expect(session.seen.some((query) => query.filters.id === NEW_TRIP)).toBe(true);
+    expect(session.fake.seen.some((query) => query.filters.id === NEW_TRIP)).toBe(true);
   });
 });
 
 describe('when the trips table cannot be read at all', () => {
   it('still hands back the trip it just committed', async () => {
-    session.answer = answering(() => fails('42P01', 'relation "trip_plans" does not exist'));
+    session.fake.answer = answering(() => fails('42P01', 'relation "trip_plans" does not exist'));
 
     const response = await create();
     const body = await response.json();
@@ -213,10 +181,10 @@ describe('tripById, on a plain read', () => {
     const { tripById } = await import('@/lib/travel/tripWrites');
     const request = new Request('https://domner.test/api/travel/trips/x');
 
-    session.answer = answering(() => fails('42P01', 'relation "trip_plans" does not exist'));
+    session.fake.answer = answering(() => fails('42P01', 'relation "trip_plans" does not exist'));
     await expect(tripById(request, NEW_TRIP)).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
 
-    session.answer = answering(() => ok([]));
+    session.fake.answer = answering(() => ok([]));
     await expect(tripById(request, NEW_TRIP)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

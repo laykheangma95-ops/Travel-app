@@ -18,6 +18,7 @@ import { getSupabase } from '@/lib/supabase';
 import { loadTravelerContext } from '@/lib/travel/context';
 import { deriveTravelState } from '@/lib/travel/state';
 import { parseTripDraft, tripAfterWrite } from '@/lib/travel/tripWrites';
+import { adoptWishlistTrip, adoptableWishlistTrip, seedTripDays } from '@/lib/travel/tripSeed';
 import { normalizeTripDraft } from '@/lib/travel/trips';
 
 export const runtime = 'nodejs';
@@ -57,18 +58,33 @@ export const POST = route(
 
     const draft = parseTripDraft(await readJson<unknown>(request));
 
-    // user_id is taken from the verified JWT, never from the body. RLS would
-    // reject a forged one anyway — this just means the request never gets that
-    // far, and a traveler cannot file a trip under someone else's account.
-    const { data, error } = await supabase
-      .from('trip_plans')
-      .insert({ user_id: user.id, ...normalizeTripDraft(draft) })
-      .select('id')
-      .single();
+    // A trip auto-created by saving a place becomes THIS trip rather than a
+    // second row beside it, so the places already gathered for this destination
+    // are on the trip from the first second. See lib/travel/tripSeed.ts for the
+    // four conditions that have to hold before a row is adopted.
+    const candidate = await adoptableWishlistTrip(supabase, user.id, draft.destination);
+    let tripId: string | null = null;
+    if (candidate && (await adoptWishlistTrip(supabase, candidate, draft))) tripId = candidate;
 
-    if (error || !data) {
-      throw new ApiError('INTERNAL', 'Could not save that trip. Please try again.');
+    if (!tripId) {
+      // user_id is taken from the verified JWT, never from the body. RLS would
+      // reject a forged one anyway — this just means the request never gets that
+      // far, and a traveler cannot file a trip under someone else's account.
+      const { data, error } = await supabase
+        .from('trip_plans')
+        .insert({ user_id: user.id, ...normalizeTripDraft(draft) })
+        .select('id')
+        .single();
+
+      if (error || !data) {
+        throw new ApiError('INTERNAL', 'Could not save that trip. Please try again.');
+      }
+      tripId = data.id as string;
     }
+
+    // The day grid, from the dates the traveler just gave. Best-effort: the
+    // trip exists either way, and the itinerary screen can still add days.
+    await seedTripDays(supabase, tripId, draft);
 
     // Re-read through the same loader the list uses, so the card the traveler
     // lands on is derived identically to every other card — including readiness
@@ -76,7 +92,7 @@ export const POST = route(
     // that read fails, the insert above still happened: `tripAfterWrite` hands
     // back the trip as written rather than reporting a failure that would
     // invite the traveler to create a duplicate.
-    const trip = await tripAfterWrite(request, data.id as string, draft);
+    const trip = await tripAfterWrite(request, tripId, draft);
 
     return ok({ trip }, { status: 201 });
   },
