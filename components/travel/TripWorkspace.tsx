@@ -296,8 +296,14 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
               ? 'រក្សាទុកកន្លែងដែលអ្នកចង់ទៅ ហើយយើងនឹងប្រាប់ពេលអ្នកនៅជិត។'
               : "Save the places you want to reach and we'll tell you when you're near one."
           }
-          actionLabel={lang === 'km' ? 'ស្វែងរក' : 'Explore'}
-          actionHref={slug ? `/destination/${slug}` : '/explore'}
+          actionLabel={lang === 'km' ? 'នាំចូលទីតាំង' : 'Import places'}
+          // Was `/destination/{slug}` — a guide page, which for a destination
+          // with no written guide fell through to `/explore`, a list of other
+          // countries. Both were dead ends for the one thing this card is
+          // asking for: getting a place onto THIS trip. The importer takes a
+          // TikTok/Instagram/Maps link and files what it finds straight onto
+          // the trip whose id it is handed.
+          actionHref={`/import?trip=${trip.id}`}
         />
 
         <Section

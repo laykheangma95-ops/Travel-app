@@ -15,9 +15,10 @@
   "categories": ["travel", "navigation", "utilities"],
   "prefer_related_applications": false,
   "share_target": {
-    "action": "/share/maps-link",
+    "action": "/import",
     "method": "GET",
     "params": {
+      "title": "title",
       "text": "text",
       "url": "url"
     }

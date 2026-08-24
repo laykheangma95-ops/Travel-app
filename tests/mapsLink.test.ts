@@ -184,12 +184,31 @@ describe('allowedMapsUrl — the SSRF allowlist', () => {
     });
   }
 
-  it('allows exactly four hostnames and no others', async () => {
+  it('allows exactly six hostnames and no others', async () => {
     const { allowedMapsUrl } = await import('@/app/api/travel/maps-link/route');
-    const hosts = ['maps.app.goo.gl', 'www.google.com', 'google.com', 'maps.google.com'];
+    // WIDENED FROM FOUR, deliberately. `goo.gl` and `g.co` are the links Google
+    // Maps on iOS and the Google search result card actually hand out — they
+    // were rejected as "not a Google Maps link", which is the bug behind most
+    // of the reports that pasting a Maps link did nothing.
+    //
+    // They are generic Google shorteners rather than Maps-only ones, so this is
+    // a real widening and it is safe for one specific reason: resolveFinalUrl
+    // re-validates EVERY hop against this same list (see the suite below), so a
+    // shortener pointing anywhere off it is refused at the next hop rather than
+    // followed. The blast radius is a GET to a public Google host whose body we
+    // never read.
+    const hosts = [
+      'maps.app.goo.gl',
+      'goo.gl',
+      'g.co',
+      'www.google.com',
+      'google.com',
+      'maps.google.com',
+    ];
     for (const host of hosts) expect(allowedMapsUrl(`https://${host}/maps`)).not.toBeNull();
-    // Neighbours of those four that must NOT be reachable.
-    for (const host of ['mail.google.com', 'goo.gl', 'app.goo.gl', 'accounts.google.com']) {
+    // Neighbours that must still NOT be reachable — including the Google hosts
+    // that hold an account session rather than a map.
+    for (const host of ['mail.google.com', 'app.goo.gl', 'accounts.google.com', 'goo.gl.evil.tld']) {
       expect(allowedMapsUrl(`https://${host}/`)).toBeNull();
     }
   });
