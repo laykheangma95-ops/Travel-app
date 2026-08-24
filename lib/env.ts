@@ -44,6 +44,25 @@ export const allowDemoInProduction =
   process.env.DOMNER_ALLOW_DEMO === 'true' ||
   process.env.NEXT_PUBLIC_DOMNER_ALLOW_DEMO === 'true';
 
+/**
+ * Demo fallbacks are permitted only outside production, or with the explicit
+ * opt-in, read at CALL TIME.
+ *
+ * The constant below is the same rule evaluated once at import, and it stays
+ * because plenty of call sites want a value rather than a call. But a module
+ * that gates a safety decision on it — lib/providers/places/registry.ts refuses
+ * to serve fixture data in production — is gating on a snapshot taken before
+ * any test could set the environment, which makes the guard untestable. The
+ * same reasoning as the note in geocode.ts about reading env inside functions.
+ */
+export function demoAllowed(): boolean {
+  const inProduction = process.env.NODE_ENV === 'production';
+  const optedIn =
+    process.env.DOMNER_ALLOW_DEMO === 'true' ||
+    process.env.NEXT_PUBLIC_DOMNER_ALLOW_DEMO === 'true';
+  return !inProduction || optedIn;
+}
+
 /** Demo fallbacks are permitted only outside production, or with the explicit opt-in. */
 export const demoModeAllowed = !isProduction || allowDemoInProduction;
 

@@ -41,6 +41,10 @@ const MIGRATIONS = [
   // traveler reading another's imports, and what stop the daily quota from
   // being reset by deleting the rows it counts.
   '012_place_imports.sql',
+  // The canonical place registry. Its policies are what make "an AI guess can
+  // never become trusted public data" a property of the database rather than a
+  // promise about the application.
+  '013_place_registry.sql',
 ];
 
 /**
@@ -148,12 +152,30 @@ export interface Harness {
   db: PGlite;
   /** A client scoped to one signed-in traveler, subject to RLS. */
   clientFor(userId: string): SupabaseClient;
+  /**
+   * A client that bypasses RLS, standing in for the service-role key.
+   *
+   * Supabase's service role is a Postgres role with BYPASSRLS; here that is the
+   * superuser the harness already owns. It exists so a test can exercise the
+   * server-side paths — provider linking, promotion — that RLS is specifically
+   * written to keep travelers out of. Handing this to code under test is how a
+   * test proves the difference between the two, so it is deliberately named to
+   * be hard to reach for by accident.
+   */
+  serviceClient(): SupabaseClient;
   /** Create an auth user + profile so trip_plans.user_id can reference it. */
   createUser(userId: string): Promise<void>;
   /** Read a table as superuser, bypassing RLS, to assert what really landed. */
   rows(table: string): Promise<Record<string, unknown>[]>;
   /** Run SQL as the superuser — seeding, and anything RLS would refuse. */
   asAdmin(sql: string, params?: unknown[]): Promise<Record<string, unknown>[]>;
+  /**
+   * Run a whole SQL FILE as the superuser. `asAdmin` sends one prepared
+   * statement, which a migration full of statements cannot be; this is what a
+   * test uses to replay a migration in production order — after the seed data
+   * it is meant to backfill.
+   */
+  execAsAdmin(sql: string): Promise<void>;
   /** Empty every table. Booting Postgres costs ~2s; truncating costs nothing. */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -200,15 +222,21 @@ export async function createHarness(): Promise<Harness> {
   return {
     db,
     clientFor: (userId: string) => supabaseLike(db, userId),
+    serviceClient: () => supabaseLike(db, null),
     async createUser(userId: string) {
       await asAdmin('INSERT INTO auth.users (id) VALUES ($1)', [userId]);
       await asAdmin('INSERT INTO profiles (id) VALUES ($1)', [userId]);
     },
     rows: (table: string) => asAdmin(`SELECT * FROM ${table}`),
     asAdmin,
+    async execAsAdmin(sql: string) {
+      await db.exec('RESET ROLE;');
+      await db.exec(sql);
+    },
     async reset() {
       await asAdmin(
-        `TRUNCATE ai_usage_log, place_sources, import_candidates, place_imports,
+        `TRUNCATE place_external_ids, places, ai_usage_log, place_sources,
+                  import_candidates, place_imports,
                   itinerary_places, itinerary_days, trip_plans, destination_places,
                   saved_flights, esim_orders, profiles, auth.users CASCADE`
       );
@@ -275,13 +303,24 @@ function parseSelect(list: string): { columns: string; embeds: Embed[] } {
   return { columns: columns.length ? columns.join(', ') : '*', embeds };
 }
 
-function supabaseLike(db: PGlite, userId: string): SupabaseClient {
+function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
   //
   // SET ROLE, not SET LOCAL ROLE: outside an explicit transaction `SET LOCAL` is
   // silently a no-op, which would leave every statement running as the superuser
   // — and a superuser bypasses RLS. That mistake makes a harness that appears to
   // test policies while testing nothing at all, so it is worth being loud about.
   async function run(sql: string, params: unknown[]) {
+    if (userId === null) {
+      // The service role: no SET ROLE, so this runs as the owner and RLS is
+      // bypassed — exactly what the real service key does. auth.uid() is null,
+      // which is also true of a service-role request in production.
+      await db.exec('RESET ROLE;');
+      await db.query(`SELECT set_config('request.jwt.claims', $1, false)`, [
+        JSON.stringify({ role: 'service_role' }),
+      ]);
+      return db.query(sql, params);
+    }
+
     await db.exec(`SET ROLE authenticated;`);
     await db.query(`SELECT set_config('request.jwt.claims', $1, false)`, [
       JSON.stringify({ sub: userId, role: 'authenticated' }),
@@ -373,6 +412,11 @@ function supabaseLike(db: PGlite, userId: string): SupabaseClient {
       },
       gte(column: string, value: unknown) {
         filters.push({ sql: `${column} >= ?`, params: [value] });
+        return api;
+      },
+      /** The other half of a bounding box. lib/places/repository.ts needs both. */
+      lte(column: string, value: unknown) {
+        filters.push({ sql: `${column} <= ?`, params: [value] });
         return api;
       },
       or(expression: string) {
