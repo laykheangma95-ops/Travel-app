@@ -25,6 +25,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./', import.meta.url)),
+      // See tests/support/serverOnly.ts — Next.js resolves this specifier in
+      // its bundler; Vitest needs to be told.
+      'server-only': fileURLToPath(new URL('./tests/support/serverOnly.ts', import.meta.url)),
     },
   },
 });

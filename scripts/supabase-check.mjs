@@ -44,6 +44,20 @@ const TABLES = [
   { name: 'affiliates', critical: false },
   { name: 'affiliate_events', critical: false },
   { name: 'saved_flights', critical: false },
+  // The travel planner. `trip_plans` is listed with the exact columns
+  // lib/travel/context.ts selects, because a single missing column there does
+  // not degrade one field — PostgREST fails the whole select, and every trip
+  // screen goes blank. `is_wishlist` arrives in migration 011, so this is the
+  // check that catches a project running the code without that migration.
+  {
+    name: 'trip_plans',
+    critical: true,
+    columns:
+      'id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist',
+  },
+  { name: 'itinerary_days', critical: false },
+  { name: 'itinerary_places', critical: false },
+  { name: 'destination_places', critical: false },
   { name: 'push_subscriptions', critical: false },
   { name: 'esim_deliveries', critical: true, serviceOnly: true },
   { name: 'telegram_links', critical: true, serviceOnly: true },
@@ -111,7 +125,7 @@ async function main() {
     const started = Date.now();
     const { count, error } = await admin
       .from(table.name)
-      .select('*', { count: 'exact', head: true });
+      .select(table.columns ?? '*', { count: 'exact', head: true });
     const ms = Date.now() - started;
 
     if (error) {

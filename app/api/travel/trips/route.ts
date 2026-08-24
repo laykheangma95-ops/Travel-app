@@ -17,7 +17,7 @@ import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
 import { loadTravelerContext } from '@/lib/travel/context';
 import { deriveTravelState } from '@/lib/travel/state';
-import { parseTripDraft, tripById } from '@/lib/travel/tripWrites';
+import { parseTripDraft, tripAfterWrite } from '@/lib/travel/tripWrites';
 import { normalizeTripDraft } from '@/lib/travel/trips';
 
 export const runtime = 'nodejs';
@@ -72,8 +72,11 @@ export const POST = route(
 
     // Re-read through the same loader the list uses, so the card the traveler
     // lands on is derived identically to every other card — including readiness
-    // against any flight or eSIM they already have for that destination.
-    const trip = await tripById(request, data.id as string);
+    // against any flight or eSIM they already have for that destination. If
+    // that read fails, the insert above still happened: `tripAfterWrite` hands
+    // back the trip as written rather than reporting a failure that would
+    // invite the traveler to create a duplicate.
+    const trip = await tripAfterWrite(request, data.id as string, draft);
 
     return ok({ trip }, { status: 201 });
   },

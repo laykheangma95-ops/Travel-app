@@ -82,6 +82,14 @@ export interface TravelerContext {
   esims: EsimSummary[];
   /** Injected rather than read from the clock so this stays testable. */
   now: Date;
+  /**
+   * True when the trips table could not be read at all, as opposed to the
+   * traveler genuinely having none. Callers that would otherwise say "no trips"
+   * or "that trip does not exist" must say "we could not load your trips"
+   * instead — the two are indistinguishable in the data and very different to
+   * the person reading them.
+   */
+  tripsUnavailable?: boolean;
 }
 
 export interface TravelSnapshot {

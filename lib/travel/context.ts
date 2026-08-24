@@ -190,6 +190,75 @@ function deriveReadiness(
   return readiness;
 }
 
+/** Options for one context load. */
+export interface LoadContextOptions {
+  /**
+   * A trip that must be present in the result if it exists at all, even when it
+   * falls outside the list window. The write paths pass the row they have just
+   * touched; the single-trip screens pass the trip they are rendering.
+   */
+  ensureTripId?: string;
+}
+
+/**
+ * The trip columns, in two tiers.
+ *
+ * WHY TWO:
+ *   `cover_image_url` and `is_wishlist` were added after the table was created
+ *   — the first in supabase/schema.sql, the second in migration 011. This
+ *   project's live schema is dashboard-managed (see scripts/supabase-check.mjs:
+ *   Supabase reports "No migrations"), so a column the repo takes for granted
+ *   can genuinely be absent in production. PostgREST answers a select naming an
+ *   unknown column with an error for the WHOLE statement, so one missing column
+ *   used to return zero trips — not a trip missing a cover image, but no trips
+ *   at all, for every screen, including the read-back that a freshly created
+ *   trip is confirmed with.
+ *
+ *   So the wide select is tried first, and a failure falls back to the columns
+ *   the table has always had. A traveler on a half-migrated database loses the
+ *   cover image and the wishlist flag. They do not lose their trips.
+ */
+const TRIP_COLUMNS_FULL =
+  'id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist';
+const TRIP_COLUMNS_CORE = 'id, title, destination, start_date, end_date, travelers, interests';
+
+/**
+ * How many trips one context carries.
+ *
+ * This was 20, which is a display cap being used as a correctness boundary: a
+ * traveler with twenty trips could still create the twenty-first, but the
+ * read-back looked for it inside a window it had fallen outside of and reported
+ * that the trip they had just made did not exist. `ensureTripId` below is the
+ * real fix for that; this is the headroom.
+ */
+const TRIP_LIMIT = 100;
+
+/** The trips query, with the narrow retry described above. */
+async function selectTrips(
+  supabase: SupabaseClient,
+  filter?: { id: string }
+): Promise<{ rows: TripRow[]; unavailable: boolean }> {
+  const build = (columns: string) => {
+    const query = supabase.from('trip_plans').select(columns);
+    return filter
+      ? query.eq('id', filter.id).limit(1)
+      : query.order('start_date', { ascending: true, nullsFirst: false }).limit(TRIP_LIMIT);
+  };
+
+  const wide = await build(TRIP_COLUMNS_FULL);
+  if (!wide.error) return { rows: (wide.data ?? []) as unknown as TripRow[], unavailable: false };
+  log.warn('travel.trips_select_degraded', { error: wide.error.message });
+
+  const core = await build(TRIP_COLUMNS_CORE);
+  if (!core.error) return { rows: (core.data ?? []) as unknown as TripRow[], unavailable: false };
+
+  // Both shapes failed: the table itself is unreachable. That is an outage, not
+  // an empty account, and callers must be able to tell the difference — saying
+  // "you have no trips" to someone who has ten is a worse answer than an error.
+  log.error('travel.trips_select_failed', { error: core.error.message });
+  return { rows: [], unavailable: true };
+}
+
 /**
  * Everything Home needs about the caller, in one round of queries.
  *
@@ -197,7 +266,10 @@ function deriveReadiness(
  * browse Domner freely (§26 of the brief), they just have nothing to
  * personalise against yet.
  */
-export async function loadTravelerContext(request: Request): Promise<TravelerContext> {
+export async function loadTravelerContext(
+  request: Request,
+  options: LoadContextOptions = {}
+): Promise<TravelerContext> {
   const now = new Date();
   const empty: TravelerContext = {
     signedIn: false,
@@ -223,11 +295,7 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
   const since = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
 
   const [tripsResult, flightsResult, ordersResult, daysResult, placesResult] = await Promise.all([
-    supabase
-      .from('trip_plans')
-      .select('id, title, destination, start_date, end_date, travelers, interests, cover_image_url, is_wishlist')
-      .order('start_date', { ascending: true, nullsFirst: false })
-      .limit(20),
+    selectTrips(supabase),
     supabase
       .from('saved_flights')
       .select('flight_number, flight_date, departure_airport, arrival_airport')
@@ -246,13 +314,28 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
     supabase.from('itinerary_places').select('category, itinerary_day_id').limit(1000),
   ]);
 
-  for (const result of [tripsResult, flightsResult, ordersResult, daysResult, placesResult]) {
+  for (const result of [flightsResult, ordersResult, daysResult, placesResult]) {
     // A missing table on a partly-migrated project must degrade to "no data",
     // not to a broken homepage.
     if (result.error) log.warn('travel.context_query_failed', { error: result.error.message });
   }
 
-  const tripRows = (tripsResult.data ?? []) as TripRow[];
+  const tripRows = tripsResult.rows;
+  let tripsUnavailable = tripsResult.unavailable;
+
+  // A trip the caller names explicitly — the one they have just created, or the
+  // one whose page they are on — is fetched by id when the list did not contain
+  // it, so "not in the first hundred" can never be reported as "does not
+  // exist". One extra query, only on the path that asks for it, and a list that
+  // failed does not rule the row out: a lookup by primary key can still succeed
+  // where a hundred-row scan timed out.
+  if (options.ensureTripId && !tripRows.some((trip) => trip.id === options.ensureTripId)) {
+    const single = await selectTrips(supabase, { id: options.ensureTripId });
+    tripRows.push(...single.rows);
+    // Only an unreadable table on BOTH attempts means we cannot answer.
+    tripsUnavailable = tripsUnavailable && single.unavailable;
+  }
+
   const flightRows = (flightsResult.data ?? []) as FlightRow[];
   const orderRows = (ordersResult.data ?? []) as OrderRow[];
   const signals = itinerarySignals(
@@ -295,5 +378,5 @@ export async function loadTravelerContext(request: Request): Promise<TravelerCon
     fulfilledAt: order.fulfilled_at,
   }));
 
-  return { signedIn: true, displayName, trips, flights, esims, now };
+  return { signedIn: true, displayName, trips, flights, esims, now, tripsUnavailable };
 }
