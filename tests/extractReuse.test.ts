@@ -169,7 +169,10 @@ describe('POST /api/travel/extract — the import ledger', () => {
     const [row] = await harness.rows('place_imports');
     expect(row.url_hash).toBeNull();
     expect(row.platform).toBe('text');
-    expect(row.status).toBe('ready');
+    // 'completed' since migration 015 moved the job vocabulary to a queue's.
+    // The old spelling 'ready' is still accepted by the CHECK constraint for
+    // rows written by an earlier release, and the reuse lookup matches both.
+    expect(row.status).toBe('completed');
 
     const second = await (await post('Bangkok\n📍 Wat Pho\n📍 Jodd Fairs')).json();
     expect(second.reused).toBe(false);

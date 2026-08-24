@@ -174,3 +174,66 @@ the people who had already set it up.
      whatever was pasted.
    - `g.co/kgs/…` and `goo.gl/maps/…`, which iOS and the search card hand out,
      were not on the allowlist. They now are.
+
+
+---
+
+## The intake (Phase 3)
+
+`POST /api/imports` — paste a link, and Domner writes down that it exists.
+
+**This is not the extractor.** `/import` runs the whole pipeline and gives back
+places, for the platforms Domner can read. The intake accepts a link from any
+supported platform — including Xiaohongshu, which nothing can read yet — and
+records a job. It fetches nothing. A successful intake means *"we have your
+link"*, and the screen at `/import/link` says exactly that.
+
+| Stage | Module |
+|---|---|
+| Validate the URL | `lib/travel/urlSafety.ts` — pure, no network |
+| Normalize + hash | `lib/travel/urlHash.ts` |
+| Classify the platform | `lib/travel/socialLink.ts` |
+| Reuse or record | `lib/travel/importIntake.ts` |
+
+### Classification is not permission to fetch
+
+`xiaohongshu` is in the classifier and in the `place_imports.platform`
+vocabulary. It is **not** in `linkPreview.ts`'s or `mapsResolve.ts`'s host
+allowlists, and Phase 3 did not touch either. RED publishes no oEmbed endpoint,
+we do not scrape, and no connector exists — so a RED link is recognised,
+recorded, and never requested. `tests/urlSafety.test.ts` asserts both allowlists
+still refuse it.
+
+### What the URL gate refuses
+
+http/https only · no credentials in the URL · ports 80/443 only · 2048 characters
+max · localhost and the `.local`/`.internal`/`.lan` namespaces · loopback,
+RFC1918, CGNAT, link-local and the metadata service — **including the decimal,
+hex, octal and short-form spellings** (`2130706433`, `0x7f000001`, `0177.0.0.1`,
+`127.1`) · IPv6 loopback, unique-local, link-local and IPv4-mapped forms.
+
+It does **not** solve DNS rebinding or redirect chains: neither is visible in a
+string. Those are fetch-time problems and are handled by the exact-match host
+allowlists, which re-validate every hop.
+
+### One open job per link per traveler
+
+A partial unique index on `(user_id, url_hash)` covering the open statuses. A
+double tap or a retrying client gets back the job it already has rather than
+creating a second — the first implementation checked-then-wrote and five
+simultaneous submissions produced five jobs.
+
+**Known limitation:** a job stuck in `processing` keeps that link un-importable
+for that traveler until it reaches a terminal status. The connector phase needs
+a reaper that fails jobs which have been open too long.
+
+### Reuse is the traveler's own history, and only theirs
+
+A completed import of the same link by the *same* traveler is replayed for free.
+Another traveler's is not, and cannot be — the row is invisible to them under
+RLS. Which links a person has pasted is a record of what they are planning and
+who they follow.
+
+If cross-user reuse is ever worth the cost saving, the thing to share is the
+derived result — candidates keyed by `url_hash` in a table with no owner — never
+another traveler's `place_imports` row.

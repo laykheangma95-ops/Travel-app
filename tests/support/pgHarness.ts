@@ -48,6 +48,9 @@ const MIGRATIONS = [
   // The saved-place library: the counter trigger, the security_invoker view,
   // and the policies that keep a library private while its totals are public.
   '014_saved_place_library.sql',
+  // Phase 3: the intake columns, the queue vocabulary, and the reuse index and
+  // replay guard that had to follow the status rename.
+  '015_import_intake.sql',
 ];
 
 /**

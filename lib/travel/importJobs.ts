@@ -38,6 +38,30 @@ import type { ImportKey } from './urlHash';
 /** How a stored import names where it came from. `text` is a caption paste. */
 export type ImportPlatform = LinkPlatform | 'text';
 
+/**
+ * The job vocabulary, as of migration 015.
+ *
+ *   queued              recorded by the intake, waiting for a connector
+ *   processing          work has started            (migration 012: 'extracting')
+ *   needs_confirmation  extracted, waiting on the traveler
+ *   completed           finished, results reusable  (migration 012: 'ready')
+ *   failed              finished, and did not work
+ *
+ * The two old spellings are still accepted by the CHECK constraint and still
+ * present in the reuse queries below, because rows written by an earlier
+ * release carry them and a rolled-back deploy would write them again. They are
+ * deprecated, not gone.
+ */
+export type ImportStatus =
+  | 'queued'
+  | 'processing'
+  | 'needs_confirmation'
+  | 'completed'
+  | 'failed';
+
+/** Every spelling of "this import finished and its result can be replayed". */
+export const COMPLETED_STATUSES = ['completed', 'ready'] as const;
+
 /** Mirrors ExtractOutcome in the route. Kept as a string union, not an import,
  *  so this module does not depend on a route file. */
 export type ImportOutcome = 'ok' | 'no-places-found' | 'caption-unavailable' | 'link-unreadable';
@@ -179,7 +203,8 @@ export async function findReusableImport(
       .select('id,outcome,preview')
       .eq('user_id', userId)
       .eq('url_hash', urlHash)
-      .eq('status', 'ready')
+      // Both spellings: a row written before migration 015 says 'ready'.
+      .in('status', COMPLETED_STATUSES as unknown as string[])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -277,7 +302,7 @@ export async function startImport(
         url_hash: input.key?.urlHash ?? null,
         normalized_url: input.key?.normalizedUrl ?? null,
         platform: input.platform,
-        status: 'extracting',
+        status: 'processing',
       })
       .select('id')
       .single();
@@ -335,7 +360,7 @@ export async function completeImport(
     await supabase
       .from('place_imports')
       .update({
-        status: 'ready',
+        status: 'completed',
         outcome: input.outcome,
         candidate_count: input.candidates.length,
         used_model: input.usedModel,
@@ -360,7 +385,7 @@ export async function failImport(supabase: SupabaseClient, importId: string | nu
       .update({ status: 'failed', completed_at: new Date().toISOString() })
       .eq('id', importId);
   } catch {
-    // Nothing useful to do. The row stays 'extracting', which is itself a
+    // Nothing useful to do. The row stays 'processing', which is itself a
     // readable signal that an extraction died halfway.
   }
 }
