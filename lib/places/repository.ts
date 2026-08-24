@@ -29,6 +29,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { log } from '@/lib/logger';
+import { isUniqueViolation, violatedConstraint } from '@/lib/supabaseError';
 import type { ProviderPlace } from '@/lib/providers/places/types';
 import {
   boundingBox,
@@ -47,6 +48,16 @@ const COLUMNS =
   'verification_status,verified_at,created_by';
 
 export type VerificationStatus = 'unverified' | 'provider_verified' | 'domner_public' | 'rejected';
+
+/**
+ * The two unique indexes on `places`, by name. They mean different things and
+ * the insert path has to tell them apart: identity means "this place already
+ * exists" and is a success, slug means "this handle is taken" and is a retry.
+ * Named here so a rename in the migration breaks the build rather than the
+ * behaviour.
+ */
+const IDENTITY_CONSTRAINT = 'places_identity_idx';
+const SLUG_CONSTRAINT = 'places_slug_key';
 
 /** A canonical place, in application shape. */
 export interface RegistryPlace {
@@ -75,7 +86,8 @@ export interface RegistryPlace {
 /**
  * The row as PostgREST returns it. supabase-js cannot infer a shape from a
  * column list built by concatenation, so every read casts through `unknown`
- * into this — which is why `toRegistryPlace` re-checks rather than trusts.
+ * into this — which is why `toRegistryPlace` re-checks the fields where being
+ * wrong would matter.
  */
 interface PlaceRow {
   id: string;
@@ -103,12 +115,47 @@ interface PlaceRow {
 const number = (value: number | string): number =>
   typeof value === 'number' ? value : Number(value);
 
+const CATEGORIES: readonly PlaceCategory[] = [
+  'spot',
+  'food',
+  'shopping',
+  'transport',
+  'stay',
+  'other',
+];
+
+const STATUSES: readonly VerificationStatus[] = [
+  'unverified',
+  'provider_verified',
+  'domner_public',
+  'rejected',
+];
+
+/**
+ * The stored verification level, or the least trusting one.
+ *
+ * A CHECK constraint means an unrecognised value should be impossible — but
+ * "should be impossible" is precisely where an unchecked cast turns a bad
+ * migration into a published place. The failure direction matters: an unknown
+ * value degrades to `unverified`, so a row we cannot understand is never
+ * treated as trusted. It is logged, because silently downgrading a place is
+ * also not something to do quietly.
+ */
+function toVerificationStatus(value: string, placeId: string): VerificationStatus {
+  if (STATUSES.includes(value as VerificationStatus)) return value as VerificationStatus;
+  log.error('place_registry.unknown_verification_status', { placeId, value: value.slice(0, 40) });
+  return 'unverified';
+}
+
 /**
  * A stored row into application shape.
  *
- * Re-validated on the way out rather than trusted. "Our own database wrote it"
- * is exactly the assumption that turns a schema change into a crash in front of
- * a traveler — the same reasoning as lib/travel/importJobs.ts.
+ * The two fields the application makes decisions on — `category`, which drives
+ * the UI, and `verification_status`, which decides whether a place is treated
+ * as trusted — are checked against their known values rather than cast. The
+ * rest are carried through as read: they are display text, and a wrong string
+ * in a description is a cosmetic problem where a wrong verification level is a
+ * security one.
  */
 function toRegistryPlace(row: PlaceRow): RegistryPlace {
   return {
@@ -121,9 +168,7 @@ function toRegistryPlace(row: PlaceRow): RegistryPlace {
     city: row.city,
     district: row.district,
     neighborhood: row.neighborhood,
-    category: (['spot', 'food', 'shopping', 'transport', 'stay', 'other'] as const).includes(
-      row.category as PlaceCategory
-    )
+    category: CATEGORIES.includes(row.category as PlaceCategory)
       ? (row.category as PlaceCategory)
       : 'other',
     subcategory: row.subcategory,
@@ -133,7 +178,7 @@ function toRegistryPlace(row: PlaceRow): RegistryPlace {
     website: row.website,
     phone: row.phone,
     priceLevel: row.price_level,
-    verificationStatus: row.verification_status as VerificationStatus,
+    verificationStatus: toVerificationStatus(row.verification_status, row.id),
     verifiedAt: row.verified_at,
     createdBy: row.created_by,
   };
@@ -222,7 +267,7 @@ export async function findNearbyByName(
     .lte('latitude', box.maxLat)
     .gte('longitude', box.minLng)
     .lte('longitude', box.maxLng)
-    .limit(20);
+    .limit(50);
 
   if (error || !data) return [];
 
@@ -297,9 +342,20 @@ async function insertPlace(
 
     if (!error && data) return { place: toRegistryPlace(data as unknown as PlaceRow), created: true };
 
-    const message = error?.message ?? '';
+    // SQLSTATE decides whether this was a unique violation at all; the
+    // constraint name decides which one. Keyed on message text instead, both
+    // branches below break silently the day the wording changes — the race
+    // would stop recovering and start reporting no canonical place.
+    if (!isUniqueViolation(error)) {
+      log.warn('place_registry.insert_failed', {
+        reason: (error?.message ?? 'unknown').slice(0, 160),
+      });
+      return null;
+    }
 
-    if (message.includes('places_identity_idx')) {
+    const constraint = violatedConstraint(error);
+
+    if (constraint === IDENTITY_CONSTRAINT) {
       // Lost a race with an identical insert. The place exists — find it.
       const existing = await findNearbyByName(supabase, {
         name: place.name,
@@ -311,8 +367,13 @@ async function insertPlace(
     }
 
     // A slug clash is the only thing worth retrying, and only with a new slug.
-    if (!message.includes('slug')) {
-      log.warn('place_registry.insert_failed', { reason: message.slice(0, 160) });
+    // Any other unique violation is a constraint we did not anticipate, and
+    // retrying it would just spend two more round trips to fail again.
+    if (constraint !== SLUG_CONSTRAINT) {
+      log.warn('place_registry.insert_refused', {
+        constraint: constraint ?? 'unknown',
+        reason: (error?.message ?? '').slice(0, 160),
+      });
       return null;
     }
   }

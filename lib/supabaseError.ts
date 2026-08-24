@@ -158,6 +158,44 @@ function kindFromMessage(message: string, status: number | null): SupabaseFailur
   return 'unknown';
 }
 
+/** SQLSTATE for a unique-constraint violation. */
+export const UNIQUE_VIOLATION = '23505';
+/** SQLSTATE raised by a CHECK constraint, and by our own RAISE EXCEPTION guards. */
+export const CHECK_VIOLATION = '23514';
+
+/**
+ * True when a write was refused because a unique index already holds that row.
+ *
+ * WHY THIS EXISTS RATHER THAN `message.includes('duplicate')`:
+ *   Two code paths depend on telling "somebody else inserted this first" from
+ *   "the write failed". Keyed on message text, both break silently the day
+ *   PostgREST rewords an error — the deduplication race would stop recovering
+ *   and start reporting no canonical place, and a re-imported source would log
+ *   a warning for a condition that is not a problem. The SQLSTATE has been
+ *   23505 since Postgres 7 and is not going to be reworded.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  const raw = (error ?? {}) as RawSupabaseError & { code?: unknown };
+  return raw.code === UNIQUE_VIOLATION;
+}
+
+/**
+ * Which constraint a violation names, or null.
+ *
+ * Postgres puts it in the error's `constraint` field; PostgREST does not
+ * forward that field, so the name is read back out of the message it does
+ * forward (`... violates unique constraint "places_identity_idx"`). The SQLSTATE
+ * decides WHETHER this was a unique violation; this only decides WHICH one, and
+ * a caller that cannot tell must treat it as an ordinary failure.
+ */
+export function violatedConstraint(error: unknown): string | null {
+  const raw = (error ?? {}) as { constraint?: unknown; message?: unknown };
+  if (typeof raw.constraint === 'string' && raw.constraint) return raw.constraint;
+  if (typeof raw.message !== 'string') return null;
+  const match = /constraint "([^"]+)"/.exec(raw.message);
+  return match ? match[1] : null;
+}
+
 /**
  * Turns anything Supabase throws or returns — PostgrestError, AuthError, a
  * plain fetch failure — into one classified, log-safe shape.

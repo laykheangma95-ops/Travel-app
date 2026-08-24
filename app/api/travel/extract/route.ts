@@ -30,6 +30,7 @@ import { z } from 'zod';
 import { ApiError, ok, readJson, route } from '@/lib/http';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { parseGoogleMapsUrl } from '@/lib/travel/mapsLink';
 import { allowedMapsUrl, resolveFinalUrl, TOTAL_TIMEOUT_MS } from '@/lib/travel/mapsResolve';
@@ -165,6 +166,7 @@ export const POST = route(async (request, context) => {
         candidates: reusable.candidates,
         usedModel: false,
         reusedFromImportId: reusable.importId,
+        preview: reusable.preview,
       });
       log.info('extract.reused', {
         requestId: context.requestId,
@@ -175,7 +177,10 @@ export const POST = route(async (request, context) => {
         {
           outcome: reusable.outcome,
           platform: platform === 'text' ? null : platform,
-          preview: null,
+          // The post's own title, author and thumbnail, as the first import
+          // showed them. A replay that dropped this rendered a different screen
+          // for the same link, which reads as a failure rather than as a hit.
+          preview: reusable.preview,
           candidates: reusable.candidates,
           destination: agreedDestination(reusable.candidates),
           capabilities,
@@ -199,11 +204,18 @@ export const POST = route(async (request, context) => {
     const result = await runExtraction(input, destinationHint ?? null, context.requestId);
 
     if (supabase) {
-      if (result.usage) await recordAiUsage(supabase, user.id, 'place_import', result.usage);
+      // The cost ledger is written with the SERVICE-ROLE client, never the
+      // caller's: ai_usage_log has no RLS policy, so a traveler can neither
+      // read it nor write it. Null when no service key is configured, and
+      // recordAiUsage does nothing with that — an absent line is honest.
+      if (result.usage) {
+        await recordAiUsage(getSupabaseAdmin(), user.id, 'place_import', result.usage);
+      }
       await completeImport(supabase, importId, {
         outcome: result.body.outcome,
         candidates: result.body.candidates,
         usedModel: result.usage !== null,
+        preview: result.body.preview,
       });
     }
 

@@ -29,6 +29,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
 import { log } from '@/lib/logger';
+import { isUniqueViolation } from '@/lib/supabaseError';
 import type { ItineraryCategory } from './itinerary';
 import type { PlaceCandidate } from './placeExtraction';
 import type { LinkPlatform } from './socialLink';
@@ -65,10 +66,46 @@ export function dailyImportQuota(): number {
 /** A candidate as it comes back out of the database on a replay. */
 export interface StoredCandidate extends PlaceCandidate {}
 
+/**
+ * What the traveler was shown about the post itself. Stored on the job row so a
+ * replay renders the same screen as the first import rather than a bare list.
+ */
+export interface ImportPreview {
+  title: string | null;
+  author: string | null;
+  thumbnailUrl: string | null;
+  canonicalUrl: string | null;
+}
+
 export interface ReusableImport {
   importId: string;
   outcome: ImportOutcome;
   candidates: StoredCandidate[];
+  preview: ImportPreview | null;
+}
+
+/**
+ * A stored preview back into application shape.
+ *
+ * Every field is checked rather than trusted: this is jsonb, so the database
+ * enforces only that it is an object. A stored preview from an older revision
+ * of the code must degrade to nulls, never to `undefined` leaking into the
+ * response the review screen reads.
+ */
+function toPreview(value: unknown): ImportPreview | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const text = (key: string): string | null =>
+    typeof raw[key] === 'string' && raw[key] ? (raw[key] as string) : null;
+  const preview = {
+    title: text('title'),
+    author: text('author'),
+    thumbnailUrl: text('thumbnailUrl'),
+    canonicalUrl: text('canonicalUrl'),
+  };
+  // All-null is the same as having no preview, and saying so keeps the replay
+  // response identical to a first import that had none.
+  return Object.values(preview).some((entry) => entry !== null) ? preview : null;
 }
 
 interface CandidateRow {
@@ -139,7 +176,7 @@ export async function findReusableImport(
   try {
     const { data, error } = await supabase
       .from('place_imports')
-      .select('id,outcome')
+      .select('id,outcome,preview')
       .eq('user_id', userId)
       .eq('url_hash', urlHash)
       .eq('status', 'ready')
@@ -149,7 +186,7 @@ export async function findReusableImport(
 
     if (error || !data) return null;
 
-    const row = data as { id: string; outcome: ImportOutcome | null };
+    const row = data as { id: string; outcome: ImportOutcome | null; preview: unknown };
     // An import that found nothing is still worth replaying: re-running the
     // model to be told "no places" a second time is the same bill for the same
     // answer. Only a row with no recorded outcome is treated as unusable.
@@ -167,6 +204,7 @@ export async function findReusableImport(
       importId: row.id,
       outcome: row.outcome,
       candidates: ((candidateRows ?? []) as CandidateRow[]).map(toCandidate),
+      preview: toPreview(row.preview),
     };
   } catch {
     return null;
@@ -261,6 +299,8 @@ export interface CompleteImportInput {
   outcome: ImportOutcome;
   candidates: PlaceCandidate[];
   usedModel: boolean;
+  /** What the traveler was shown about the post. Replayed verbatim. */
+  preview?: ImportPreview | null;
   /** Set when this import answered from an earlier one. */
   reusedFromImportId?: string | null;
 }
@@ -299,6 +339,7 @@ export async function completeImport(
         outcome: input.outcome,
         candidate_count: input.candidates.length,
         used_model: input.usedModel,
+        preview: input.preview ?? null,
         reused_from_import_id: input.reusedFromImportId ?? null,
         completed_at: new Date().toISOString(),
       })
@@ -393,8 +434,10 @@ export async function recordPlaceSource(
       submitted_by: input.userId,
       import_id: input.importId,
     });
-    // 23505 is unique_violation: this post is already a source for this place.
-    if (error && !error.message.includes('duplicate')) {
+    // A unique violation means this post is already a source for this place —
+    // the traveler re-importing something they already saved. Not an error, and
+    // decided by SQLSTATE rather than by the wording of a message.
+    if (error && !isUniqueViolation(error)) {
       log.warn('import_job.source_failed', { reason: error.message.slice(0, 120) });
     }
   } catch {

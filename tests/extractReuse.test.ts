@@ -35,6 +35,9 @@ vi.mock('@/lib/supabase', () => ({
   getSupabase: () => {
     throw new Error('the extract route must never use the unscoped client');
   },
+  // The service-role client, used for the cost ledger only. Null is the
+  // empty-.env deployment: no key, so no line is recorded and nothing throws.
+  getSupabaseAdmin: () => null,
 }));
 
 const { POST } = await import('@/app/api/travel/extract/route');
@@ -113,6 +116,31 @@ describe('POST /api/travel/extract — the import ledger', () => {
     // It points at the import that actually did the work.
     expect(replay!.reused_from_import_id).toBe(first.importId);
     expect(replay!.id).toBe(second.importId);
+  });
+
+  it('shows the same preview on a replay as on the first import', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(oembed());
+
+    const first = await (await post(LINK)).json();
+    // The post's own card: what the traveler recognises the reel by.
+    expect(first.preview).toMatchObject({
+      author: 'chef',
+      thumbnailUrl: 'https://p16.tiktokcdn.com/thumb.jpg',
+    });
+    expect(first.preview.canonicalUrl).toContain('tiktok.com');
+
+    const second = await (await post(LINK)).json();
+    expect(second.reused).toBe(true);
+    // A replay that dropped this rendered a different screen for the same
+    // link, which reads as a failure rather than as a hit.
+    expect(second.preview).toEqual(first.preview);
+  });
+
+  it('replays an import that had no preview as having none, not as an empty one', async () => {
+    // A caption paste has no post behind it. `null` is the honest answer and
+    // the same one the first import gave.
+    const first = await (await post('Bangkok\n📍 Wat Pho')).json();
+    expect(first.preview).toBeNull();
   });
 
   it('treats a link shared in a different shape as the same post', async () => {

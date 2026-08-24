@@ -8,10 +8,21 @@
 //   which line was ours. A row per call answers it in SQL, per day, per feature
 //   and per traveler.
 //
+// WHO MAY WRITE IT:
+//   The service role, and nothing else. `ai_usage_log` has no RLS policy at
+//   all, so an authenticated caller can neither read nor write it.
+//
+//   It briefly had an INSERT policy scoped to the caller's own user id, written
+//   so the extract route could record usage on the session client it already
+//   had. That policy constrained whose row could be written but not what was in
+//   it: any signed-in account could insert arbitrary models, token counts and
+//   costs into the numbers we would use to answer "what is this costing us".
+//   A ledger anybody can write is not a ledger.
+//
 // WHAT THIS IS NOT:
-//   Not the quota. The quota counts place_imports rows, which a traveler cannot
-//   backdate or delete (see migration 012). This table is the bill, and a
-//   traveler can insert into it — so nothing may be enforced from it.
+//   Not the quota. The quota counts place_imports rows, which a traveler can
+//   neither backdate, delete, nor mark as a replay (see migration 012). Cost
+//   ENFORCEMENT lives there; this table is the record, not the control.
 //
 // WHAT THE NUMBER MEANS:
 //   An ESTIMATE, from a price list in this file. The invoice is the vendor's,
@@ -63,15 +74,22 @@ export interface AiUsage {
 /**
  * Write one line of the bill. Best-effort, like the rest of the ledger: a
  * traveler must never see an error because bookkeeping failed.
+ *
+ * `admin` is the SERVICE-ROLE client, and null is a normal state — a deployment
+ * with no service key simply does not record cost. An absent line is honest; a
+ * line a traveler could have written is not, which is why this no longer falls
+ * back to the session client.
  */
 export async function recordAiUsage(
-  supabase: SupabaseClient,
+  admin: SupabaseClient | null,
   userId: string,
   feature: string,
   usage: AiUsage
 ): Promise<void> {
+  if (!admin) return;
+
   try {
-    const { error } = await supabase.from('ai_usage_log').insert({
+    const { error } = await admin.from('ai_usage_log').insert({
       user_id: userId,
       feature,
       model: usage.model,

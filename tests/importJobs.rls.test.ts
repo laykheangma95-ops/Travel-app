@@ -6,12 +6,17 @@
 //   1. Ordinary: one traveler cannot see, write or claim another's imports,
 //      candidates or provenance. Same shape as tests/savedPlaces.rls.test.ts.
 //
-//   2. Not ordinary: THE QUOTA CANNOT BE CHEATED. The daily cap is a COUNT over
-//      place_imports, and a traveler holds the anon key — they can call
-//      PostgREST directly. So "our code never backdates a row" is not a
-//      control. The migration closes three specific holes and each one is
-//      tested by doing exactly what an attacker would do: insert a backdated
-//      row, update created_at afterwards, and delete yesterday's rows.
+//   2. Not ordinary: THE FOUR WAYS OF DEFEATING THE QUOTA ARE CLOSED. The daily
+//      cap is a COUNT over place_imports, and a traveler holds the anon key —
+//      they can call PostgREST directly, so "our code never backdates a row" is
+//      not a control. Each attack below is tested by performing it: insert a
+//      backdated row, rewrite created_at afterwards, delete yesterday's rows,
+//      and mark real imports as replays (which the count excludes).
+//
+//      The fourth shipped and was found in review, after this file claimed the
+//      quota could not be cheated. Three closed holes and one open one is an
+//      open cap. The list here is what is tested, not a promise that no fifth
+//      way exists.
 //
 // PGlite is Postgres itself, so these policies are enforced by the same engine
 // Supabase runs.
@@ -27,6 +32,7 @@ import {
   recordPlaceSource,
   startImport,
 } from '@/lib/travel/importJobs';
+import { recordAiUsage } from '@/lib/travel/aiUsage';
 import type { PlaceCandidate } from '@/lib/travel/placeExtraction';
 import { createHarness, type Harness } from './support/pgHarness';
 
@@ -185,6 +191,110 @@ describe('the quota cannot be cheated', () => {
     expect(row.user_id).toBe(ALICE);
   });
 
+  it('refuses to let a traveler mark a fresh import as a replay of another link', async () => {
+    // THE ATTACK THAT SHIPPED AND WAS FOUND IN REVIEW.
+    //
+    // The quota excludes replays, because a replay costs nothing to serve.
+    // Nothing stopped a traveler from UPDATEing `reused_from_import_id` on
+    // every row to point at some other import of theirs — at which point the
+    // count is zero and the daily cap is gone entirely. Three attacks were
+    // closed and tested, this fourth was open, and the migration claimed the
+    // quota could not be cheated.
+    vi.stubEnv('PLACE_IMPORT_DAILY_QUOTA', '2');
+    const alice = harness.clientFor(ALICE);
+
+    const first = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, first, { outcome: 'ok', candidates: [WAT_PHO], usedModel: true });
+
+    // A DIFFERENT link — a different hash, so a real second extraction.
+    const other = { normalizedUrl: 'tiktok.com/@chef/video/999', urlHash: 'c'.repeat(64) };
+    const second = await startImport(alice, { userId: ALICE, key: other, platform: 'tiktok' });
+
+    await expect(assertWithinQuota(alice, ALICE)).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+
+    // Exactly what a direct PostgREST call would send.
+    const { error } = await alice
+      .from('place_imports')
+      .update({ reused_from_import_id: first })
+      .eq('id', second!);
+
+    expect(error).not.toBeNull();
+    expect(String(error?.message)).toContain('same link');
+
+    const rows = await harness.rows('place_imports');
+    expect(rows.find((row) => row.id === second)!.reused_from_import_id).toBeNull();
+    // And the cap still holds, which is the point of all of it.
+    await expect(assertWithinQuota(alice, ALICE)).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+  });
+
+  it('refuses a replay claim on an import that never had a link', async () => {
+    const alice = harness.clientFor(ALICE);
+    const source = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, source, { outcome: 'ok', candidates: [], usedModel: true });
+
+    // A caption paste has no stable identity, so it can never be a replay of
+    // anything — the cheapest form of the same attack.
+    const pasted = await startImport(alice, { userId: ALICE, key: null, platform: 'text' });
+    const { error } = await alice
+      .from('place_imports')
+      .update({ reused_from_import_id: source })
+      .eq('id', pasted!);
+
+    expect(String(error?.message)).toContain('cannot be a replay');
+  });
+
+  it('refuses a replay that names another traveler\'s import', async () => {
+    const alice = harness.clientFor(ALICE);
+    const bob = harness.clientFor(BOB);
+
+    const aliceImport = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, aliceImport, { outcome: 'ok', candidates: [], usedModel: true });
+
+    const bobImport = await startImport(bob, { userId: BOB, key: KEY, platform: 'tiktok' });
+    const { error } = await bob
+      .from('place_imports')
+      .update({ reused_from_import_id: aliceImport })
+      .eq('id', bobImport!);
+
+    // Same link, different traveler: Alice paid for that extraction, not Bob.
+    expect(String(error?.message)).toContain('same link');
+  });
+
+  it('refuses a replay of an import that never completed', async () => {
+    const alice = harness.clientFor(ALICE);
+    const unfinished = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    const second = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+
+    const { error } = await alice
+      .from('place_imports')
+      .update({ reused_from_import_id: unfinished })
+      .eq('id', second!);
+
+    // Nothing was cached by an extraction that never finished, so there is
+    // nothing to have replayed.
+    expect(String(error?.message)).toContain('same link');
+  });
+
+  it('still allows the genuine replay the exclusion exists for', async () => {
+    vi.stubEnv('PLACE_IMPORT_DAILY_QUOTA', '2');
+    const alice = harness.clientFor(ALICE);
+
+    const first = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, first, { outcome: 'ok', candidates: [WAT_PHO], usedModel: true });
+
+    const replay = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, replay, {
+      outcome: 'ok',
+      candidates: [WAT_PHO],
+      usedModel: false,
+      reusedFromImportId: first,
+    });
+
+    const rows = await harness.rows('place_imports');
+    expect(rows.find((row) => row.id === replay)!.reused_from_import_id).toBe(first);
+    await expect(assertWithinQuota(alice, ALICE)).resolves.toBeUndefined();
+  });
+
   it('has no delete policy, so the evidence the quota counts cannot be removed', async () => {
     const alice = harness.clientFor(ALICE);
     const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
@@ -297,23 +407,65 @@ describe('provenance', () => {
 });
 
 describe('the bill', () => {
-  it('lets a traveler write their usage line but never read the table', async () => {
+  it('cannot be written by a traveler at all', async () => {
+    // It briefly could: an INSERT policy scoped to `user_id = auth.uid()` let
+    // the extract route write on the caller's session client. That constrained
+    // WHOSE row could be written but not what was in it, so any signed-in
+    // account could inject arbitrary models, token counts and costs into the
+    // numbers we use to answer "what is this costing us". There is now no
+    // policy of any kind, and RLS defaults to deny.
     const alice = harness.clientFor(ALICE);
 
     const { error } = await alice.from('ai_usage_log').insert({
       user_id: ALICE,
       feature: 'place_import',
       model: 'claude-sonnet-5',
-      tokens_in: 900,
-      tokens_out: 120,
-      cost_estimate_micros: 4500,
+      tokens_in: 999_999,
+      tokens_out: 999_999,
+      cost_estimate_micros: 1,
     });
-    expect(error).toBeNull();
 
-    // Model names and cost estimates are our business, not the traveler's, so
-    // there is no SELECT policy at all — RLS defaults to deny.
-    const { data } = await alice.from('ai_usage_log').select('id');
+    expect(error).not.toBeNull();
+    expect(await harness.rows('ai_usage_log')).toHaveLength(0);
+  });
+
+  it('cannot be read by a traveler either', async () => {
+    const service = harness.serviceClient();
+    await recordAiUsage(service, ALICE, 'place_import', {
+      model: 'claude-sonnet-5',
+      tokensIn: 900,
+      tokensOut: 120,
+    });
+
+    const { data } = await harness.clientFor(ALICE).from('ai_usage_log').select('id');
     expect(data ?? []).toHaveLength(0);
-    expect(await harness.rows('ai_usage_log')).toHaveLength(1);
+  });
+
+  it('is written by the service role, with the cost it estimated', async () => {
+    const service = harness.serviceClient();
+    await recordAiUsage(service, ALICE, 'place_import', {
+      model: 'claude-sonnet-5',
+      tokensIn: 900,
+      tokensOut: 120,
+    });
+
+    const [row] = await harness.rows('ai_usage_log');
+    expect(row.model).toBe('claude-sonnet-5');
+    expect(row.tokens_in).toBe(900);
+    // $3/1M in and $15/1M out: 900*3 + 120*15 = 4500 micro-dollars.
+    expect(Number(row.cost_estimate_micros)).toBe(4500);
+  });
+
+  it('records nothing, and does not throw, with no service key configured', async () => {
+    // The empty-.env deployment. An absent line is honest; a line a traveler
+    // could have written is not.
+    await expect(
+      recordAiUsage(null, ALICE, 'place_import', {
+        model: 'claude-sonnet-5',
+        tokensIn: 10,
+        tokensOut: 10,
+      })
+    ).resolves.toBeUndefined();
+    expect(await harness.rows('ai_usage_log')).toHaveLength(0);
   });
 });

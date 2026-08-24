@@ -533,22 +533,58 @@ path behaves exactly as before.
 ### The quota is enforced in the database, not in the app
 
 The daily cap is a `COUNT` over `place_imports`, and a traveler holds the anon
-key — they can call PostgREST directly. Three holes are closed in SQL rather
-than in code: a trigger stamps `created_at` on insert (no backdating), preserves
-`user_id`/`created_at`/`url_hash` on update (no rewriting), and there is **no
-DELETE policy** (no deleting the evidence). Each one has a test that performs
-the attack.
+key — they can call PostgREST directly, so "our code never does that" is not a
+control. **Four** ways of defeating the count are closed in SQL:
 
-Replays are excluded from the count. They cost nothing, so charging for them
-would ration exactly the behaviour this phase exists to encourage.
+| Attack | Closed by |
+|---|---|
+| Insert a row backdated outside the window | Trigger stamps `created_at` on INSERT |
+| Update `created_at`, `user_id` or `url_hash` afterwards | Trigger preserves all three on UPDATE |
+| Delete yesterday's rows to buy a fresh allowance | No DELETE policy exists |
+| Mark real imports as replays, which the count excludes | Trigger requires a replay to name a **completed import of the same link by the same traveler** |
+
+Each has a test that performs the attack.
+
+**The fourth was missed in the first implementation and found in review**, after
+this document had already claimed the quota could not be cheated. It could: the
+count excludes rows with `reused_from_import_id` set, nothing stopped a traveler
+from setting that column on every row, and three closed holes plus one open one
+is an open cap. It is closed now, and the claim is stated as what is tested
+rather than as a general guarantee.
+
+Replays are still excluded from the count — they cost nothing to serve, so
+rationing them would punish the behaviour this phase exists to encourage. What
+changed is that being a replay now has to be *true*: a genuine replay is keyed
+on the hash it reused, and a hundred distinct links cannot claim to be replays
+of anything because no earlier import shares their hash.
 
 ### Privacy
 
 `place_sources` links a person to a place they liked enough to save, so it is
 private: own-row SELECT and INSERT, no UPDATE, no DELETE. Aggregate save counts
 — what a public surface actually needs — are a Phase 4 table computed from this
-one, never this table exposed. `ai_usage_log` has **no** SELECT policy at all;
-model names and cost estimates are read by staff through the service role.
+one, never this table exposed.
+
+### Where cost enforcement lives, and where the record lives
+
+These are two different things and they are deliberately in two different
+places.
+
+**Enforcement is `place_imports`.** It is the table a traveler cannot backdate,
+delete, or mark as a replay, so the daily cap computed from it means something.
+
+**The record is `ai_usage_log`, and it is written only by the service role.**
+It has *no RLS policy of any kind*: an authenticated caller can neither read nor
+write it. It briefly had an INSERT policy scoped to `user_id = auth.uid()`, so
+the extract route could write it on the session client it already had. That was
+the wrong architecture — the policy constrained whose row could be written but
+not what was in it, so any signed-in account could inject arbitrary models,
+token counts and cost estimates into the numbers we would use to answer "what is
+the AI importer costing us". A ledger anybody can write is not a ledger.
+
+The route now writes it through `getSupabaseAdmin()`, and **records nothing when
+no service key is configured**. An absent line is honest; an unverifiable one is
+not. Nothing is enforced from this table, and nothing should ever be.
 
 ### Environment variables
 
@@ -707,6 +743,61 @@ what the vendor's terms permit us to store.
 |---|---|---|
 | `PLACES_PROVIDER` | unset | Which adapter resolves places. Unset means none, which is how Domner ships today. `sandbox` works in dev only. |
 
+### Rolling back, and rebuilding the keys
+
+**Rollback order matters.** `destination_places.canonical_place_id` is a foreign
+key into `places`, so dropping the table first fails. Reverse order, and no
+existing data is destroyed:
+
+```sql
+-- 013, in reverse. Losing canonical_place_id loses the links, not the places.
+ALTER TABLE destination_places DROP COLUMN IF EXISTS canonical_place_id;
+DROP TABLE IF EXISTS place_external_ids;
+DROP TABLE IF EXISTS places;
+DROP FUNCTION IF EXISTS public.places_verification_guard();
+DROP FUNCTION IF EXISTS public.place_name_normalized(TEXT);
+DROP FUNCTION IF EXISTS public.geohash_encode(NUMERIC, NUMERIC, INT);
+
+-- 012, in reverse. Import history and provenance are lost with it.
+DROP TABLE IF EXISTS ai_usage_log;
+DROP TABLE IF EXISTS place_sources;
+DROP TABLE IF EXISTS import_candidates;
+DROP TABLE IF EXISTS place_imports;
+DROP FUNCTION IF EXISTS public.place_imports_guard();
+```
+
+Neither migration alters or removes a pre-existing column, so rolling both back
+returns the database to exactly its previous shape. `destination_places`,
+`trip_plans` and the itinerary tables are untouched throughout.
+
+**Changing a normalizer is not a normal migration.** `place_name_normalized` and
+`geohash_encode` sit behind GENERATED columns. Postgres accepts a
+`CREATE OR REPLACE` of either and does **not** recompute the stored values — so
+an edit silently leaves every existing row keyed under the old rule while new
+rows use the new one, and deduplication quietly stops working with no error
+anywhere. If one of them ever has to change:
+
+```sql
+BEGIN;
+-- 1. Replace the function.
+CREATE OR REPLACE FUNCTION public.place_name_normalized(value TEXT) ... ;
+
+-- 2. Force every stored key to be recomputed. A no-op UPDATE does it, because
+--    a generated column is re-evaluated on every write.
+UPDATE places SET name = name;
+
+-- 3. The identity index may now see collisions that did not exist before.
+--    This must return zero rows before the transaction is committed.
+SELECT name_normalized, substr(geohash, 1, 7), count(*)
+FROM places GROUP BY 1, 2 HAVING count(*) > 1;
+COMMIT;
+```
+
+If step 3 returns rows, the new rule merges places that were previously
+distinct: resolve those by hand before committing. Update the TypeScript twin in
+`lib/places/normalize.ts` in the same change, and run
+`tests/places.normalize.test.ts` — it is what proves the two still agree.
+
 ### Known limitations
 
 1. **Nothing calls the registry yet.** It is infrastructure: the importer still
@@ -721,3 +812,25 @@ what the vendor's terms permit us to store.
 4. **The SQL/TypeScript parity is proven under PGlite's collation.** It is
    collation-independent by construction now, but the guarantee is a test, so
    run the suite against any database whose locale differs.
+
+### Open items carried forward from the Principal Engineer review
+
+None of these are live — nothing calls the registry yet — but they are real and
+they are written down rather than forgotten:
+
+- **`resolveProviderPlace` is ~8 round trips per place.** A 25-place import
+  would be ~200. It must be collapsed before anything calls it in a loop.
+- **`findNearbyByName` caps at 50 candidates before sorting by distance.** In a
+  dense cluster of identically-named places the true nearest could in principle
+  be truncated away.
+- **The `013` backfill is a function-per-row join** over `destination_places`
+  and cannot use an index. Fine at editorial-catalogue scale; check the row
+  count before running it on a large table.
+- **Provider ids are readable by any authenticated user** for published places.
+  Some vendors' terms restrict redistributing their place ids — check before
+  wiring a real adapter.
+- **Slug format is inconsistent** between backfilled rows (which keep the
+  hyphenated `content_slug`) and new ones (punctuation stripped). Cosmetic:
+  identity is the index, never the slug.
+- **No places audit table.** Promotions are logged with actor and reason, not
+  stored.

@@ -550,7 +550,23 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
             // supabase-js reports a policy violation in the envelope, not by
             // throwing. Matching that is what lets the code under test behave
             // here exactly as it would in production.
-            return { data: null, count: null, error: { message: (cause as Error).message } };
+            //
+            // The SQLSTATE and the constraint name are carried through as well.
+            // Production code branches on `code` (23505 for a unique violation)
+            // rather than on message text, so a harness that dropped it would
+            // exercise a path that cannot run — every unique violation would
+            // look like an unrecognised failure.
+            const failure = cause as Error & { code?: string; constraint?: string; detail?: string };
+            return {
+              data: null,
+              count: null,
+              error: {
+                message: failure.message,
+                code: failure.code,
+                constraint: failure.constraint,
+                details: failure.detail,
+              },
+            };
           }
         };
         return execute().then(resolve, reject);

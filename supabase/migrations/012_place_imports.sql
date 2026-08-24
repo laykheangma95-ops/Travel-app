@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS place_imports (
   candidate_count INTEGER NOT NULL DEFAULT 0 CHECK (candidate_count >= 0),
   used_model BOOLEAN NOT NULL DEFAULT FALSE,
 
+  -- What we read back to the traveler about the post itself: its title, author
+  -- and thumbnail. Stored so a REPLAY shows the same screen as the first
+  -- import. Without it a repeat import silently lost the preview card, which
+  -- made "we already had this" look like "something went wrong".
+  preview JSONB CHECK (preview IS NULL OR jsonb_typeof(preview) = 'object'),
+
   -- Set when this import answered from an earlier one instead of running the
   -- pipeline. The row that cost nothing points at the row that cost something.
   reused_from_import_id UUID REFERENCES place_imports(id) ON DELETE SET NULL,
@@ -59,6 +65,22 @@ CREATE TABLE IF NOT EXISTS place_imports (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
+
+-- Re-application safety.
+--
+-- `preview` and the replay guard below were added to this file AFTER an earlier
+-- revision of it may already have been applied to a development database. The
+-- CREATE TABLE above is IF NOT EXISTS, so on such a database it does nothing
+-- and the new column would silently never arrive — the app would then insert a
+-- column that is not there. The trigger function and the policies are
+-- CREATE OR REPLACE / DROP IF EXISTS and update themselves; a column needs
+-- saying explicitly.
+ALTER TABLE place_imports
+  ADD COLUMN IF NOT EXISTS preview JSONB;
+
+ALTER TABLE place_imports DROP CONSTRAINT IF EXISTS place_imports_preview_object;
+ALTER TABLE place_imports ADD CONSTRAINT place_imports_preview_object
+  CHECK (preview IS NULL OR jsonb_typeof(preview) = 'object');
 
 -- The reuse lookup: "have I already extracted this exact link successfully?"
 -- Partial, because that is the only question this index is ever asked.
@@ -83,16 +105,50 @@ CREATE INDEX IF NOT EXISTS place_imports_user_idx
 --
 -- No DELETE policy exists below, which closes the third: deleting yesterday's
 -- rows to buy a fresh allowance.
+--
+-- The fourth was found in review, after the first three were written and tested
+-- and after this file claimed the quota could not be cheated. The quota counts
+-- rows where `reused_from_import_id IS NULL`, because a replay costs nothing to
+-- serve. Nothing stopped a traveler from UPDATEing that column on every row to
+-- point at some other import of theirs — at which point the count is zero and
+-- the cap is gone. Three attacks closed and one open is an open cap.
+--
+-- So a reuse marker now has to be TRUE rather than merely present: it may only
+-- name a completed import, belonging to the same traveler, OF THE SAME LINK.
+-- A genuine replay satisfies that by construction — it is keyed on the hash it
+-- reused. A hundred distinct TikToks cannot, because no earlier import shares
+-- their hash, so each one still costs its share of the allowance.
 CREATE OR REPLACE FUNCTION public.place_imports_guard() RETURNS TRIGGER AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     NEW.created_at := NOW();
-    RETURN NEW;
+  ELSE
+    NEW.user_id    := OLD.user_id;
+    NEW.created_at := OLD.created_at;
+    NEW.url_hash   := OLD.url_hash;
   END IF;
 
-  NEW.user_id    := OLD.user_id;
-  NEW.created_at := OLD.created_at;
-  NEW.url_hash   := OLD.url_hash;
+  IF NEW.reused_from_import_id IS NOT NULL THEN
+    -- A text paste has no stable identity, so it can never be a replay of
+    -- anything. Claiming otherwise is the cheapest form of the attack.
+    IF NEW.url_hash IS NULL THEN
+      RAISE EXCEPTION 'an import with no link cannot be a replay'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM place_imports source
+      WHERE source.id       = NEW.reused_from_import_id
+        AND source.id      <> NEW.id
+        AND source.user_id  = NEW.user_id
+        AND source.url_hash = NEW.url_hash
+        AND source.status   = 'ready'
+    ) THEN
+      RAISE EXCEPTION 'a replay must name a completed import of the same link by the same traveler'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
   RETURN NEW;
 END;
 $fn$ LANGUAGE plpgsql;
@@ -168,13 +224,21 @@ CREATE INDEX IF NOT EXISTS place_sources_hash_idx  ON place_sources (url_hash);
 
 -- ── ai_usage_log ─────────────────────────────────────────────────────────────
 --
--- What the model cost, per call. Deliberately NOT the quota mechanism — the
--- quota counts place_imports, which a traveler cannot backdate. This is the
--- bill, read by staff through the service role.
+-- What the model cost, per call. NOT the quota mechanism — the quota counts
+-- place_imports, which a traveler can neither backdate nor mark as a replay.
 --
--- There is no SELECT policy on purpose. RLS defaults to deny, so a traveler
--- cannot read this table at all, including their own rows: it carries model
--- names and cost estimates, which are our business rather than theirs.
+-- WRITTEN ONLY BY THE SERVICE ROLE. There is no policy of any kind on this
+-- table, so RLS denies every authenticated caller both reads and writes.
+--
+-- It briefly had an INSERT policy scoped to `user_id = auth.uid()`, so that the
+-- extract route could write it on the caller's own session client. That was
+-- wrong: the policy constrained WHOSE row could be written but not what was in
+-- it, so any signed-in account could insert arbitrary models, token counts and
+-- cost estimates straight into the numbers we would use to answer "what is the
+-- AI importer costing us". A ledger anybody can write is not a ledger. The
+-- route now writes it through the service-role client and skips the line
+-- entirely when no service key is configured — an absent line is honest, an
+-- unverifiable one is not.
 CREATE TABLE IF NOT EXISTS ai_usage_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -230,7 +294,9 @@ DROP POLICY IF EXISTS "place_sources_insert_own" ON place_sources;
 CREATE POLICY "place_sources_insert_own" ON place_sources
   FOR INSERT WITH CHECK (submitted_by = auth.uid());
 
--- ai_usage_log: write your own line, read nothing. Staff read via service role.
+-- ai_usage_log: no policies at all. RLS defaults to deny, so an authenticated
+-- caller can neither read nor write it; only the service role can, and staff
+-- read it through that. The DROP is deliberate rather than an omission — an
+-- earlier revision of this migration created an INSERT policy here, and a
+-- database that already applied it must lose it.
 DROP POLICY IF EXISTS "ai_usage_log_insert_own" ON ai_usage_log;
-CREATE POLICY "ai_usage_log_insert_own" ON ai_usage_log
-  FOR INSERT WITH CHECK (user_id = auth.uid());

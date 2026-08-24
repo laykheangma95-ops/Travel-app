@@ -46,6 +46,9 @@ vi.mock('@/lib/supabase', () => ({
   getSupabase: () => {
     throw new Error('the extract route must never use the unscoped client');
   },
+  // The service-role client, used for the cost ledger only. Null is the
+  // empty-.env deployment: no key, so no line is recorded and nothing throws.
+  getSupabaseAdmin: () => null,
 }));
 
 const { POST } = await import('@/app/api/travel/extract/route');

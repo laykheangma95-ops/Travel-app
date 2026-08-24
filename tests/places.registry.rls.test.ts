@@ -327,6 +327,33 @@ describe('one traveler cannot see another\'s unverified place', () => {
   });
 });
 
+describe('a verification level we do not recognise', () => {
+  it('degrades to untrusted rather than being cast through', async () => {
+    const service = harness.serviceClient();
+    const resolved = await resolveProviderPlace(service, PROVIDER_WAT_PHO);
+    expect(resolved!.place.verificationStatus).toBe('provider_verified');
+
+    // A CHECK constraint means this should be impossible — which is exactly
+    // where an unchecked cast turns a bad migration into a published place.
+    // The constraint is dropped here to reproduce that future, because the
+    // failure DIRECTION is the thing worth pinning: unknown must mean
+    // untrusted, never trusted.
+    await harness.execAsAdmin(`
+      ALTER TABLE places DROP CONSTRAINT places_verification_status_check;
+      UPDATE places SET verification_status = 'totally_legit';
+    `);
+
+    const read = await getPlaceById(service, resolved!.place.id);
+    expect(read?.verificationStatus).toBe('unverified');
+
+    await harness.execAsAdmin(`
+      UPDATE places SET verification_status = 'unverified';
+      ALTER TABLE places ADD CONSTRAINT places_verification_status_check
+        CHECK (verification_status IN ('unverified','provider_verified','domner_public','rejected'));
+    `);
+  });
+});
+
 describe('the link to a traveler\'s saved copy', () => {
   it('points a destination_places row at its canonical record without changing anything else', async () => {
     const alice = harness.clientFor(ALICE);
