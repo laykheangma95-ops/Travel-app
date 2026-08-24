@@ -32,9 +32,15 @@ CREATE TABLE IF NOT EXISTS saved_places (
   place_id UUID NOT NULL REFERENCES places(id) ON DELETE RESTRICT,
 
   -- The collections table does not exist yet, so there is no REFERENCES clause
-  -- to write. Nothing accepts this column on the way in — the API schema does
-  -- not have the field — so it is NULL on every row until collections ship and
-  -- add the foreign key in their own migration.
+  -- to write — and a column with no foreign key is a column with no referential
+  -- integrity. The API schema does not accept the field, but the API is not the
+  -- security boundary: a direct PostgREST call can set any column the policies
+  -- allow, and this one was writable to any uuid at all.
+  --
+  -- So it is pinned to NULL by a CHECK constraint, named so the collections
+  -- migration can drop it in the same statement that adds the foreign key. A
+  -- row written today can therefore never point at a collection somebody else
+  -- creates tomorrow.
   collection_id UUID,
 
   -- Which import produced this save, when one did. Provenance, same as
@@ -44,6 +50,19 @@ CREATE TABLE IF NOT EXISTS saved_places (
 
   saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Phase 2 has no collections. Dropped by the collections migration, which adds
+-- the foreign key in its place:
+--
+--   ALTER TABLE saved_places DROP CONSTRAINT saved_places_collection_null;
+--   ALTER TABLE saved_places ADD CONSTRAINT saved_places_collection_fkey
+--     FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL;
+--
+-- Stated as an ALTER rather than inline so a database that already applied an
+-- earlier revision of this file picks it up on re-run.
+ALTER TABLE saved_places DROP CONSTRAINT IF EXISTS saved_places_collection_null;
+ALTER TABLE saved_places ADD CONSTRAINT saved_places_collection_null
+  CHECK (collection_id IS NULL);
 
 -- Saving twice is the same as saving once. This is what makes the API
 -- idempotent rather than the API remembering to be.
@@ -186,6 +205,27 @@ CREATE POLICY "saved_places_select_own" ON saved_places
 --
 -- So the visibility rule from migration 013 is restated here as a condition of
 -- saving: published, or your own.
+-- WITH CHECK carries THREE conditions, and every one of them was learned the
+-- same way: by a foreign key being asked to do authorization's job.
+--
+--   1. The save belongs to the caller.
+--
+--   2. It names a place the caller can see. `user_id = auth.uid()` alone is not
+--      enough, because a foreign key is enforced regardless of row-level
+--      security — that is what a foreign key is. Without this, a traveler could
+--      insert a save naming somebody else's unverified place: nothing leaked
+--      directly, but a write that succeeds for one id and fails for another is
+--      an oracle for enumerating other people's places, and it moved their
+--      save_count.
+--
+--   3. It names an import the caller owns, or no import at all. Same failure,
+--      one column over, and reachable through the documented API rather than
+--      only through a direct PostgREST call — the route accepts a
+--      `sourceImportId` and passed it straight through. A save could therefore
+--      claim to originate from another traveler's import, corrupting provenance
+--      and distinguishing real import ids from invented ones.
+--
+-- None of this is checked in the route. The route is not the boundary.
 DROP POLICY IF EXISTS "saved_places_insert_own" ON saved_places;
 CREATE POLICY "saved_places_insert_own" ON saved_places
   FOR INSERT WITH CHECK (
@@ -195,6 +235,13 @@ CREATE POLICY "saved_places_insert_own" ON saved_places
       WHERE p.id = saved_places.place_id
         AND (p.verification_status = 'domner_public' OR p.created_by = auth.uid())
     )
+    AND (
+      saved_places.source_import_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM place_imports i
+        WHERE i.id = saved_places.source_import_id AND i.user_id = auth.uid()
+      )
+    )
   );
 
 DROP POLICY IF EXISTS "saved_places_delete_own" ON saved_places;
@@ -202,12 +249,23 @@ CREATE POLICY "saved_places_delete_own" ON saved_places
   FOR DELETE USING (user_id = auth.uid());
 
 -- UPDATE exists for one future reason only: filing a save into a collection.
--- It cannot be used to move a save to another traveler or to another place —
--- the guard below pins both, so the only column that can ever change is
--- collection_id.
+-- It repeats the import-ownership condition rather than trusting the guard
+-- trigger below to have pinned the column — the trigger and the policy are two
+-- independent statements of the same rule, and a future edit that loosens one
+-- should still meet the other.
 DROP POLICY IF EXISTS "saved_places_update_own" ON saved_places;
 CREATE POLICY "saved_places_update_own" ON saved_places
-  FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid())
+  WITH CHECK (
+    user_id = auth.uid()
+    AND (
+      saved_places.source_import_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM place_imports i
+        WHERE i.id = saved_places.source_import_id AND i.user_id = auth.uid()
+      )
+    )
+  );
 
 CREATE OR REPLACE FUNCTION public.saved_places_guard() RETURNS TRIGGER
 LANGUAGE plpgsql AS $fn$
@@ -220,10 +278,17 @@ BEGIN
   -- Re-pointing a save at a different place would move the save_count of two
   -- places at once without the counter trigger noticing, because it only fires
   -- on INSERT and DELETE. Changing the owner would hand somebody else's
-  -- library a row. Neither is a thing this table supports.
-  NEW.user_id  := OLD.user_id;
-  NEW.place_id := OLD.place_id;
-  NEW.saved_at := OLD.saved_at;
+  -- library a row. Changing the import would rewrite where a save came from
+  -- after the fact, which is the opposite of what provenance is for — and it
+  -- was how a foreign import got attached in the first place.
+  --
+  -- All four are immutable after creation. The only column an UPDATE can move
+  -- is collection_id, and a CHECK constraint pins that to NULL until
+  -- collections exist.
+  NEW.user_id          := OLD.user_id;
+  NEW.place_id         := OLD.place_id;
+  NEW.saved_at         := OLD.saved_at;
+  NEW.source_import_id := OLD.source_import_id;
   RETURN NEW;
 END;
 $fn$;
@@ -233,12 +298,35 @@ CREATE TRIGGER saved_places_guard_trg
   BEFORE INSERT OR UPDATE ON saved_places
   FOR EACH ROW EXECUTE FUNCTION public.saved_places_guard();
 
--- place_stats: readable by anyone signed in, writable by nobody. The trigger
--- above is the only thing that changes it, and it runs as the function's owner.
--- No INSERT, UPDATE or DELETE policy exists, so RLS denies all three.
+-- place_stats: writable by nobody. The trigger above is the only thing that
+-- changes it, and it runs as the function's owner. No INSERT, UPDATE or DELETE
+-- policy exists, so RLS denies all three.
+--
+-- READABLE ONLY FOR A PLACE THE CALLER CAN ALREADY SEE. The first revision of
+-- this policy was `auth.role() = 'authenticated'` and nothing else, which meant
+-- a signed-in traveler could read the save count of any place by id — including
+-- another traveler's private, unverified one. And because the backfill at the
+-- bottom of this file inserts a row for EVERY place, on a populated database
+-- that also enumerated every place id in the system.
+--
+-- No identity was exposed by that and none is now: this table holds a place id
+-- and a number, and who saved what lives in `saved_places`, which is own-row
+-- only. But existence and popularity are not nothing, so the visibility rule
+-- from migration 013 is restated here as a condition of reading.
+--
+-- Anonymous callers are deliberately excluded. Phase 2 has no surface that
+-- shows counts to a signed-out visitor, and opening one is a product decision
+-- rather than a default.
 DROP POLICY IF EXISTS "place_stats_read" ON place_stats;
 CREATE POLICY "place_stats_read" ON place_stats
-  FOR SELECT USING (auth.role() = 'authenticated');
+  FOR SELECT USING (
+    auth.role() = 'authenticated'
+    AND EXISTS (
+      SELECT 1 FROM places p
+      WHERE p.id = place_stats.place_id
+        AND (p.verification_status = 'domner_public' OR p.created_by = auth.uid())
+    )
+  );
 
 -- ── Backfill ─────────────────────────────────────────────────────────────────
 --
