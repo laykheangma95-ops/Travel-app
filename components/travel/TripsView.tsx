@@ -51,6 +51,14 @@ export function TripsView() {
     };
   }, [attempt]);
 
+  // Optimistic: the card that asked for this has already run its own confirm
+  // step and already knows the DELETE succeeded, so there is nothing left to
+  // wait on here beyond taking the row out of the list it belongs to.
+  const handleDelete = (tripId: string) => {
+    setTrips((current) => current.filter((trip) => trip.id !== tripId));
+    if (activeId === tripId) setActiveId(null);
+  };
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { now, wishlist, upcoming, past } = useMemo(() => {
@@ -190,24 +198,28 @@ export function TripsView() {
               trips={now}
               phase="now"
               activeId={activeId}
+              onDelete={handleDelete}
             />
             <TripSection
               title={lang === 'km' ? 'រក្សាទុកសម្រាប់ពេលក្រោយ' : 'Saved for later'}
               trips={wishlist}
               phase="wishlist"
               activeId={activeId}
+              onDelete={handleDelete}
             />
             <TripSection
               title={lang === 'km' ? 'ខាងមុខ' : 'Upcoming'}
               trips={upcoming}
               phase="upcoming"
               activeId={activeId}
+              onDelete={handleDelete}
             />
             <TripSection
               title={lang === 'km' ? 'បានបញ្ចប់' : 'Past'}
               trips={past}
               phase="past"
               activeId={activeId}
+              onDelete={handleDelete}
             />
           </div>
         )}
@@ -221,11 +233,13 @@ function TripSection({
   trips,
   phase,
   activeId,
+  onDelete,
 }: {
   title: string;
   trips: TripSummary[];
   phase: 'now' | 'wishlist' | 'upcoming' | 'past';
   activeId: string | null;
+  onDelete: (tripId: string) => void;
 }) {
   // TripCard knows three phases; a saved-place trip is simply an undated
   // upcoming one to it, so only the section heading differs.
@@ -243,6 +257,7 @@ function TripSection({
             trip={trip}
             phase={trip.id === activeId && cardPhase === 'upcoming' ? 'upcoming' : cardPhase}
             index={index}
+            onDelete={onDelete}
           />
         ))}
       </div>
