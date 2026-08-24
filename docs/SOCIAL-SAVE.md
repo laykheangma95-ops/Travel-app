@@ -915,6 +915,25 @@ still can.
 2. **A `rejected` place drops out of a library.** The save row survives; the
    view stops returning it, because RLS on `places` no longer matches. Correct,
    and tested, but it means a list can shrink without the traveler acting.
+
+   **TECHNICAL DEBT (M1) — rejected places inflate `place_stats.save_count`.**
+   The surviving `saved_places` rows still count. A place we have judged not
+   real therefore keeps its popularity, and every screen that ranks or displays
+   by save count inherits that number. Nothing is exposed by it — the count is
+   already gated on the place being visible, and a rejected place is visible to
+   nobody but its creator — so this is a correctness debt, not a security one.
+
+   It is deliberately NOT fixed in the security pull request that landed the
+   ownership fixes, because that change had to stay reviewable. Fixing it means
+   deciding what `rejected` should do to existing saves: leave them (today),
+   delete them and let the counter trigger settle the number, or exclude
+   rejected places from the counter and reconcile. That is a product decision
+   about somebody else's library, so it needs an owner, not a default. Until it
+   is made, treat `save_count` on a rejected place as stale.
+
+   The reconciliation query in this document detects nothing here, by design:
+   the counter and `saved_places` agree with each other. What disagrees is
+   `save_count` and the intent of `rejected`.
 3. **`getSavedDestinations` tallies in the application** over one page of saves,
    so the country counts describe the first 50. A `GROUP BY` view is the fix
    when a library that large exists.
