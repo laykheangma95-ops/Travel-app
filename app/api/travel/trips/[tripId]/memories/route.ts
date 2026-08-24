@@ -57,7 +57,7 @@ async function ownedTrip(request: Request, tripId: string) {
     .eq('id', tripId)
     .maybeSingle();
   if (error) throw new ApiError('INTERNAL', 'Could not open that trip.');
-  if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  if (!data) throw new ApiError('NOT_FOUND', 'We could not open that trip to reach its memories.');
   return supabase;
 }
 

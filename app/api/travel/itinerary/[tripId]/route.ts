@@ -53,7 +53,9 @@ async function ownedTrip(request: Request, tripId: string) {
     .eq('id', tripId)
     .maybeSingle();
   if (error) throw new ApiError('INTERNAL', 'Could not load this itinerary.');
-  if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  if (!data) {
+    throw new ApiError('NOT_FOUND', 'We could not open that itinerary. The trip may have been deleted.');
+  }
   return { supabase, trip: data };
 }
 

@@ -45,7 +45,7 @@ export async function addIdeaToTrip(
     .select('id,destination')
     .eq('id', tripId)
     .maybeSingle();
-  if (!trip) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  if (!trip) throw new ApiError('NOT_FOUND', 'We could not find that trip to save this place into.');
 
   let { data: ideasDay } = await supabase
     .from('itinerary_days')
@@ -223,7 +223,7 @@ async function chosenTrip(supabase: SupabaseClient, tripId: string): Promise<Res
     .eq('id', tripId)
     .maybeSingle();
   if (error) throw new ApiError('INTERNAL', 'Could not load that trip.');
-  if (!data) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  if (!data) throw new ApiError('NOT_FOUND', 'That trip is no longer available. Please choose another.');
   return { status: 'single', id: data.id as string, title: data.title as string, created: false };
 }
 

@@ -38,7 +38,9 @@ export const POST = route(async (request, context) => {
     .eq('id', tripId)
     .maybeSingle();
 
-  if (tripError || !trip) throw new ApiError('NOT_FOUND', 'That trip could not be found.');
+  if (tripError || !trip) {
+    throw new ApiError('NOT_FOUND', 'We could not read that trip to build a draft. Open it from Trips and try again.');
+  }
 
   const [{ data: places, error: placesError }, { data: existingDays, error: daysError }] = await Promise.all([
     supabase.from('destination_places').select('id,name,category,lat,lng,created_by')
