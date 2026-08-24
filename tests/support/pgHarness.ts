@@ -45,6 +45,9 @@ const MIGRATIONS = [
   // never become trusted public data" a property of the database rather than a
   // promise about the application.
   '013_place_registry.sql',
+  // The saved-place library: the counter trigger, the security_invoker view,
+  // and the policies that keep a library private while its totals are public.
+  '014_saved_place_library.sql',
 ];
 
 /**
@@ -235,7 +238,8 @@ export async function createHarness(): Promise<Harness> {
     },
     async reset() {
       await asAdmin(
-        `TRUNCATE place_external_ids, places, ai_usage_log, place_sources,
+        `TRUNCATE saved_places, place_stats, place_external_ids, places,
+                  ai_usage_log, place_sources,
                   import_candidates, place_imports,
                   itinerary_places, itinerary_days, trip_plans, destination_places,
                   saved_flights, esim_orders, profiles, auth.users CASCADE`

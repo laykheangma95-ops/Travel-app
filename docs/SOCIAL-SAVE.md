@@ -422,7 +422,7 @@ Each phase is independently shippable, additive, and reversible.
 - New `ServiceName` in `lib/env.ts`; absent key → provider off → Nominatim.
 - Promotion to `provider_verified` happens **only** here.
 
-### Phase 4 — Saved places, collections, ratings, stats
+### Phase 4 — Saved places ✅ **shipped as Phase 2 — see Part 10** · collections, ratings still open
 
 - Trip-independent `saved_places`, `collections`, `place_ratings`, aggregate
   `place_stats`. Existing trip-Ideas saves keep working unchanged.
@@ -834,3 +834,80 @@ they are written down rather than forgotten:
   identity is the index, never the slug.
 - **No places audit table.** Promotions are logged with actor and reason, not
   stored.
+
+
+---
+
+## Part 10 — The saved-place library (shipped)
+
+Migration `014_saved_place_library.sql`. A traveler can keep a canonical place
+**without a trip existing anywhere**.
+
+### Two saves, deliberately kept apart
+
+| | Trip save (unchanged) | Library save (new) |
+|---|---|---|
+| Means | "put this on a trip" | "keep this" |
+| Keyed on | guide `content_slug` | canonical `places.id` |
+| Needs a trip | yes — creates or asks which | no |
+| Code | `lib/travel/savedPlaces.ts` | `lib/places/saved.ts` |
+| Endpoint | `POST /api/travel/places/save` | `/api/travel/places/saved` |
+| Button | `SavePlaceButton` (bookmark) | `SavedPlaceButton` (heart) |
+
+Nothing in the trip path changed. A test asserts the library writes no row into
+`destination_places`, `trip_plans` or `itinerary_places`.
+
+### Save counts without COUNT(\*)
+
+`place_stats` is a counter maintained by an `AFTER INSERT OR DELETE` trigger, so
+a screen of twenty place cards reads one row per card from a primary key instead
+of running twenty aggregates that get slower as the product succeeds. The
+trigger is `SECURITY DEFINER` with `search_path` pinned to empty — it has to be,
+because `place_stats` has no write policy at all.
+
+**Reconciliation** (the counter is a cache; this is the truth it caches):
+
+```sql
+SELECT st.place_id, st.save_count,
+       (SELECT count(*) FROM saved_places s WHERE s.place_id = st.place_id) AS actual
+FROM place_stats st
+WHERE st.save_count <> (SELECT count(*) FROM saved_places s WHERE s.place_id = st.place_id);
+```
+
+Expected: zero rows. A test asserts this after a save/save/unsave sequence.
+
+### Privacy
+
+`saved_places` is own-row only for SELECT, INSERT, UPDATE and DELETE — there is
+no policy under which one traveler's library is visible to another.
+`place_stats` is the only publicly readable table and holds a place id and a
+number; who saved what is never joinable to it.
+
+### One finding, found while testing
+
+The first version of `saved_places_insert_own` checked only
+`user_id = auth.uid()`. **A foreign key is enforced regardless of RLS** — that
+is what a foreign key is — so a traveler could insert a save naming a place they
+cannot see. Nothing leaked (the library view joins `places` and filters it back
+out), but a write that succeeds for one id and fails for another is an oracle
+for enumerating other travelers' unverified places, and it moved their
+`save_count`.
+
+The policy now restates migration 013's visibility rule as a condition of
+saving: published, or your own. Two permanent regression tests cover it — one
+that the invisible place cannot be saved, one that your own unverified place
+still can.
+
+### Known limitations
+
+1. **`collection_id` is a column with no table.** Nullable, no FK, and the API
+   schema does not accept the field, so nothing can put a value in it until
+   collections ship with their constraint.
+2. **A `rejected` place drops out of a library.** The save row survives; the
+   view stops returning it, because RLS on `places` no longer matches. Correct,
+   and tested, but it means a list can shrink without the traveler acting.
+3. **`getSavedDestinations` tallies in the application** over one page of saves,
+   so the country counts describe the first 50. A `GROUP BY` view is the fix
+   when a library that large exists.
+4. **The heart is only mounted on `/you/saved`.** There is no public
+   canonical-place surface yet to put it on; that arrives with place pages.
