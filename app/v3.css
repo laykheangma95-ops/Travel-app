@@ -1886,6 +1886,20 @@ body.lang-km :is(.v3-visa-facts span, .v3-req-tag, .v3-place-kind, .v3-flag) {
   text-decoration: none;
 }
 
+/* The kept state of the library heart. Starlight blue, not gold: a list shows
+   twenty of these at once and twenty gold hearts would spend the whole
+   viewport's gold budget on a state indicator. Same cool accent as the trip
+   save's tick, for the same reason — it reads as system state. */
+.v3-save-kept {
+  color: #8fd8ff;
+  background: rgba(87, 200, 255, 0.12);
+  border-color: rgba(143, 216, 255, 0.38);
+}
+.v3-save-kept:hover:not(:disabled) {
+  background: rgba(87, 200, 255, 0.2);
+  border-color: rgba(143, 216, 255, 0.6);
+}
+
 .v3-save-done {
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.82);

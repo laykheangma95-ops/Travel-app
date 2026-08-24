@@ -10,9 +10,17 @@
 //   `body.capabilities`, so a change that renamed any of those would break the
 //   screen while every unit test stayed green.
 //
-// THE PROPERTY THAT MATTERS MOST HERE: this endpoint WRITES NOTHING. The whole
-// design of the importer rests on extraction being free to be wrong, so a test
-// asserts the Supabase client is never even constructed.
+// THE PROPERTY THAT MATTERS MOST HERE: this endpoint WRITES NO TRAVEL CONTENT.
+// The whole design of the importer rests on extraction being free to be wrong —
+// no trip, no place, no itinerary row is created by asking "what is in this
+// link?", so a wrong guess costs a glance rather than a cleanup.
+//
+// It is narrower than it used to be. Since migration 012 the endpoint writes
+// ONE row of its own: the import job that records what was extracted, so a
+// repeat of the same link can be replayed instead of re-paid for. That ledger
+// is deliberately best-effort — these tests run with no session client at all,
+// which is the empty-.env configuration, and prove the extraction still works
+// end to end when nothing can be recorded.
 //
 // The model is deliberately left unconfigured in these tests, so what runs is
 // the deterministic floor — which is also the configuration the app ships in
@@ -24,14 +32,23 @@ import { __resetRateLimits } from '@/lib/rateLimit';
 
 vi.mock('@/lib/serverAuth', () => ({
   requireUser: async () => ({ id: 'traveler-1' }),
+  // Null is what the real one returns when Supabase is unconfigured. Every
+  // ledger call in the route accepts it and does nothing, so these tests
+  // exercise the pipeline exactly as an empty .env deployment runs it.
+  supabaseFromRequest: () => null,
 }));
 
-// If the read endpoint ever reaches for the database, this throws rather than
-// quietly succeeding.
+// The route reaches the database only through supabaseFromRequest (mocked to
+// null above). If it ever reaches for the ambient client — the one that is not
+// scoped to the caller's session, and so is not subject to RLS — this throws
+// rather than quietly succeeding.
 vi.mock('@/lib/supabase', () => ({
   getSupabase: () => {
-    throw new Error('the extract route must never touch the database');
+    throw new Error('the extract route must never use the unscoped client');
   },
+  // The service-role client, used for the cost ledger only. Null is the
+  // empty-.env deployment: no key, so no line is recorded and nothing throws.
+  getSupabaseAdmin: () => null,
 }));
 
 const { POST } = await import('@/app/api/travel/extract/route');

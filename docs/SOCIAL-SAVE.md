@@ -1,0 +1,913 @@
+# Social Save + AI Place Intelligence — architecture audit & implementation plan
+
+**Status: the import ledger and the canonical registry are delivered. The
+remaining phases are proposals awaiting a decision.**
+Parts 1–4 are the audit; Part 5 carries the phase plan and Part 8 records what
+Phase 1 actually shipped.
+
+Required by CLAUDE.md §6 ("before coding, always report first"). It answers
+three questions: what is actually in this repository, what of it can be reused,
+and what is the safest additive path to
+**Social Save → AI Place Extraction → Place Verification → Saved Places →
+Domner Place Database**.
+
+---
+
+## Part 1 — Architecture audit
+
+### 1.1 Application structure
+
+Next.js **14.2.35**, App Router, TypeScript, at the **repo root** (`app/`,
+`lib/`, `components/`). This is the live storefront and the target of this work.
+
+`apps/*` and `packages/*` are npm-workspace scaffolds from an unrelated platform
+migration, mostly empty (CLAUDE.md §8), and are **excluded from the root
+`tsconfig.json`**. Nothing in this plan goes there — putting Social Save in
+`apps/` would inherit two unresolved owner decisions and a `_staging/` directory
+that does not exist.
+
+### 1.2 Frontend routing
+
+Route groups `(auth)`, `(dashboard)`, `(legal)` plus flat public routes. The
+travel surface: `/trips`, `/trips/[tripId]/itinerary`, `/trips/new`, `/explore`,
+`/destination/[slug]`, `/import`, `/share/trip/[token]`, `/share/maps-link`,
+`/you`, `/updates`.
+
+`app/import/page.tsx` is **43 lines** — a thin shell over a client component. The
+importer UI is already the right shape to extend without a redesign.
+
+### 1.3 API / server architecture
+
+Every route handler is wrapped by `route()` in `lib/http.ts`, which supplies:
+
+- a per-request `requestId`, echoed into every log line and every response;
+- optional declarative rate limiting (`{ rateLimit: 'tripWrite' }`);
+- one place where `ApiError`, `ConfigurationError` and `PricingError` become
+  correct status codes, and anything unexpected becomes a 500 — never a 200
+  with partial data.
+
+Responses go through `ok<T>()`; input through `readJson()` + **Zod** schemas
+(`.strict()` on the import routes). `runtime = 'nodejs'` and
+`dynamic = 'force-dynamic'` on the travel routes; `maxDuration = 60` on
+`/api/travel/extract`.
+
+**This wrapper is the single most reusable asset in the audit.** Every new
+endpoint below is a `route()` handler and gets logging, error mapping and rate
+limiting for free.
+
+### 1.4 Supabase configuration
+
+`lib/supabase.ts` exposes `getSupabase()` (anon, returns `null` unconfigured)
+and `getSupabaseAdmin()` (service key). `lib/serverAuth.ts` exposes
+`supabaseFromRequest()` — a **per-request client carrying the caller's JWT**, so
+RLS applies. Migrations are numbered SQL files in `supabase/migrations/`
+(`001`–`011`) with `supabase/schema.sql` as the base. Region `sin1`
+(`vercel.json`), matching the Singapore database move runbook.
+
+**The convention to follow:** feature code takes a `SupabaseClient` parameter
+and never reaches for the admin client. `lib/travel/placeImport.ts` documents
+why in its header — handing it a service-role client would silently switch off
+every policy (rule 3).
+
+### 1.5 Authentication
+
+Supabase Auth. `requireUser(request)` for travelers; `requireStaff`,
+`requirePermission`, `requireAdmin`, `verifyServiceToken` and
+`requireAdminOrService` for staff and scheduled jobs. `middleware.ts` refreshes
+the session cookie and gates `/admin` and the dashboard prefixes **before any
+HTML is sent** — explicitly documented as defence in depth, not the boundary.
+
+Auth is a **locked area** (`docs/LOCKED.md`). Nothing in this plan modifies it;
+everything reuses `requireUser()`.
+
+### 1.6 User tables
+
+`profiles` (id → `auth.users`, name, email, phone, `passport_country`,
+`preferred_language km|en`, `role customer|support|admin`), extended by
+migration `001` with `phone_verified_at`, `email_verified_at`, `auth_providers`,
+plus `recovery_codes` and `otp_attempts`. Staff live separately in `staff_users`
+/ `staff_events` (migration `004`, `docs/STAFF-ROLES.md`).
+
+**Reuse:** every new user-owned table references `auth.users(id)` — the pattern
+migration `009` already used for `destination_places.created_by`.
+
+### 1.7 Existing place-related tables
+
+| Table | Shape |
+|---|---|
+| `destination_places` | `id, destination, name, category(spot\|food\|shopping\|transport\|other), lat, lng, description, photo_url, source(editorial\|ai_generated), created_at, created_by, opening_hours jsonb, timezone, content_slug` |
+| `itinerary_days` | `trip_id, day_index (0 = private Ideas), date, theme` |
+| `itinerary_places` | `itinerary_day_id, place_id → destination_places, category, time_start, time_end, notes, sort_order` |
+| `trip_plans` | `user_id, title, destination, dates, travelers, budget, interests, generated_itinerary, is_public, share_token, is_wishlist` |
+
+Indexes exist on `(destination, category, name)`, plus partial uniques for
+editorial names and per-owner names, and an owner index. RLS: editorial rows are
+readable by any authenticated user, traveler rows only by their owner; writes
+are confined to `created_by = auth.uid()`.
+
+**This is the table the canonical registry must extend, not replace.** It holds
+live editorial seed data (`supabase/seeds/destination_places.sql`) and traveler
+rows; rule 12 forbids dropping it.
+
+### 1.8 Itinerary architecture
+
+`day_index 0` is a private Ideas holding area; days 1..n are the plan.
+`lib/travel/itinerary.ts`, `savedPlaces.ts` (`addIdeaToTrip`), `tripWrites.ts`,
+`smartDraft.ts` (deterministic day-drafting — **not** an LLM), `trips.ts`,
+`tripSeed.ts`, `context.ts`, `state.ts`. `POST /api/travel/itinerary/[tripId]/generate`
+reports `strategy: 'smart-draft'` and leaves Ideas untouched.
+
+### 1.9 Saved / favourite functionality
+
+There is **no `saved_places` table**. "Saved" means: a `destination_places` row
+(found or created) referenced from the trip's Ideas day.
+`savePlaceForTraveler()` resolves a guide `content_slug`, finds or creates the
+trip for that country, and can return `needsChoice` — writing nothing — when
+"which trip?" is genuinely ambiguous. `POST /api/travel/places/save` and
+`POST /api/travel/places/import` are the two write doors.
+
+**Consequence for this brief:** a save is always trip-bound today. A
+trip-independent saved place is genuinely new (Phase 4), and is the one place
+where a new table is unavoidable.
+
+### 1.10 Map integrations
+
+**Leaflet + OpenStreetMap** (`leaflet ^1.9.4`, `@types/leaflet`), used in
+`components/travel/ItineraryEditor.tsx` and the flight map/globe (`three`,
+`gsap`). Geocoding is **Nominatim** via `lib/travel/geocode.ts`: HTTPS-only,
+5s timeout, a process-wide 1.1s floor between calls, capped at 8 lookups per
+import, and disabled entirely by `NOMINATIM_BASE_URL=""`.
+
+**No Google Maps SDK, no Mapbox, no billing relationship with a map vendor.**
+That is a deliberate low-lock-in position and this plan preserves it.
+
+### 1.11 Environment variables
+
+`lib/env.ts` is the single source of truth: a `required` map per service,
+`missingVars()`, `isConfigured()`, `assertConfigured()` and `configReport()`
+(surfaced by `/api/health`). The rule it enforces: demo fallbacks are a
+development convenience, and **in production a missing key is an outage, never a
+discount** — written after a missing env var turned checkout into a free vending
+machine. `DOMNER_ALLOW_DEMO` is the explicit staging escape hatch.
+
+Place-related today: `ANTHROPIC_API_KEY`, `ANTHROPIC_PLACE_MODEL`,
+`NOMINATIM_BASE_URL` — all read inside functions, never at module scope, so
+tests can stub them.
+
+### 1.12 PWA configuration
+
+`public/manifest.webmanifest` + `public/sw.js` + `public/offline.html`, with
+`next.config.mjs` forcing revalidation on all three. The manifest already
+declares a **`share_target` pointing at `/import`** (GET, `title`/`text`/`url`),
+so Android share-sheet ingestion is live. `scripts/pwa-check.mjs` guards it.
+
+**Reuse:** the ingestion front door for Social Save already exists and is
+installed on real phones. It must not change address — an installed PWA keeps
+the manifest it was installed with, which is exactly why `/share/maps-link` was
+kept as a forwarder.
+
+### 1.13 Existing social / share functionality
+
+Inbound: `lib/travel/socialLink.ts` classifies TikTok / Instagram / Facebook /
+YouTube / Google Maps, strips tracking params (`igsh`, `_t`, `fbclid`, `utm_*`)
+and produces a canonical URL. `linkPreview.ts` fetches captions by oEmbed or
+OpenGraph. `mapsResolve.ts` resolves Maps links to exact coordinates.
+
+Outbound: `trip_plans.is_public` + `share_token`, `/share/trip/[token]`,
+`flight_shares`.
+
+**Xiaohongshu / RED is not in the classifier.** The brief names it; adding it is
+a classifier entry plus an allowlist decision, not a new pipeline.
+
+### 1.14 Existing background jobs
+
+There is **no `crons` block in `vercel.json`** and no queue. The nearest thing
+is `POST /api/notifications/dispatch`, gated by `requireAdminOrService()` — a
+staff session or `DOMNER_SERVICE_TOKEN`, "the token the scheduled jobs hold".
+
+**This is the most consequential finding for the brief's "Import Job" layer.**
+There is no worker to run a job on. Any job must either be driven by the
+foreground request or polled by an authenticated endpoint an external scheduler
+calls. Introducing a queue here would be a new dependency and new vendor lock-in
+for a pipeline that currently completes inside one 60s request.
+
+### 1.15 Existing AI integrations
+
+Exactly one: `lib/travel/placeAgent.ts` (Anthropic SDK, `claude-sonnet-5` by
+default, 20s timeout, 6,000-char caption cap, `server-only`). The caption is
+fenced and labelled as untrusted data, and the model's JSON is passed through
+`normaliseCandidate()`, which is documented as **the only door**.
+
+`/api/chat` is *not* an LLM: it runs `lib/domnerEngine.ts` locally, deliberately
+so it cannot fail on billing. Itinerary generation is deterministic
+(`smartDraft.ts`). So today's total AI cost surface is one call per import, and
+**that call is uncached**.
+
+### 1.16 Logging / error architecture
+
+`lib/logger.ts` — one JSON line per event with `level`, `event`, `ts`, plus
+`redactEmail()` / `redactPhone()`. `LOG_LEVEL` configurable, `info` in
+production. `lib/supabaseError.ts` classifies Postgres failures into causes
+(`docs/SUPABASE-OPS.md`). No Sentry, no APM.
+
+### 1.17 Analytics
+
+**None as a product.** No GA, PostHog or Plausible; the `analytics` matches in
+the codebase are unrelated identifiers. Any counting this brief needs must be
+built as aggregate rows in Postgres — which is the privacy-preferable answer
+anyway.
+
+### 1.18 TypeScript configuration
+
+`strict: true`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
+`isolatedModules`, `target ES2022`, `moduleResolution: bundler`, path alias
+`@/*` → repo root. `apps` and `packages` excluded.
+
+### 1.19 Testing infrastructure
+
+**Vitest**, node environment, `tests/**/*.test.ts`, contract tests excluded from
+the default gate. The notable asset: `tests/support/pgHarness.ts` boots
+**PGlite** (Postgres in WebAssembly), replays real migrations
+(`007, 008, 009, 010, 011`) plus a `trip_plans` prerequisite and stub
+`auth.uid()` / `auth.role()`, and runs statements as `authenticated` with a real
+JWT claim. `tests/savedPlaces.rls.test.ts` therefore proves the **actual
+policies**, not a mock.
+
+Two gates, reported separately: `npm run verify` (typecheck + lint + tests) and
+`npm run verify:runtime` (real server, real browser), with `npm run env:check`
+first — a `SKIP` is an unproven claim, never a pass (`docs/VERIFICATION.md`).
+
+**Reuse:** every new migration in this plan gets appended to `MIGRATIONS` in
+`pgHarness.ts` and its RLS asserted the same way. This is non-negotiable for
+anything touching user-owned rows.
+
+### 1.20 Deployment configuration
+
+Vercel, region `sin1`, `DEPLOY.md`. Serverless functions — no long-lived
+process, no in-memory state that survives a request. Note: `lib/rateLimit.ts` is
+an **in-process** map, so limits are per-instance, not global. Fine as a
+courtesy limit; not a quota mechanism.
+
+---
+
+## Part 2 — Reuse matrix
+
+| Need | Reuse | Verdict |
+|---|---|---|
+| Endpoint scaffolding | `lib/http.ts` `route()`/`ok()`/`ApiError` | Reuse as-is |
+| Auth | `requireUser()`, `supabaseFromRequest()` | Reuse as-is |
+| Link classification | `lib/travel/socialLink.ts` | Extend: add RED, export a canonical-URL hash |
+| Caption fetch | `lib/travel/linkPreview.ts` | Reuse as-is; allowlist untouched |
+| Maps link → coordinates | `lib/travel/mapsResolve.ts`, `mapsLink.ts` | Reuse as-is |
+| AI extraction | `lib/travel/placeAgent.ts` | Extend: cheap-first tiering + usage metering |
+| Validation | `normaliseCandidate()`, `dedupeCandidates()` | Reuse as the only door |
+| Geocoding | `lib/travel/geocode.ts` | Reuse; add a cache in front, keep Nominatim default |
+| Writing a place onto a trip | `placeImport.ts` → `savedPlaces.addIdeaToTrip` | Reuse as-is |
+| Place catalogue | `destination_places` | **Extend with columns — do not create a parallel `places` table** |
+| Ideas / saved list | `itinerary_days.day_index 0` | Reuse; Phase 4 adds a trip-independent record alongside |
+| Share ingestion | manifest `share_target` → `/import` | Reuse; address must not change |
+| Config gating | `lib/env.ts` | Extend `ServiceName` for a places provider |
+| Logging | `lib/logger.ts` | Reuse |
+| Rate limiting | `lib/rateLimit.ts` | Reuse for burst; quotas need a DB counter (see 4.3) |
+| RLS testing | `tests/support/pgHarness.ts` | Reuse; append every new migration |
+
+**Nothing in the existing pipeline needs to be rewritten.** The gaps are all
+*below* the water line: persistence, identity, provenance, and cost.
+
+---
+
+## Part 3 — Gap analysis
+
+| Brief layer | Today | Gap |
+|---|---|---|
+| Import API | `POST /api/travel/extract` | Exists |
+| Import Job | — | **Missing.** Synchronous, nothing persisted, nothing resumable or auditable |
+| Content ingestion | `linkPreview.ts` | Exists. No screenshot/OCR path |
+| AI extraction | `placeAgent.ts` | Exists. One model, no tiering, no metering |
+| Candidate places | in-memory `PlaceCandidate[]` | **Missing as data** — candidates die with the response |
+| Place resolver | `geocode.ts` | Partial: coordinates only, no provider identity |
+| Trusted places provider | — | **Missing** |
+| Confidence scoring | `AUTO_SELECT_CONFIDENCE = 0.55` | UI-only, not persisted, not resolver-aware |
+| User confirmation | `/import` review screen | Exists |
+| Canonical registry | `destination_places` | Partial: dedupe is per-owner name-string; no canonical id, no geo dedupe, no external-id map |
+| Saved places | Ideas list | Exists, but trip-bound only |
+| Collections | — | **Missing** |
+| Ratings / stats / save counts | — | **Missing** |
+| Provenance (`PlaceSource`) | — | **Missing** — the source URL is never stored |
+| Verification tiers | `source ∈ {editorial, ai_generated}` | **Missing the distinction the brief calls critical**: `ai_generated` conflates AI-guess, provider-verified and publicly-safe |
+| Cost control | burst rate limit only | **Mostly missing**: no URL hash, no duplicate detection, no result reuse, no quota, no usage log |
+
+---
+
+## Part 4 — Proposed architecture
+
+### 4.1 Principles
+
+1. **Extend `destination_places`; never fork it.** A parallel `places` table
+   would split the editorial seed, the guide save path, `itinerary_places.place_id`
+   and every existing RLS policy. Canonical identity is added as a
+   self-referencing column instead.
+2. **Three-state verification, stored explicitly.** A new
+   `verification` column: `ai_candidate` → `provider_verified` →
+   `domner_public`. The model may only ever write `ai_candidate`. Promotion to
+   `provider_verified` requires a trusted provider record; promotion to
+   `domner_public` requires a human or a threshold rule the owner sets. This is
+   the brief's "critical principle" made into a database constraint rather than
+   a convention.
+3. **Provenance is a separate table, private by default.** Who submitted a
+   source is never publicly readable; public surfaces read aggregate counts.
+4. **The job is a row, not a queue.** `place_imports` records state
+   (`pending → extracting → ready → saved/failed`) and is driven by the same
+   foreground request that already does the work. No queue, no worker, no new
+   vendor. If the pipeline later outgrows 60s, the row is already the handoff
+   point for a poller.
+5. **Every new capability degrades to off.** No key → no provider → Nominatim →
+   no pin. The app still runs with an empty `.env` (CLAUDE.md §11).
+
+### 4.2 Data model (additive)
+
+**New columns on `destination_places`** (all nullable / defaulted, no rewrite):
+
+| Column | Purpose |
+|---|---|
+| `canonical_place_id UUID REFERENCES destination_places(id)` | Self-reference. NULL = this row *is* canonical. Lets duplicates collapse without deleting anyone's row |
+| `verification TEXT NOT NULL DEFAULT 'ai_candidate'` | `ai_candidate\|provider_verified\|domner_public`, CHECK-constrained. Backfill: existing `editorial` → `domner_public`, existing `ai_generated` → `ai_candidate` |
+| `confidence NUMERIC` | The score that produced the row |
+| `provider_place_id TEXT` / `provider TEXT` | Trusted-provider identity, when one exists |
+| `geohash TEXT` | Cheap proximity bucketing for dedupe |
+
+`source` is **left alone** — deprecating a column in the same migration that
+reshapes meaning is what CLAUDE.md Step 1 explicitly forbids.
+
+**New tables:**
+
+| Table | Key columns | RLS |
+|---|---|---|
+| `place_imports` | `id, user_id, url_hash, normalized_url, platform, status, outcome, candidate_count, model, tokens_in/out, created_at, completed_at` | owner-only |
+| `import_candidates` | `id, import_id, name, description, category, lat, lng, confidence, resolved_place_id, accepted` | via import owner |
+| `place_sources` | `id, place_id, platform, normalized_url, url_hash, submitted_by, created_at` | insert own; **read = aggregate only** |
+| `ai_usage_log` | `id, user_id, feature, model, tokens_in, tokens_out, cost_estimate_micros, created_at` | service/staff read only |
+| `place_stats` *(Phase 4)* | `place_id, save_count, source_count, rating_avg, rating_count` | public read, service write |
+| `saved_places`, `collections`, `collection_places`, `place_ratings` *(Phase 4)* | owner-scoped | owner-only, ratings aggregate-public |
+
+Indexes: `place_imports (user_id, created_at DESC)`, unique
+`place_imports (url_hash) WHERE status = 'ready'`, `place_sources (place_id)`,
+unique `place_sources (place_id, url_hash)`, `destination_places (geohash)`,
+`destination_places (provider, provider_place_id)`,
+`destination_places (canonical_place_id) WHERE canonical_place_id IS NOT NULL`.
+
+### 4.3 Cost control design
+
+```
+paste → normalize URL (socialLink.ts) → sha256 → url_hash
+      → SELECT completed import for this hash
+           hit  → replay stored candidates, ZERO model tokens
+           miss → check per-user daily quota (COUNT over place_imports)
+                → cheap model pass
+                → escalate to the stronger model only if confidence < threshold
+                → write ai_usage_log
+```
+
+Four separate savings, deliberately: a repeat of the *same link* costs nothing;
+a place already resolved is reused rather than re-geocoded; the cheap model
+handles the majority; and the quota is a **database count**, not the in-process
+rate limiter, because serverless instances do not share memory (§1.20).
+
+The existing burst limiter stays in front of all of it.
+
+### 4.4 Module layout
+
+Follow the repo's own convention (`lib/travel/*`) rather than importing the
+brief's `features/ services/` tree — a second architecture in one codebase costs
+more than it explains. New modules:
+
+```
+lib/travel/importJobs.ts      job row lifecycle
+lib/travel/urlHash.ts         normalize + sha256 (pure, testable)
+lib/travel/placeRegistry.ts   canonical resolution, geo+name dedupe, promotion
+lib/travel/placeProvider.ts   provider interface (adapter behind it, Phase 3)
+lib/travel/aiUsage.ts         metering + quota
+```
+
+---
+
+## Part 5 — Phased implementation plan
+
+Each phase is independently shippable, additive, and reversible.
+
+### Phase 1 — Persistence + cost control ✅ **shipped — see Part 8**
+
+- Migration `012_place_imports.sql`: `place_imports`, `import_candidates`,
+  `place_sources`, `ai_usage_log` + RLS + indexes.
+- `lib/travel/urlHash.ts`, `importJobs.ts`, `aiUsage.ts`.
+- `/api/travel/extract` records a job and **reuses a completed import for the
+  same hash**. Request/response shape unchanged except an added `importId`, so
+  the UI needs no change to keep working.
+- `/api/travel/places/import` writes `place_sources` for saved places.
+- Tests: pure hash tests; PGlite RLS tests for all four tables; a reuse test
+  asserting **zero model calls** on a repeat import.
+- **Nothing user-visible changes.** That is the point.
+
+### Phase 2 — Canonical registry + verification tiers ✅ **shipped — see Part 9**
+
+- Migration `013_place_registry.sql`: the columns in §4.2 + backfill
+  (`editorial → domner_public`, `ai_generated → ai_candidate`).
+- `placeRegistry.ts`: resolve by provider id → geohash+name proximity → create.
+- Import writes `ai_candidate` only. Nothing AI-created is publicly readable.
+
+### Phase 3 — Trusted places provider *(owner cost decision required)*
+
+- `placeProvider.ts` interface + one adapter behind a server-only key, with
+  timeout, retry-with-backoff, structured logs and a resolved-place cache.
+- New `ServiceName` in `lib/env.ts`; absent key → provider off → Nominatim.
+- Promotion to `provider_verified` happens **only** here.
+
+### Phase 4 — Saved places ✅ **shipped as Phase 2 — see Part 10** · collections, ratings still open
+
+- Trip-independent `saved_places`, `collections`, `place_ratings`, aggregate
+  `place_stats`. Existing trip-Ideas saves keep working unchanged.
+
+### Phase 5 — Screenshot/OCR ingestion, RED support, trip generation from the flywheel
+
+---
+
+## Part 6 — Risk register
+
+### Vendor lock-in
+
+| Risk | Assessment |
+|---|---|
+| **Google Places (Phase 3)** | The real one. Provider place ids and Terms that restrict caching/redisplay would make a switch expensive. **Mitigation:** the adapter interface is the contract; `provider` + `provider_place_id` are stored as a *mapping*, never as the primary key; Nominatim stays the working default. Do not store provider content we are not permitted to retain — that is an owner/legal decision before Phase 3, not after |
+| Anthropic | Low. One narrow JSON-extraction call behind `placeAgent.ts`, already optional |
+| Supabase | Pre-existing and accepted. Plain Postgres + RLS; nothing new added here deepens it |
+| Vercel | Pre-existing. Adding a queue vendor **would** deepen it — hence the job-as-row design |
+| Leaflet/OSM | None. No contract, and this plan keeps it as the default |
+
+### Security & privacy
+
+1. **SSRF** — any new fetch path inherits the existing rule: exact-match `Set`
+   allowlist, checked before the socket opens and **re-checked at every redirect
+   hop**, https only, no credentials, no odd ports, capped body reads. Adding
+   RED means adding hosts to an allowlist, which is an owner decision like
+   `goo.gl` was.
+2. **Prompt injection** — a caption is hostile input. The existing fencing and
+   `normaliseCandidate()` gate stay the only door; new fields (`confidence`,
+   provider ids) must pass through it too, never around it.
+3. **Provenance leaks identity** — `place_sources.submitted_by` must never be
+   readable by another traveler. Public surfaces read `place_stats` counts only.
+4. **Verification bypass** — the whole design fails if anything can write
+   `domner_public`. Enforce it as a CHECK plus an RLS policy, and prove it in a
+   PGlite test.
+5. **Provider key exposure** — server-only module, never `NEXT_PUBLIC_`, gated
+   through `lib/env.ts` like every other service.
+6. **Quota as an abuse control** — without it, one account can spend the model
+   budget. The in-process limiter cannot do this (§1.20); the DB counter can.
+
+### API cost risks
+
+| Risk | Control |
+|---|---|
+| Same link imported repeatedly | `url_hash` reuse — zero tokens |
+| Viral link imported by many users | Same hash across users; reuse a completed extraction (candidates only, never another user's *saves*) |
+| Long transcripts | Existing 6,000-char cap |
+| Model escalation on every import | Cheap-first; escalate only below a confidence threshold |
+| Provider lookups per candidate | Cache resolved places; cap per import as geocoding already does (8) |
+| Runaway account | Per-user daily quota + `ai_usage_log` |
+| Silent bill growth | `ai_usage_log` with cost estimate, reportable per day/user/feature |
+
+### Operational risks
+
+- **No worker exists.** Anything genuinely long-running needs an owner decision
+  on a scheduler. Phase 1 deliberately avoids needing one.
+- **`maxDuration = 60`** is the hard ceiling on foreground extraction.
+- **PGlite harness must be updated** with every new migration or the RLS tests
+  silently stop covering the new tables.
+- **Locked areas** — none of this touches auth, identity or QR delivery. If a
+  phase turns out to, it stops and asks (CLAUDE.md §7).
+- **Checkout** — untouched by every phase. Non-negotiable (rule 13).
+
+---
+
+## Part 7 — Decisions needed before any code
+
+1. **Which phase to build.** Recommendation: Phase 1. It is invisible to
+   travelers, reversible, and it is what makes Phase 3's bill predictable.
+2. **Is a paid Places provider approved in principle?** Affects Phase 2/3
+   design only. Phase 1 is unaffected either way.
+3. **May a saved place exist outside a trip?** Phase 4 assumes yes.
+4. **Who may promote a place to `domner_public`?** A human, or a rule
+   (e.g. N independent saves + provider verification)?
+5. **Xiaohongshu / RED:** add its hosts to the SSRF allowlist? Same class of
+   decision as the `goo.gl` widening already recorded in `docs/PLACE-IMPORT.md`.
+
+
+---
+
+## Part 8 — Phase 1 as built
+
+Approved decisions this was built under: a paid places provider is approved in
+principle but stays behind an abstraction and is **not activated here**; a saved
+place must eventually exist independently of a trip (Phase 4); promotion to
+public must never be AI-only; and the SSRF allowlist is **not widened** — RED is
+prepared for by the `platform` vocabulary and nothing else.
+
+### What it does
+
+```
+paste → normalize URL → sha256 → url_hash
+      → own completed import for this hash?
+            hit  → replay stored candidates      ZERO tokens, ZERO fetches
+            miss → daily quota check (a DB count)
+                 → the existing pipeline, unchanged
+                 → record job + candidates + token cost
+save  → record which post each place came from, and which guess was kept
+```
+
+### Tables (migration `012_place_imports.sql`)
+
+`place_imports` · `import_candidates` · `place_sources` · `ai_usage_log`.
+No existing table is altered. `destination_places`, `trip_plans`,
+`itinerary_days` and `itinerary_places` are untouched, so every existing save
+path behaves exactly as before.
+
+### The quota is enforced in the database, not in the app
+
+The daily cap is a `COUNT` over `place_imports`, and a traveler holds the anon
+key — they can call PostgREST directly, so "our code never does that" is not a
+control. **Four** ways of defeating the count are closed in SQL:
+
+| Attack | Closed by |
+|---|---|
+| Insert a row backdated outside the window | Trigger stamps `created_at` on INSERT |
+| Update `created_at`, `user_id` or `url_hash` afterwards | Trigger preserves all three on UPDATE |
+| Delete yesterday's rows to buy a fresh allowance | No DELETE policy exists |
+| Mark real imports as replays, which the count excludes | Trigger requires a replay to name a **completed import of the same link by the same traveler** |
+
+Each has a test that performs the attack.
+
+**The fourth was missed in the first implementation and found in review**, after
+this document had already claimed the quota could not be cheated. It could: the
+count excludes rows with `reused_from_import_id` set, nothing stopped a traveler
+from setting that column on every row, and three closed holes plus one open one
+is an open cap. It is closed now, and the claim is stated as what is tested
+rather than as a general guarantee.
+
+Replays are still excluded from the count — they cost nothing to serve, so
+rationing them would punish the behaviour this phase exists to encourage. What
+changed is that being a replay now has to be *true*: a genuine replay is keyed
+on the hash it reused, and a hundred distinct links cannot claim to be replays
+of anything because no earlier import shares their hash.
+
+### Privacy
+
+`place_sources` links a person to a place they liked enough to save, so it is
+private: own-row SELECT and INSERT, no UPDATE, no DELETE. Aggregate save counts
+— what a public surface actually needs — are a Phase 4 table computed from this
+one, never this table exposed.
+
+### Where cost enforcement lives, and where the record lives
+
+These are two different things and they are deliberately in two different
+places.
+
+**Enforcement is `place_imports`.** It is the table a traveler cannot backdate,
+delete, or mark as a replay, so the daily cap computed from it means something.
+
+**The record is `ai_usage_log`, and it is written only by the service role.**
+It has *no RLS policy of any kind*: an authenticated caller can neither read nor
+write it. It briefly had an INSERT policy scoped to `user_id = auth.uid()`, so
+the extract route could write it on the session client it already had. That was
+the wrong architecture — the policy constrained whose row could be written but
+not what was in it, so any signed-in account could inject arbitrary models,
+token counts and cost estimates into the numbers we would use to answer "what is
+the AI importer costing us". A ledger anybody can write is not a ledger.
+
+The route now writes it through `getSupabaseAdmin()`, and **records nothing when
+no service key is configured**. An absent line is honest; an unverifiable one is
+not. Nothing is enforced from this table, and nothing should ever be.
+
+### Environment variables
+
+| Name | Default | Effect |
+|---|---|---|
+| `PLACE_IMPORT_DAILY_QUOTA` | `40` | Pipeline runs per traveler per rolling day. `0` disables the cap. |
+| `ANTHROPIC_PLACE_MODEL_FAST` | unset | Opt-in cheap first pass. **Unset = one call to the same model as before**, so default behaviour is unchanged. |
+
+### Known limitations
+
+1. **Reuse is own-user only.** A viral link imported by many travelers is still
+   extracted once per traveler. Cross-user reuse means reading another user's
+   row, which requires the service role — a decision with a privacy argument
+   attached, not a free win. Phase 2 question.
+2. **The escalation is billed twice.** With `ANTHROPIC_PLACE_MODEL_FAST` set and
+   the cheap pass failing, both calls are paid for. `ai_usage_log` records the
+   stronger model's line; the escalation itself is logged as
+   `place_agent.escalated`.
+3. **The ledger is best-effort.** If Supabase is unavailable the importer works
+   and simply stops remembering — `importId` comes back `null`. That is the
+   empty-`.env` configuration and it is covered by a test.
+4. **The quota fails open.** If the count cannot be read the import proceeds. A
+   database hiccup locking every traveler out of the importer would be a worse
+   outage than the spending it guards against.
+5. **No screenshot/OCR path, no RED classifier, no provider.** Out of scope by
+   instruction.
+
+### One invariant was deliberately narrowed
+
+`tests/extractRoute.test.ts` asserted that the extract endpoint "must never
+touch the database". It now asserts the narrower, true property: the endpoint
+writes **no trip, place or itinerary row** — a wrong guess still costs a glance
+rather than a cleanup — and writes only its own job row. It also may never use
+the unscoped Supabase client; everything runs on the caller's session client so
+RLS applies.
+
+
+---
+
+## Part 9 — The canonical place registry as built
+
+Migration `013_place_registry.sql`. Delivered against the approved decisions: a
+provider abstraction with **no paid vendor activated**, promotion that AI can
+never reach, and **no SSRF allowlist change** — RED is prepared for only in the
+platform vocabulary.
+
+### The shape
+
+| Table | What it is |
+|---|---|
+| `places` | One row per real-world place. Name, local name, slug, country, city/district/neighborhood, category/subcategory, coordinates, address, website, phone, price level, verification status. |
+| `place_external_ids` | `(provider, provider_place_id) → place_id`, **unique**. This is what makes "100 users, 1 place" true. |
+| `destination_places.canonical_place_id` | One nullable column. A traveler's saved copy points at the shared record. Nothing else changed. |
+
+`itinerary_days`, `itinerary_places` and `trip_plans` are untouched. A
+`destination_places` row that never resolves keeps working exactly as it does
+today — the pointer is additive, and nothing reads it yet.
+
+### Why some fields are not where the brief put them
+
+- **`provider` / `provider_place_id` are not columns on `places`.** A place has
+  ids from as many providers as have ever seen it, and the thing that actually
+  prevents duplication is a UNIQUE constraint on the provider's id — which two
+  columns cannot express without forbidding a second provider. The mapping
+  table carries them.
+- **`country_code` is nullable.** Domner's country identity is the *name*
+  (`trip_plans.destination`), and there is no reliable way to derive an ISO code
+  from a name in SQL. Inventing one during the backfill would be fabricated
+  data. A provider fills it in when it knows it; `country_name` is NOT NULL and
+  is what everything joins on.
+- **`category` reuses the existing six values.** A registry with its own
+  vocabulary needs a translation on every read, and translations drift.
+
+### Deduplication
+
+Two keys, both **generated by the database** so a row can never carry a key that
+disagrees with its own name or coordinates:
+
+- `name_normalized` — case-folded, Latin accents flattened, whitespace and
+  ASCII punctuation removed. Chinese, Khmer and Thai characters survive.
+- `geohash` — standard base32, 9 characters.
+
+`UNIQUE (name_normalized, substr(geohash,1,7))` — same name inside one ~150m
+cell is one place. The resolver searches a real **bounding box** first, because
+a cell has edges and two points 30m apart can fall either side of one; the index
+is the last-resort race guard, not the primary mechanism.
+
+Resolution order, strongest evidence first: **provider id → proximity + name →
+create as `unverified`**.
+
+**Both keys exist twice — in SQL and in TypeScript.** If they ever disagree,
+nothing throws: lookups compute one key, rows hold another, and every import
+silently creates a duplicate. `tests/places.normalize.test.ts` runs both
+implementations over Latin, Chinese and Khmer inputs in a real Postgres and
+asserts they agree. Writing that test found two real divergences — a broken row
+in the accent-folding table, and Postgres and JavaScript disagreeing about Khmer
+combining marks. The second is why neither side uses a character class: POSIX
+`[[:alnum:]]` and JavaScript's `\p{L}` classify those marks differently, so both
+sides now strip an explicit, written-down set that means the same thing under
+every collation.
+
+### Promotion — the rule, as a policy rather than a habit
+
+```
+unverified  →  provider_verified  →  domner_public
+```
+
+- A traveler's session can insert and edit **only `unverified` rows they own**.
+  There is no request body that reaches any other status: it is the RLS
+  `WITH CHECK`, not a code path. A future AI pipeline runs as a traveler, so
+  this is the answer to "AI must never promote", enforced by the database.
+- `provider_verified` requires a provider mapping to exist — checked in the
+  repository *and* by a trigger, so a direct SQL `UPDATE` cannot get around it.
+- `domner_public` requires a **human actor**. A provider may verify; a provider
+  may not publish. Publishing an unverified place needs an explicit `override`
+  plus an actor and a reason, which is the editorial case.
+- Every promotion is logged with actor and reason. There is no places audit
+  table yet; that is worth adding when staff tooling arrives.
+
+Provider mappings are **service-role only, with no INSERT policy at all**. A
+caller who could write one could claim a real Google id for a place they
+invented, and the unique index would then refuse the genuine link forever.
+
+### The provider abstraction
+
+`lib/providers/places/` — `types.ts` (the port), `registry.ts`, `sandbox.ts` —
+mirroring the existing `lib/providers/esim/` convention.
+
+```ts
+interface PlacesProvider {
+  readonly id: string;
+  isConfigured(): boolean;
+  search(query: PlaceSearchQuery): Promise<PlaceSearchResult[]>;
+  getDetails(providerPlaceId: string): Promise<ProviderPlace | null>;
+}
+```
+
+**No paid adapter is written or activated.** The default is no provider at all.
+A vendor's payload is transformed into Domner types and validated
+(`lib/places/validation.ts`) before it reaches any application logic — coordinate
+ranges, a `.strict()` schema that rejects unmapped vendor fields, and an
+http(s)-only website check, because a `javascript:` URL from a third party that
+we store and later render is stored XSS handed to us.
+
+The sandbox adapter is **refused in production** unless demo mode is explicitly
+enabled. Fixtures that could stamp `provider_verified` on a live place would put
+the word "verified" on data nobody verified.
+
+Adding a real vendor is: one adapter file, one `register()` line, one
+`ServiceName` in `lib/env.ts`, and an owner decision about the bill and about
+what the vendor's terms permit us to store.
+
+### Environment variables
+
+| Name | Default | Effect |
+|---|---|---|
+| `PLACES_PROVIDER` | unset | Which adapter resolves places. Unset means none, which is how Domner ships today. `sandbox` works in dev only. |
+
+### Rolling back, and rebuilding the keys
+
+**Rollback order matters.** `destination_places.canonical_place_id` is a foreign
+key into `places`, so dropping the table first fails. Reverse order, and no
+existing data is destroyed:
+
+```sql
+-- 013, in reverse. Losing canonical_place_id loses the links, not the places.
+ALTER TABLE destination_places DROP COLUMN IF EXISTS canonical_place_id;
+DROP TABLE IF EXISTS place_external_ids;
+DROP TABLE IF EXISTS places;
+DROP FUNCTION IF EXISTS public.places_verification_guard();
+DROP FUNCTION IF EXISTS public.place_name_normalized(TEXT);
+DROP FUNCTION IF EXISTS public.geohash_encode(NUMERIC, NUMERIC, INT);
+
+-- 012, in reverse. Import history and provenance are lost with it.
+DROP TABLE IF EXISTS ai_usage_log;
+DROP TABLE IF EXISTS place_sources;
+DROP TABLE IF EXISTS import_candidates;
+DROP TABLE IF EXISTS place_imports;
+DROP FUNCTION IF EXISTS public.place_imports_guard();
+```
+
+Neither migration alters or removes a pre-existing column, so rolling both back
+returns the database to exactly its previous shape. `destination_places`,
+`trip_plans` and the itinerary tables are untouched throughout.
+
+**Changing a normalizer is not a normal migration.** `place_name_normalized` and
+`geohash_encode` sit behind GENERATED columns. Postgres accepts a
+`CREATE OR REPLACE` of either and does **not** recompute the stored values — so
+an edit silently leaves every existing row keyed under the old rule while new
+rows use the new one, and deduplication quietly stops working with no error
+anywhere. If one of them ever has to change:
+
+```sql
+BEGIN;
+-- 1. Replace the function.
+CREATE OR REPLACE FUNCTION public.place_name_normalized(value TEXT) ... ;
+
+-- 2. Force every stored key to be recomputed. A no-op UPDATE does it, because
+--    a generated column is re-evaluated on every write.
+UPDATE places SET name = name;
+
+-- 3. The identity index may now see collisions that did not exist before.
+--    This must return zero rows before the transaction is committed.
+SELECT name_normalized, substr(geohash, 1, 7), count(*)
+FROM places GROUP BY 1, 2 HAVING count(*) > 1;
+COMMIT;
+```
+
+If step 3 returns rows, the new rule merges places that were previously
+distinct: resolve those by hand before committing. Update the TypeScript twin in
+`lib/places/normalize.ts` in the same change, and run
+`tests/places.normalize.test.ts` — it is what proves the two still agree.
+
+### Known limitations
+
+1. **Nothing calls the registry yet.** It is infrastructure: the importer still
+   writes `destination_places`, and `canonical_place_id` stays null until a
+   later phase wires resolution into the save path. That is deliberate — adding
+   the table and changing the save path in one commit would put the live
+   importer at risk for a table with no data in it.
+2. **Cross-user proximity matching only sees published places.** Two travelers
+   who each save an unverified place get two rows until one is published. That
+   is the privacy trade, and it is the right way round.
+3. **No places audit table.** Promotions are logged, not stored.
+4. **The SQL/TypeScript parity is proven under PGlite's collation.** It is
+   collation-independent by construction now, but the guarantee is a test, so
+   run the suite against any database whose locale differs.
+
+### Open items carried forward from the Principal Engineer review
+
+None of these are live — nothing calls the registry yet — but they are real and
+they are written down rather than forgotten:
+
+- **`resolveProviderPlace` is ~8 round trips per place.** A 25-place import
+  would be ~200. It must be collapsed before anything calls it in a loop.
+- **`findNearbyByName` caps at 50 candidates before sorting by distance.** In a
+  dense cluster of identically-named places the true nearest could in principle
+  be truncated away.
+- **The `013` backfill is a function-per-row join** over `destination_places`
+  and cannot use an index. Fine at editorial-catalogue scale; check the row
+  count before running it on a large table.
+- **Provider ids are readable by any authenticated user** for published places.
+  Some vendors' terms restrict redistributing their place ids — check before
+  wiring a real adapter.
+- **Slug format is inconsistent** between backfilled rows (which keep the
+  hyphenated `content_slug`) and new ones (punctuation stripped). Cosmetic:
+  identity is the index, never the slug.
+- **No places audit table.** Promotions are logged with actor and reason, not
+  stored.
+
+
+---
+
+## Part 10 — The saved-place library (shipped)
+
+Migration `014_saved_place_library.sql`. A traveler can keep a canonical place
+**without a trip existing anywhere**.
+
+### Two saves, deliberately kept apart
+
+| | Trip save (unchanged) | Library save (new) |
+|---|---|---|
+| Means | "put this on a trip" | "keep this" |
+| Keyed on | guide `content_slug` | canonical `places.id` |
+| Needs a trip | yes — creates or asks which | no |
+| Code | `lib/travel/savedPlaces.ts` | `lib/places/saved.ts` |
+| Endpoint | `POST /api/travel/places/save` | `/api/travel/places/saved` |
+| Button | `SavePlaceButton` (bookmark) | `SavedPlaceButton` (heart) |
+
+Nothing in the trip path changed. A test asserts the library writes no row into
+`destination_places`, `trip_plans` or `itinerary_places`.
+
+### Save counts without COUNT(\*)
+
+`place_stats` is a counter maintained by an `AFTER INSERT OR DELETE` trigger, so
+a screen of twenty place cards reads one row per card from a primary key instead
+of running twenty aggregates that get slower as the product succeeds. The
+trigger is `SECURITY DEFINER` with `search_path` pinned to empty — it has to be,
+because `place_stats` has no write policy at all.
+
+**Reconciliation** (the counter is a cache; this is the truth it caches):
+
+```sql
+SELECT st.place_id, st.save_count,
+       (SELECT count(*) FROM saved_places s WHERE s.place_id = st.place_id) AS actual
+FROM place_stats st
+WHERE st.save_count <> (SELECT count(*) FROM saved_places s WHERE s.place_id = st.place_id);
+```
+
+Expected: zero rows. A test asserts this after a save/save/unsave sequence.
+
+### Privacy
+
+`saved_places` is own-row only for SELECT, INSERT, UPDATE and DELETE — there is
+no policy under which one traveler's library is visible to another.
+`place_stats` is the only publicly readable table and holds a place id and a
+number; who saved what is never joinable to it.
+
+### One finding, found while testing
+
+The first version of `saved_places_insert_own` checked only
+`user_id = auth.uid()`. **A foreign key is enforced regardless of RLS** — that
+is what a foreign key is — so a traveler could insert a save naming a place they
+cannot see. Nothing leaked (the library view joins `places` and filters it back
+out), but a write that succeeds for one id and fails for another is an oracle
+for enumerating other travelers' unverified places, and it moved their
+`save_count`.
+
+The policy now restates migration 013's visibility rule as a condition of
+saving: published, or your own. Two permanent regression tests cover it — one
+that the invisible place cannot be saved, one that your own unverified place
+still can.
+
+### Known limitations
+
+1. **`collection_id` is a column with no table.** Nullable, no FK, and the API
+   schema does not accept the field, so nothing can put a value in it until
+   collections ship with their constraint.
+2. **A `rejected` place drops out of a library.** The save row survives; the
+   view stops returning it, because RLS on `places` no longer matches. Correct,
+   and tested, but it means a list can shrink without the traveler acting.
+3. **`getSavedDestinations` tallies in the application** over one page of saves,
+   so the country counts describe the first 50. A `GROUP BY` view is the fix
+   when a library that large exists.
+4. **The heart is only mounted on `/you/saved`.** There is no public
+   canonical-place surface yet to put it on; that arrives with place pages.

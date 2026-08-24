@@ -68,6 +68,10 @@ MIGRATIONS=(
   supabase/migrations/008_itinerary_readiness.sql
   supabase/migrations/009_custom_places.sql
   supabase/migrations/010_place_opening_hours.sql
+  supabase/migrations/011_saved_places.sql
+  supabase/migrations/012_place_imports.sql
+  supabase/migrations/013_place_registry.sql
+  supabase/migrations/014_saved_place_library.sql
 )
 
 # Every migration on disk must be listed above, or a new one silently never

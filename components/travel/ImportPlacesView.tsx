@@ -56,6 +56,11 @@ interface ExtractResponse {
   candidates: PlaceCandidate[];
   destination: string | null;
   capabilities: { model: boolean; geocoding: boolean };
+  /** The server's record of this extraction. Handed back on save so the place
+   *  keeps a link to the post it came from. Null when the ledger was down. */
+  importId: string | null;
+  /** True when the server answered from an earlier identical import. */
+  reused: boolean;
 }
 
 interface TripOption {
@@ -267,6 +272,10 @@ export function ImportPlacesView({
             lng: row.lng,
           })),
           ...target,
+          // Optional on the wire, and only ever an id: the server reads the
+          // source link off its own job row rather than trusting this client
+          // to say where a place came from.
+          ...(result?.importId ? { importId: result.importId } : {}),
         }),
       });
       const body = (await response.json().catch(() => null)) as
