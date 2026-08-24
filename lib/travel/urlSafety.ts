@@ -194,7 +194,17 @@ export function parseSafeUrl(candidate: string): UrlVerdict {
 
   if (!ALLOWED_PORTS.has(url.port)) return { ok: false, code: 'blocked-port' };
 
-  const hostname = url.hostname.toLowerCase();
+  // NORMALIZE BEFORE COMPARING, and this is the whole of the fix that put it
+  // here. `localhost.` is the fully-qualified form of `localhost` and resolves
+  // to the same place, but WHATWG `URL` preserves a trailing dot on a name-based
+  // host — so an exact-match Set on 'localhost' let it straight through. The
+  // asymmetry that hid it: `127.0.0.1.` WAS caught, because the trailing dot is
+  // stripped when a host parses as IPv4, so only the name checks were affected.
+  //
+  // Every hostname rule below — the exact set, the suffix list, the IP parsing
+  // — runs on this normalized value, so none of them can be bypassed by a
+  // spelling the resolver would ignore.
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/, '');
   if (!hostname) return { ok: false, code: 'malformed' };
 
   if (BLOCKED_HOSTNAMES.has(hostname)) return { ok: false, code: 'private-host' };

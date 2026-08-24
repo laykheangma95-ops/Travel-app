@@ -120,6 +120,63 @@ describe('recording a link', () => {
   });
 });
 
+describe('a row that does not state its status', () => {
+  it('is queued, never the deprecated value the column used to default to', async () => {
+    // FOUND IN REVIEW. Migration 015 expanded the CHECK and backfilled the rows
+    // but left `DEFAULT 'extracting'` in place, so any INSERT omitting status
+    // kept writing a deprecated value — and a row like that is invisible to the
+    // whole Phase 3 model.
+    const alice = harness.clientFor(ALICE);
+    const { error } = await alice.from('place_imports').insert({
+      user_id: ALICE,
+      url_hash: 'd'.repeat(64),
+      normalized_url: 'tiktok.com/@a/video/77',
+      platform: 'tiktok',
+    });
+    expect(error).toBeNull();
+
+    const [row] = await harness.rows('place_imports');
+    expect(row.status).toBe('queued');
+    expect(['extracting', 'ready']).not.toContain(row.status);
+  });
+
+  it('participates in the open-job model like any other queued row', async () => {
+    const alice = harness.clientFor(ALICE);
+    await alice.from('place_imports').insert({
+      user_id: ALICE,
+      url_hash: 'd'.repeat(64),
+      normalized_url: 'tiktok.com/@a/video/77',
+      platform: 'tiktok',
+    });
+
+    // The partial unique index covers `queued`, so a second open job for the
+    // same link is refused — which is the property a defaulted row would have
+    // escaped entirely while it was landing as 'extracting'.
+    const { error } = await alice.from('place_imports').insert({
+      user_id: ALICE,
+      url_hash: 'd'.repeat(64),
+      platform: 'tiktok',
+    });
+    expect(error?.code).toBe('23505');
+    expect(await harness.rows('place_imports')).toHaveLength(1);
+  });
+
+  it('leaves nothing that would block removing the deprecated values later', async () => {
+    // The contraction this migration promises: a later migration drops
+    // 'extracting' and 'ready' from the CHECK. That cannot run while anything
+    // still produces one — including the column default.
+    const [column] = await harness.asAdmin(
+      `SELECT column_default FROM information_schema.columns
+        WHERE table_name = 'place_imports' AND column_name = 'status'`
+    );
+    expect(String(column.column_default)).toContain('queued');
+    expect(String(column.column_default)).not.toContain('extracting');
+
+    const rows = await harness.rows('place_imports');
+    expect(rows.filter((row) => row.status === 'extracting' || row.status === 'ready')).toEqual([]);
+  });
+});
+
 describe('the same link twice', () => {
   it('returns the job already in flight instead of queueing a second', async () => {
     const alice = harness.clientFor(ALICE);

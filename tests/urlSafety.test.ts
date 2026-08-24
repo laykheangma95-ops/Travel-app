@@ -151,6 +151,42 @@ describe('loopback, private and metadata addresses', () => {
     }
   });
 
+  it('refuses a blocked name however it is spelled, including the FQDN dot', () => {
+    // FOUND IN REVIEW. `localhost.` is the fully-qualified form and resolves to
+    // 127.0.0.1, but WHATWG URL preserves a trailing dot on a name-based host,
+    // so an exact-match Set on 'localhost' let it past. The IPv4 form was
+    // already caught — the dot is stripped when a host parses as an address —
+    // which is exactly why only the name checks were affected and why nothing
+    // noticed.
+    for (const url of [
+      'http://localhost/',
+      'http://localhost./',
+      'http://LOCALHOST./',
+      'http://localhost../',
+      'http://LocalHost.:80/admin',
+      'http://evil.localhost./',
+      'http://wiki.internal./',
+      'http://printer.local./',
+      'http://ip6-localhost./',
+    ]) {
+      expect({ url, code: refused(url) }).toEqual({ url, code: 'private-host' });
+    }
+  });
+
+  it('still refuses the IP forms after normalization, and still accepts real hosts', () => {
+    // The normalization must not have loosened anything that already worked…
+    expect(refused('http://127.0.0.1./')).toBe('private-host');
+    expect(refused('http://2130706433./')).toBe('private-host');
+    expect(refused('http://169.254.169.254./')).toBe('private-host');
+    expect(refused('http://[::1]/')).toBe('private-host');
+    expect(refused('http://[::ffff:127.0.0.1]/')).toBe('private-host');
+    // …nor tightened anything that should pass. A trailing dot on a public host
+    // is legal and common in DNS tooling.
+    expect(parseSafeUrl('https://www.tiktok.com./@a/video/1').ok).toBe(true);
+    expect(parseSafeUrl('https://example.com./').ok).toBe(true);
+    expect(parseSafeUrl('http://8.8.8.8./').ok).toBe(true);
+  });
+
   it('refuses internal-looking names', () => {
     expect(refused('http://intranet/')).toBe('private-host');
     expect(refused('http://wiki.internal/')).toBe('private-host');

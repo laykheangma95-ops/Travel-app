@@ -83,6 +83,23 @@ ALTER TABLE place_imports ADD CONSTRAINT place_imports_status_check CHECK (
 UPDATE place_imports SET status = 'processing' WHERE status = 'extracting';
 UPDATE place_imports SET status = 'completed'  WHERE status = 'ready';
 
+-- THE DEFAULT HAS TO MOVE WITH THE VOCABULARY.
+--
+-- Migration 012 declared `DEFAULT 'extracting'`, and expanding the CHECK and
+-- backfilling the rows does not touch it. Left alone, every INSERT that omits
+-- `status` would keep writing a value this file calls deprecated — and such a
+-- row is invisible to the whole Phase 3 model: it is not in
+-- place_imports_open_idx, so the one-open-job-per-link guarantee does not cover
+-- it; it is not `completed`, so it is never reusable. An orphan no code path
+-- can see or clean up.
+--
+-- It would also block the promised contraction: a later migration that removes
+-- 'extracting' from the CHECK cannot run while the DEFAULT still produces one.
+--
+-- `queued` is the intake's initial state, so it is what a row with no stated
+-- status means: recorded, waiting for a connector.
+ALTER TABLE place_imports ALTER COLUMN status SET DEFAULT 'queued';
+
 -- ── The reuse index has to follow the rename ────────────────────────────────
 --
 -- 012 built this partial index WHERE status = 'ready'. Backfilling the rows
