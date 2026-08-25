@@ -129,6 +129,9 @@ describe('reading a job at each stage', () => {
     expect(body.candidateCount).toBeGreaterThan(0);
     expect(body.candidates.length).toBe(body.candidateCount);
     expect(body.preview).toMatchObject({ title: 'A day in Bangkok' });
+    // The noop connector's caption goes through the deterministic extractor,
+    // not the model, so this mirrors what a real basic-mode job would report.
+    expect(body.usedModel).toBe(false);
   });
 
   it('a failed job reports failed with no candidates, not an error', async () => {

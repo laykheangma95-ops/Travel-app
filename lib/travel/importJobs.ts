@@ -262,6 +262,11 @@ export interface ImportJobSnapshot {
   outcome: ImportOutcome | null;
   candidates: StoredCandidate[];
   preview: ImportPreview | null;
+  /** Mirrors the synchronous pipeline's `capabilities.model` — whether the
+   *  model actually ran for this job, so the review screen can show the same
+   *  "reading captions without AI" hint it already shows there. False (not
+   *  null) for a job with no outcome yet, matching the column's own default. */
+  usedModel: boolean;
 }
 
 /**
@@ -288,18 +293,24 @@ export async function loadImportForReview(
   try {
     const { data, error } = await supabase
       .from('place_imports')
-      .select('status,outcome,preview')
+      .select('status,outcome,preview,used_model')
       .eq('id', importId)
       .eq('user_id', userId)
       .maybeSingle();
 
     if (error || !data) return null;
 
-    const row = data as { status: string; outcome: ImportOutcome | null; preview: unknown };
+    const row = data as {
+      status: string;
+      outcome: ImportOutcome | null;
+      preview: unknown;
+      used_model: boolean | null;
+    };
     const status = normaliseStatus(row.status);
+    const usedModel = row.used_model === true;
 
     if (status !== 'completed') {
-      return { status, outcome: row.outcome, candidates: [], preview: null };
+      return { status, outcome: row.outcome, candidates: [], preview: null, usedModel };
     }
 
     const { data: candidateRows, error: candidateError } = await supabase
@@ -313,6 +324,7 @@ export async function loadImportForReview(
       outcome: row.outcome,
       candidates: candidateError ? [] : ((candidateRows ?? []) as CandidateRow[]).map(toCandidate),
       preview: toPreview(row.preview),
+      usedModel,
     };
   } catch {
     return null;

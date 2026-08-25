@@ -370,6 +370,18 @@ describe('loadImportForReview — the queued-job review screen\'s only read', ()
     expect(snapshot?.candidates).toHaveLength(1);
     expect(snapshot?.candidates[0]).toMatchObject({ name: 'Wat Pho', country: 'Thailand' });
     expect(snapshot?.preview).toMatchObject({ title: 'Bangkok in a day', author: '@chef' });
+    // completeImport was told usedModel: true above — the review screen's
+    // "basic mode" hint depends on this surviving the round trip.
+    expect(snapshot?.usedModel).toBe(true);
+  });
+
+  it('reports usedModel: false for a job the deterministic extractor answered', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, importId, { outcome: 'ok', candidates: [WAT_PHO], usedModel: false });
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.usedModel).toBe(false);
   });
 
   it('reads a job the connector layer completed via completeImportIfProcessing the same way', async () => {

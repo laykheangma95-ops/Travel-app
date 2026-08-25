@@ -48,6 +48,7 @@ export const GET = route(
       candidateCount: snapshot.candidates.length,
       candidates: snapshot.candidates,
       preview: snapshot.preview,
+      usedModel: snapshot.usedModel,
     });
   },
   // A poll loop is many small reads in a short window — the 'session' tier
