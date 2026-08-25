@@ -26,6 +26,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   assertWithinQuota,
   completeImport,
+  failImport,
   findReusableImport,
   loadImportProvenance,
   markCandidateAccepted,
@@ -263,15 +264,22 @@ describe('the quota cannot be cheated', () => {
   it('refuses a replay of an import that never completed', async () => {
     const alice = harness.clientFor(ALICE);
     const unfinished = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+
+    // The source has to be OUT of the open set before a second row for the same
+    // link can exist at all — migration 015 added a partial unique index
+    // allowing one open job per link per traveler. Failing it is the honest way
+    // to get there: a failed extraction cached nothing, so there is nothing to
+    // have replayed, which is exactly what this test is about.
+    await failImport(alice, unfinished);
+
     const second = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    expect(second).not.toBeNull();
 
     const { error } = await alice
       .from('place_imports')
       .update({ reused_from_import_id: unfinished })
       .eq('id', second!);
 
-    // Nothing was cached by an extraction that never finished, so there is
-    // nothing to have replayed.
     expect(String(error?.message)).toContain('same link');
   });
 

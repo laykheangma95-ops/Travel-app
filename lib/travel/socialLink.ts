@@ -22,6 +22,7 @@ export type LinkPlatform =
   | 'tiktok'
   | 'facebook'
   | 'youtube'
+  | 'xiaohongshu'
   | 'google-maps'
   | 'web';
 
@@ -102,6 +103,21 @@ const HOSTS: { platform: LinkPlatform; hosts: string[]; short?: string[] }[] = [
     platform: 'youtube',
     hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
     short: ['youtu.be'],
+  },
+  {
+    // Xiaohongshu / RED. Domner's travelers plan China trips on it, and a link
+    // we cannot name is a link we cannot record honestly — it would be filed as
+    // generic `web` and lose the one fact worth knowing about it.
+    //
+    // CLASSIFYING A HOST IS NOT TRUSTING IT. Nothing in this file opens a
+    // socket, and these hosts are deliberately NOT added to the fetch
+    // allowlists in lib/travel/linkPreview.ts or lib/travel/mapsResolve.ts.
+    // RED publishes no oEmbed endpoint and we do not scrape, so a RED link is
+    // recognised, recorded, and never requested. The day a connector exists is
+    // the day that allowlist decision gets made, on its own merits.
+    platform: 'xiaohongshu',
+    hosts: ['xiaohongshu.com', 'www.xiaohongshu.com'],
+    short: ['xhslink.com'],
   },
   {
     platform: 'google-maps',
@@ -230,6 +246,7 @@ export const PLATFORM_LABEL: Record<LinkPlatform, { en: string; km: string }> = 
   tiktok: { en: 'TikTok', km: 'TikTok' },
   facebook: { en: 'Facebook', km: 'Facebook' },
   youtube: { en: 'YouTube', km: 'YouTube' },
+  xiaohongshu: { en: 'Xiaohongshu', km: 'Xiaohongshu' },
   'google-maps': { en: 'Google Maps', km: 'Google Maps' },
   web: { en: 'Web page', km: 'គេហទំព័រ' },
 };
