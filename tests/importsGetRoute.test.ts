@@ -147,6 +147,26 @@ describe('reading a job at each stage', () => {
     const response = await getImport(queued.importId);
     const body = await response.json();
     expect(body).toMatchObject({ status: 'failed', candidateCount: 0, candidates: [] });
+    // Phase 6: the real reason must survive the round trip through the actual
+    // orchestrator, not just a hand-written DB row — this is what lets the
+    // review screen tell "unsupported platform" apart from "reaped for
+    // sitting stuck" instead of one generic sentence for both.
+    expect(body.errorCode).toBe('no_connector');
+    expect(typeof body.errorMessage).toBe('string');
+    expect(body.errorMessage.length).toBeGreaterThan(0);
+  });
+
+  it('a completed job never carries an error_code or error_message', async () => {
+    const alice = harness.clientFor(ALICE);
+    const queued = await createImportFromUrl(alice, ALICE, TIKTOK);
+    if (!queued.ok) throw new Error('setup failed');
+    await process(queued.importId);
+
+    const response = await getImport(queued.importId);
+    const body = await response.json();
+    expect(body.status).toBe('completed');
+    expect(body.errorCode).toBeNull();
+    expect(body.errorMessage).toBeNull();
   });
 });
 

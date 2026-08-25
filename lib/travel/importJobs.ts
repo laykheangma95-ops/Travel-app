@@ -267,6 +267,12 @@ export interface ImportJobSnapshot {
    *  "reading captions without AI" hint it already shows there. False (not
    *  null) for a job with no outcome yet, matching the column's own default. */
   usedModel: boolean;
+  /** Set only when `status === 'failed'`. `failImportWithReason()` is the only
+   *  writer (lib/travel/importOrchestrator.ts); null for a job that never
+   *  failed, or one failed by the older synchronous pipeline's plain
+   *  `failImport()`, which predates this column and never sets it. */
+  errorCode: ImportErrorCode | null;
+  errorMessage: string | null;
 }
 
 /**
@@ -293,7 +299,7 @@ export async function loadImportForReview(
   try {
     const { data, error } = await supabase
       .from('place_imports')
-      .select('status,outcome,preview,used_model')
+      .select('status,outcome,preview,used_model,error_code,error_message')
       .eq('id', importId)
       .eq('user_id', userId)
       .maybeSingle();
@@ -305,12 +311,22 @@ export async function loadImportForReview(
       outcome: ImportOutcome | null;
       preview: unknown;
       used_model: boolean | null;
+      error_code: string | null;
+      error_message: string | null;
     };
     const status = normaliseStatus(row.status);
     const usedModel = row.used_model === true;
+    // Only meaningful for a `failed` job, and only trusted when it is one of
+    // the closed vocabulary this module itself writes — a value that reached
+    // the column any other way (there is no other writer today, but the same
+    // caution normaliseStatus already applies to `status`) is reported as
+    // absent rather than handed to the client as something it must recognise.
+    const errorCode =
+      status === 'failed' && isImportErrorCode(row.error_code) ? row.error_code : null;
+    const errorMessage = status === 'failed' ? row.error_message : null;
 
     if (status !== 'completed') {
-      return { status, outcome: row.outcome, candidates: [], preview: null, usedModel };
+      return { status, outcome: row.outcome, candidates: [], preview: null, usedModel, errorCode, errorMessage };
     }
 
     const { data: candidateRows, error: candidateError } = await supabase
@@ -325,6 +341,8 @@ export async function loadImportForReview(
       candidates: candidateError ? [] : ((candidateRows ?? []) as CandidateRow[]).map(toCandidate),
       preview: toPreview(row.preview),
       usedModel,
+      errorCode,
+      errorMessage,
     };
   } catch {
     return null;
@@ -651,6 +669,17 @@ export type ImportErrorCode =
   | 'connector_error'
   | 'unsafe_url'
   | 'stuck_timeout';
+
+const IMPORT_ERROR_CODES = new Set<ImportErrorCode>([
+  'no_connector',
+  'connector_error',
+  'unsafe_url',
+  'stuck_timeout',
+]);
+
+function isImportErrorCode(value: string | null): value is ImportErrorCode {
+  return value !== null && IMPORT_ERROR_CODES.has(value as ImportErrorCode);
+}
 
 /**
  * Mark a job as failed with a reason, for a human or the UI to read back.
