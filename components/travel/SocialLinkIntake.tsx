@@ -408,9 +408,17 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
           className="v3-save mt-4"
           onClick={() => {
             if (!importId || !platform) return;
-            const token = pollToken.current;
-            poll(importId, token, Date.now() + POLL_TIMEOUT_MS, platform);
-            setStage('working');
+            // Not poll() alone: a job that timed out here may never have been
+            // claimed at all (e.g. it was still 'queued' when the 70s budget
+            // ran out) — re-polling a job nothing is running would wait
+            // another 70s for a status that will never change. startWorking
+            // re-attempts POST .../process first (a harmless no-op if the job
+            // is already processing or done, per its own comment above) and
+            // then polls, which is the only path that can actually un-stick
+            // this screen. 'queued' is a placeholder, not a claim about the
+            // job's real status — startWorking only branches on whether it
+            // equals 'completed'.
+            startWorking(importId, 'queued', platform);
           }}
         >
           {globalT('intake.checkAgain')}
