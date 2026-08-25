@@ -33,7 +33,7 @@ import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 import { classifyLink, firstUrlIn, PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import { AUTO_SELECT_CONFIDENCE, type PlaceCandidate } from '@/lib/travel/placeExtraction';
-import { decidePollOutcome } from '@/lib/travel/importPollDecision';
+import { decidePollOutcome, jobFailedReason } from '@/lib/travel/importPollDecision';
 import { COPY, type Translate } from './placeImportCopy';
 import {
   DoneStage,
@@ -86,6 +86,8 @@ interface JobSnapshotBody {
   candidates: PlaceCandidate[];
   preview: PlaceReviewResult['preview'];
   usedModel: boolean;
+  errorCode: 'no_connector' | 'connector_error' | 'unsafe_url' | 'stuck_timeout' | null;
+  errorMessage: string | null;
 }
 
 function toReviewRows(candidates: PlaceCandidate[]): ReviewRow[] {
@@ -111,6 +113,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
   const [result, setResult] = useState<PlaceReviewResult | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [jobErrorCode, setJobErrorCode] = useState<JobSnapshotBody['errorCode']>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [tripSheetOpen, setTripSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -148,6 +151,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
     setResult(null);
     setRows([]);
     setError(null);
+    setJobErrorCode(null);
     setOutcome(null);
     setTripSheetOpen(false);
   }, []);
@@ -187,6 +191,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
           setStage('pollTimeout');
           return;
         case 'failed':
+          setJobErrorCode(body?.errorCode ?? null);
           setStage('jobFailed');
           return;
         case 'needsConfirmation':
@@ -403,13 +408,22 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
   }
 
   if (stage === 'jobFailed') {
+    const reason = jobFailedReason(jobErrorCode);
+    const title =
+      reason === 'generic'
+        ? globalT('intake.jobFailed')
+        : globalT(`intake.jobFailed.${reason}` as Parameters<typeof globalT>[0]);
+    const hint =
+      reason === 'generic'
+        ? globalT('intake.jobFailedHint')
+        : globalT(`intake.jobFailedHint.${reason}` as Parameters<typeof globalT>[0]);
     return (
       <div className="night-card rounded-card p-5 text-center" role="alert">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white/[0.06] text-white/60">
           <AlertTriangle size={20} aria-hidden="true" />
         </span>
-        <h2 className="mt-3 font-display text-lg text-white">{globalT('intake.jobFailed')}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-white/60">{globalT('intake.jobFailedHint')}</p>
+        <h2 className="mt-3 font-display text-lg text-white">{title}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-white/60">{hint}</p>
         <button type="button" className="v3-save mt-4" onClick={resetToIdle}>
           {t('tryAgain')}
         </button>

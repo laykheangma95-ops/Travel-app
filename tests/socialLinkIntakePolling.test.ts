@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from 'vitest';
-import { decidePollOutcome } from '@/lib/travel/importPollDecision';
+import { decidePollOutcome, jobFailedReason } from '@/lib/travel/importPollDecision';
 
 describe('a settled job', () => {
   it('completed always means review, timeout or not', () => {
@@ -63,5 +63,22 @@ describe('a response the client could not read', () => {
 
   it('a null status past the deadline still gives up rather than polling forever', () => {
     expect(decidePollOutcome(null, true)).toEqual({ kind: 'timeout' });
+  });
+});
+
+describe('jobFailedReason — which copy a failed job gets', () => {
+  it('maps each closed-vocabulary code to its own reason', () => {
+    expect(jobFailedReason('no_connector')).toBe('noConnector');
+    expect(jobFailedReason('unsafe_url')).toBe('unsafeUrl');
+    expect(jobFailedReason('stuck_timeout')).toBe('stuckTimeout');
+  });
+
+  it('falls back to the generic reason for connector_error and null', () => {
+    // connector_error is a transient/unclassified failure — still honestly
+    // "we could not read that link", not a specific cause worth its own copy.
+    expect(jobFailedReason('connector_error')).toBe('generic');
+    // null covers a failed job the older synchronous pipeline's plain
+    // failImport() wrote, which predates error_code and never sets it.
+    expect(jobFailedReason(null)).toBe('generic');
   });
 });

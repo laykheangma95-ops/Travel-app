@@ -9,6 +9,27 @@
 
 export type JobPollStatus = 'queued' | 'processing' | 'needs_confirmation' | 'completed' | 'failed';
 
+export type JobErrorCode = 'no_connector' | 'connector_error' | 'unsafe_url' | 'stuck_timeout' | null;
+
+/** Which `jobFailed` copy the client shows. `connector_error`, and a failed
+ *  job with no code at all (the older synchronous pipeline's plain
+ *  failImport()), keep the generic sentence — a transient or unclassified
+ *  failure is still honestly "we could not read that link". */
+export type JobFailedReason = 'noConnector' | 'unsafeUrl' | 'stuckTimeout' | 'generic';
+
+export function jobFailedReason(code: JobErrorCode): JobFailedReason {
+  switch (code) {
+    case 'no_connector':
+      return 'noConnector';
+    case 'unsafe_url':
+      return 'unsafeUrl';
+    case 'stuck_timeout':
+      return 'stuckTimeout';
+    default:
+      return 'generic';
+  }
+}
+
 export type PollDecision =
   | { kind: 'continue' }
   | { kind: 'timeout' }
