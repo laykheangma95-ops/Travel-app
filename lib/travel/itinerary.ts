@@ -23,6 +23,24 @@ export interface CuratedPlace {
   created_by: string | null;
   opening_hours?: OpeningHours | null;
   timezone?: string | null;
+  /**
+   * The canonical registry row this catalogue row resolved to (migration 013),
+   * when it did. Already present on the wire since Phase 7 — Phase 9 is the
+   * first reader. Null is common and normal: coordinate-less places, and a
+   * traveler's row that lost the resolver's race, never link.
+   */
+  canonical_place_id: string | null;
+}
+
+/**
+ * Where the canonical place page for this catalogue row lives, or null when
+ * it has none to link to. The only thing a caller needs to know before
+ * rendering a "View place" affordance — `/place/[id]` re-derives visibility
+ * from RLS on every request regardless of how the id arrived, so this is a
+ * navigation target, never a claim that the place is visible to anyone.
+ */
+export function placeDetailHref(place: Pick<CuratedPlace, 'canonical_place_id'>): string | null {
+  return place.canonical_place_id ? `/place/${place.canonical_place_id}` : null;
 }
 
 export const PLACE_NAME_MAX = 120;

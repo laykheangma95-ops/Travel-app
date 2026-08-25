@@ -265,6 +265,56 @@ describe('the verification ceiling holds through the import path', () => {
   });
 });
 
+describe('Phase 9 — the canonical id surfaced for a "View place" link', () => {
+  it('is the resolved canonical id when exactly one place is added', async () => {
+    const alice = harness.clientFor(ALICE);
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
+
+    const [place] = await harness.rows('places');
+    expect(result.canonicalPlaceId).toBe(place.id);
+  });
+
+  it('is null when the single added place never resolved (no coordinates)', async () => {
+    const alice = harness.clientFor(ALICE);
+
+    const result = await importPlacesToTrip(alice, ALICE, [{ ...WAT_PHO, lat: null, lng: null }], {
+      destination: 'Thailand',
+    });
+
+    expect(result.added).toEqual(['Wat Pho']);
+    expect(result.canonicalPlaceId).toBeNull();
+  });
+
+  it('is null for a multi-place import, even though every place resolved', async () => {
+    const alice = harness.clientFor(ALICE);
+    const watArun: ImportablePlace = {
+      name: 'Wat Arun',
+      description: 'Temple of Dawn.',
+      category: 'spot',
+      lat: WAT_PHO.lat! + 0.02,
+      lng: WAT_PHO.lng! + 0.02,
+    };
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO, watArun], { destination: 'Thailand' });
+
+    expect(result.added).toHaveLength(2);
+    expect(await harness.rows('places')).toHaveLength(2);
+    // There is no single place left for a "View place" link to point at.
+    expect(result.canonicalPlaceId).toBeNull();
+  });
+
+  it('is null when the registry link failed (mocked)', async () => {
+    vi.mocked(registry.resolvePlaceForTraveler).mockRejectedValueOnce(new Error('boom'));
+    const alice = harness.clientFor(ALICE);
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
+
+    expect(result.added).toEqual(['Wat Pho']);
+    expect(result.canonicalPlaceId).toBeNull();
+  });
+});
+
 describe('failure isolation', () => {
   it('a registry failure does not fail the place save, the import, or trip creation', async () => {
     vi.mocked(registry.resolvePlaceForTraveler).mockRejectedValueOnce(new Error('boom'));

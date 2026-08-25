@@ -182,21 +182,28 @@ export default function SavedPlacesPage() {
             <ul className="mt-3 space-y-3">
               {places.map((place) => (
                 <li key={place.savedId} className="night-card rounded-card p-4">
-                  <h2 className="font-display text-lg text-white">{place.name}</h2>
-                  {place.localName && (
-                    <p className="mt-0.5 text-sm text-white/55">{place.localName}</p>
-                  )}
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-white/65">
-                    <MapPin size={13} aria-hidden="true" className="flex-none" />
-                    <span>
-                      {place.city ? `${place.city}, ${place.countryName}` : place.countryName}
-                      {' · '}
-                      {CATEGORY_LABEL[place.category][lang]}
-                    </span>
-                  </p>
-                  {place.address && (
-                    <p className="mt-1 text-xs leading-relaxed text-white/45">{place.address}</p>
-                  )}
+                  {/* The whole card is the route to /place/[id] — placeId is
+                      already the canonical registry id (lib/places/saved.ts),
+                      so no lookup is needed to link it. The button stays a
+                      sibling, never nested inside the anchor, so removing a
+                      save is still one tap and not also a navigation. */}
+                  <Link href={`/place/${place.placeId}`} className="-m-1 block rounded-card p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light">
+                    <h2 className="font-display text-lg text-white">{place.name}</h2>
+                    {place.localName && (
+                      <p className="mt-0.5 text-sm text-white/55">{place.localName}</p>
+                    )}
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-white/65">
+                      <MapPin size={13} aria-hidden="true" className="flex-none" />
+                      <span>
+                        {place.city ? `${place.city}, ${place.countryName}` : place.countryName}
+                        {' · '}
+                        {CATEGORY_LABEL[place.category][lang]}
+                      </span>
+                    </p>
+                    {place.address && (
+                      <p className="mt-1 text-xs leading-relaxed text-white/45">{place.address}</p>
+                    )}
+                  </Link>
                   <SavedPlaceButton
                     placeId={place.placeId}
                     placeName={place.name}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { scheduleWarnings, type CuratedPlace, type ItineraryPlace, type RouteLeg } from '@/lib/travel/itinerary';
+import {
+  placeDetailHref,
+  scheduleWarnings,
+  type CuratedPlace,
+  type ItineraryPlace,
+  type RouteLeg,
+} from '@/lib/travel/itinerary';
 import { buildSmartDraft, type DraftPlace } from '@/lib/travel/smartDraft';
 
 function curated(overrides: Partial<CuratedPlace> = {}): CuratedPlace {
@@ -7,6 +13,7 @@ function curated(overrides: Partial<CuratedPlace> = {}): CuratedPlace {
     id: '10000000-0000-4000-8000-000000000001',
     name: 'Museum', category: 'spot', lat: 23.1, lng: 113.2,
     description: '', photo_url: null, source: 'editorial', created_by: null,
+    canonical_place_id: null,
     ...overrides,
   };
 }
@@ -14,6 +21,17 @@ function curated(overrides: Partial<CuratedPlace> = {}): CuratedPlace {
 function stop(id: string, start: string, end: string, place = curated()): ItineraryPlace {
   return { id, place_id: place.id, category: place.category, time_start: start, time_end: end, notes: null, sort_order: 0, place };
 }
+
+describe('placeDetailHref', () => {
+  it('links to the canonical place when one is attached', () => {
+    const place = curated({ canonical_place_id: '30000000-0000-4000-8000-000000000001' });
+    expect(placeDetailHref(place)).toBe('/place/30000000-0000-4000-8000-000000000001');
+  });
+
+  it('is null when the catalogue row never resolved to a canonical place', () => {
+    expect(placeDetailHref(curated({ canonical_place_id: null }))).toBeNull();
+  });
+});
 
 describe('scheduleWarnings', () => {
   it('detects overlaps and insufficient routed transfer time', () => {
