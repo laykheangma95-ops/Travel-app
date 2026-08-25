@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { Heart, MapPin } from 'lucide-react';
 import { SignInLink } from '@/components/ui/SignInLink';
 import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
+import { AddToTripButton } from '@/components/travel/AddToTripButton';
 import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
@@ -204,22 +205,32 @@ export default function SavedPlacesPage() {
                       <p className="mt-1 text-xs leading-relaxed text-white/45">{place.address}</p>
                     )}
                   </Link>
-                  <SavedPlaceButton
-                    placeId={place.placeId}
-                    placeName={place.name}
-                    initialSaved
-                    returnTo="/you/saved"
-                    // Removing from this screen takes the row out of the list —
-                    // leaving a card that says "Save" in a list of saved places
-                    // would be a screen contradicting itself.
-                    onChange={(stillSaved) => {
-                      if (!stillSaved) {
-                        setPlaces((current) =>
-                          (current ?? []).filter((row) => row.savedId !== place.savedId)
-                        );
-                      }
-                    }}
-                  />
+                  <div className="mt-2 flex flex-wrap items-start gap-3">
+                    <SavedPlaceButton
+                      placeId={place.placeId}
+                      placeName={place.name}
+                      initialSaved
+                      returnTo="/you/saved"
+                      // Removing from this screen takes the row out of the list —
+                      // leaving a card that says "Save" in a list of saved places
+                      // would be a screen contradicting itself.
+                      onChange={(stillSaved) => {
+                        if (!stillSaved) {
+                          setPlaces((current) =>
+                            (current ?? []).filter((row) => row.savedId !== place.savedId)
+                          );
+                        }
+                      }}
+                    />
+                    {/* Same shared component and backend as /place/[id] — the
+                        library's whole reason to exist is to lead somewhere,
+                        and until now it led nowhere but back to itself. */}
+                    <AddToTripButton
+                      placeId={place.placeId}
+                      placeName={place.name}
+                      returnTo="/you/saved"
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

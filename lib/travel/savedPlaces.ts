@@ -216,7 +216,7 @@ export async function savePlaceForTraveler(
 }
 
 /** The trip the traveler picked. RLS hides anyone else's, so this 404s. */
-async function chosenTrip(supabase: SupabaseClient, tripId: string): Promise<ResolvedTrip> {
+export async function chosenTrip(supabase: SupabaseClient, tripId: string): Promise<ResolvedTrip> {
   const { data, error } = await supabase
     .from('trip_plans')
     .select('id,title')
@@ -233,7 +233,7 @@ async function chosenTrip(supabase: SupabaseClient, tripId: string): Promise<Res
  * Anywhere, not just Ideas: a traveler who has already scheduled this place on
  * day two does not want it reappearing in Ideas as though it were new.
  */
-async function isAlreadyOnTrip(
+export async function isAlreadyOnTrip(
   supabase: SupabaseClient,
   tripId: string,
   placeId: string
@@ -250,11 +250,20 @@ async function isAlreadyOnTrip(
   return (count ?? 0) > 0;
 }
 
-type ResolvedTrip =
+export type ResolvedTrip =
   | { status: 'single'; id: string; title: string; created: boolean }
   | { status: 'ambiguous'; candidates: { id: string; title: string }[] };
 
-async function resolveTrip(
+/**
+ * Resolve which trip a place for `destination` belongs on: the traveler's one
+ * open trip for that country, a pick from several, or a freshly created one.
+ *
+ * Exported so other save flows (the library's "add to trip" — see
+ * lib/places/addToTrip.ts) reuse this exact interpretation of "which trip?"
+ * rather than growing a second one. `savePlaceForTraveler` above is this
+ * function's own first caller and is unchanged.
+ */
+export async function resolveTrip(
   supabase: SupabaseClient,
   userId: string,
   destination: string

@@ -28,6 +28,7 @@ import Link from 'next/link';
 import { MapPin, ShieldQuestion } from 'lucide-react';
 import { SignInLink } from '@/components/ui/SignInLink';
 import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
+import { AddToTripButton } from '@/components/travel/AddToTripButton';
 import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
@@ -220,7 +221,7 @@ export default function PlaceDetailPage() {
                   : t('place.saveCount.many').replace('{n}', String(state.saveCount))}
             </p>
 
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-start gap-3">
               <SavedPlaceButton
                 placeId={state.place.id}
                 placeName={state.place.name}
@@ -237,6 +238,15 @@ export default function PlaceDetailPage() {
                       : current
                   )
                 }
+              />
+              {/* A separate action from the heart above, on purpose (Phase 10
+                  brief): saving to the library and putting a place on a trip
+                  are two different intents, and this button never writes to
+                  saved_places. */}
+              <AddToTripButton
+                placeId={state.place.id}
+                placeName={state.place.name}
+                returnTo={returnTo}
               />
             </div>
           </article>
