@@ -1149,12 +1149,33 @@ not wired to the registry by this phase — identified while auditing every
 insert site, deliberately left alone as a separate, unapproved scope
 expansion.
 
-**Known limitation, inherited from Part 9 and not addressed here:** cross-user
-proximity matching still only sees *published* places. Two different
-travelers each importing the same real-world place, neither of which is yet
-`domner_public`, still get two unlinked canonical rows until one is
-published — Phase 7 makes the registry reachable, it does not change who can
-see what in it.
+**Known limitation, inherited from Part 9 and not addressed here — corrected
+after the Phase 7 review found the original wording wrong.** Two different
+travelers each importing the same unpublished real-world place do **not**
+produce two canonical rows. What actually happens, verified against the real
+migrations rather than assumed:
+
+1. Alice imports the place. One `places` row is created, `unverified`, owned
+   by her. Her `destination_places` row gets `canonical_place_id` set to it.
+2. Bob imports the same real place while Alice's row is still `unverified`.
+   `places_identity_idx` — `UNIQUE (name_normalized, substr(geohash, 1, 7))`,
+   with no owner column in it at all — refuses a second row for the same name
+   and cell, exactly as it is designed to.
+3. The recovery path for that refusal is a proximity re-lookup on Bob's own
+   session client. `places_read_public_or_own` hides Alice's still-unverified
+   row from Bob, so his lookup finds nothing.
+4. Bob's `destination_places` row is written successfully — his import still
+   reports the place as added, not failed — but it stays unlinked:
+   `canonical_place_id` is `NULL`.
+
+So the registry never holds a duplicate; it holds one row, plus one
+traveler the row correctly refuses to reveal to. **The link is not backfilled
+retroactively when Alice's place is later published** — Bob's row stays
+`NULL` unless he imports that place again after publication, at which point
+the ordinary published-place path (proven in
+`tests/places.registry.rls.test.ts`) resolves it. Phase 7 makes the registry
+reachable; it does not change who can see what in it, and it does not add
+any process that revisits an old unlinked row once visibility changes.
 
 **Staging validation — still BLOCKED / OUTSTANDING, unchanged in kind, one
 item added.** No session doing any phase of this work has held staging

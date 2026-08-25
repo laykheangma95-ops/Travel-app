@@ -148,6 +148,37 @@ describe('deduplication through the real save path', () => {
     expect(destRows.map((row) => row.canonical_place_id)).toEqual([placeId, placeId]);
   });
 
+  it('the same real place imported by a second traveler BEFORE publication: one canonical row, one unlinked import — not two rows', async () => {
+    // The actual, verified behavior for the common case (neither traveler has
+    // published anything): places_identity_idx (no owner column at all) is
+    // what stops a second canonical row from ever being created here — RLS is
+    // what then stops Bob's own recovery lookup from finding Alice's row. The
+    // combination is not "two unlinked duplicates"; it is one canonical row
+    // plus one traveler whose save correctly stays unlinked. No mocking here:
+    // this goes through the real resolvePlaceForTraveler, twice.
+    const alice = harness.clientFor(ALICE);
+    const bob = harness.clientFor(BOB);
+
+    const aliceResult = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
+    const bobResult = await importPlacesToTrip(bob, BOB, [WAT_PHO], { destination: 'Thailand' });
+
+    const places = await harness.rows('places');
+    expect(places).toHaveLength(1);
+    expect(places[0].verification_status).toBe('unverified');
+
+    const destRows = await harness.rows('destination_places');
+    const aliceRow = destRows.find((row) => row.created_by === ALICE);
+    const bobRow = destRows.find((row) => row.created_by === BOB);
+
+    expect(aliceRow?.canonical_place_id).toBe(places[0].id);
+    expect(bobRow?.canonical_place_id).toBeNull();
+
+    // Bob's save still succeeds — a registry miss is never a save failure.
+    expect(aliceResult.added).toEqual(['Wat Pho']);
+    expect(bobResult.added).toEqual(['Wat Pho']);
+    expect(bobResult.failed).toEqual([]);
+  });
+
   it('does not merge two different places that happen to share a normalized name', async () => {
     const alice = harness.clientFor(ALICE);
 
