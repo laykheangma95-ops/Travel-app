@@ -78,10 +78,14 @@ beforeEach(async () => {
   await harness.createUser(ALICE);
   await harness.createUser(BOB);
   __registerConnectorForTest(noopConnector);
+  // Geocoding off, so nothing in this file makes a real network call to
+  // OpenStreetMap — matches tests/extractRoute.test.ts's own setup.
+  vi.stubEnv('NOMINATIM_BASE_URL', '');
 });
 
 afterEach(() => {
   __resetConnectorsForTest();
+  vi.unstubAllEnvs();
 });
 
 describe('processing a queued import', () => {

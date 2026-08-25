@@ -13,7 +13,7 @@
 // with whatever a connector hands back.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createImportFromUrl } from '@/lib/travel/importIntake';
 import { processImport } from '@/lib/travel/importOrchestrator';
 import {
@@ -56,10 +56,14 @@ beforeEach(async () => {
   await harness.createUser(ALICE);
   await harness.createUser(BOB);
   extractCalls = 0;
+  // Geocoding off, so nothing in this file makes a real network call to
+  // OpenStreetMap — matches tests/extractRoute.test.ts's own setup.
+  vi.stubEnv('NOMINATIM_BASE_URL', '');
 });
 
 afterEach(() => {
   __resetConnectorsForTest();
+  vi.unstubAllEnvs();
 });
 
 afterAll(async () => {

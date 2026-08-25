@@ -70,6 +70,9 @@ beforeEach(async () => {
   await harness.createUser(BOB);
   connectorRuns = 0;
   __registerConnectorForTest(counting);
+  // Geocoding off, so nothing in this file makes a real network call to
+  // OpenStreetMap — matches tests/extractRoute.test.ts's own setup.
+  vi.stubEnv('NOMINATIM_BASE_URL', '');
 });
 
 afterEach(() => {

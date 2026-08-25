@@ -20,7 +20,7 @@
 // source 'maps-link'), so this is also the two paths agreeing again.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createImportFromUrl } from '@/lib/travel/importIntake';
 import { processImport } from '@/lib/travel/importOrchestrator';
 import {
@@ -71,10 +71,21 @@ beforeEach(async () => {
   await harness.reset();
   await harness.createUser(ALICE);
   __registerConnectorForTest(mapsConnector);
+  // Geocoding off, so no test in this file depends on OpenStreetMap being
+  // reachable. Without this, "never spreads one coordinate across many names"
+  // passed locally (no network) and failed in CI (real network): the real
+  // Nominatim instance actually resolves "Wat Pho" to a real-world coordinate
+  // close enough to this file's own fixture to look identical, which
+  // `addCoordinates` — the existing, correct, unrelated-to-this-fix geocoding
+  // step — then fills in. That is desired behaviour for a candidate with no
+  // pin; asserting `lat` stays `null` forever was the test's mistake, not the
+  // orchestrator's.
+  vi.stubEnv('NOMINATIM_BASE_URL', '');
 });
 
 afterEach(() => {
   __resetConnectorsForTest();
+  vi.unstubAllEnvs();
 });
 
 afterAll(async () => {
