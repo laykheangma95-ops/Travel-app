@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from 'vitest';
-import { decidePollOutcome, jobFailedReason } from '@/lib/travel/importPollDecision';
+import { decidePollOutcome, isProcessingQuotaError, jobFailedReason } from '@/lib/travel/importPollDecision';
 
 describe('a settled job', () => {
   it('completed always means review, timeout or not', () => {
@@ -80,5 +80,41 @@ describe('jobFailedReason — which copy a failed job gets', () => {
     // null covers a failed job the older synchronous pipeline's plain
     // failImport() wrote, which predates error_code and never sets it.
     expect(jobFailedReason(null)).toBe('generic');
+  });
+});
+
+describe('isProcessingQuotaError — telling the daily cap apart from the burst limiter', () => {
+  it('recognizes the shape assertWithinProcessingQuota actually throws', () => {
+    // lib/travel/importJobs.ts: new ApiError('RATE_LIMITED', '...', { limit: quota })
+    // becomes this body via lib/http.ts's fail(code, message, { details: error.details }).
+    const body = {
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'You have imported a lot of places today. Please try again tomorrow.',
+        details: { limit: 40 },
+      },
+    };
+    expect(isProcessingQuotaError(body)).toBe(true);
+  });
+
+  it('does not mistake the route wrapper\'s own burst limiter for the daily cap', () => {
+    // lib/http.ts's route() pre-check: fail('RATE_LIMITED', '...', { requestId, headers })
+    // — same code, same status, but no `details` at all.
+    const body = {
+      error: { code: 'RATE_LIMITED', message: 'Too many requests. Please wait a moment and try again.' },
+    };
+    expect(isProcessingQuotaError(body)).toBe(false);
+  });
+
+  it('is false for a body with no error at all, or one that failed to parse', () => {
+    expect(isProcessingQuotaError(null)).toBe(false);
+    expect(isProcessingQuotaError(undefined)).toBe(false);
+    expect(isProcessingQuotaError({})).toBe(false);
+    expect(isProcessingQuotaError({ error: { code: 'NOT_FOUND', message: 'gone' } })).toBe(false);
+  });
+
+  it('is false for a details object that exists but carries no limit field', () => {
+    const body = { error: { code: 'RATE_LIMITED', message: '...', details: { retryAfterSeconds: 5 } } };
+    expect(isProcessingQuotaError(body)).toBe(false);
   });
 });

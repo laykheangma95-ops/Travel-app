@@ -33,7 +33,7 @@ import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 import { classifyLink, firstUrlIn, PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import { AUTO_SELECT_CONFIDENCE, type PlaceCandidate } from '@/lib/travel/placeExtraction';
-import { decidePollOutcome, jobFailedReason } from '@/lib/travel/importPollDecision';
+import { decidePollOutcome, isProcessingQuotaError, jobFailedReason } from '@/lib/travel/importPollDecision';
 import { COPY, type Translate } from './placeImportCopy';
 import {
   DoneStage,
@@ -56,6 +56,7 @@ type Stage =
   | 'working'
   | 'pollTimeout'
   | 'jobFailed'
+  | 'quotaReached'
   | 'needsConfirmation'
   | 'review'
   | 'done';
@@ -244,10 +245,21 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
               setStage('signIn');
               return;
             }
-            // Any other non-OK response (rate limit, quota, a transient
-            // failure) is not fatal here — the poll loop below reads the
-            // job's real status regardless of whether this request itself
-            // succeeded, and reports the truth either way.
+            if (!response.ok && live.current && pollToken.current === token) {
+              const payload = await response.json().catch(() => null);
+              // Without this check, an over-quota traveler's job stays
+              // 'queued' forever and the poll loop below would wait the full
+              // 70s just to report the generic "taking longer than usual"
+              // message over a rejection the server already explained.
+              if (isProcessingQuotaError(payload)) {
+                setStage('quotaReached');
+                return;
+              }
+              // Any other non-OK response (the burst limiter, a transient
+              // failure) is not fatal here — the poll loop below reads the
+              // job's real status regardless of whether this request itself
+              // succeeded, and reports the truth either way.
+            }
           } catch {
             // Same reasoning: network failure calling process() does not mean
             // the job failed. Poll and find out.
@@ -402,6 +414,21 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
           }}
         >
           {globalT('intake.checkAgain')}
+        </button>
+      </div>
+    );
+  }
+
+  if (stage === 'quotaReached') {
+    return (
+      <div className="night-card rounded-card p-5 text-center" role="alert">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white/[0.06] text-white/60">
+          <Clock3 size={20} aria-hidden="true" />
+        </span>
+        <h2 className="mt-3 font-display text-lg text-white">{globalT('intake.quotaReached')}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-white/60">{globalT('intake.quotaReachedHint')}</p>
+        <button type="button" className="v3-save mt-4" onClick={resetToIdle}>
+          {t('tryAgain')}
         </button>
       </div>
     );
