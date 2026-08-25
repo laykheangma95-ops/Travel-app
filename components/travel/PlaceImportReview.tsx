@@ -34,6 +34,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import type { PlaceCandidate } from '@/lib/travel/placeExtraction';
+import { viewPlaceHref, type ImportOutcome } from '@/lib/travel/importOutcome';
 import type { CopyKey, Translate } from './placeImportCopy';
 
 /** A candidate plus the state the review list keeps about it. */
@@ -71,15 +72,13 @@ export interface PlaceReviewResult {
   capabilities: { model: boolean; geocoding: boolean };
 }
 
-/** What POST /api/travel/places/import always returns, whichever flow called it. */
-export interface ImportOutcome {
-  tripId: string;
-  tripTitle: string;
-  createdTrip: boolean;
-  added: string[];
-  skipped: string[];
-  failed: string[];
-}
+// ImportOutcome and viewPlaceHref live in lib/travel/importOutcome.ts — a
+// plain .ts module, not here — so a regression test can import them without
+// this file's JSX ever needing to parse (see that module's own header).
+// Re-exported so existing imports of ImportOutcome from this file (
+// ImportPlacesView.tsx, SocialLinkIntake.tsx) need no change.
+export { viewPlaceHref };
+export type { ImportOutcome };
 
 /** The country the ticked rows agree on, when they do. */
 export function suggestedFrom(rows: ReviewRow[]): string | null {
@@ -536,6 +535,14 @@ export function DoneStage({
       )}
 
       <div className="mt-6 space-y-2">
+        {viewPlaceHref(outcome) && (
+          <Link
+            href={viewPlaceHref(outcome)!}
+            className="flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors duration-200 ease-smooth hover:border-gold-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            {t('viewPlace')}
+          </Link>
+        )}
         <Link
           href={`/trips/${outcome.tripId}/itinerary`}
           className="liquid-glass-accent liquid-press flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"

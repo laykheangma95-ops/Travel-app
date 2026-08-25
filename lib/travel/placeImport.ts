@@ -69,6 +69,16 @@ export interface ImportResult {
   skipped: string[];
   /** Names that could not be written. Reported, never swallowed. */
   failed: string[];
+  /**
+   * The canonical registry id (migration 013) for the one place this import
+   * added, when there was exactly one and it resolved. Null for a multi-place
+   * import — there is no single place left to point a "View place" link at —
+   * and null whenever the place didn't resolve (no coordinates, a registry
+   * miss, a race lost to another traveler). Additive, nullable, and nothing
+   * but the id: no submitter, no registry ownership, matching the same shape
+   * GET /api/travel/places/:id already hands back.
+   */
+  canonicalPlaceId: string | null;
 }
 
 /**
@@ -117,6 +127,9 @@ export async function importPlacesToTrip(
   const added: string[] = [];
   const skipped: string[] = [];
   const failed: string[] = [];
+  // Parallel to `added`, one entry per place actually written — never per
+  // input place, so a skip never shifts this out of alignment with `added`.
+  const addedCanonicalIds: (string | null)[] = [];
 
   for (const place of places) {
     const name = place.name.trim().slice(0, PLACE_NAME_MAX);
@@ -128,7 +141,10 @@ export async function importPlacesToTrip(
     }
 
     try {
-      const placeId = await insertPlace(supabase, userId, destination, { ...place, name });
+      const { placeId, canonicalPlaceId } = await insertPlace(supabase, userId, destination, {
+        ...place,
+        name,
+      });
       await addIdeaToTrip(supabase, trip.id, placeId);
 
       // Provenance and the accepted-candidate mark. Both are ledger writes and
@@ -148,6 +164,7 @@ export async function importPlacesToTrip(
       }
       existingNames.add(fold(name));
       added.push(name);
+      addedCanonicalIds.push(canonicalPlaceId);
     } catch {
       // One bad row must not cost the traveler the other eight.
       failed.push(name);
@@ -161,6 +178,10 @@ export async function importPlacesToTrip(
     added,
     skipped,
     failed,
+    // Only meaningful for "I imported one place" — the common single-link
+    // paste. A multi-place import has no single place a "View place" link
+    // could point at, so this stays null rather than picking one arbitrarily.
+    canonicalPlaceId: added.length === 1 ? addedCanonicalIds[0] : null,
   };
 }
 
@@ -278,7 +299,7 @@ async function insertPlace(
   userId: string,
   destination: string,
   place: ImportablePlace
-): Promise<string> {
+): Promise<{ placeId: string; canonicalPlaceId: string | null }> {
   const { data, error } = await supabase
     .from('destination_places')
     .insert({
@@ -305,15 +326,16 @@ async function insertPlace(
   // never a location, and (0, 0) sent into a 150m proximity search would
   // silently merge every coordinate-less import from every traveler into one
   // row at null island. A place with no real coordinates is left unlinked.
-  if (place.lat !== null && place.lng !== null) {
-    await linkCanonicalPlace(supabase, userId, placeId, destination, {
-      ...place,
-      lat: place.lat,
-      lng: place.lng,
-    });
-  }
+  const canonicalPlaceId =
+    place.lat !== null && place.lng !== null
+      ? await linkCanonicalPlace(supabase, userId, placeId, destination, {
+          ...place,
+          lat: place.lat,
+          lng: place.lng,
+        })
+      : null;
 
-  return placeId;
+  return { placeId, canonicalPlaceId };
 }
 
 /**
@@ -339,7 +361,7 @@ async function linkCanonicalPlace(
   destinationPlaceId: string,
   destination: string,
   place: ImportablePlace & { lat: number; lng: number }
-): Promise<void> {
+): Promise<string | null> {
   try {
     const input: CanonicalPlaceInput = {
       name: place.name,
@@ -350,12 +372,19 @@ async function linkCanonicalPlace(
     };
     const resolution = await resolvePlaceForTraveler(supabase, userId, input);
     if (resolution) {
-      await attachCanonicalPlace(supabase, destinationPlaceId, resolution.place.id);
+      // The returned id must mean "this row is actually linked", not "a
+      // resolution merely happened" — a failed write here must not make
+      // ImportResult.canonicalPlaceId claim a link destination_places itself
+      // does not have.
+      const attached = await attachCanonicalPlace(supabase, destinationPlaceId, resolution.place.id);
+      return attached ? resolution.place.id : null;
     }
+    return null;
   } catch (cause) {
     log.warn('place_import.registry_link_failed', {
       reason: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
     });
+    return null;
   }
 }
 

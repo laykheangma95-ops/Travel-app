@@ -44,6 +44,7 @@ export const COPY = {
   edit: { en: 'Edit', km: 'កែ' },
   done: { en: 'Done', km: 'រួចរាល់' },
   saved: { en: 'Saved to your trip', km: 'បានរក្សាទុកទៅដំណើររបស់អ្នក' },
+  viewPlace: { en: 'View place', km: 'មើលទីតាំង' },
   openTrip: { en: 'Open the trip', km: 'បើកដំណើរ' },
   openItinerary: { en: 'Open the itinerary', km: 'បើកកម្មវិធីដំណើរ' },
   importAnother: { en: 'Import another', km: 'នាំចូលមួយទៀត' },

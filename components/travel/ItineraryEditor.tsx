@@ -38,6 +38,7 @@ import {
   Clock,
   CarFront,
   Copy,
+  ExternalLink,
   Link2,
   MapPin,
   Pencil,
@@ -52,6 +53,7 @@ import {
   CATEGORY_LABEL,
   PLACE_DESCRIPTION_MAX,
   PLACE_NAME_MAX,
+  placeDetailHref,
   scheduleWarnings,
   type CuratedPlace,
   type ItineraryCategory,
@@ -1276,6 +1278,20 @@ function EditPlaceSheet({
             <X size={18} aria-hidden="true" />
           </button>
         </div>
+
+        {/* Subtle, and only there when the catalogue row actually resolved to
+            a canonical place (migration 013) — most manually-added and many
+            imported places never do, and this must render nothing rather than
+            a broken link when that's the case. */}
+        {placeDetailHref(item.place) && (
+          <Link
+            href={placeDetailHref(item.place)!}
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-gold-light transition-colors hover:text-gold-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+          >
+            {lang === 'km' ? 'មើលទីតាំង' : 'View place'}
+            <ExternalLink size={12} aria-hidden="true" />
+          </Link>
+        )}
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div>
