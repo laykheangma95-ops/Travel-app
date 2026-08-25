@@ -17,14 +17,18 @@
 // is what lets a queued job's GET /api/imports/:id response — a different
 // shape, built for a different request — feed the exact same component.
 //
-// ImportPlacesView.tsx keeps PasteStage, ParsingStage and DoneStage: those are
-// specific to the synchronous flow's own paste box and "done" screen, and the
-// queued-link flow has its own equivalents for the stages before and after
-// review (SocialLinkIntake owns paste/processing, this file owns review only).
+// DoneStage moves here too, alongside ImportOutcome (the shape
+// POST /api/travel/places/import always returns, regardless of which flow
+// called it) — both pipelines end on the identical "saved" screen, so it is
+// exactly as shared as TripSheet. ImportPlacesView.tsx keeps only PasteStage
+// and ParsingStage, which really are specific to its own paste box and
+// "reading…" state; SocialLinkIntake owns the queued flow's equivalents for
+// those two.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Loader2, MapPin, Pencil, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Check, Loader2, MapPin, Pencil, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/ui/Reveal';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
@@ -65,6 +69,16 @@ export interface PlaceReviewResult {
     canonicalUrl: string | null;
   } | null;
   capabilities: { model: boolean; geocoding: boolean };
+}
+
+/** What POST /api/travel/places/import always returns, whichever flow called it. */
+export interface ImportOutcome {
+  tripId: string;
+  tripTitle: string;
+  createdTrip: boolean;
+  added: string[];
+  skipped: string[];
+  failed: string[];
 }
 
 /** The country the ticked rows agree on, when they do. */
@@ -481,6 +495,72 @@ export function TripSheet({
         )}
       </section>
     </div>
+  );
+}
+
+// ─── The "saved" screen ──────────────────────────────────────────────────────
+
+export function DoneStage({
+  lang,
+  t,
+  outcome,
+  onAgain,
+}: {
+  lang: 'en' | 'km';
+  t: Translate;
+  outcome: ImportOutcome;
+  onAgain: () => void;
+}) {
+  return (
+    <Reveal className="night-card mt-6 p-6 text-center">
+      <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gold-light/12 text-gold-light">
+        <Check size={24} aria-hidden="true" />
+      </span>
+
+      <h2 className="mt-4 font-display text-2xl text-white">
+        {outcome.added.length} {t('saved')}
+      </h2>
+      <p className="mt-1 text-sm text-white/60">{outcome.tripTitle}</p>
+
+      {/* Skipped and failed are stated, not hidden. A traveler who ticked nine
+          and sees "7 saved" needs to know the other two were already there. */}
+      {outcome.skipped.length > 0 && (
+        <p className="mt-3 text-xs text-white/45">
+          {outcome.skipped.length} {t('alreadyThere')}
+        </p>
+      )}
+      {outcome.failed.length > 0 && (
+        <p role="alert" className="mt-1 text-xs text-amber-200">
+          {outcome.failed.length} {t('couldNotSave')}
+        </p>
+      )}
+
+      <div className="mt-6 space-y-2">
+        <Link
+          href={`/trips/${outcome.tripId}/itinerary`}
+          className="liquid-glass-accent liquid-press flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"
+        >
+          {t('openItinerary')}
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+        <Link
+          href={`/trips/${outcome.tripId}`}
+          className="flex min-h-[2.75rem] w-full items-center justify-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors duration-200 ease-smooth hover:border-gold-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+        >
+          {t('openTrip')}
+        </Link>
+        <button
+          type="button"
+          onClick={onAgain}
+          className="flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-btn px-5 text-sm font-semibold text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+        >
+          <Plus size={15} aria-hidden="true" />
+          {t('importAnother')}
+        </button>
+      </div>
+
+      <p className="sr-only">{lang === 'km' ? 'រួចរាល់' : 'Done'}</p>
+    </Reveal>
   );
 }
 
