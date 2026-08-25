@@ -28,6 +28,7 @@ import {
   completeImport,
   completeImportIfProcessing,
   failImport,
+  failImportWithReason,
   findReusableImport,
   loadImportForReview,
   loadImportProvenance,
@@ -423,6 +424,53 @@ describe('loadImportForReview — the queued-job review screen\'s only read', ()
     const snapshot = await loadImportForReview(alice, ALICE, importId!);
     expect(snapshot?.status).toBe('failed');
     expect(snapshot?.candidates).toEqual([]);
+    // failImport() is the older, reason-less writer (the synchronous
+    // pipeline's own path) — nothing to surface, and nothing should be
+    // invented in its place.
+    expect(snapshot?.errorCode).toBeNull();
+    expect(snapshot?.errorMessage).toBeNull();
+  });
+
+  it('surfaces error_code and error_message for a job the connector layer failed with a reason', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'xiaohongshu' });
+    await failImportWithReason(
+      alice,
+      importId!,
+      'no_connector',
+      'Domner cannot read this kind of link automatically yet.'
+    );
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('failed');
+    expect(snapshot?.errorCode).toBe('no_connector');
+    expect(snapshot?.errorMessage).toBe('Domner cannot read this kind of link automatically yet.');
+  });
+
+  it('never surfaces error_code or error_message for a job that has not failed', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, importId, { outcome: 'ok', candidates: [WAT_PHO], usedModel: true });
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('completed');
+    expect(snapshot?.errorCode).toBeNull();
+    expect(snapshot?.errorMessage).toBeNull();
+  });
+
+  it('treats a stored error_code outside the closed vocabulary as absent, not as an unknown value handed to the client', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    // What a row from a future release, or a direct PostgREST write, could
+    // leave behind — the same caution normaliseStatus already applies.
+    await alice
+      .from('place_imports')
+      .update({ status: 'failed', error_code: 'a_future_reason_this_build_does_not_know' })
+      .eq('id', importId!);
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('failed');
+    expect(snapshot?.errorCode).toBeNull();
   });
 
   it('never reads another traveler\'s job — a foreign id is null, not another traveler\'s data', async () => {

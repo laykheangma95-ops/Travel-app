@@ -1,9 +1,11 @@
 # Social Save + AI Place Intelligence — architecture audit & implementation plan
 
-**Status: the import ledger and the canonical registry are delivered. The
-remaining phases are proposals awaiting a decision.**
-Parts 1–4 are the audit; Part 5 carries the phase plan and Part 8 records what
-Phase 1 actually shipped.
+**Status: the import ledger and the canonical registry are delivered, and the
+async import pipeline is production-complete as of Phase 6. This document's
+own Phase 3 and Phase 5 remain proposals awaiting a decision.**
+Parts 1–4 are the audit; Part 5 carries the phase plan (see its numbering note
+— Phase 6 does not continue it) and Part 8 records what Phase 1 actually
+shipped. Part 12 records Phase 6.
 
 Required by CLAUDE.md §6 ("before coding, always report first"). It answers
 three questions: what is actually in this repository, what of it can be reused,
@@ -394,6 +396,25 @@ lib/travel/aiUsage.ts         metering + quota
 ## Part 5 — Phased implementation plan
 
 Each phase is independently shippable, additive, and reversible.
+
+> **Numbering note, added in Phase 6.** The Phase 3/4/5 numbers below describe
+> a plan that was superseded in practice. What actually shipped through PRs
+> #73–#76 is a *different* sequence, documented in
+> [`docs/PLACE-IMPORT.md`](PLACE-IMPORT.md): its own Phase 3 is the social-link
+> intake (`/api/imports`), its Phase 4 is the connector/orchestration layer,
+> and its Phase 5 is wiring `/import/link` to process+poll+review. Those are
+> not the same features this table calls Phase 3/4/5 — this table's Phase 4
+> (saved places) shipped too, but as *its own* "Phase 2" (see Part 10), and
+> this table's Phase 3 (trusted provider) and Phase 5 (OCR/RED/flywheel)
+> **have not started**. Two documents used the same numbers for different
+> work; this note exists so a future session does not have to rediscover that
+> the hard way.
+>
+> **The actually-current phase is Phase 6**, continuing the PLACE-IMPORT.md
+> track (production-completing the shipped async pipeline), not this table's
+> Phase 3 or Phase 5 — see *Part 12 — Phase 6* below. This table's own Phase 3
+> and Phase 5 remain real, scoped, future work — owner-approved cost/security
+> decisions away, not "next" by default.
 
 ### Phase 1 — Persistence + cost control ✅ **shipped — see Part 8**
 
@@ -993,3 +1014,50 @@ route returned. The `place_stats` enumeration test is built in **production
 migration order** — 014 re-applied against a populated `places` table — because
 the ordinary harness runs migrations against an empty database and would have
 reported that leak as blocked.
+
+
+---
+
+## Part 12 — Phase 6
+
+**Status: implemented, this document's Phase 3 and Phase 5 remain untouched.**
+
+Phase 6 does not continue this document's own Part 5 plan (see the numbering
+note at the top of that section). It continues the *other* shipped track —
+`docs/PLACE-IMPORT.md`'s intake → connector → UI-wiring sequence (PRs #73–#76)
+— and production-completes it, rather than expanding ingestion. Full detail,
+including the exact gaps found and fixed, lives in
+[`docs/PLACE-IMPORT.md`](PLACE-IMPORT.md); this entry exists so a reader
+starting from this document's own phase table lands on the right next step
+instead of Part 5's Phase 3 or Phase 5.
+
+**Owner decisions this was built under**, matching the pattern Parts 8–10
+record for earlier phases: continue the PLACE-IMPORT.md track, not this
+document's Phase 3 (trusted provider) or Phase 5 (OCR/RED/flywheel); schedule
+the stuck-job reaper with an external authenticated POST caller, not Vercel
+Cron; do not activate a paid Places provider; do not widen the SSRF allowlist
+for Xiaohongshu/RED; leave M1 (Part 10) exactly as documented; leave
+collections/ratings deferred.
+
+**What it does:**
+
+- `GET /api/imports/:id` now returns `error_code`/`error_message` for a
+  failed job (already written since Phase 4's `failImportWithReason`, never
+  previously read back), so the review screen can say *why* a link could not
+  be read instead of one sentence for every cause.
+- The client distinguishes the daily processing-quota rejection from the
+  route wrapper's own burst rate limit — both throw the same `RATE_LIMITED`
+  code, so the distinction is made on the response body's `details.limit`,
+  which only the quota path sets — and shows the specific message
+  immediately instead of decaying into a 70-second generic timeout.
+- The `pollTimeout` screen's "Check again" button now re-attempts
+  `process()` before polling, closing a dead end where a job that was never
+  claimed could not be un-stuck from that screen at all.
+- The stuck-job reaper's production requirement is now stated as a decision,
+  not an open question — see `docs/PLACE-IMPORT.md`, *Scheduling the
+  reaper*.
+
+**What it deliberately does not do:** add OCR/screenshot ingestion, add a
+Xiaohongshu/RED connector or widen the SSRF allowlist, activate a paid Places
+provider, touch M1, or add collections/ratings. All five remain exactly where
+Parts 5 and 10 of this document left them.

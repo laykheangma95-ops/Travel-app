@@ -389,8 +389,9 @@ flight-alert cron," as if that were a working precedent to point at. It
 is not — there is no flight-alert cron either. Nothing in this codebase has
 ever called a scheduled endpoint in production; `vercel.json` has never had a
 `crons` block. That comparison overstated what exists, and it is corrected
-here rather than repeated. See *Scheduling the reaper — not yet configured*
-below for what actually needs to happen before this is a real safety net.
+here rather than repeated. See *Scheduling the reaper — an external POST
+caller, not yet configured* below for what actually needs to happen before
+this is a real safety net.
 
 ### Environment variables
 
@@ -398,7 +399,7 @@ below for what actually needs to happen before this is a real safety net.
 |---|---|---|
 | `PLACE_IMPORT_REAP_TIMEOUT_MS` | `600000` (10 min) | How long a job may sit in `processing` before the reaper fails it. |
 
-### Scheduling the reaper — not yet configured
+### Scheduling the reaper — an external POST caller, not yet configured
 
 **Nothing calls `POST /api/imports/reap` on a schedule today.** The endpoint
 is built, its logic is tested (`tests/importReaper.test.ts` — idempotency and
@@ -421,40 +422,47 @@ imports will actually complete. The reaper is the safety net for the
 traveler who does not stay on the screen long enough to see the job finish,
 which is expected to be uncommon but not impossible.
 
-**Two ways to actually schedule it, neither applied to this repo:**
+**Owner decision (Phase 6): an external authenticated POST caller, not
+Vercel Cron.** Vercel Cron was considered and declined — it is not a
+drop-in fit for this endpoint (it sends `GET` with `Authorization: Bearer
+$CRON_SECRET`, not the `POST` + `x-domner-service-token` this route uses)
+and its Hobby-plan ceiling of one run per day would leave a stuck job
+un-reaped for up to 24 hours; only the Pro plan allows down-to-the-minute
+schedules, and Phase 6 does not take on a Vercel plan-tier dependency just
+for this. The chosen shape instead:
 
-1. **Vercel Cron** (`vercel.json`'s `crons` array) is *not* a drop-in fit for
-   this endpoint as it stands. Vercel Cron sends a `GET` request, and its
-   built-in auth is `Authorization: Bearer $CRON_SECRET` (a `CRON_SECRET`
-   Vercel env var it adds automatically) — this route only exports `POST` and
-   checks a custom `x-domner-service-token` header
-   (`lib/serverAuth.ts:verifyServiceToken`). Wiring this option up means: add
-   a `GET` handler here (or a `CRON_SECRET`-aware branch) mirroring what
-   `POST` does, then add a `vercel.json` entry such as
-   `{"path": "/api/imports/reap", "schedule": "*/10 * * * *"}`. It also has a
-   plan-tier ceiling worth knowing before choosing it: the Hobby plan runs
-   cron jobs at most once a day, which would leave a stuck job un-reaped for
-   up to 24 hours; the Pro plan allows down-to-the-minute schedules.
-2. **Any external scheduler that can send an authenticated `POST`** — a
-   GitHub Actions workflow on a `schedule:` trigger, a small always-on cron
-   host, `cron-job.org`, or equivalent — calling
-   `POST https://<domain>/api/imports/reap` with header
-   `x-domner-service-token: <DOMNER_SERVICE_TOKEN>`. This needs **no code
-   change here at all**, works with the endpoint exactly as it is today, and
-   is not tied to any Vercel plan tier. `PLACE_IMPORT_REAP_TIMEOUT_MS` is 10
-   minutes by default, so a call every 5–10 minutes is a reasonable interval.
+**The exact production configuration this requires:** any external
+scheduler capable of an authenticated `POST` on a timer — a GitHub Actions
+workflow on a `schedule:` trigger, a small always-on cron host,
+`cron-job.org`, or equivalent — calling
 
-**This is an owner decision, not a default this document picks for you** —
-it involves a real choice (a code change plus a Vercel plan-tier
-consideration, vs. an external service to stand up and hold a copy of
-`DOMNER_SERVICE_TOKEN`), which is exactly the kind of thing CLAUDE.md §6 asks
-to be flagged rather than guessed at. **Until one of these is actually
-configured and verified working, do not describe Phase 5's background
-processing as production-complete.** A brief way to verify it once
-configured: submit a link, kill the tab before the review screen appears (so
-the job is left `processing`), wait past the interval, then check that
-`place_imports` row reads `failed` with `error_code = 'stuck_timeout'` and
-that the same link can be submitted again.
+```
+POST https://<domain>/api/imports/reap
+x-domner-service-token: <DOMNER_SERVICE_TOKEN>
+```
+
+on an interval of roughly 5–10 minutes (`PLACE_IMPORT_REAP_TIMEOUT_MS` is 10
+minutes by default). This needs **no code change in this repository** and
+is not tied to any Vercel plan tier. It is, however, still **not
+configured** — this document states the requirement precisely so it is not
+mistaken for done; standing up the caller itself (which service, which
+account holds `DOMNER_SERVICE_TOKEN`) is an operator task outside this
+repo, for the owner to complete.
+
+*Vercel Cron remains available as a documented, deliberately-declined
+alternative* if the operator later moves to Vercel Pro for other reasons:
+add a `GET` handler here (or a `CRON_SECRET`-aware branch) mirroring what
+`POST` does, then a `vercel.json` entry such as
+`{"path": "/api/imports/reap", "schedule": "*/10 * * * *"}`.
+
+**Until the external caller above is actually configured and verified
+working, the async import pipeline's background completion is not
+production-complete**, whatever else in Phase 6 has shipped. A brief way to
+verify it once configured: submit a link, kill the tab before the review
+screen appears (so the job is left `processing`), wait past the interval,
+then check that the `place_imports` row reads `failed` with
+`error_code = 'stuck_timeout'` and that the same link can be submitted
+again.
 
 ### What Phase 4 deliberately did not do
 

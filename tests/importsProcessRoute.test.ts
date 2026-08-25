@@ -21,6 +21,7 @@ import { createHarness, type Harness } from './support/pgHarness';
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
 const TIKTOK = 'https://www.tiktok.com/@chef/video/7311122233344455566';
+const TIKTOK_2 = 'https://www.tiktok.com/@chef/video/7311122233344455577';
 
 let harness: Harness;
 let currentUser: string | null = ALICE;
@@ -99,6 +100,43 @@ describe('processing a queued import', () => {
     const body = await response.json();
     expect(body).toMatchObject({ status: 'completed', outcome: 'ok' });
     expect(body.candidateCount).toBeGreaterThan(0);
+  });
+});
+
+describe('the processing quota', () => {
+  it('rejects a second run over the daily cap with a details.limit the client can key on', async () => {
+    // Intake (assertWithinQuota) and processing (assertWithinProcessingQuota)
+    // share the same PLACE_IMPORT_DAILY_QUOTA env var and the same
+    // dailyImportQuota() reader, but count different things — rows created
+    // vs. runs performed (docs/PLACE-IMPORT.md, "The quota is counted at the
+    // point of spend"). Both jobs have to exist before the cap is lowered, or
+    // the second createImportFromUrl would be rejected by the intake count
+    // instead of exercising the processing count this test is about.
+    const alice = harness.clientFor(ALICE);
+    const first = await createImportFromUrl(alice, ALICE, TIKTOK);
+    const second = await createImportFromUrl(alice, ALICE, TIKTOK_2);
+    if (!first.ok || !second.ok) throw new Error('setup failed');
+
+    vi.stubEnv('PLACE_IMPORT_DAILY_QUOTA', '1');
+
+    const firstRun = await process(first.importId);
+    expect(firstRun.status).toBe(200);
+
+    const secondRun = await process(second.importId);
+    expect(secondRun.status).toBe(429);
+    const body = await secondRun.json();
+    // This is the exact shape components/travel/SocialLinkIntake.tsx's
+    // isProcessingQuotaError() (lib/travel/importPollDecision.ts) checks for
+    // — proving the client's assumption against the real server contract,
+    // not just a hand-written fixture.
+    expect(body.error.code).toBe('RATE_LIMITED');
+    expect(body.error.details.limit).toBe(1);
+
+    // Rejected before the claim — the second job is still there to retry
+    // tomorrow, not burned to 'failed'.
+    const rows = await harness.rows('place_imports');
+    const secondRow = rows.find((row) => row.id === second.importId);
+    expect(secondRow?.status).toBe('queued');
   });
 });
 

@@ -18,6 +18,12 @@
 // (lib/travel/importOrchestrator.ts, lib/travel/importJobs.ts), guarded by
 // migration 016's terminal-status trigger. Adding a second writer here was
 // never the point of this route.
+//
+// errorCode, not errorMessage: a failed job's error_code is validated against
+// a closed vocabulary before it ever leaves loadImportForReview(), so it is
+// safe to return to whoever owns the row. error_message is free text a
+// server-side caller wrote, and not every writer treats it as
+// traveler-facing — see lib/travel/importJobs.ts's ImportJobSnapshot comment.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ApiError, ok, requireParam, route } from '@/lib/http';
@@ -49,6 +55,15 @@ export const GET = route(
       candidates: snapshot.candidates,
       preview: snapshot.preview,
       usedModel: snapshot.usedModel,
+      // errorCode only, never errorMessage: errorCode is validated against a
+      // closed vocabulary (lib/travel/importJobs.ts's isImportErrorCode), so
+      // it is safe to hand to any caller who owns the row. errorMessage is
+      // not — for `connector_error`, failImportWithReason() can be called
+      // with a plain caught Error's raw `.message` (importOrchestrator.ts),
+      // which was never written with a traveler as its audience. It stays
+      // available on the snapshot for a future internal/staff surface, but
+      // this traveler-facing route does not forward it.
+      errorCode: snapshot.errorCode,
     });
   },
   // A poll loop is many small reads in a short window — the 'session' tier

@@ -304,6 +304,17 @@ const dicts = {
     'intake.checkAgain': 'Check again',
     'intake.jobFailed': 'We could not read that link.',
     'intake.jobFailedHint': 'Check the link is complete, or paste the caption text into the importer instead.',
+    // Phase 6: the same failure, said honestly for the reason the server
+    // actually recorded, instead of one sentence for every cause.
+    'intake.jobFailed.noConnector': "Domner can't read this kind of link automatically yet.",
+    'intake.jobFailedHint.noConnector': 'Paste the caption text into the importer instead.',
+    'intake.jobFailed.unsafeUrl': 'This link is no longer considered safe to open.',
+    'intake.jobFailedHint.unsafeUrl':
+      'Try pasting it again, or use the caption box in the importer instead.',
+    'intake.jobFailed.stuckTimeout': 'This took too long and was stopped automatically.',
+    'intake.jobFailedHint.stuckTimeout': 'Paste the link again to give it another try.',
+    'intake.quotaReached': "You've imported a lot of places today.",
+    'intake.quotaReachedHint': 'Please try again tomorrow.',
     'intake.needsConfirmation': 'We need a bit more from you to finish this one.',
     'intake.needsConfirmationHint':
       'This kind of link needs a closer look than we can give it automatically right now.',
@@ -644,6 +655,15 @@ const dicts = {
     'intake.checkAgain': 'ពិនិត្យម្តងទៀត',
     'intake.jobFailed': 'យើងមិនអាចអានតំណនោះបានទេ។',
     'intake.jobFailedHint': 'សូមពិនិត្យថាតំណពេញលេញ ឬបិទភ្ជាប់អត្ថបទរបស់ការបង្ហោះទៅក្នុងកម្មវិធីនាំចូលជំនួស។',
+    'intake.jobFailed.noConnector': 'Domner មិនទាន់អាចអានតំណប្រភេទនេះដោយស្វ័យប្រវត្តិនៅឡើយទេ។',
+    'intake.jobFailedHint.noConnector': 'សូមបិទភ្ជាប់អត្ថបទរបស់ការបង្ហោះទៅក្នុងកម្មវិធីនាំចូលជំនួសវិញ។',
+    'intake.jobFailed.unsafeUrl': 'តំណនេះលែងត្រូវបានចាត់ទុកថាមានសុវត្ថិភាពសម្រាប់បើកទៀតហើយ។',
+    'intake.jobFailedHint.unsafeUrl':
+      'សូមព្យាយាមបិទភ្ជាប់វាម្តងទៀត ឬប្រើប្រអប់អត្ថបទរបស់ការបង្ហោះនៅក្នុងកម្មវិធីនាំចូលជំនួសវិញ។',
+    'intake.jobFailed.stuckTimeout': 'វាចំណាយពេលយូរពេក ហើយត្រូវបានបញ្ឈប់ដោយស្វ័យប្រវត្តិ។',
+    'intake.jobFailedHint.stuckTimeout': 'សូមបិទភ្ជាប់តំណម្តងទៀត ដើម្បីព្យាយាមម្តងទៀត។',
+    'intake.quotaReached': 'អ្នកបាននាំចូលទីកន្លែងជាច្រើននៅថ្ងៃនេះ។',
+    'intake.quotaReachedHint': 'សូមព្យាយាមម្តងទៀតនៅថ្ងៃស្អែក។',
     'intake.needsConfirmation': 'យើងត្រូវការព័ត៌មានបន្ថែមពីអ្នក ដើម្បីបញ្ចប់វា។',
     'intake.needsConfirmationHint': 'តំណប្រភេទនេះត្រូវការការពិនិត្យលម្អិតជាងអ្វីដែលយើងអាចធ្វើដោយស្វ័យប្រវត្តិឥឡូវនេះ។',
     'v3.fold.show': 'បង្ហាញ',

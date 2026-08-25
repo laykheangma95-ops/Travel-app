@@ -33,7 +33,7 @@ import { SignInLink } from '@/components/ui/SignInLink';
 import { useLang } from '@/lib/i18n';
 import { classifyLink, firstUrlIn, PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import { AUTO_SELECT_CONFIDENCE, type PlaceCandidate } from '@/lib/travel/placeExtraction';
-import { decidePollOutcome } from '@/lib/travel/importPollDecision';
+import { decidePollOutcome, isProcessingQuotaError, jobFailedReason } from '@/lib/travel/importPollDecision';
 import { COPY, type Translate } from './placeImportCopy';
 import {
   DoneStage,
@@ -56,6 +56,7 @@ type Stage =
   | 'working'
   | 'pollTimeout'
   | 'jobFailed'
+  | 'quotaReached'
   | 'needsConfirmation'
   | 'review'
   | 'done';
@@ -86,6 +87,11 @@ interface JobSnapshotBody {
   candidates: PlaceCandidate[];
   preview: PlaceReviewResult['preview'];
   usedModel: boolean;
+  // errorMessage is deliberately not part of this shape: GET /api/imports/:id
+  // does not return it (not every error_message a connector writes is
+  // traveler-safe — see app/api/imports/[id]/route.ts). errorCode alone
+  // drives which copy jobFailedReason() selects.
+  errorCode: 'no_connector' | 'connector_error' | 'unsafe_url' | 'stuck_timeout' | null;
 }
 
 function toReviewRows(candidates: PlaceCandidate[]): ReviewRow[] {
@@ -111,6 +117,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
   const [result, setResult] = useState<PlaceReviewResult | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [jobErrorCode, setJobErrorCode] = useState<JobSnapshotBody['errorCode']>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [tripSheetOpen, setTripSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -148,6 +155,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
     setResult(null);
     setRows([]);
     setError(null);
+    setJobErrorCode(null);
     setOutcome(null);
     setTripSheetOpen(false);
   }, []);
@@ -187,6 +195,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
           setStage('pollTimeout');
           return;
         case 'failed':
+          setJobErrorCode(body?.errorCode ?? null);
           setStage('jobFailed');
           return;
         case 'needsConfirmation':
@@ -239,10 +248,21 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
               setStage('signIn');
               return;
             }
-            // Any other non-OK response (rate limit, quota, a transient
-            // failure) is not fatal here — the poll loop below reads the
-            // job's real status regardless of whether this request itself
-            // succeeded, and reports the truth either way.
+            if (!response.ok && live.current && pollToken.current === token) {
+              const payload = await response.json().catch(() => null);
+              // Without this check, an over-quota traveler's job stays
+              // 'queued' forever and the poll loop below would wait the full
+              // 70s just to report the generic "taking longer than usual"
+              // message over a rejection the server already explained.
+              if (isProcessingQuotaError(payload)) {
+                setStage('quotaReached');
+                return;
+              }
+              // Any other non-OK response (the burst limiter, a transient
+              // failure) is not fatal here — the poll loop below reads the
+              // job's real status regardless of whether this request itself
+              // succeeded, and reports the truth either way.
+            }
           } catch {
             // Same reasoning: network failure calling process() does not mean
             // the job failed. Poll and find out.
@@ -391,9 +411,17 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
           className="v3-save mt-4"
           onClick={() => {
             if (!importId || !platform) return;
-            const token = pollToken.current;
-            poll(importId, token, Date.now() + POLL_TIMEOUT_MS, platform);
-            setStage('working');
+            // Not poll() alone: a job that timed out here may never have been
+            // claimed at all (e.g. it was still 'queued' when the 70s budget
+            // ran out) — re-polling a job nothing is running would wait
+            // another 70s for a status that will never change. startWorking
+            // re-attempts POST .../process first (a harmless no-op if the job
+            // is already processing or done, per its own comment above) and
+            // then polls, which is the only path that can actually un-stick
+            // this screen. 'queued' is a placeholder, not a claim about the
+            // job's real status — startWorking only branches on whether it
+            // equals 'completed'.
+            startWorking(importId, 'queued', platform);
           }}
         >
           {globalT('intake.checkAgain')}
@@ -402,14 +430,38 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
     );
   }
 
+  if (stage === 'quotaReached') {
+    return (
+      <div className="night-card rounded-card p-5 text-center" role="alert">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white/[0.06] text-white/60">
+          <Clock3 size={20} aria-hidden="true" />
+        </span>
+        <h2 className="mt-3 font-display text-lg text-white">{globalT('intake.quotaReached')}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-white/60">{globalT('intake.quotaReachedHint')}</p>
+        <button type="button" className="v3-save mt-4" onClick={resetToIdle}>
+          {t('tryAgain')}
+        </button>
+      </div>
+    );
+  }
+
   if (stage === 'jobFailed') {
+    const reason = jobFailedReason(jobErrorCode);
+    const title =
+      reason === 'generic'
+        ? globalT('intake.jobFailed')
+        : globalT(`intake.jobFailed.${reason}` as Parameters<typeof globalT>[0]);
+    const hint =
+      reason === 'generic'
+        ? globalT('intake.jobFailedHint')
+        : globalT(`intake.jobFailedHint.${reason}` as Parameters<typeof globalT>[0]);
     return (
       <div className="night-card rounded-card p-5 text-center" role="alert">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white/[0.06] text-white/60">
           <AlertTriangle size={20} aria-hidden="true" />
         </span>
-        <h2 className="mt-3 font-display text-lg text-white">{globalT('intake.jobFailed')}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-white/60">{globalT('intake.jobFailedHint')}</p>
+        <h2 className="mt-3 font-display text-lg text-white">{title}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-white/60">{hint}</p>
         <button type="button" className="v3-save mt-4" onClick={resetToIdle}>
           {t('tryAgain')}
         </button>
