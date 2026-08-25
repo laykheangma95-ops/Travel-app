@@ -21,6 +21,12 @@
 // (`trips_all_own`), days and itinerary rows (migration 007), and their own
 // `destination_places` rows (migration 009). No service-role client appears
 // anywhere in this file.
+//
+// A PRINCIPLE THE REVIEW ADDED: this module may REUSE a traveler's own row,
+// but it may never REASSIGN one — every path below either returns a row that
+// is PROVABLY the requested canonical place, or creates a new one. It never
+// returns success while having filed a different place, and it never mutates
+// a pre-existing row's identity on a guess.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'server-only';
@@ -35,7 +41,7 @@ import {
   isAlreadyOnTrip,
   resolveTrip,
 } from '@/lib/travel/savedPlaces';
-import { attachCanonicalPlace, getPlaceById, type RegistryPlace } from './repository';
+import { getPlaceById, type RegistryPlace } from './repository';
 
 export type AddPlaceToTripResult =
   | {
@@ -49,17 +55,117 @@ export type AddPlaceToTripResult =
   | { status: 'needsChoice'; candidates: { id: string; title: string }[] };
 
 /**
+ * A `destination_places` row this traveler already made for this exact
+ * canonical place, if one exists — or null.
+ *
+ * `(created_by, canonical_place_id)` carries NO unique constraint (only
+ * `canonical_place_id` alone is indexed, migration 013). Two rows CAN and DO
+ * end up pointing at the same canonical place for one traveler: two imports
+ * whose raw captions differ only in case ("Wat Pho" vs "WAT PHO") pass
+ * `destination_places_owner_name_idx` — UNIQUE on the RAW name — as two
+ * distinct rows, while the canonical resolver matches on the NORMALIZED name
+ * and folds them onto one `places` row. `.maybeSingle()` would throw on that
+ * second row (PostgREST's PGRST116, "multiple rows returned"); `.limit(1)`
+ * with an explicit read of the first row degrades correctly instead.
+ */
+async function findMaterializedRow(
+  supabase: SupabaseClient,
+  userId: string,
+  canonicalPlaceId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('destination_places')
+    .select('id')
+    .eq('created_by', userId)
+    .eq('canonical_place_id', canonicalPlaceId)
+    .limit(1);
+  if (error) throw new ApiError('INTERNAL', 'Could not check your saved places.');
+  return data && data.length > 0 ? (data[0].id as string) : null;
+}
+
+/**
+ * The traveler's own row with this exact (destination, name), if any.
+ *
+ * Backed by `destination_places_owner_name_idx` — UNIQUE (created_by,
+ * destination, name), migration 009 — so at most one row can ever match.
+ * `.maybeSingle()` is provably safe here, unlike the lookup above.
+ */
+async function findNameCollision(
+  supabase: SupabaseClient,
+  userId: string,
+  destination: string,
+  name: string
+): Promise<{ id: string; canonicalPlaceId: string | null } | null> {
+  const { data, error } = await supabase
+    .from('destination_places')
+    .select('id, canonical_place_id')
+    .eq('created_by', userId)
+    .eq('destination', destination)
+    .eq('name', name)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    canonicalPlaceId: (data.canonical_place_id as string | null) ?? null,
+  };
+}
+
+/**
+ * A name that will never collide with an unrelated row of the traveler's,
+ * deterministically. Keyed on the canonical place's OWN id — never on
+ * randomness — so a retried request, or two concurrent requests, for the
+ * SAME canonical place converge on the SAME disambiguated name and therefore
+ * the SAME row, rather than each attempt minting a new one.
+ */
+function disambiguatedName(name: string, canonicalPlaceId: string): string {
+  const suffix = ` (${canonicalPlaceId.slice(0, 8)})`;
+  const base = name.slice(0, Math.max(0, PLACE_NAME_MAX - suffix.length));
+  return `${base}${suffix}`;
+}
+
+/** One insert attempt. Null means `destination_places_owner_name_idx` refused it. */
+async function tryInsertDestinationPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  place: RegistryPlace,
+  name: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('destination_places')
+    .insert({
+      destination: place.countryName,
+      name,
+      category: place.category,
+      lat: place.latitude,
+      lng: place.longitude,
+      description: '',
+      source: 'ai_generated',
+      created_by: userId,
+      canonical_place_id: place.id,
+    })
+    .select('id')
+    .single();
+
+  if (!error && data) return data.id as string;
+  if (isUniqueViolation(error)) return null;
+  throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
+}
+
+/**
  * Find or create the traveler's own `destination_places` row for a canonical
  * place, so it can be filed onto a trip the same way any other catalogue row
  * is.
  *
- * REUSE FIRST. A traveler who taps "Add to trip" on the same place twice (two
- * different trips, or the same trip after removing it) must not accumulate a
- * second `destination_places` row for it — `canonical_place_id` is exactly the
- * key that makes "the row I already made for this place" a lookup instead of
- * a guess.
+ * REUSE FIRST, AND ONLY WHEN PROVEN. A traveler who taps "Add to trip" on the
+ * same place twice must not accumulate a second row for it — but reuse is
+ * only ever a row whose `canonical_place_id` already equals the place being
+ * requested. A same-named row that is unlinked, or linked to a DIFFERENT
+ * canonical place, is never treated as a match: this function must never
+ * return success while having filed a different place than the one asked
+ * for, and it must never rewrite an existing row's identity on a guess.
  *
- * WHAT THE NEW ROW CARRIES, and what it deliberately does not:
+ * WHAT A NEW ROW CARRIES, and what it deliberately does not:
  *   - `created_by` is always the caller — migration 009's insert policy
  *     accepts nothing else.
  *   - name, category and coordinates come from the canonical record, which
@@ -79,65 +185,74 @@ async function materializeDestinationPlace(
   userId: string,
   place: RegistryPlace
 ): Promise<string> {
-  const { data: existing, error: lookupError } = await supabase
-    .from('destination_places')
-    .select('id')
-    .eq('created_by', userId)
-    .eq('canonical_place_id', place.id)
-    .maybeSingle();
-  if (lookupError) throw new ApiError('INTERNAL', 'Could not check your saved places.');
-  if (existing) return existing.id as string;
+  const reused = await findMaterializedRow(supabase, userId, place.id);
+  if (reused) return reused;
 
   const name = place.name.trim().slice(0, PLACE_NAME_MAX);
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('destination_places')
-    .insert({
-      destination: place.countryName,
-      name,
-      category: place.category,
-      lat: place.latitude,
-      lng: place.longitude,
-      description: '',
-      source: 'ai_generated',
-      created_by: userId,
-      canonical_place_id: place.id,
-    })
-    .select('id')
-    .single();
+  const created = await tryInsertDestinationPlace(supabase, userId, place, name);
+  if (created) return created;
 
-  if (!insertError && inserted) return inserted.id as string;
-
-  // destination_places_owner_name_idx — UNIQUE (created_by, destination, name)
-  // (migration 009) — refuses a second row with the exact same name for this
-  // traveler and destination. That only happens here when the traveler already
-  // made an unrelated row with an identical name before ever reaching this
-  // canonical place (a manual add, or an older import that never resolved).
-  // Their own row, already theirs: reuse it rather than fail the whole action,
-  // and link it to this canonical place if nothing else already claims it.
-  if (isUniqueViolation(insertError)) {
-    const { data: collided, error: collisionError } = await supabase
-      .from('destination_places')
-      .select('id, canonical_place_id')
-      .eq('created_by', userId)
-      .eq('destination', place.countryName)
-      .eq('name', name)
-      .maybeSingle();
-    if (collisionError) throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
-    if (collided) {
-      // Never overwrite a link to a DIFFERENT canonical place — that would be
-      // this function silently reassigning a row's identity. Reusing the row
-      // as-is (rare: two distinctly-named-alike places for one traveler in one
-      // destination) is the smallest safe behaviour; the mismatch is cosmetic,
-      // not a security issue, since the row still only ever belongs to them.
-      if (!collided.canonical_place_id) {
-        await attachCanonicalPlace(supabase, collided.id as string, place.id);
-      }
-      return collided.id as string;
-    }
+  // destination_places_owner_name_idx refused the plain name: the traveler
+  // already has a row with this exact (destination, name). Reuse it ONLY when
+  // it is provably this same canonical place already — a race where a
+  // concurrent request just won and committed it. A NULL link, or a link to a
+  // different canonical place, proves nothing about whether the two rows
+  // describe the same real-world place, so neither is ever reused and neither
+  // is ever mutated to claim an identity this function cannot establish.
+  const collision = await findNameCollision(supabase, userId, place.countryName, name);
+  if (collision && collision.canonicalPlaceId === place.id) {
+    return collision.id;
   }
 
+  // Disambiguate instead: a new row, under a name that cannot collide with the
+  // unrelated one, so "add to trip" never silently files the wrong place and
+  // never rewrites a row the traveler did not ask to change.
+  const disambiguated = await tryInsertDestinationPlace(
+    supabase,
+    userId,
+    place,
+    disambiguatedName(name, place.id)
+  );
+  if (disambiguated) return disambiguated;
+
+  // The disambiguated name collided too — only reachable if a concurrent
+  // request for this exact canonical place just won that exact race and
+  // committed first. One more reuse check before giving up honestly.
+  const afterRace = await findMaterializedRow(supabase, userId, place.id);
+  if (afterRace) return afterRace;
+
   throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
+}
+
+/**
+ * Whether an EXPLICITLY-NAMED trip is even for the right country.
+ *
+ * Only needed on that path: `resolveTrip`'s own auto-match branch already
+ * guarantees `trip.destination === countryName` by construction (it searches,
+ * or creates, by that exact string) — see lib/travel/savedPlaces.ts. A trip
+ * the traveler names directly carries no such guarantee.
+ *
+ * `.eq('id', tripId)` is a primary-key lookup, so `.maybeSingle()` here is
+ * provably safe (unlike `findMaterializedRow` above).
+ */
+async function tripDestinationMatches(
+  supabase: SupabaseClient,
+  tripId: string,
+  countryName: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('trip_plans')
+    .select('destination')
+    .eq('id', tripId)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL', 'Could not verify that trip.');
+  if (!data) return false;
+  // Exact match after trim, not case-folded — the same convention
+  // lib/travel/savedPlaces.ts's own resolveTrip uses, and for the same
+  // reason: destination is free text, and a looser match here would approve a
+  // trip that addIdeaToTrip's own destination check would then still refuse.
+  return String(data.destination ?? '').trim() === countryName.trim();
 }
 
 /**
@@ -156,6 +271,13 @@ async function materializeDestinationPlace(
  * foreign tripId 404s exactly like an unknown one) or `resolveTrip` to find,
  * disambiguate between, or create one for the place's country. Nothing here
  * re-decides what counts as a matching or ambiguous trip.
+ *
+ * An explicit `tripId` is additionally checked for destination compatibility
+ * BEFORE anything is materialized — a mismatched trip is refused outright
+ * rather than left behind as an orphan `destination_places` row (the review's
+ * LOW-1: unlike the guide-save path, which resolves a pre-existing catalogue
+ * row and creates nothing, this path creates a row, so an unchecked mismatch
+ * would leave one dangling even though the write it was for never completes).
  */
 export async function addPlaceToTrip(
   supabase: SupabaseClient,
@@ -175,6 +297,13 @@ export async function addPlaceToTrip(
     return { status: 'needsChoice', candidates: trip.candidates };
   }
 
+  if (tripId && !(await tripDestinationMatches(supabase, trip.id, place.countryName))) {
+    throw new ApiError(
+      'BAD_REQUEST',
+      'That trip is not set up for this place. Choose a trip for the right destination.'
+    );
+  }
+
   const destinationPlaceId = await materializeDestinationPlace(supabase, userId, place);
 
   if (await isAlreadyOnTrip(supabase, trip.id, destinationPlaceId)) {
@@ -187,11 +316,6 @@ export async function addPlaceToTrip(
     };
   }
 
-  // If `tripId` was explicit and its trip's own `destination` does not match
-  // `place.countryName` (a traveler picking a trip for the wrong country),
-  // `addIdeaToTrip` itself refuses with NOT_FOUND — the same guard it already
-  // enforces for the guide-save path (`savePlaceForTraveler` relies on the
-  // exact same check rather than a second one here).
   await addIdeaToTrip(supabase, trip.id, destinationPlaceId);
 
   return {

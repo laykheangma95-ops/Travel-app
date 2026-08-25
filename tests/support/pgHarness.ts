@@ -523,7 +523,24 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
           error: unknown;
         };
         if (error) return { data: null, error };
-        return { data: (data ?? [])[0] ?? null, error: null };
+        const list = data ?? [];
+        // Real PostgREST (and therefore real supabase-js): 0 rows is a valid
+        // "nothing here" answer for maybeSingle, but more than one row is an
+        // error — PGRST116 — not "here's the first one". A query backed by a
+        // unique constraint can never hit this; a query that ISN'T can silently
+        // return a wrong row instead of surfacing the bug, which is exactly the
+        // gap that let lib/places/addToTrip.ts ship a `.maybeSingle()` on a
+        // non-unique (created_by, canonical_place_id) pair undetected.
+        if (list.length > 1) {
+          return {
+            data: null,
+            error: {
+              message: 'JSON object requested, multiple (or no) rows returned',
+              code: 'PGRST116',
+            },
+          };
+        }
+        return { data: list[0] ?? null, error: null };
       },
       async single() {
         const { data, error } = (await api.then((value: unknown) => value)) as {

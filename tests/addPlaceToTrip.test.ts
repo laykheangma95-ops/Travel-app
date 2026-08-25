@@ -192,24 +192,101 @@ describe('adding an authorized canonical place to a trip', () => {
     expect(await harness.rows('itinerary_places')).toHaveLength(2);
   });
 
-  it('reuses the traveler-owned row even when a same-named, unrelated row already exists (owner_name_idx collision)', async () => {
+  it('A. succeeds without a 500 when the traveler already has two rows pointing at the same canonical place (differing raw names)', async () => {
+    // (created_by, canonical_place_id) carries no unique constraint — see
+    // lib/places/addToTrip.ts's findMaterializedRow. Two imports whose raw
+    // captions differ only in case pass destination_places_owner_name_idx
+    // (UNIQUE on the raw name) as two distinct rows, while the canonical
+    // resolver folds them onto one `places` row by NORMALIZED name. This
+    // reaches that exact precondition directly, rather than depending on the
+    // importer to reproduce it.
     const placeId = await publishedPlace();
-    // Alice already has her own catalogue entry with the exact same name for
-    // the same destination — e.g. a manual add from before this canonical
-    // place ever existed for her.
     await harness.asAdmin(
-      `INSERT INTO destination_places (destination,name,category,lat,lng,description,created_by)
-       VALUES ('Thailand','Wat Pho','food',0,0,'',$1)`,
-      [ALICE]
+      `INSERT INTO destination_places (destination,name,category,lat,lng,description,created_by,canonical_place_id)
+       VALUES ('Thailand','Wat Pho','spot',13.7,100.4,'',$1,$2),
+              ('Thailand','WAT PHO','spot',13.7,100.4,'',$1,$2)`,
+      [ALICE, placeId]
     );
+
+    const response = await post(placeId);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'added', alreadyAdded: false });
+    // Neither pre-existing row is duplicated — one of the two is reused.
+    expect(await harness.rows('destination_places')).toHaveLength(2);
+    expect(await harness.rows('itinerary_places')).toHaveLength(1);
+  });
+
+  it('D. does not silently relink an unrelated same-named row with canonical_place_id NULL', async () => {
+    const placeId = await publishedPlace();
+    // Alice's own, unrelated catalogue entry: same raw name, same destination,
+    // never linked to any canonical place, with its own distinct content.
+    const manualRow = await harness
+      .asAdmin(
+        `INSERT INTO destination_places (destination,name,category,lat,lng,description,created_by)
+         VALUES ('Thailand','Wat Pho','food',1.5,2.5,'my own note',$1) RETURNING id`,
+        [ALICE]
+      )
+      .then((rows) => rows[0].id as string);
 
     const response = await post(placeId);
     expect(response.status).toBe(200);
 
     const rows = await harness.rows('destination_places');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].canonical_place_id).toBe(placeId);
-    expect(await harness.rows('itinerary_places')).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+    // The traveler's pre-existing row is untouched: still unlinked, still
+    // carrying its own category, coordinates and description.
+    const manual = rows.find((row) => row.id === manualRow)!;
+    expect(manual.canonical_place_id).toBeNull();
+    expect(manual).toMatchObject({ category: 'food', description: 'my own note' });
+    expect(Number(manual.lat)).toBeCloseTo(1.5);
+    // A second, new row was created for the canonical place instead — under a
+    // disambiguated name so it could never collide with the manual row above.
+    const linked = rows.find((row) => row.id !== manualRow)!;
+    expect(linked.canonical_place_id).toBe(placeId);
+    expect(linked.name).not.toBe('Wat Pho');
+    expect(linked.name).toContain('Wat Pho');
+    // The itinerary was filed against the CORRECT (linked) row, never the
+    // traveler's pre-existing, unrelated one.
+    const filed = await harness.rows('itinerary_places');
+    expect(filed).toHaveLength(1);
+    expect(filed[0].place_id).toBe(linked.id);
+  });
+
+  it('C. never returns success filing a different canonical place under a name collision', async () => {
+    const placeA = await publishedPlace(); // "Wat Pho" @ 13.7465,100.4927
+    const placeB = await publishedPlace({
+      providerPlaceId: 'p-wat-pho-b',
+      // Far enough from A that the registry treats it as a distinct place.
+      latitude: 15.0,
+      longitude: 101.0,
+    });
+    expect(placeA).not.toBe(placeB);
+
+    // Alice already has a row for A under the plain name.
+    const firstResponse = await post(placeA);
+    expect(firstResponse.status).toBe(200);
+    const rowsAfterA = await harness.rows('destination_places');
+    expect(rowsAfterA).toHaveLength(1);
+    expect(rowsAfterA[0].canonical_place_id).toBe(placeA);
+
+    // Now Alice adds B, which collides on (destination, name) with her row for A.
+    const secondResponse = await post(placeB);
+    expect(secondResponse.status).toBe(200);
+    const body = await secondResponse.json();
+    expect(body.status).toBe('added');
+
+    // The response must never claim success while having filed A instead of B.
+    const rows = await harness.rows('destination_places');
+    expect(rows).toHaveLength(2);
+    const forB = rows.find((row) => row.canonical_place_id === placeB);
+    expect(forB).toBeDefined(); // a correct row for B exists — created or reused, never faked
+    const filed = await harness.rows('itinerary_places');
+    const filedIds = filed.map((row) => row.place_id);
+    expect(filedIds).toContain(forB!.id);
+    // Never the wrong row: B's own request must not have filed A's row again
+    // as though it were the answer for B.
+    const forA = rows.find((row) => row.canonical_place_id === placeA)!;
+    expect(filedIds.filter((id) => id === forA.id)).toHaveLength(1); // only A's own earlier add
   });
 });
 
@@ -321,6 +398,104 @@ describe('multiple eligible trips', () => {
     const days = await harness.rows('itinerary_days');
     expect(days).toHaveLength(1);
     expect(days[0].trip_id).toBe(islands.id);
+  });
+});
+
+describe('explicit tripId — destination compatibility, checked before any write', () => {
+  it('rejects a Thailand place for an explicit Japan trip, leaving no orphan rows', async () => {
+    const placeId = await publishedPlace(); // Thailand
+    const japanTrip = await harness
+      .asAdmin(
+        `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'Japan trip','Japan') RETURNING id`,
+        [ALICE]
+      )
+      .then((rows) => rows[0].id as string);
+
+    const response = await post(placeId, { tripId: japanTrip });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('BAD_REQUEST');
+    // Unlike a place that cannot be found at all, this trip DOES belong to
+    // Alice — the error must name the mismatch, not imply the place is
+    // missing or that she doesn't own the trip.
+    expect(body.error.message).toMatch(/trip/i);
+    // The whole point of the precheck: no row is created for a request that
+    // is about to be refused anyway.
+    expect(await harness.rows('destination_places')).toHaveLength(0);
+    expect(await harness.rows('itinerary_places')).toHaveLength(0);
+    expect(await harness.rows('itinerary_days')).toHaveLength(0);
+  });
+
+  it('still succeeds for an explicit trip whose destination matches', async () => {
+    const placeId = await publishedPlace();
+    const thaiTrip = await harness
+      .asAdmin(
+        `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'My Thailand trip','Thailand') RETURNING id`,
+        [ALICE]
+      )
+      .then((rows) => rows[0].id as string);
+
+    const response = await post(placeId, { tripId: thaiTrip });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'added', tripId: thaiTrip });
+  });
+
+  it("still 404s for another traveler's trip before the destination check ever runs", async () => {
+    // RLS hides the trip entirely, so this must stay a 404, not surface as a
+    // 400 that would imply Alice can even see Bob's trip to compare it.
+    const placeId = await publishedPlace();
+    const bobsJapanTrip = await harness
+      .asAdmin(
+        `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'Bob Japan','Japan') RETURNING id`,
+        [BOB]
+      )
+      .then((rows) => rows[0].id as string);
+
+    const response = await post(placeId, { tripId: bobsJapanTrip });
+    expect(response.status).toBe(404);
+  });
+});
+
+describe('test-harness fidelity — .maybeSingle() on real PostgREST semantics', () => {
+  it('B. errors PGRST116-style when a query without a unique backing matches more than one row', async () => {
+    const alice = harness.clientFor(ALICE);
+    await harness.asAdmin(
+      `INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'One','Thailand'),($1,'Two','Thailand')`,
+      [ALICE]
+    );
+
+    const { data, error } = await alice
+      .from('trip_plans')
+      .select('id')
+      .eq('user_id', ALICE)
+      .maybeSingle();
+
+    expect(data).toBeNull();
+    expect(error).toMatchObject({ code: 'PGRST116' });
+  });
+
+  it('still returns null, no error, for zero matching rows', async () => {
+    const alice = harness.clientFor(ALICE);
+    const { data, error } = await alice
+      .from('trip_plans')
+      .select('id')
+      .eq('user_id', ALICE)
+      .maybeSingle();
+    expect(data).toBeNull();
+    expect(error).toBeNull();
+  });
+
+  it('still returns the row for exactly one match', async () => {
+    const alice = harness.clientFor(ALICE);
+    const trip = await harness
+      .asAdmin(`INSERT INTO trip_plans (user_id,title,destination) VALUES ($1,'Solo','Thailand') RETURNING id`, [
+        ALICE,
+      ])
+      .then((rows) => rows[0].id as string);
+    const { data, error } = await alice.from('trip_plans').select('id').eq('user_id', ALICE).maybeSingle();
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ id: trip });
   });
 });
 
