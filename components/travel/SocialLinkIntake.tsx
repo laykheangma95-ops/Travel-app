@@ -87,8 +87,11 @@ interface JobSnapshotBody {
   candidates: PlaceCandidate[];
   preview: PlaceReviewResult['preview'];
   usedModel: boolean;
+  // errorMessage is deliberately not part of this shape: GET /api/imports/:id
+  // does not return it (not every error_message a connector writes is
+  // traveler-safe — see app/api/imports/[id]/route.ts). errorCode alone
+  // drives which copy jobFailedReason() selects.
   errorCode: 'no_connector' | 'connector_error' | 'unsafe_url' | 'stuck_timeout' | null;
-  errorMessage: string | null;
 }
 
 function toReviewRows(candidates: PlaceCandidate[]): ReviewRow[] {

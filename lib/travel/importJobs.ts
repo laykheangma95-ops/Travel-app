@@ -270,8 +270,15 @@ export interface ImportJobSnapshot {
   /** Set only when `status === 'failed'`. `failImportWithReason()` is the only
    *  writer (lib/travel/importOrchestrator.ts); null for a job that never
    *  failed, or one failed by the older synchronous pipeline's plain
-   *  `failImport()`, which predates this column and never sets it. */
+   *  `failImport()`, which predates this column and never sets it. Validated
+   *  against the closed ImportErrorCode vocabulary, so unlike errorMessage it
+   *  is safe to return to a traveler-facing route. */
   errorCode: ImportErrorCode | null;
+  /** NOT necessarily traveler-safe. `connector_error`'s message can be a
+   *  plain caught Error's raw `.message` (importOrchestrator.ts), which was
+   *  never written with an end user as its audience. Kept on the snapshot
+   *  for a future internal/staff surface; GET /api/imports/:id deliberately
+   *  does not forward it — read errorCode instead. */
   errorMessage: string | null;
 }
 

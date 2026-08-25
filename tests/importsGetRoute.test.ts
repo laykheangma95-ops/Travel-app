@@ -152,11 +152,15 @@ describe('reading a job at each stage', () => {
     // review screen tell "unsupported platform" apart from "reaped for
     // sitting stuck" instead of one generic sentence for both.
     expect(body.errorCode).toBe('no_connector');
-    expect(typeof body.errorMessage).toBe('string');
-    expect(body.errorMessage.length).toBeGreaterThan(0);
+    // errorMessage is deliberately NOT part of this route's response — not
+    // every error_message a connector writes is traveler-safe (some are a
+    // caught Error's raw .message). errorCode is the validated, closed-
+    // vocabulary field this route exposes instead. See
+    // app/api/imports/[id]/route.ts.
+    expect(body.errorMessage).toBeUndefined();
   });
 
-  it('a completed job never carries an error_code or error_message', async () => {
+  it('a completed job never carries an error_code', async () => {
     const alice = harness.clientFor(ALICE);
     const queued = await createImportFromUrl(alice, ALICE, TIKTOK);
     if (!queued.ok) throw new Error('setup failed');
@@ -166,7 +170,7 @@ describe('reading a job at each stage', () => {
     const body = await response.json();
     expect(body.status).toBe('completed');
     expect(body.errorCode).toBeNull();
-    expect(body.errorMessage).toBeNull();
+    expect(body.errorMessage).toBeUndefined();
   });
 });
 
