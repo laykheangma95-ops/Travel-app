@@ -26,8 +26,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   assertWithinQuota,
   completeImport,
+  completeImportIfProcessing,
   failImport,
   findReusableImport,
+  loadImportForReview,
   loadImportProvenance,
   markCandidateAccepted,
   recordPlaceSource,
@@ -348,6 +350,96 @@ describe('one traveler cannot reach another\'s ledger', () => {
     // Bob guessing an id gets nothing — which is what stops a caller dictating
     // where a place came from.
     expect(await loadImportProvenance(harness.clientFor(BOB), importId!)).toBeNull();
+  });
+});
+
+describe('loadImportForReview — the queued-job review screen\'s only read', () => {
+  it('returns candidates and preview once a job has completed', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, importId, {
+      outcome: 'ok',
+      candidates: [WAT_PHO],
+      usedModel: true,
+      preview: { title: 'Bangkok in a day', author: '@chef', thumbnailUrl: null, canonicalUrl: null },
+    });
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('completed');
+    expect(snapshot?.outcome).toBe('ok');
+    expect(snapshot?.candidates).toHaveLength(1);
+    expect(snapshot?.candidates[0]).toMatchObject({ name: 'Wat Pho', country: 'Thailand' });
+    expect(snapshot?.preview).toMatchObject({ title: 'Bangkok in a day', author: '@chef' });
+  });
+
+  it('reads a job the connector layer completed via completeImportIfProcessing the same way', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    // The queue path claims 'processing' before it may complete (migration
+    // 016's terminal-status guard requires it); startImport above already
+    // wrote 'processing', so this is the claimed state the orchestrator would
+    // have produced.
+    const won = await completeImportIfProcessing(alice, importId!, {
+      outcome: 'ok',
+      candidates: [WAT_PHO],
+      usedModel: false,
+    });
+    expect(won).toBe(true);
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('completed');
+    expect(snapshot?.candidates).toHaveLength(1);
+  });
+
+  it('returns the status with no candidate query for a job still in flight', async () => {
+    const alice = harness.clientFor(ALICE);
+    // startImport itself writes 'processing' — there is no queued-then-fetch
+    // step in this harness, so this job is already mid-flight.
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('processing');
+    expect(snapshot?.candidates).toEqual([]);
+    expect(snapshot?.preview).toBeNull();
+  });
+
+  it('returns the status for a failed job, with no candidates', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await failImport(alice, importId);
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.status).toBe('failed');
+    expect(snapshot?.candidates).toEqual([]);
+  });
+
+  it('never reads another traveler\'s job — a foreign id is null, not another traveler\'s data', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    await completeImport(alice, importId, { outcome: 'ok', candidates: [WAT_PHO], usedModel: true });
+
+    const bob = harness.clientFor(BOB);
+    expect(await loadImportForReview(bob, BOB, importId!)).toBeNull();
+  });
+
+  it('a nonexistent id reads as null, not as a crash', async () => {
+    const alice = harness.clientFor(ALICE);
+    expect(await loadImportForReview(alice, ALICE, '00000000-0000-4000-8000-000000000000')).toBeNull();
+  });
+
+  it('degrades a malformed stored preview to null rather than leaking it raw', async () => {
+    const alice = harness.clientFor(ALICE);
+    const importId = await startImport(alice, { userId: ALICE, key: KEY, platform: 'tiktok' });
+    // Exactly what a row from an older release, or a direct PostgREST write,
+    // could leave behind: jsonb the database accepts because it enforces only
+    // that this column is an object, not its shape.
+    await alice
+      .from('place_imports')
+      .update({ status: 'completed', preview: { unexpected: 'shape' }, outcome: 'ok' })
+      .eq('id', importId!);
+
+    const snapshot = await loadImportForReview(alice, ALICE, importId!);
+    expect(snapshot?.preview).toBeNull();
   });
 });
 

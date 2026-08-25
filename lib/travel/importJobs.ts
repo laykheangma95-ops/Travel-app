@@ -237,6 +237,89 @@ export async function findReusableImport(
 }
 
 /**
+ * Every status spelling this function might read back, folded onto the
+ * current vocabulary. Not trusted as an enum straight off the row for the
+ * same reason toCandidate() re-validates category and source: the database
+ * enforces the CHECK constraint, not this module's idea of what a valid value
+ * is, and a value this code does not recognise is treated as `failed` rather
+ * than handed to a client that will poll it forever waiting for a status that
+ * will never arrive.
+ */
+function normaliseStatus(value: string): ImportStatus {
+  if ((['queued', 'processing', 'needs_confirmation', 'completed', 'failed'] as const).includes(
+    value as ImportStatus
+  )) {
+    return value as ImportStatus;
+  }
+  if (value === 'extracting') return 'processing';
+  if (value === 'ready') return 'completed';
+  return 'failed';
+}
+
+/** What GET /api/imports/:id has to answer with, for the queued-job review flow. */
+export interface ImportJobSnapshot {
+  status: ImportStatus;
+  outcome: ImportOutcome | null;
+  candidates: StoredCandidate[];
+  preview: ImportPreview | null;
+}
+
+/**
+ * A queued job's current state, by id — the read side of the connector
+ * layer's `processImport()` (lib/travel/importOrchestrator.ts).
+ *
+ * OWN-ROW ONLY, the same as everything else here: the caller's session client
+ * carries RLS (`place_imports_select_own`, `import_candidates_owner`), and
+ * this adds no `service_role` path around it. A foreign or forged id reads as
+ * null — the route above turns that into 404, never into another traveler's
+ * job.
+ *
+ * Candidates are only worth reading once the job is `completed` — a job still
+ * `queued`, `processing`, `needs_confirmation` or `failed` has nothing in
+ * `import_candidates` yet (or, for `failed`, nothing that was ever written).
+ * Returning an empty list for those rather than querying is one fewer request
+ * on every poll.
+ */
+export async function loadImportForReview(
+  supabase: SupabaseClient,
+  userId: string,
+  importId: string
+): Promise<ImportJobSnapshot | null> {
+  try {
+    const { data, error } = await supabase
+      .from('place_imports')
+      .select('status,outcome,preview')
+      .eq('id', importId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const row = data as { status: string; outcome: ImportOutcome | null; preview: unknown };
+    const status = normaliseStatus(row.status);
+
+    if (status !== 'completed') {
+      return { status, outcome: row.outcome, candidates: [], preview: null };
+    }
+
+    const { data: candidateRows, error: candidateError } = await supabase
+      .from('import_candidates')
+      .select('name,description,category,city,country,lat,lng,confidence,extraction_source')
+      .eq('import_id', importId)
+      .order('position', { ascending: true });
+
+    return {
+      status,
+      outcome: row.outcome,
+      candidates: candidateError ? [] : ((candidateRows ?? []) as CandidateRow[]).map(toCandidate),
+      preview: toPreview(row.preview),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Refuse a traveler who has run the pipeline more times today than the quota
  * allows. Replays do not count — they cost nothing, so charging for them would
  * punish exactly the behaviour this whole phase is trying to encourage.
