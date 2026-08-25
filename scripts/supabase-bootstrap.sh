@@ -73,6 +73,7 @@ MIGRATIONS=(
   supabase/migrations/013_place_registry.sql
   supabase/migrations/014_saved_place_library.sql
   supabase/migrations/015_import_intake.sql
+  supabase/migrations/016_import_status_terminal.sql
 )
 
 # Every migration on disk must be listed above, or a new one silently never

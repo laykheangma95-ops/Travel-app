@@ -37,7 +37,12 @@ import { getConnectorFor } from '@/lib/connectors/places/registry';
 import { ConnectorError, type ConnectorExtraction } from '@/lib/connectors/places/types';
 import { sanitizeConnectorResult } from './connectorBoundary';
 import { recordAiUsage } from './aiUsage';
-import { completeImport, failImportWithReason, type ImportOutcome } from './importJobs';
+import {
+  assertWithinProcessingQuota,
+  completeImportIfProcessing,
+  failImportWithReason,
+  type ImportOutcome,
+} from './importJobs';
 import {
   dedupeCandidates,
   extractFromCaption,
@@ -145,11 +150,33 @@ async function addCoordinates(candidates: PlaceCandidate[], hint: string | null)
  * the same single door every other candidate source uses, so a connector
  * cannot hand through a category, a coordinate or a confidence the rest of
  * the pipeline has not validated.
+ *
+ * WHY `source` AND `confidence` ARE PARAMETERS RATHER THAN CONSTANTS:
+ *   They were hardcoded to `'model'` and `0.5`, and the Phase 4 review proved
+ *   what that cost. A Google Maps link arrived as
+ *   `{lat: null, lng: null, confidence: 0.5, extraction_source: 'model'}` —
+ *   three separate defects in one row. `'model'` is a lie no model told, and
+ *   migration 012 leans on that column meaning something exact: "'model' is
+ *   the only one that costs". `0.5` sits below AUTO_SELECT_CONFIDENCE (0.55),
+ *   so Domner's single most reliable input arrived un-ticked in the review
+ *   list. And the exact pin the connector had already resolved was dropped on
+ *   the floor, to be re-guessed by the geocoder.
+ *
+ * `coordinates` is applied only when the connector named exactly ONE place.
+ * A single pin spread across several names would put every one of them at the
+ * same wrong spot, which is worse than having no pin at all.
  */
 function candidatesFromNames(
   names: string[],
-  destination: ReturnType<typeof guessDestination>
+  destination: ReturnType<typeof guessDestination>,
+  options: {
+    source: PlaceCandidate['source'];
+    confidence: number;
+    coordinates: { lat: number; lng: number } | null;
+  }
 ): PlaceCandidate[] {
+  const pin = names.length === 1 ? options.coordinates : null;
+
   return names
     .map((name) =>
       normaliseCandidate(
@@ -159,10 +186,10 @@ function candidatesFromNames(
           category: inferCategory(name),
           city: destination?.label ?? null,
           country: destination?.country ?? null,
-          lat: null,
-          lng: null,
-          confidence: 0.5,
-          source: 'model',
+          lat: pin?.lat ?? null,
+          lng: pin?.lng ?? null,
+          confidence: options.confidence,
+          source: options.source,
         },
         destination
       )
@@ -211,7 +238,17 @@ async function runConnector(
   const fromCaption = sanitized.captionText
     ? (fromModel.candidates ?? extractFromCaption(sanitized.captionText))
     : [];
-  const fromConnector = candidatesFromNames(sanitized.candidateNames, destination);
+  const fromConnector = candidatesFromNames(sanitized.candidateNames, destination, {
+    // A resolved Google Maps link is an exact pin the platform itself produced
+    // — the same `'maps-link'` provenance and high confidence
+    // app/api/travel/extract has always recorded for it. Any other connector's
+    // names were read off the post without a model call, which is what
+    // `'caption'` means; calling them `'model'` would put a cost against a
+    // call that never happened.
+    source: platform === 'google-maps' ? 'maps-link' : 'caption',
+    confidence: sanitized.confidence,
+    coordinates: sanitized.coordinates,
+  });
 
   const merged = dedupeCandidates([...fromCaption, ...fromConnector]);
   const located = await addCoordinates(merged, destination?.label ?? null);
@@ -246,6 +283,14 @@ export async function processImport(
   userId: string,
   importId: string
 ): Promise<ProcessResult> {
+  // The cap that guards money, checked BEFORE the claim so an over-quota
+  // traveler's job stays `queued` and can simply be processed tomorrow rather
+  // than being burned to `failed`. See assertWithinProcessingQuota: the intake
+  // quota counts rows a traveler can forge through PostgREST, so it cannot be
+  // the cap on spend; this counts runs actually performed, at the one point
+  // that no request can reach except through this function.
+  await assertWithinProcessingQuota(supabase, userId);
+
   const claimed = await claimQueuedImport(supabase, userId, importId);
   if (!claimed) {
     const status = await currentStatus(supabase, userId, importId);
@@ -304,17 +349,30 @@ export async function processImport(
 
   const result = await runConnector(connector.id, platform, extraction);
 
+  // The cost ledger is written whatever happens to the job row below: the
+  // tokens were spent even if the reaper has since given up on this job, and a
+  // ledger that omits spend it could not attribute is a ledger that understates
+  // the bill.
   if (result.usage) {
     const admin = getSupabaseAdmin();
     if (admin) await recordAiUsage(admin, userId, 'place_import', result.usage);
   }
 
-  await completeImport(supabase, importId, {
+  const won = await completeImportIfProcessing(supabase, importId, {
     outcome: result.outcome,
     candidates: result.candidates,
     usedModel: result.usedModel,
     preview: result.preview,
   });
+
+  if (!won) {
+    // Something reached a terminal status while the connector was working —
+    // in practice the reaper deciding this job was stuck. Its verdict stands;
+    // migration 016 would refuse to overwrite it in any case.
+    const status = await currentStatus(supabase, userId, importId);
+    log.warn('import_orchestrator.completion_lost', { importId, status });
+    return { outcome: 'already-processing', status, importOutcome: null, candidateCount: 0 };
+  }
 
   return {
     outcome: 'completed',

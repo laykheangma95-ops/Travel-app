@@ -277,6 +277,79 @@ export async function assertWithinQuota(supabase: SupabaseClient, userId: string
   }
 }
 
+/**
+ * Every status meaning "this row has already consumed a pipeline run".
+ *
+ * `queued` is deliberately absent: a queued row has been recorded and has cost
+ * nothing yet. The two deprecated spellings are present because a row written
+ * by a pre-Phase-3 release spent a model call just the same.
+ */
+const PROCESSED_STATUSES = ['processing', 'completed', 'failed', 'extracting', 'ready'] as const;
+
+/**
+ * Refuse a traveler who has already had the quota's worth of imports PROCESSED
+ * today. This is the cap that guards money.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM assertWithinQuota:
+ *   That one runs at intake and counts rows created. It was the whole cost
+ *   control until Phase 4, and Phase 4's review found the gap: a traveler
+ *   holds the anon key, and `place_imports_insert_own` lets them INSERT their
+ *   own rows straight through PostgREST. Creating a thousand `queued` rows
+ *   that way never passes through createImportFromUrl, so the intake count is
+ *   never consulted — and each of those rows would then buy a connector run
+ *   and a model call.
+ *
+ *   Rows a traveler can forge cannot be the cap. The cap has to sit at the
+ *   point of SPEND, and that point is reachable only through our own server:
+ *   there is no PostgREST route to a connector or to Anthropic. So the count
+ *   here is of runs actually performed, checked immediately before performing
+ *   another one.
+ *
+ * IT DOES NOT DOUBLE-CHARGE. The intake counts rows created; this counts rows
+ * processed. A traveler who legitimately queues forty links and processes all
+ * forty passes both: at the fortieth, thirty-nine have been processed.
+ *
+ * FAILS OPEN, exactly like assertWithinQuota, and for the same reason: a
+ * database hiccup that locked every traveler out of the importer would be a
+ * worse outage than the spending it was guarding against.
+ */
+export async function assertWithinProcessingQuota(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<void> {
+  const quota = dailyImportQuota();
+  if (quota === 0) return;
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    const { count, error } = await supabase
+      .from('place_imports')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      // A replay served from an earlier import ran no pipeline, so it is not
+      // spend — the same exclusion the intake quota makes, and the guard
+      // trigger is what stops the marker being forged (migration 012).
+      .is('reused_from_import_id', null)
+      .in('status', PROCESSED_STATUSES as unknown as string[])
+      .gte('created_at', since);
+
+    if (error || count === null || count === undefined) return;
+
+    if (count >= quota) {
+      log.warn('import_job.processing_quota_exceeded', { userId, count, quota });
+      throw new ApiError(
+        'RATE_LIMITED',
+        'You have imported a lot of places today. Please try again tomorrow.',
+        { limit: quota }
+      );
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    log.warn('import_job.processing_quota_unreadable', { userId });
+  }
+}
+
 export interface StartImportInput {
   userId: string;
   key: ImportKey | null;
@@ -376,6 +449,93 @@ export async function completeImport(
   }
 }
 
+/**
+ * Close a job the connector layer claimed — but only if it is still the one
+ * holding the claim.
+ *
+ * SIBLING OF completeImport, NOT A REPLACEMENT. That function is what
+ * app/api/travel/extract has always called and its behaviour is unchanged;
+ * this is the queue path's variant, in the same style as
+ * failImportWithReason above.
+ *
+ * WHAT THE `status = 'processing'` FILTER IS FOR:
+ *   The Phase 4 review reproduced this: the reaper decides a long-running job
+ *   is stuck and marks it `failed`, then the connector finishes and writes
+ *   `completed` over the top — leaving a row that reads `completed` while
+ *   still carrying `error_code = 'stuck_timeout'` and a cancellation message.
+ *   Migration 016 refuses that write at the database, which is the real fix;
+ *   this filter means the losing side never attempts it, so the orchestrator
+ *   can report what actually happened instead of logging a swallowed error.
+ *
+ * Returns false when the claim was lost, and the caller then writes nothing
+ * else: candidates are only inserted AFTER the terminal transition is won, so
+ * a reaped job never accumulates the results of the run that outlived it.
+ */
+export async function completeImportIfProcessing(
+  supabase: SupabaseClient,
+  importId: string,
+  input: CompleteImportInput
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('place_imports')
+      .update({
+        status: 'completed',
+        outcome: input.outcome,
+        candidate_count: input.candidates.length,
+        used_model: input.usedModel,
+        preview: input.preview ?? null,
+        // A job that succeeded carries no failure. Clearing these matters
+        // because a retry of a previously-failed link would otherwise inherit
+        // the old row's error text.
+        error_code: null,
+        error_message: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', importId)
+      .eq('status', 'processing')
+      .select('id');
+
+    if (error) {
+      log.warn('import_job.complete_guarded_failed', { reason: error.message.slice(0, 160) });
+      return false;
+    }
+    // Zero rows means something else reached a terminal status first — the
+    // reaper, or a concurrent call. Not an error, and not ours to overwrite.
+    if (!data || (data as unknown[]).length === 0) {
+      log.warn('import_job.complete_lost_claim', { importId });
+      return false;
+    }
+
+    if (input.candidates.length > 0) {
+      const rows = input.candidates.map((candidate, index) => ({
+        import_id: importId,
+        name: candidate.name,
+        description: candidate.description,
+        category: candidate.category,
+        city: candidate.city,
+        country: candidate.country,
+        lat: candidate.lat,
+        lng: candidate.lng,
+        confidence: candidate.confidence,
+        extraction_source: candidate.source,
+        position: index,
+      }));
+      const { error: candidateError } = await supabase.from('import_candidates').insert(rows);
+      if (candidateError) {
+        log.warn('import_job.candidates_failed', { reason: candidateError.message.slice(0, 120) });
+      }
+    }
+
+    return true;
+  } catch (error) {
+    log.warn('import_job.complete_guarded_threw', {
+      reason: error instanceof Error ? error.message.slice(0, 160) : 'unknown',
+    });
+    return false;
+  }
+}
+
 /** Mark a job as failed. Used when the pipeline throws, so the row is not left open. */
 export async function failImport(supabase: SupabaseClient, importId: string | null): Promise<void> {
   if (!importId) return;
@@ -421,7 +581,13 @@ export async function failImportWithReason(
         error_message: message.slice(0, 500),
         completed_at: new Date().toISOString(),
       })
-      .eq('id', importId);
+      .eq('id', importId)
+      // Only the holder of the claim may record the verdict. Without this, a
+      // connector that fails after the reaper already gave up on the job would
+      // overwrite `stuck_timeout` with its own error — `failed` → `failed`
+      // leaves the status unchanged, so migration 016 permits it and only this
+      // filter keeps the first, true verdict.
+      .eq('status', 'processing');
   } catch (error) {
     log.warn('import_job.fail_with_reason_threw', {
       reason: error instanceof Error ? error.message.slice(0, 120) : 'unknown',

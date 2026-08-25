@@ -51,6 +51,11 @@ const MIGRATIONS = [
   // Phase 3: the intake columns, the queue vocabulary, and the reuse index and
   // replay guard that had to follow the status rename.
   '015_import_intake.sql',
+  // Phase 4: terminal statuses are absorbing. This is what stops a traveler
+  // rewinding a finished import to `queued` to buy another connector/model
+  // run, and what stops the reaper's `failed` being overwritten by a late
+  // completion.
+  '016_import_status_terminal.sql',
 ];
 
 /**

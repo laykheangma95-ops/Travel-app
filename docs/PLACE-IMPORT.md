@@ -301,6 +301,49 @@ extractor, a Maps link) uses. **A connector can never write to `places`,
 `destination_places`, or any canonical record** — it produces candidates for a
 human to review, and the existing SAVE endpoint is the only door onto a trip.
 
+### A finished import stays finished
+
+Migration `016_import_status_terminal.sql`. Once a row reads `completed`,
+`failed` (or the deprecated `ready`), its status may never change again — for
+any caller, service role included.
+
+This closes a quota bypass the Phase 4 review proved. Phase 4 gave
+`place_imports.status` a price: `queued` became a claim on a connector run and
+a model call. Nothing stopped a traveler writing that value themselves — they
+hold the anon key, so `PATCH place_imports?id=eq.<own job> {"status":"queued"}`
+is a request they can just send, and the guard from `012` pinned `user_id`,
+`created_at` and `url_hash` but never `status`. Six model runs came out of one
+quota-counted row, with no bound on the loop. Terminal states being absorbing
+means a job can be claimed exactly once in its life, so model runs are bounded
+by job rows again.
+
+The same rule closes a second finding: the reaper marking a long-running job
+`failed`, and the connector then finishing and writing `completed` over the
+top — leaving a row reading `completed` while still carrying
+`error_code = 'stuck_timeout'`. The late write is now refused.
+
+Operational surgery on a genuinely stuck row is still possible the way any
+trigger is bypassed (`ALTER TABLE place_imports DISABLE TRIGGER
+place_imports_guard_trg`) — deliberate, auditable, and out of reach of an API
+call.
+
+### The quota is counted at the point of spend
+
+`assertWithinProcessingQuota` runs before a job is claimed, and counts imports
+already *processed* in the rolling day rather than imports created.
+
+The intake quota (`assertWithinQuota`, migration 012) counts rows a traveler
+creates — and RLS lets a traveler INSERT their own rows straight through
+PostgREST, which never passes through `createImportFromUrl` and so never
+consults that count. A thousand forged `queued` rows would each have bought a
+connector run. Rows a traveler can forge cannot be the cap, so the cap sits at
+the one place no request can reach except through Domner's own server: there
+is no PostgREST route to a connector or to Anthropic.
+
+The two counts do not double-charge. One counts rows created, the other counts
+runs performed; a traveler who queues forty links and processes all forty
+passes both.
+
 ### Claiming is one conditional UPDATE
 
 `UPDATE place_imports SET status = 'processing' ... WHERE status = 'queued'
@@ -329,6 +372,11 @@ which never set that column.
 Reaping a job un-sticks the exact link it was stuck on: `failed` is not one of
 the statuses `place_imports_open_idx` covers, so the traveler can submit that
 link again immediately rather than being told one is already open.
+
+If the connector the reaper gave up on finishes anyway, its result is dropped
+rather than written: the completion is filtered on `status = 'processing'`, and
+migration 016 would refuse it regardless. The reaper's verdict is the one that
+stands, and no candidates are left behind by the run that outlived its claim.
 
 `POST /api/imports/reap` runs it, gated by `requireAdminOrService()` — an
 admin session or `DOMNER_SERVICE_TOKEN` — exactly like
