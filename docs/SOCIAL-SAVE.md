@@ -834,6 +834,31 @@ they are written down rather than forgotten:
   identity is the index, never the slug.
 - **No places audit table.** Promotions are logged with actor and reason, not
   stored.
+- **OUTSTANDING — real-catalogue staging validation for the `013` backfill has
+  never been run.** Everything above about the backfill (dedup by geohash +
+  normalized name, the function-per-row join, "check the row count before
+  running it on a large table") has been verified against synthetic and
+  PGlite-rehearsal data only — never against a copy of the real production
+  `destination_places` catalogue, because no session doing this work has held
+  staging credentials or network access to Supabase. Before `013` (or any
+  migration reshaping `destination_places`) is applied to production, run it
+  against a staging copy seeded from a real `destination_places` export and
+  confirm, by hand:
+    1. The backfilled row count into `places` matches the source row count in
+       `destination_places` (no rows silently dropped).
+    2. The step-3 "would this new rule merge two previously-distinct places"
+       query (above, in *Rolling back, and rebuilding the keys*) returns zero
+       unexpected merges — or every merge it does return has been reviewed by
+       a human, not auto-resolved.
+    3. The backfill's wall-clock time is acceptable at the real row count —
+       it is a function-per-row join with no index, and "fine at editorial
+       scale" was never checked against the actual catalogue size.
+    4. A sample of `canonical_place_id` links from `destination_places` reads
+       back correctly through the registry's own lookup path, not just via a
+       direct SQL join.
+  This is carried forward from Phase 3's own review rather than newly
+  discovered; it is written here so it is tracked in the repository rather
+  than only in a PR description or a chat transcript.
 
 
 ---

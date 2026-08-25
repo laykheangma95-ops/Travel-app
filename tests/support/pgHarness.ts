@@ -51,6 +51,11 @@ const MIGRATIONS = [
   // Phase 3: the intake columns, the queue vocabulary, and the reuse index and
   // replay guard that had to follow the status rename.
   '015_import_intake.sql',
+  // Phase 4: terminal statuses are absorbing. This is what stops a traveler
+  // rewinding a finished import to `queued` to buy another connector/model
+  // run, and what stops the reaper's `failed` being overwritten by a late
+  // completion.
+  '016_import_status_terminal.sql',
 ];
 
 /**
@@ -427,16 +432,55 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
         return api;
       },
       or(expression: string) {
-        const parts: string[] = [];
-        const params: unknown[] = [];
-        for (const clause of expression.split(',')) {
-          const [column, operator, operand] = clause.split('.');
-          if (operator === 'is' && operand === 'null') parts.push(`${column} IS NULL`);
-          else if (operator === 'gte') {
-            parts.push(`${column} >= ?`);
-            params.push(operand);
-          } else throw new Error(`pgHarness: unsupported or() operator "${operator}"`);
+        // Split on top-level commas only, so the comma inside `and(a.is.null,
+        // b.lt.x)` does not split that group in half — same reasoning as
+        // splitSelect() above. lib/travel/importReaper.ts's
+        // `started_at.lt.X,and(started_at.is.null,created_at.lt.X)` needs
+        // exactly this: an OR of a simple clause and an AND-group.
+        const clauses: string[] = [];
+        let depth = 0;
+        let current = '';
+        for (const character of expression) {
+          if (character === '(') depth += 1;
+          if (character === ')') depth -= 1;
+          if (character === ',' && depth === 0) {
+            clauses.push(current);
+            current = '';
+            continue;
+          }
+          current += character;
         }
+        if (current) clauses.push(current);
+
+        const simple = (clause: string): { sql: string; params: unknown[] } => {
+          // Split on the first two dots only: `column.operator.value`, where
+          // `value` is everything after — an ISO timestamp is full of dots and
+          // colons of its own (`2026-08-25T04:20:00.000Z`), and a naive
+          // `clause.split('.')` truncates it at the millisecond dot and drops
+          // the trailing seconds/hundredths/Z, producing a timestamp Postgres
+          // parses in server-local time instead of UTC.
+          const match = /^([^.]+)\.([^.]+)\.(.+)$/.exec(clause);
+          if (!match) throw new Error(`pgHarness: cannot parse or() clause "${clause}"`);
+          const [, column, operator, operand] = match;
+          if (operator === 'is' && operand === 'null') return { sql: `${column} IS NULL`, params: [] };
+          if (operator === 'gte') return { sql: `${column} >= ?`, params: [operand] };
+          if (operator === 'lt') return { sql: `${column} < ?`, params: [operand] };
+          throw new Error(`pgHarness: unsupported or() operator "${operator}"`);
+        };
+
+        const params: unknown[] = [];
+        const parts = clauses.map((clause) => {
+          const group = /^and\((.*)\)$/.exec(clause);
+          if (group) {
+            const inner = group[1].split(',').map(simple);
+            inner.forEach((entry) => params.push(...entry.params));
+            return `(${inner.map((entry) => entry.sql).join(' AND ')})`;
+          }
+          const entry = simple(clause);
+          params.push(...entry.params);
+          return entry.sql;
+        });
+
         filters.push({ sql: `(${parts.join(' OR ')})`, params });
         return api;
       },
