@@ -31,6 +31,7 @@ import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
 import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
+import { safeWebsiteHref } from '@/lib/places/safeLink';
 
 interface PlaceDetail {
   id: string;
@@ -180,14 +181,27 @@ export default function PlaceDetailPage() {
               )}
               {state.place.website && (
                 <p className="truncate text-sm">
-                  <a
-                    href={state.place.website}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-accent underline underline-offset-2"
-                  >
-                    {state.place.website}
-                  </a>
+                  {(() => {
+                    // A place's `website` has no protocol CHECK in the
+                    // database (migration 013) — a direct PostgREST write can
+                    // store a javascript: or data: value, and it does not
+                    // error when it happens. This is the render boundary that
+                    // actually stops it: anything that is not http(s) is
+                    // shown as plain text, never as a clickable anchor.
+                    const safeHref = safeWebsiteHref(state.place.website);
+                    return safeHref ? (
+                      <a
+                        href={safeHref}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-accent underline underline-offset-2"
+                      >
+                        {state.place.website}
+                      </a>
+                    ) : (
+                      <span className="text-white/70">{state.place.website}</span>
+                    );
+                  })()}
                 </p>
               )}
               {state.place.phone && (
