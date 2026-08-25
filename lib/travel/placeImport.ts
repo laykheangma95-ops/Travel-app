@@ -23,6 +23,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
+import { log } from '@/lib/logger';
+import { attachCanonicalPlace, resolvePlaceForTraveler } from '@/lib/places/repository';
+import type { CanonicalPlaceInput } from '@/lib/places/validation';
 import type { ItineraryCategory } from './itinerary';
 import { PLACE_DESCRIPTION_MAX, PLACE_NAME_MAX } from './itinerary';
 import { addIdeaToTrip } from './savedPlaces';
@@ -295,7 +298,65 @@ async function insertPlace(
     .single();
 
   if (error || !data) throw new ApiError('INTERNAL', 'Could not save that place.');
-  return data.id as string;
+  const placeId = data.id as string;
+
+  // Registry linking reads `place.lat`/`place.lng` BEFORE the `?? 0` fallback
+  // above — that fallback is a "no map pin" placeholder for destination_places,
+  // never a location, and (0, 0) sent into a 150m proximity search would
+  // silently merge every coordinate-less import from every traveler into one
+  // row at null island. A place with no real coordinates is left unlinked.
+  if (place.lat !== null && place.lng !== null) {
+    await linkCanonicalPlace(supabase, userId, placeId, destination, {
+      ...place,
+      lat: place.lat,
+      lng: place.lng,
+    });
+  }
+
+  return placeId;
+}
+
+/**
+ * Resolve the imported place against the shared canonical registry
+ * (migration 013) and point this traveler's row at it, best-effort.
+ *
+ * WHY THIS CAN NEVER FAIL THE SAVE: `place` is already written to
+ * `destination_places` by the time this runs. `resolvePlaceForTraveler` and
+ * `attachCanonicalPlace` already swallow their own Supabase errors and return
+ * null/false rather than throw, but this is wrapped anyway — the same "belt
+ * and braces" reasoning `recordPlaceSource`/`markCandidateAccepted` already
+ * use below, for the same reason: a bookkeeping/linking step must not turn a
+ * successful save into a failed one.
+ *
+ * WHY THE CALLER'S SESSION CLIENT: resolution must only ever see places this
+ * traveler's own RLS already permits (published, or their own unverified
+ * rows), and anything it creates must land as `unverified` — the ceiling RLS
+ * enforces on that client and nothing here overrides.
+ */
+async function linkCanonicalPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  destinationPlaceId: string,
+  destination: string,
+  place: ImportablePlace & { lat: number; lng: number }
+): Promise<void> {
+  try {
+    const input: CanonicalPlaceInput = {
+      name: place.name,
+      countryName: destination,
+      category: place.category,
+      latitude: place.lat,
+      longitude: place.lng,
+    };
+    const resolution = await resolvePlaceForTraveler(supabase, userId, input);
+    if (resolution) {
+      await attachCanonicalPlace(supabase, destinationPlaceId, resolution.place.id);
+    }
+  } catch (cause) {
+    log.warn('place_import.registry_link_failed', {
+      reason: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
+    });
+  }
 }
 
 /** Case- and punctuation-insensitive, so "Wat Pho" and "wat pho." are one place. */

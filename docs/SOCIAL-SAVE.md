@@ -880,6 +880,17 @@ they are written down rather than forgotten:
   This is carried forward from Phase 3's own review rather than newly
   discovered; it is written here so it is tracked in the repository rather
   than only in a PR description or a chat transcript.
+- **OUTSTANDING, added by Phase 7 — a sample of newly-imported real places
+  must be checked against real editorial data in staging.** Phase 7 (Part 13)
+  is the first thing that ever calls this registry from a live save path.
+  Everything above about the `013` backfill was checked against synthetic and
+  PGlite data only; Phase 7 adds one more question the same staging copy must
+  answer before either migration reshapes production: import a handful of
+  captions naming places that already exist in the real editorial
+  `destination_places` catalogue, and confirm each one attaches
+  `canonical_place_id` to that place's real backfilled row — not a fresh
+  duplicate. This has not been run. No session doing this work has held
+  staging Supabase credentials.
 
 
 ---
@@ -1061,3 +1072,95 @@ collections/ratings deferred.
 Xiaohongshu/RED connector or widen the SSRF allowlist, activate a paid Places
 provider, touch M1, or add collections/ratings. All five remain exactly where
 Parts 5 and 10 of this document left them.
+
+
+---
+
+## Part 13 — Phase 7
+
+**Status: implemented.** Registry wiring only — the smallest change that makes
+Part 9's canonical registry (`places`, `place_external_ids`,
+`resolvePlaceForTraveler`, `attachCanonicalPlace`) reachable from a real save,
+rather than infrastructure nothing calls. See Part 9's own "Known
+limitations" #1, which this phase closes: "nothing calls the registry yet."
+
+**Owner decisions this was built under:** registry wiring exactly as scoped
+here — no paid Places provider, no AI extraction change, no OCR/RED, no
+collections/ratings, no M1 change, no itinerary-editor manual-add wiring, no
+provider verification, no batched-resolver redesign. No schema change: the
+`canonical_place_id` column Phase 2 added to `destination_places` is reused
+as-is. Resolver performance is left as measured (one `findNearbyByName`
+lookup per place, not the ~8-round-trip provider path Part 9's risk register
+warned about) rather than redesigned around batching, matched to current
+pre-launch traffic; batching is documented below as follow-up if measurement
+ever shows otherwise.
+
+**What it does:** `insertPlace()` in `lib/travel/placeImport.ts` — the one
+place both the synchronous (`/import`) and async (`/import/link`) pipelines
+write a traveler's `destination_places` row — now calls
+`resolvePlaceForTraveler()` on the caller's own session client immediately
+after that row is written, and sets `canonical_place_id` via
+`attachCanonicalPlace()` when a resolution comes back. Both pipelines pick
+this up automatically through the shared call site; neither was touched
+directly.
+
+**The null-island guard.** `insertPlace()` already substituted `lat: place.lat
+?? 0, lng: place.lng ?? 0` for a place with no geocoded pin — existing
+behaviour, unchanged. Registry resolution reads `place.lat`/`place.lng`
+*before* that substitution: a place with either one `null` is never sent into
+`resolvePlaceForTraveler` at all, so `(0, 0)` — a "no map pin" placeholder,
+never a location — can never seed or match a proximity search. Without this,
+every coordinate-less import from every traveler would eventually collide at
+one canonical row sitting on the null island in the Gulf of Guinea.
+
+**Failure isolation.** The resolve-and-attach call is wrapped in its own
+try/catch, on top of the fact that `resolvePlaceForTraveler` and
+`attachCanonicalPlace` already return `null`/`false` rather than throw. A
+registry failure costs a place that stays unlinked; it can never fail the
+`destination_places` insert, the import as a whole, or trip creation — the
+same failure-isolation pattern `recordPlaceSource`/`markCandidateAccepted`
+already use two lines below it.
+
+**Tests.** `tests/placeImport.registry.test.ts`, against the same PGlite
+harness every RLS-sensitive suite uses, proves through the actual import call
+path (not the repository directly, which `tests/places.registry.rls.test.ts`
+already covers): a real-coordinate place gets `canonical_place_id` attached
+and starts `unverified`; the resolve call is made with the caller's own
+session client and never a service/admin client; the same place imported
+twice (by one traveler, or by two once the first is published — cross-user
+matching only sees published places, per Part 9's own known limitation)
+lands on one canonical row; two places sharing a normalized name but ~150km
+apart do not merge; a place with no coordinates is never sent into
+resolution and leaves `canonical_place_id` NULL; two coordinate-less imports
+from different travelers never merge through the `(0, 0)` sentinel; the
+import path cannot escalate a place past `unverified`, checked by attempting
+it through the traveler's own client; and a mocked registry failure still
+lets the place, the import, and trip creation all succeed.
+
+**What Phase 7 deliberately did not do:** touch `lib/places/repository.ts`,
+`lib/places/normalize.ts`, or `lib/places/validation.ts` — the resolver,
+already built and already tested by Phase 2's own review, needed no change,
+only a caller. No migration, no new `ServiceName`, no service-role client
+introduced anywhere in the call path. The itinerary editor's own manual
+"add a place" insert sites
+(`app/api/travel/itinerary/[tripId]/route.ts`,
+`.../generate/route.ts`) also write fresh `destination_places` rows and are
+not wired to the registry by this phase — identified while auditing every
+insert site, deliberately left alone as a separate, unapproved scope
+expansion.
+
+**Known limitation, inherited from Part 9 and not addressed here:** cross-user
+proximity matching still only sees *published* places. Two different
+travelers each importing the same real-world place, neither of which is yet
+`domner_public`, still get two unlinked canonical rows until one is
+published — Phase 7 makes the registry reachable, it does not change who can
+see what in it.
+
+**Staging validation — still BLOCKED / OUTSTANDING, unchanged in kind, one
+item added.** No session doing any phase of this work has held staging
+Supabase credentials or network access to Supabase. Part 9's four-point
+backfill checklist (row count, zero-unexpected-merges, wall-clock time,
+sampled round-trip) remains unrun. Phase 7 adds a fifth, specific to what it
+wires in — recorded in Part 9's own "Open items carried forward" list rather
+than duplicated here — and it must not be reported as passed until an
+owner or a session with real staging access runs it.
