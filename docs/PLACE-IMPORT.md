@@ -382,14 +382,79 @@ stands, and no candidates are left behind by the run that outlived its claim.
 admin session or `DOMNER_SERVICE_TOKEN` — exactly like
 `POST /api/notifications/dispatch`. There is still no `crons` block in
 `vercel.json` and no queue (§1.14 of `SOCIAL-SAVE.md`); an external scheduler
-calling this endpoint on an interval is the intended trigger, the same as the
-flight-alert cron.
+calling this endpoint on an interval is the intended trigger.
+
+**Corrected, Phase 5:** the sentence this replaced said "the same as the
+flight-alert cron," as if that were a working precedent to point at. It
+is not — there is no flight-alert cron either. Nothing in this codebase has
+ever called a scheduled endpoint in production; `vercel.json` has never had a
+`crons` block. That comparison overstated what exists, and it is corrected
+here rather than repeated. See *Scheduling the reaper — not yet configured*
+below for what actually needs to happen before this is a real safety net.
 
 ### Environment variables
 
 | Name | Default | What it does |
 |---|---|---|
 | `PLACE_IMPORT_REAP_TIMEOUT_MS` | `600000` (10 min) | How long a job may sit in `processing` before the reaper fails it. |
+
+### Scheduling the reaper — not yet configured
+
+**Nothing calls `POST /api/imports/reap` on a schedule today.** The endpoint
+is built, its logic is tested (`tests/importReaper.test.ts` — idempotency and
+concurrency, not the route itself), and it is safe to call any number of
+times from any number of callers at once — but until *something* actually
+calls it periodically, a job
+abandoned mid-flight (a traveler closes the tab, loses connectivity, or the
+app crashes between `process` claiming the job and it completing) stays
+`processing` forever. That traveler cannot simply paste the link again either:
+`place_imports_open_idx` (migration 015) refuses a second job for the same
+link while an earlier one is still open, and calling `process` again on a job
+already `processing` does not reclaim it — `claimQueuedImport` only claims
+from `status = 'queued'` — it just reports `already-processing` and changes
+nothing. Only the reaper actually un-sticks that link.
+
+**This does not affect the ordinary, foreground-driven path.** Phase 5 wires
+`/import/link` to call `process` and then poll immediately after intake, in
+the same session, and that path needs no scheduler at all — it is how most
+imports will actually complete. The reaper is the safety net for the
+traveler who does not stay on the screen long enough to see the job finish,
+which is expected to be uncommon but not impossible.
+
+**Two ways to actually schedule it, neither applied to this repo:**
+
+1. **Vercel Cron** (`vercel.json`'s `crons` array) is *not* a drop-in fit for
+   this endpoint as it stands. Vercel Cron sends a `GET` request, and its
+   built-in auth is `Authorization: Bearer $CRON_SECRET` (a `CRON_SECRET`
+   Vercel env var it adds automatically) — this route only exports `POST` and
+   checks a custom `x-domner-service-token` header
+   (`lib/serverAuth.ts:verifyServiceToken`). Wiring this option up means: add
+   a `GET` handler here (or a `CRON_SECRET`-aware branch) mirroring what
+   `POST` does, then add a `vercel.json` entry such as
+   `{"path": "/api/imports/reap", "schedule": "*/10 * * * *"}`. It also has a
+   plan-tier ceiling worth knowing before choosing it: the Hobby plan runs
+   cron jobs at most once a day, which would leave a stuck job un-reaped for
+   up to 24 hours; the Pro plan allows down-to-the-minute schedules.
+2. **Any external scheduler that can send an authenticated `POST`** — a
+   GitHub Actions workflow on a `schedule:` trigger, a small always-on cron
+   host, `cron-job.org`, or equivalent — calling
+   `POST https://<domain>/api/imports/reap` with header
+   `x-domner-service-token: <DOMNER_SERVICE_TOKEN>`. This needs **no code
+   change here at all**, works with the endpoint exactly as it is today, and
+   is not tied to any Vercel plan tier. `PLACE_IMPORT_REAP_TIMEOUT_MS` is 10
+   minutes by default, so a call every 5–10 minutes is a reasonable interval.
+
+**This is an owner decision, not a default this document picks for you** —
+it involves a real choice (a code change plus a Vercel plan-tier
+consideration, vs. an external service to stand up and hold a copy of
+`DOMNER_SERVICE_TOKEN`), which is exactly the kind of thing CLAUDE.md §6 asks
+to be flagged rather than guessed at. **Until one of these is actually
+configured and verified working, do not describe Phase 5's background
+processing as production-complete.** A brief way to verify it once
+configured: submit a link, kill the tab before the review screen appears (so
+the job is left `processing`), wait past the interval, then check that
+`place_imports` row reads `failed` with `error_code = 'stuck_timeout'` and
+that the same link can be submitted again.
 
 ### What Phase 4 deliberately did not do
 
