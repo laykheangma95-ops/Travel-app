@@ -223,9 +223,11 @@ double tap or a retrying client gets back the job it already has rather than
 creating a second — the first implementation checked-then-wrote and five
 simultaneous submissions produced five jobs.
 
-**Known limitation:** a job stuck in `processing` keeps that link un-importable
-for that traveler until it reaches a terminal status. The connector phase needs
-a reaper that fails jobs which have been open too long.
+**Known limitation, closed in Phase 4:** a job stuck in `processing` used to
+keep that link un-importable for that traveler until it reached a terminal
+status, with nothing to move it there. `lib/travel/importReaper.ts` now fails
+any job that has been `processing` too long — see *The connector layer
+(Phase 4)* below.
 
 ### Reuse is the traveler's own history, and only theirs
 
@@ -237,3 +239,120 @@ who they follow.
 If cross-user reuse is ever worth the cost saving, the thing to share is the
 derived result — candidates keyed by `url_hash` in a table with no owner — never
 another traveler's `place_imports` row.
+
+---
+
+## The connector layer (Phase 4)
+
+`POST /api/imports/:id/process` — read a queued job and turn it into candidates.
+
+Phase 3 only records that a link exists. Nothing then read it — this is the
+gap that closes. It is a separate request from the intake, deliberately, for
+the same reason recording and reading were already split for the synchronous
+importer: recording a link must never itself fetch anything.
+
+| Stage | Module |
+|---|---|
+| Claim the job (`queued` → `processing`) | `lib/travel/importOrchestrator.ts` |
+| Which platform reads which link | `lib/connectors/places/registry.ts` |
+| The one connector Domner has today | `lib/connectors/places/linkConnector.ts` |
+| Sanitize what it returns | `lib/travel/connectorBoundary.ts` |
+| Read the caption, same as `/import` | `lib/travel/placeAgent.ts`, `lib/travel/placeExtraction.ts` |
+| Reap a job stuck in `processing` | `lib/travel/importReaper.ts` |
+
+### One connector, and why it opens no new socket
+
+`lib/connectors/places/linkConnector.ts` calls `fetchLinkPreview`
+(`lib/travel/linkPreview.ts`) and, for a Google Maps link, `resolveFinalUrl`
+(`lib/travel/mapsResolve.ts`) — the exact two functions `/api/travel/extract`
+already uses. Both carry their own exact-match host allowlist, checked before
+any socket opens and re-checked at every redirect hop. This connector opens no
+socket of its own; it is registered for `tiktok`, `instagram`, `facebook`,
+`youtube`, `google-maps` and `web` — every platform Domner can already read.
+
+**Xiaohongshu still has no connector**, on purpose. Adding one would mean
+adding RED's hosts to `linkPreview.ts`'s allowlist, which Phase 3 explicitly
+declined to do (*Classification is not permission to fetch*, above). A link
+with no registered connector fails cleanly with `error_code = 'no_connector'`
+— never a silent fetch of a site that never agreed to be read, and never a job
+stuck forever.
+
+### The connector port
+
+`lib/connectors/places/types.ts` — mirrors `lib/providers/places/types.ts`
+exactly: an adapter returns a normalized `ConnectorExtraction` or throws, and
+is responsible for its own timeout and retry. A future official TikTok/
+Instagram/RED integration is a new adapter file plus one `register()` call in
+the registry, never a change to the job state machine.
+
+### Connector output is untrusted
+
+A `ConnectorExtraction` is treated exactly like a model's JSON in
+`placeAgent.ts` — "our own connector wrote it" is not a safety property. Every
+field passes through `sanitizeConnectorResult()`
+(`lib/travel/connectorBoundary.ts`) before anything downstream sees it: text is
+length-capped, coordinates outside the physical range are dropped, a
+confidence outside `[0,1]` is clamped, a thumbnail URL must be `https`, and
+connector metadata is reduced to a small bag of primitives — a connector
+reading a real vendor API cannot hand its entire raw payload through as
+"metadata". Candidate place names still go through `normaliseCandidate()`, the
+same single door every other candidate source (the model, the deterministic
+extractor, a Maps link) uses. **A connector can never write to `places`,
+`destination_places`, or any canonical record** — it produces candidates for a
+human to review, and the existing SAVE endpoint is the only door onto a trip.
+
+### Claiming is one conditional UPDATE
+
+`UPDATE place_imports SET status = 'processing' ... WHERE status = 'queued'
+RETURNING ...`. A double-tap of "process", or two workers reaching for the
+same row, resolves without an application-level lock: Postgres serializes the
+two statements, exactly one matches `status = 'queued'`, and the loser is told
+the job's real current status rather than being allowed to run the connector
+twice. The same pattern Phase 3 used for the open-job partial index, expressed
+as a `WHERE` clause instead of a constraint because this is a state
+transition, not a new row.
+
+### The stuck-job reaper
+
+`lib/travel/importReaper.ts` fails any job that has been `processing` for
+longer than `PLACE_IMPORT_REAP_TIMEOUT_MS` (default ten minutes — generous
+relative to the connector layer's own few-second timeouts). One `UPDATE ...
+WHERE status = 'processing' AND (started_at < cutoff OR (started_at IS NULL
+AND created_at < cutoff))`, which is the whole safety argument: idempotent
+(a row it already failed is no longer `processing`, so a second sweep leaves
+it alone) and safe under concurrency (two sweeps racing on one row serialize
+at the database — the loser's `WHERE` matches nothing once the winner has
+committed). The `started_at IS NULL` branch reaches a `processing` row written
+by the older synchronous pipeline (`app/api/travel/extract`, migration 012),
+which never set that column.
+
+Reaping a job un-sticks the exact link it was stuck on: `failed` is not one of
+the statuses `place_imports_open_idx` covers, so the traveler can submit that
+link again immediately rather than being told one is already open.
+
+`POST /api/imports/reap` runs it, gated by `requireAdminOrService()` — an
+admin session or `DOMNER_SERVICE_TOKEN` — exactly like
+`POST /api/notifications/dispatch`. There is still no `crons` block in
+`vercel.json` and no queue (§1.14 of `SOCIAL-SAVE.md`); an external scheduler
+calling this endpoint on an interval is the intended trigger, the same as the
+flight-alert cron.
+
+### Environment variables
+
+| Name | Default | What it does |
+|---|---|---|
+| `PLACE_IMPORT_REAP_TIMEOUT_MS` | `600000` (10 min) | How long a job may sit in `processing` before the reaper fails it. |
+
+### What Phase 4 deliberately did not do
+
+- **No UI wires up to `/api/imports/:id/process` yet.** `/import/link`
+  (Phase 3) still only records a job; nothing calls "process" for it
+  automatically. The endpoint is built, tested, and ready to be called — from
+  that screen, from a background trigger, or from a future connector-specific
+  flow — but wiring a live product surface to it is a separate, smaller
+  decision than building the orchestration layer itself.
+- **No `needs_confirmation` status is produced yet.** The vocabulary
+  (migration 015) reserves it for a future connector that can signal genuine
+  ambiguity — "this could be one of three places" — rather than the
+  deterministic completed/failed the current connector produces.
+- **M1 and M2** (`docs/SOCIAL-SAVE.md`, Part 10) are unchanged by this phase.

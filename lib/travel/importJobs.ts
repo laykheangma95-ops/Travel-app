@@ -390,6 +390,45 @@ export async function failImport(supabase: SupabaseClient, importId: string | nu
   }
 }
 
+/** Closed vocabulary for `place_imports.error_code`, set by the connector orchestrator. */
+export type ImportErrorCode =
+  | 'no_connector'
+  | 'connector_error'
+  | 'unsafe_url'
+  | 'stuck_timeout';
+
+/**
+ * Mark a job as failed with a reason, for a human or the UI to read back.
+ *
+ * Additive to `failImport` above, not a replacement: that function is used by
+ * the existing synchronous pipeline (app/api/travel/extract) and its callers
+ * are unchanged. This is for the queue orchestration added in Phase 4, which
+ * has a reason worth recording — `error_code`/`error_message` were added by
+ * migration 015 for exactly this and have had no writer until now.
+ */
+export async function failImportWithReason(
+  supabase: SupabaseClient,
+  importId: string,
+  code: ImportErrorCode,
+  message: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('place_imports')
+      .update({
+        status: 'failed',
+        error_code: code,
+        error_message: message.slice(0, 500),
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', importId);
+  } catch (error) {
+    log.warn('import_job.fail_with_reason_threw', {
+      reason: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+    });
+  }
+}
+
 export interface ImportProvenance {
   platform: ImportPlatform;
   key: ImportKey;
