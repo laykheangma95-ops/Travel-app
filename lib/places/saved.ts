@@ -292,16 +292,20 @@ export async function getSavedPlaces(
 
   if (query.destination) builder = builder.eq('country_name', query.destination);
 
+  // .range() is inclusive on both ends and does the paging in the database —
+  // page 2 reads only page 2's rows, not page 1's again. `order()` first is
+  // what makes a `range` mean anything: without a stable sort, "rows 50-99"
+  // is a different 50 rows on every request.
   const { data, error } = await builder
     .order('saved_at', { ascending: false })
-    .limit(limit + offset);
+    .range(offset, offset + limit - 1);
 
   if (error || !data) {
     if (error) log.warn('saved_places.list_failed', { reason: error.message.slice(0, 160) });
     return [];
   }
 
-  return (data as unknown as SavedRow[]).slice(offset).map(toSavedPlace);
+  return (data as unknown as SavedRow[]).map(toSavedPlace);
 }
 
 /**
@@ -320,6 +324,20 @@ export async function getSavedPlacesByDestination(
   return getSavedPlaces(supabase, userId, { ...query, destination });
 }
 
+/**
+ * Comfortably larger than any real library today — a defensive cap on the
+ * query, not a page size meant to bind. PostgREST has no `GROUP BY`, so this
+ * tally is built in the server process rather than the database; keeping it
+ * correct without a migration (no aggregating view or RPC exists yet — see
+ * Phase 10's `getSavedDestinations` limitation) means reading enough rows
+ * that a real library is never truncated, while still bounding the query
+ * rather than reading the whole table unconditionally. Only `country_name` is
+ * selected — no joined columns — so this stays cheap even at this size, and
+ * the tally is what leaves this module: the browser only ever receives the
+ * aggregated `{ destination, count }` list, never these raw rows.
+ */
+const DESTINATION_TALLY_LIMIT = 5000;
+
 /** Which countries the traveler has saved places in, for a filter control. */
 export async function getSavedDestinations(
   supabase: SupabaseClient,
@@ -329,7 +347,7 @@ export async function getSavedDestinations(
     .from('saved_places_detailed')
     .select('country_name')
     .eq('user_id', userId)
-    .limit(SAVED_PLACES_PAGE_SIZE);
+    .limit(DESTINATION_TALLY_LIMIT);
 
   if (error || !data) return [];
 

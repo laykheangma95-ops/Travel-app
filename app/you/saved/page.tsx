@@ -45,6 +45,14 @@ interface Destination {
   count: number;
 }
 
+// One page of the "Load more" button. Deliberately smaller than the server's
+// own SAVED_PLACES_PAGE_SIZE (50, see lib/places/saved.ts) — that number is a
+// safety ceiling on the route, not a UI page size, and the two are free to
+// differ as long as this stays at or under it. A response shorter than a full
+// page is how "no more pages" is detected; no separate total-count field
+// exists to ask for instead.
+const PAGE_SIZE = 20;
+
 export default function SavedPlacesPage() {
   const { t, lang } = useLang();
   const { user, loading: sessionLoading } = useSession();
@@ -53,13 +61,16 @@ export default function SavedPlacesPage() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(
     async (destination: string | null) => {
       setError(null);
       try {
-        const query = destination ? `?destination=${encodeURIComponent(destination)}` : '';
-        const response = await fetch(`/api/travel/places/saved${query}`, {
+        const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
+        if (destination) query.set('destination', destination);
+        const response = await fetch(`/api/travel/places/saved?${query}`, {
           credentials: 'include',
         });
         if (!response.ok) throw new Error('load failed');
@@ -67,18 +78,51 @@ export default function SavedPlacesPage() {
           places?: SavedPlaceRow[];
           destinations?: Destination[];
         };
-        setPlaces(body.places ?? []);
+        const page = body.places ?? [];
+        setPlaces(page);
+        setHasMore(page.length === PAGE_SIZE);
         // The country list is deliberately NOT refreshed while a filter is
         // applied: it is the set of countries the traveler has saves in, and
         // narrowing the list must not narrow the way back out of it.
         if (!destination) setDestinations(body.destinations ?? []);
       } catch {
         setPlaces([]);
+        setHasMore(false);
         setError(t('saved.loadError'));
       }
     },
     [t]
   );
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const query = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(places?.length ?? 0),
+      });
+      if (filter) query.set('destination', filter);
+      const response = await fetch(`/api/travel/places/saved?${query}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('load failed');
+      const body = (await response.json()) as { places?: SavedPlaceRow[] };
+      const page = body.places ?? [];
+      // Guards against a duplicate card if a save landed between two page
+      // requests and shifted the newest-first ordering by one row.
+      setPlaces((current) => {
+        const seen = new Set((current ?? []).map((row) => row.savedId));
+        return [...(current ?? []), ...page.filter((row) => !seen.has(row.savedId))];
+      });
+      setHasMore(page.length === PAGE_SIZE);
+    } catch {
+      setError(t('saved.loadError'));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [filter, places, loadingMore, hasMore, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -243,6 +287,18 @@ export default function SavedPlacesPage() {
                 </li>
               ))}
             </ul>
+            {hasMore && (
+              <div className="mt-5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40 disabled:opacity-60"
+                >
+                  {loadingMore ? t('saved.loadingMore') : t('saved.loadMore')}
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>

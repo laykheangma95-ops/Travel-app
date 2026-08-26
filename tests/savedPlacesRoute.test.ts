@@ -88,6 +88,17 @@ async function publishedPlace(overrides: Partial<ProviderPlace> = {}): Promise<s
   return resolved!.place.id;
 }
 
+/** An import belonging to one traveler, for the provenance tests. Same shape
+ *  as tests/savedPlaces.security.test.ts's own `importFor`. */
+async function importFor(owner: string, hash: string): Promise<string> {
+  const [row] = await harness.asAdmin(
+    `INSERT INTO place_imports (user_id,url_hash,normalized_url,platform,status)
+     VALUES ($1,$2,'tiktok.com/x','tiktok','ready') RETURNING id`,
+    [owner, hash]
+  );
+  return row.id as string;
+}
+
 beforeAll(async () => {
   harness = await createHarness();
 });
@@ -154,6 +165,45 @@ describe('POST — saving', () => {
     const placeId = await publishedPlace();
     currentUser = null;
     expect((await post({ placeId })).status).toBe(401);
+  });
+});
+
+// Phase 12 — hearting a place from the import "saved" screen sends
+// sourceImportId over this exact route, so this is the path SavedPlaceButton
+// actually takes rather than a re-statement of the module-level contract
+// tests/savedPlaces.security.test.ts already proves (which this does not
+// duplicate — that suite is the adversarial one, this is the HTTP one).
+describe('POST — saving with provenance', () => {
+  it('persists sourceImportId when it names the caller\'s own import', async () => {
+    const placeId = await publishedPlace();
+    const ownImport = await importFor(ALICE, 'a'.repeat(64));
+
+    const response = await post({ placeId, sourceImportId: ownImport });
+    expect(response.status).toBe(200);
+
+    const [row] = await harness.rows('saved_places');
+    expect(row.source_import_id).toBe(ownImport);
+  });
+
+  it('still saves, with no provenance, when sourceImportId is omitted', async () => {
+    const placeId = await publishedPlace();
+
+    expect((await post({ placeId })).status).toBe(200);
+
+    const [row] = await harness.rows('saved_places');
+    expect(row.source_import_id).toBeNull();
+  });
+
+  it('refuses another traveler\'s import id, and writes nothing', async () => {
+    const placeId = await publishedPlace();
+    const bobsImport = await importFor(BOB, 'b'.repeat(64));
+
+    const response = await post({ placeId, sourceImportId: bobsImport });
+    // Same NOT_FOUND shape as a place the caller cannot see — a save that
+    // succeeds for one id and fails for another is an oracle, whichever
+    // column is being probed.
+    expect(response.status).toBe(404);
+    expect(await harness.rows('saved_places')).toHaveLength(0);
   });
 });
 
@@ -244,6 +294,99 @@ describe('GET — reading the library', () => {
     };
     expect(body.places).toHaveLength(1);
     expect(body.places[0].countryName).toBe('China');
+  });
+
+  // Phase 12 — the 50-row ceiling (BREAK-4 in the readiness report): before
+  // this phase, GET never read `offset` at all, so save #51 was permanently
+  // unreachable, and getSavedDestinations tallied only the first 50 rows, so
+  // a country whose only save landed past row 50 vanished from the filter
+  // entirely rather than merely being undercounted.
+  describe('paging past the first page', () => {
+    async function seedFiftyOne(): Promise<{ ids: string[]; vietnamId: string }> {
+      const ids: string[] = [];
+      // 50 Thailand places, spread far enough apart (0.1 degrees, ~11km) that
+      // none collide on the registry's name+geohash identity index.
+      for (let i = 0; i < 50; i++) {
+        // tripWrite is capped at 30/min (lib/rateLimit.ts) — real protection
+        // against a traveler hammering the save button, not something this
+        // fixture's bulk seeding should trip. Reset periodically rather than
+        // disabling the limiter, so it stays exercised by every other test.
+        if (i % 25 === 0) __resetRateLimits();
+        const placeId = await publishedPlace({
+          providerPlaceId: `p-th-${i}`,
+          name: `Place ${i}`,
+          latitude: 10 + i * 0.1,
+          longitude: 100 + i * 0.1,
+        });
+        ids.push(placeId);
+        expect((await post({ placeId })).status).toBe(200);
+      }
+      __resetRateLimits();
+      // The 51st save, and the only one in a second country — the row that
+      // the pre-Phase-12 50-row tally would have silently dropped.
+      const vietnamId = await publishedPlace({
+        providerPlaceId: 'p-vn-1',
+        name: 'Hanoi Old Quarter',
+        countryName: 'Vietnam',
+        latitude: 21.0285,
+        longitude: 105.8542,
+      });
+      ids.push(vietnamId);
+      expect((await post({ placeId: vietnamId })).status).toBe(200);
+
+      return { ids, vietnamId };
+    }
+
+    it('reaches every saved place through limit/offset, with no duplicates', async () => {
+      const { ids } = await seedFiftyOne();
+
+      const collected: string[] = [];
+      const seen = new Set<string>();
+      let offset = 0;
+      const pageSize = 20;
+      // A generous iteration cap so a pagination bug (e.g. offset never
+      // advancing) fails the test instead of hanging it.
+      for (let guard = 0; guard < 20; guard++) {
+        const body = (await (await get(`?limit=${pageSize}&offset=${offset}`)).json()) as {
+          places: { placeId: string }[];
+        };
+        if (body.places.length === 0) break;
+        for (const row of body.places) {
+          expect(seen.has(row.placeId)).toBe(false); // no duplicate cards
+          seen.add(row.placeId);
+          collected.push(row.placeId);
+        }
+        offset += body.places.length;
+      }
+
+      expect(collected).toHaveLength(51);
+      expect(new Set(collected)).toEqual(new Set(ids));
+    });
+
+    it('clamps a negative offset to the start rather than erroring', async () => {
+      await seedFiftyOne();
+      const body = (await (await get('?limit=5&offset=-10')).json()) as { places: unknown[] };
+      expect(body.places).toHaveLength(5);
+    });
+
+    it('answers an empty page, not an error, once every save has been read', async () => {
+      await seedFiftyOne();
+      const body = (await (await get('?limit=20&offset=200')).json()) as { places: unknown[] };
+      expect(body.places).toEqual([]);
+    });
+
+    it('never truncates the destination filter to the first page', async () => {
+      const { vietnamId } = await seedFiftyOne();
+      void vietnamId;
+
+      const body = (await (await get('?limit=1')).json()) as {
+        destinations: { destination: string; count: number }[];
+      };
+      const byName = new Map(body.destinations.map((d) => [d.destination, d.count]));
+      expect(byName.get('Thailand')).toBe(50);
+      // The one place that would have fallen off a 50-row tally.
+      expect(byName.get('Vietnam')).toBe(1);
+    });
   });
 
   it('shows one traveler nothing of another\'s', async () => {

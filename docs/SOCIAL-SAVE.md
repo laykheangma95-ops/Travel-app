@@ -410,11 +410,12 @@ Each phase is independently shippable, additive, and reversible.
 > work; this note exists so a future session does not have to rediscover that
 > the hard way.
 >
-> **The actually-current phase is Phase 11**, continuing the same track
+> **The actually-current phase is Phase 12**, continuing the same track
 > Phase 6 started (production-completing and wiring what Phases 1–7 built),
-> not this table's Phase 3 or Phase 5 — see *Part 14 — Phases 8–11* below.
-> This table's own Phase 3 and Phase 5 remain real, scoped, future work —
-> owner-approved cost/security decisions away, not "next" by default.
+> not this table's Phase 3 or Phase 5 — see *Part 14 — Phases 8–11* and
+> *Part 15 — Phase 12* below. This table's own Phase 3 and Phase 5 remain
+> real, scoped, future work — owner-approved cost/security decisions away,
+> not "next" by default.
 
 ### Phase 1 — Persistence + cost control ✅ **shipped — see Part 8**
 
@@ -1331,3 +1332,162 @@ runtime check was performed. This is stated rather than implied: per
 `docs/VERIFICATION.md`, a skip is not a pass. All staging-validation debt
 recorded in Part 9's "Open items carried forward" and this section's own
 Phase 10 entry remains exactly as outstanding as before this phase.
+
+---
+
+## Part 15 — Phase 12
+
+**Status: implemented.** The Phase 11 readiness inspection found a
+truthfulness gap Phase 11 itself had introduced: `/you/saved`'s empty state
+tells a traveler to paste a link, but completing an import wrote **zero**
+`saved_places` rows — every place landed on a trip, none in the library — and
+a multi-place import (the typical carousel-post shape) offered no "View
+place" link at all, because `ImportResult.canonicalPlaceId` was null
+whenever more than one place was added. Phase 12 closes that gap: the import
+"saved" screen. **No migration, no RLS change, no AI, no paid provider, no
+`service_role` client anywhere in the path.**
+
+**Owner decisions this was built under:** manual save only — importing never
+auto-saves a place to the library, preserving the Part 10 distinction between
+"put this on a trip" and "keep this"; pagination and the destination-filter
+truncation (both carried-forward debt from Part 10's "Known limitations") are
+fixed now rather than deferred; provenance is written but not yet displayed —
+"Saved from TikTok" stays future, presentation-only work; reaper scheduling
+is untouched, still an external operator task; runtime/staging validation
+remains outstanding and is not blocking.
+
+**What it does:**
+
+- `ImportResult`/`ImportOutcome` (`lib/travel/placeImport.ts`,
+  `lib/travel/importOutcome.ts`) gain `addedPlaces: { name, canonicalPlaceId
+  }[]` — one entry per place actually written, built as the loop's single
+  source of truth rather than a second array kept in step with `added` by
+  convention. `added` and the existing single-place `canonicalPlaceId` field
+  are now *derived* from `addedPlaces` (`added: addedPlaces.map(p =>
+  p.name)`, `canonicalPlaceId: addedPlaces.length === 1 ?
+  addedPlaces[0].canonicalPlaceId : null`), so no existing caller's contract
+  changed — this is additive, matching how `canonicalPlaceId` itself was
+  added under Phase 7.
+- The import "saved" screen (`DoneStage` in
+  `components/travel/PlaceImportReview.tsx`) renders one row per
+  `addedPlaces` entry: the place's name, and — only when its own
+  `canonicalPlaceId` is non-null — a "View place" link and a
+  `SavedPlaceButton` heart. A place that never resolved to a canonical id
+  (no coordinates, a registry miss, a race lost to another traveler, per
+  Phase 7's own documented cases) still shows its name; it gets no link and
+  no heart, because there is nothing a library bookmark could point at. The
+  heart is the same `SavedPlaceButton` `/place/[id]` and `/you/saved` already
+  mount — hearting here is a real library save, not a preview of one.
+- `SavedPlaceButton` gains an optional `sourceImportId` prop, included in the
+  `POST /api/travel/places/saved` body only when present. Every existing
+  mount (`/place/[id]`, `/you/saved`) omits it and saves exactly as before —
+  this is additive, not a behavior change for either.
+- Both import screens (`ImportPlacesView.tsx` at `/import`,
+  `SocialLinkIntake.tsx` at `/import/link`) already held the import id they
+  used to call `POST /api/travel/places/import` — `result?.importId` and
+  `importId` respectively — so threading it into `DoneStage` as a new
+  `importId` prop needed no new lookup, only two new props (`importId`,
+  `returnTo`) at each existing call site.
+- **Provenance was already fully specified by migration `014` and Part 11's
+  security review; nothing called it.** `sourceImportId` has been an accepted
+  field on `POST /api/travel/places/saved` and enforced by
+  `saved_places_insert_own`'s `WITH CHECK` (own import or NULL, immutable
+  after creation by the guard trigger) since Phase 2 — the C1 finding in Part
+  11 closed exactly this hole. Phase 12 is the first caller that ever passes
+  a real value.
+- **Pagination.** `lib/places/saved.ts`'s `getSavedPlaces` already accepted
+  an `offset`, but read `limit + offset` rows and sliced the first `offset`
+  off in the application — correct, but re-reading every earlier page on
+  every request. `GET /api/travel/places/saved` never read `offset` from the
+  query string at all, so save #51 was permanently unreachable regardless.
+  Both are fixed together: the route now reads and clamps `offset`, and the
+  query uses `.range(offset, offset + limit - 1)` — paging in the database,
+  reading only the page requested. `/you/saved` gets a "Load more" button: a
+  client-side `PAGE_SIZE` of 20 (a UI choice, independent of and smaller than
+  the route's own 50-row safety ceiling), `hasMore` detected by a
+  short-of-a-full-page response (there is no separate total-count field to
+  ask for instead), and a `savedId` de-duplication guard on append in case a
+  save landed between two page requests and shifted the newest-first order.
+- **The destination filter's 50-row truncation.** `getSavedDestinations`
+  tallied only the first `SAVED_PLACES_PAGE_SIZE` (50) rows — Part 10's Known
+  Limitation #3 recorded the *count* half of this; the *worse* half, that a
+  country whose only save landed past row 50 disappeared from the filter
+  entirely, was found and fixed here. PostgREST has no `GROUP BY`, so there
+  is no aggregating view or RPC to call without a migration; the fix reads
+  only the `country_name` column (no joined columns) up to a new
+  `DESTINATION_TALLY_LIMIT` of 5,000 — comfortably larger than any real
+  library today, a defensive cap on the query rather than a page size meant
+  to bind — and tallies server-side. The browser still only ever receives
+  the aggregated `{ destination, count }` list, never the raw rows read to
+  build it.
+- `tests/support/pgHarness.ts` gained a `.range(from, to)` method on its
+  query-builder stand-in — the harness previously implemented `.limit()`
+  only, and `getSavedPlaces`'s switch to `.range()` surfaced this as
+  `builder.order(...).range is not a function` against the real harness (not
+  a mock), the same way Phase 10's `maybeSingle()` gap surfaced HIGH-1. Fixed
+  the same way: matched to real PostgREST/`.range()` semantics (inclusive on
+  both ends), not special-cased for this call site — `lib/orders.ts` and
+  `lib/reports/sales.ts` already use `.range()` in production and this is
+  the first harness-backed test to exercise it.
+
+**Security review, done before writing any code, confirmed against migration
+`014` and Part 11's own findings (all still true, unchanged by this phase):**
+`saved_places_insert_own` still requires `user_id = auth.uid()`;
+`source_import_id` ownership is still enforced at the database boundary (own
+import or NULL); the guard trigger still makes it immutable after creation;
+an invisible canonical place still cannot be saved through the route (the
+same `verification_status = 'domner_public' OR created_by = auth.uid()`
+`WITH CHECK` condition, unchanged); `place_stats` is still aggregate-only,
+gated on caller visibility, with no join back to an identity; and no
+`service_role` client is used anywhere in this phase's path — every read and
+write runs on the caller's own session client, RLS is the only boundary.
+Phase 12 makes `sourceImportId` a value a real caller sends for the first
+time; it does not change how that value is checked.
+
+**Tests.** `tests/placeImport.registry.test.ts` gained a per-place
+correctness suite: two resolved places each get their own, correctly-matched
+canonical id (not each other's); a coordinate-less place among resolved ones
+gets a null id without failing the batch; a skipped place is excluded from
+`addedPlaces`; and importing alone (no heart) writes zero `saved_places`
+rows — the other half of Part 10's own "the library writes no row into
+`destination_places`, `trip_plans` or `itinerary_places`" separation
+assertion. `tests/savedPlacesRoute.test.ts` gained: a provenance suite
+exercising the actual HTTP path `SavedPlaceButton` takes (own import
+persists, no import still saves, another traveler's import is refused with
+the same `NOT_FOUND` shape existing enumeration protections use) — this
+complements rather than duplicates `tests/savedPlaces.security.test.ts`'s
+adversarial module/database-level C1 coverage, which was re-run unchanged
+and still passes; and a pagination suite seeding 51 saved places across two
+countries, proving every one is reachable through `limit`/`offset` with no
+duplicates, a negative offset clamps rather than errors, a page past the end
+answers empty rather than erroring, and the destination filter includes the
+country whose only save is the 51st row. `tests/placeImportReview.viewPlace.test.ts`'s
+existing factory was extended with a default `addedPlaces` entry so its four
+pre-existing `viewPlaceHref` assertions — unrelated to this phase, still
+covering the single-place link decision unchanged by it — kept typechecking
+against the now-required field.
+
+**What it deliberately does not do:** auto-save an imported place; show
+"Saved from TikTok" or any other provenance display; add collections,
+ratings, search or category/recency filters; add nearby saved
+places/`PlaceCapsule`; activate a Places/search provider; change AI
+extraction; add OCR or RED/Xiaohongshu; widen any SSRF allowlist; touch
+`canonical_place_id`'s writable-pointer debt (Phase 7/8, still unscheduled)
+or M1 (Part 10, still unscheduled); schedule the reaper (still an external
+operator task, `docs/PLACE-IMPORT.md`); or touch any locked file
+(`docs/LOCKED.md`).
+
+**Verification.** `npm run typecheck` and `npm run lint` pass (the one
+pre-existing `<img>` warning in `PlaceImportReview.tsx` is unrelated to this
+phase and unchanged). The full `npm run test` — **1031 tests across 71
+files** (1020 carried forward from Phase 11, 11 new: 4 in
+`placeImport.registry.test.ts`, 7 in `savedPlacesRoute.test.ts`) — passes, as
+does `npm run build`. **`npm run verify:runtime` reports SKIPPED** — the
+`playwright` package is still not a project dependency in this environment —
+and no staging or authenticated runtime check was performed. Per
+`docs/VERIFICATION.md`, a skip is not a pass: the end-to-end claim "a
+traveler can import a link and find those places in their library" is
+unverified beyond the database and route layer until executed against a real
+backend. All staging-validation debt recorded in Part 9's "Open items
+carried forward" and Part 14's Phase 10 entry remains exactly as outstanding
+as before this phase.
