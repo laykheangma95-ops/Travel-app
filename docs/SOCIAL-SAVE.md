@@ -1408,18 +1408,23 @@ remains outstanding and is not blocking.
   short-of-a-full-page response (there is no separate total-count field to
   ask for instead), and a `savedId` de-duplication guard on append in case a
   save landed between two page requests and shifted the newest-first order.
-- **The destination filter's 50-row truncation.** `getSavedDestinations`
-  tallied only the first `SAVED_PLACES_PAGE_SIZE` (50) rows — Part 10's Known
-  Limitation #3 recorded the *count* half of this; the *worse* half, that a
-  country whose only save landed past row 50 disappeared from the filter
-  entirely, was found and fixed here. PostgREST has no `GROUP BY`, so there
-  is no aggregating view or RPC to call without a migration; the fix reads
-  only the `country_name` column (no joined columns) up to a new
-  `DESTINATION_TALLY_LIMIT` of 5,000 — comfortably larger than any real
-  library today, a defensive cap on the query rather than a page size meant
-  to bind — and tallies server-side. The browser still only ever receives
+- **The destination filter's 50-row truncation, raised to 5,000 — still a
+  cap, not unbounded correctness.** `getSavedDestinations` tallied only the
+  first `SAVED_PLACES_PAGE_SIZE` (50) rows — Part 10's Known Limitation #3
+  recorded the *count* half of this; the *worse* half, that a country whose
+  only save landed past row 50 disappeared from the filter entirely, was
+  found and fixed here. PostgREST has no `GROUP BY`, so there is no
+  aggregating view or RPC to call without a migration; the fix reads only
+  `country_name` (no joined columns) up to a new `DESTINATION_TALLY_LIMIT`
+  of 5,000 and tallies server-side — the browser still only ever receives
   the aggregated `{ destination, count }` list, never the raw rows read to
-  build it.
+  build it. **This raises the threshold; it does not remove it.** A library
+  past 5,000 saved places gets the same class of failure this fix closes —
+  both the destination LIST and the COUNTS become incomplete — just at a
+  size no real library reaches today. Carried as open debt, corrected by the
+  Principal Engineer review below (LOW-1/LOW-2): true unbounded correctness
+  needs database-side aggregation (a `GROUP BY` view or RPC), which is a
+  migration and stays out of this phase's scope.
 - `tests/support/pgHarness.ts` gained a `.range(from, to)` method on its
   query-builder stand-in — the harness previously implemented `.limit()`
   only, and `getSavedPlaces`'s switch to `.range()` surfaced this as
@@ -1491,3 +1496,91 @@ unverified beyond the database and route layer until executed against a real
 backend. All staging-validation debt recorded in Part 9's "Open items
 carried forward" and Part 14's Phase 10 entry remains exactly as outstanding
 as before this phase.
+
+**Principal Engineer review, and the remediation it required.** A review of
+this phase against the merged Phase 11 baseline attacked the client race
+conditions and the pagination ordering directly rather than trusting this
+document's own account of them, and found two real defects — both fixed in
+the same PR, before merge:
+
+- **A stale response could mix two filters' results.** Neither `load` nor
+  `loadMore` (`app/you/saved/page.tsx`) carried any guard against arriving
+  out of request order. Proven concretely: load the unfiltered list, tap
+  "Load more" (slow), switch to the China filter before it resolves — the
+  China request correctly lands first, then the stale unfiltered page
+  arrives and appends 20 Thailand rows onto a list rendered under the China
+  chip. **Fixed** with `lib/travel/requestGeneration.ts`'s `RequestGeneration`
+  — a plain incrementing-ticket guard, the same shape as
+  `SocialLinkIntake.tsx`'s own pre-existing `pollToken`, pulled into its own
+  module (rather than left inline, `pollToken`'s way) specifically so the
+  exact race above could be regression-tested: this repo's Vitest config has
+  no JSX transform, so `page.tsx` itself cannot be imported into a test, the
+  same constraint `tests/socialLinkIntakePolling.test.ts` documents for
+  `SocialLinkIntake`. `load` is authoritative (`generation.next()`, and it
+  clears `loadingMore` immediately so a superseded "Load more" spinner does
+  not hang); `loadMore` only ever holds a ticket (`generation.peek()`) and
+  applies its response, or its own error, or clears its own spinner, only
+  while that ticket is still current. `tests/requestGeneration.test.ts`
+  proves the class in isolation and then, against a pager built from the
+  real class and wired the way the page wires it, the exact scenario above
+  plus: a stale initial-load cannot replace a newer filter's results, a
+  stale Load More cannot move `hasMore` for the current filter, rapid
+  filter-switching settles on the last filter requested regardless of
+  arrival order, and a current request's error is not overwritten by an
+  earlier stale success.
+- **Offset pagination had no total order.** `getSavedPlaces` ordered by
+  `saved_at DESC` alone. Migration 014's guard trigger sets
+  `saved_at := NOW()` — the *transaction* timestamp — so a batch of saves
+  written in one statement (or, in production, several requests Postgres
+  happens to serialize into one instant) share an identical value, and
+  Postgres makes no promise about how it breaks a tie the same way across
+  two different queries. `EXPLAIN` on this exact shape showed offset 0
+  satisfied by an index scan and a large offset by an explicit sort — two
+  different physical mechanisms with no shared tie-break rule between them.
+  **Proven, mutation-checked**, per `docs/VERIFICATION.md`: 400 rows sharing
+  one `saved_at`, `ANALYZE`d to force the same plan split `EXPLAIN` showed
+  (an earlier, weaker version of this test at 55 rows never triggered the
+  divergence at all and would have shipped as a false pass); with the
+  tiebreaker removed, paging through all 400 loses 8 of them to
+  skip-or-duplicate; with it restored, `npm run verify` and this same test
+  both pass. **Fixed** by appending `saved_id` (the `saved_places` primary
+  key, unique per row) as a second `DESC` key in both `getSavedPlaces` and
+  `getSavedDestinations` — a total, deterministic order, though `saved_id`
+  itself is a random UUID with no chronological meaning; it exists only to
+  break ties consistently. `tests/support/pgHarness.ts` needed no change for
+  this — its `.order()` already composed multiple calls correctly. The
+  regression test lives in `tests/savedPlacesRoute.test.ts`'s "paging order
+  stays total when many saves share one saved_at".
+- **The destination tally's documentation overclaimed.** "A real library is
+  never truncated" was written into `DESTINATION_TALLY_LIMIT`'s own comment
+  and this Part. Both are corrected above and in `lib/places/saved.ts`
+  itself: the 5,000-row cap is bounded correctness, not unbounded — a
+  library past it gets incomplete destination counts and an incomplete
+  filter list, the same class of bug this phase closed at 50 rows, at a
+  size no real library reaches today. `getSavedDestinations` also gained the
+  same `saved_at DESC, saved_id DESC` ordering, for the same reason as
+  `getSavedPlaces`: a `LIMIT` with no total order underneath it does not
+  guarantee *which* 5,000 rows are read, only how many — so without it, the
+  cap's failure mode would have been silently nondeterministic on top of
+  being real.
+
+**What the review did not find any issue with, attacked directly rather than
+assumed:** the `source_import_id` security boundary (own-import-only,
+immutable after creation even for the caller's own import, no existence
+oracle distinguishing a real foreign import from a fabricated uuid, a
+repeated save does not overwrite original provenance, unsave-then-re-save
+correctly takes new provenance), `collection_id` still pinned NULL, hearting
+still writes nothing but `saved_places`, and an own import does not unlock a
+place the caller cannot otherwise see. None of this needed a change; all of
+it was re-verified adversarially rather than re-read from this document.
+
+**Verification, after remediation.** `npm run typecheck` and `npm run lint`
+remain clean (the one pre-existing `<img>` warning, unchanged). The full
+`npm run test` — **1041 tests across 72 files** (1031 from this phase's
+first pass, 10 new: 9 in the new `tests/requestGeneration.test.ts`, 1
+replacing the earlier, weaker 55-row version of the tied-order test in
+`tests/savedPlacesRoute.test.ts`) — passes, as does `npm run build`.
+`npm run verify:runtime` still reports **SKIPPED**, unchanged from this
+phase's first pass — remediation did not and could not close that gap. No
+migration, no RLS change, no `service_role` use, and no AI/provider work was
+introduced by this remediation.

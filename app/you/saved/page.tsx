@@ -18,7 +18,7 @@
 // this phase was told to avoid.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Heart, MapPin } from 'lucide-react';
 import { SignInLink } from '@/components/ui/SignInLink';
@@ -27,6 +27,7 @@ import { AddToTripButton } from '@/components/travel/AddToTripButton';
 import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
+import { RequestGeneration } from '@/lib/travel/requestGeneration';
 
 interface SavedPlaceRow {
   savedId: string;
@@ -64,8 +65,21 @@ export default function SavedPlacesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // A ticket for whichever request is allowed to touch `places`/`hasMore`
+  // right now. `load` is authoritative — a fresh one invalidates anything
+  // already in flight, `loadMore` included. `loadMore` only ever holds a
+  // ticket, never mints one, so two overlapping "Load more" taps do not
+  // invalidate each other, only a filter change does. See
+  // lib/travel/requestGeneration.ts for why this exists and how it is tested.
+  const generation = useRef(new RequestGeneration()).current;
+
   const load = useCallback(
     async (destination: string | null) => {
+      const ticket = generation.next();
+      // A fresh load supersedes any "Load more" already in flight — its
+      // spinner is now for a request whose answer, even if it arrives, will
+      // never be applied.
+      setLoadingMore(false);
       setError(null);
       try {
         const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
@@ -78,6 +92,7 @@ export default function SavedPlacesPage() {
           places?: SavedPlaceRow[];
           destinations?: Destination[];
         };
+        if (!generation.isCurrent(ticket)) return; // superseded while this was in flight
         const page = body.places ?? [];
         setPlaces(page);
         setHasMore(page.length === PAGE_SIZE);
@@ -86,16 +101,18 @@ export default function SavedPlacesPage() {
         // narrowing the list must not narrow the way back out of it.
         if (!destination) setDestinations(body.destinations ?? []);
       } catch {
+        if (!generation.isCurrent(ticket)) return;
         setPlaces([]);
         setHasMore(false);
         setError(t('saved.loadError'));
       }
     },
-    [t]
+    [generation, t]
   );
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
+    const ticket = generation.peek();
     setLoadingMore(true);
     setError(null);
     try {
@@ -109,6 +126,10 @@ export default function SavedPlacesPage() {
       });
       if (!response.ok) throw new Error('load failed');
       const body = (await response.json()) as { places?: SavedPlaceRow[] };
+      // A `load` that started after this request must own the screen from
+      // here — applying a stale page now would append the OLD filter's rows
+      // onto the NEW filter's list.
+      if (!generation.isCurrent(ticket)) return;
       const page = body.places ?? [];
       // Guards against a duplicate card if a save landed between two page
       // requests and shifted the newest-first ordering by one row.
@@ -118,11 +139,15 @@ export default function SavedPlacesPage() {
       });
       setHasMore(page.length === PAGE_SIZE);
     } catch {
+      if (!generation.isCurrent(ticket)) return;
       setError(t('saved.loadError'));
     } finally {
-      setLoadingMore(false);
+      // Only this request's OWN spinner — a newer `load` already cleared it
+      // for the generation it superseded, and must not have that reset
+      // undone by a stale response settling after.
+      if (generation.isCurrent(ticket)) setLoadingMore(false);
     }
-  }, [filter, places, loadingMore, hasMore, t]);
+  }, [filter, places, loadingMore, hasMore, generation, t]);
 
   useEffect(() => {
     if (!user) return;
