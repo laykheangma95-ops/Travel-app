@@ -1197,20 +1197,26 @@ stop being written down at Phase 7.
 
 ### Phase 8 — the first traveler-visible canonical place page
 
-**Status: shipped.** `/place/[id]` (authenticated-only by decision — no
-anonymous variant) and the save-to-library surface: migration
-`014_saved_place_library.sql` (`saved_places`, `place_stats`), `SavedPlaceButton`
-(the library heart, distinct from the existing trip-save bookmark), and
-`GET /api/travel/places/:id`. Authorization is `getPlaceById` on the caller's
-own session client — `places_read_public_or_own` decides visibility, and an
+**Status: shipped.** `GET /api/travel/places/:id` and `/place/[id]`
+(authenticated-only by decision — no anonymous variant): the first screen
+that renders a canonical `places` row on its own, rather than only through an
+import or a trip. **No migration.** The `saved_places`/`place_stats` schema
+(migration `014_saved_place_library.sql`) and `SavedPlaceButton` already
+existed — they shipped earlier, ahead of Phase 8 in commit order, and are
+documented in Part 10. Phase 8's own contribution is reusing that
+already-shipped save-to-library infrastructure on the new page (mounting
+`SavedPlaceButton`, reading `place_stats` for the save count) rather than
+building any of it. Authorization is `getPlaceById` on the caller's own
+session client — `places_read_public_or_own` decides visibility, and an
 invisible place 404s identically to a nonexistent one, matching the pattern
-`app/api/travel/places/saved/route.ts` had already settled. No migration
-touched `destination_places`; no AI, no paid provider.
+`app/api/travel/places/saved/route.ts` had already settled. No AI, no paid
+provider.
 
 ### Phase 9 — canonical place reachability wiring
 
-**Status: shipped.** Phase 8 built the page and the save action; nothing in
-the app linked to either. Phase 9 is pure wiring, no new tables, no RLS
+**Status: shipped.** Phase 8 built the page and mounted the (already-shipped,
+see Part 10) save-to-library action on it; nothing in the app linked to
+either. Phase 9 is pure wiring, no new tables, no RLS
 change: `/you/saved` cards link to `/place/[canonicalId]`; the import "saved"
 screen shows "View place" for a single-place import that resolved a canonical
 place (`ImportOutcome.canonicalPlaceId`, additive on the wire); the itinerary
