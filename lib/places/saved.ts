@@ -292,16 +292,34 @@ export async function getSavedPlaces(
 
   if (query.destination) builder = builder.eq('country_name', query.destination);
 
+  // .range() is inclusive on both ends and does the paging in the database —
+  // page 2 reads only page 2's rows, not page 1's again. `order()` first is
+  // what makes a `range` mean anything: without a stable sort, "rows 50-99"
+  // is a different 50 rows on every request.
+  //
+  // saved_at ALONE is not a total order. Migration 014's guard trigger sets
+  // it to NOW() — the transaction timestamp — so two saves in one statement
+  // (a batch, or two requests Postgres happens to serialize into one instant)
+  // share an identical value, and Postgres makes no promise about how ties in
+  // an ORDER BY are broken across two different queries: EXPLAIN on this same
+  // shape shows offset 0 satisfied by an index scan and a large offset by an
+  // explicit sort — two different mechanisms with no shared tie-breaking rule
+  // between them. Without a second column, that is a real skip-or-duplicate
+  // risk across a page boundary, not merely a cosmetic one. `saved_id` (the
+  // saved_places primary key) is unique per row, so appending it as a second
+  // DESC key makes the order total — deterministic and gap-free — even though
+  // the id itself is a random UUID with no chronological meaning of its own.
   const { data, error } = await builder
     .order('saved_at', { ascending: false })
-    .limit(limit + offset);
+    .order('saved_id', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error || !data) {
     if (error) log.warn('saved_places.list_failed', { reason: error.message.slice(0, 160) });
     return [];
   }
 
-  return (data as unknown as SavedRow[]).slice(offset).map(toSavedPlace);
+  return (data as unknown as SavedRow[]).map(toSavedPlace);
 }
 
 /**
@@ -320,16 +338,45 @@ export async function getSavedPlacesByDestination(
   return getSavedPlaces(supabase, userId, { ...query, destination });
 }
 
-/** Which countries the traveler has saved places in, for a filter control. */
+/**
+ * A defensive cap on the query, not a claim that every library fits under
+ * it. PostgREST has no `GROUP BY`, so this tally is built in the server
+ * process rather than the database — there is no aggregating view or RPC to
+ * call instead without a migration (Part 10's original `getSavedDestinations`
+ * limitation, still open). **This is bounded correctness, not unbounded
+ * correctness**: for the — as of this phase, entirely hypothetical — traveler
+ * with more than 5,000 saved places, both the destination LIST and the COUNTS
+ * become wrong past this many rows, the same way the pre-Phase-12 50-row cap
+ * was wrong, just at a threshold no real library reaches today. True
+ * unbounded correctness needs database-side aggregation — a `GROUP BY` view
+ * or RPC — which is a migration, and is carried as open debt rather than
+ * built here (see docs/SOCIAL-SAVE.md Part 15). Only `country_name` and
+ * `saved_id` are selected — no joined columns — so this stays cheap even at
+ * this size, and the tally is what leaves this module: the browser only ever
+ * receives the aggregated `{ destination, count }` list, never these raw rows.
+ */
+const DESTINATION_TALLY_LIMIT = 5000;
+
+/**
+ * Which countries the traveler has saved places in, for a filter control.
+ *
+ * Ordered the same way, and for the same reason, as `getSavedPlaces`'s own
+ * page read: `saved_at DESC, saved_id DESC` is what makes "the first 5,000
+ * rows" a *deterministic* 5,000 rather than whichever 5,000 Postgres happens
+ * to return — without an ORDER BY, a LIMIT with no total order gives no
+ * guarantee about WHICH rows are included, only how many.
+ */
 export async function getSavedDestinations(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ destination: string; count: number }[]> {
   const { data, error } = await supabase
     .from('saved_places_detailed')
-    .select('country_name')
+    .select('country_name,saved_id')
     .eq('user_id', userId)
-    .limit(SAVED_PLACES_PAGE_SIZE);
+    .order('saved_at', { ascending: false })
+    .order('saved_id', { ascending: false })
+    .limit(DESTINATION_TALLY_LIMIT);
 
   if (error || !data) return [];
 

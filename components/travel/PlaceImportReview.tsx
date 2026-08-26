@@ -31,6 +31,7 @@ import Link from 'next/link';
 import { ArrowRight, Check, Loader2, MapPin, Pencil, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/ui/Reveal';
+import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import type { PlaceCandidate } from '@/lib/travel/placeExtraction';
@@ -503,11 +504,22 @@ export function DoneStage({
   lang,
   t,
   outcome,
+  importId,
+  returnTo,
   onAgain,
 }: {
   lang: 'en' | 'km';
   t: Translate;
   outcome: ImportOutcome;
+  /**
+   * The import this batch came from, when the caller has one. Threaded
+   * through to each place's SavedPlaceButton as provenance — the caller
+   * already holds this value (it is the same id the save request itself just
+   * sent), so this is not a new lookup, only a new prop.
+   */
+  importId: string | null;
+  /** Where a heart's sign-in link should return to — the page DoneStage is mounted on. */
+  returnTo: string;
   onAgain: () => void;
 }) {
   return (
@@ -534,15 +546,41 @@ export function DoneStage({
         </p>
       )}
 
+      {/* Every place actually written, own row each — not only the "exactly
+          one place" case viewPlaceHref covers. A place that never resolved to
+          a canonical id (no coordinates, a registry miss) still shows its
+          name; it just gets no View-place link and no heart, because there is
+          nothing to save a library bookmark AGAINST. The heart is SavedPlaceButton,
+          unchanged — the same component /place/[id] and /you/saved already
+          mount — so hearting here is a real library save, not a preview of one. */}
+      {outcome.addedPlaces.length > 0 && (
+        <ul className="mt-5 space-y-2 text-left" aria-label={t('saved')}>
+          {outcome.addedPlaces.map((place, index) => (
+            <li key={`${place.name}-${index}`} className="night-card rounded-card p-3">
+              <p className="text-sm font-semibold text-white">{place.name}</p>
+              {place.canonicalPlaceId && (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/place/${place.canonicalPlaceId}`}
+                    className="text-xs font-semibold text-gold-light hover:text-gold-bright"
+                  >
+                    {t('viewPlace')}
+                  </Link>
+                  <SavedPlaceButton
+                    placeId={place.canonicalPlaceId}
+                    placeName={place.name}
+                    initialSaved={false}
+                    returnTo={returnTo}
+                    sourceImportId={importId}
+                  />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="mt-6 space-y-2">
-        {viewPlaceHref(outcome) && (
-          <Link
-            href={viewPlaceHref(outcome)!}
-            className="flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors duration-200 ease-smooth hover:border-gold-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
-          >
-            {t('viewPlace')}
-          </Link>
-        )}
         <Link
           href={`/trips/${outcome.tripId}/itinerary`}
           className="liquid-glass-accent liquid-press flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-btn px-5 text-sm font-semibold text-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-bright"

@@ -282,6 +282,8 @@ export function ImportPlacesView({
             lang={lang}
             t={t}
             outcome={outcome}
+            importId={result?.importId ?? null}
+            returnTo="/import"
             onAgain={() => {
               setInput('');
               setRows([]);

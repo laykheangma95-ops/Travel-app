@@ -527,7 +527,16 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
   }
 
   if (stage === 'done' && outcome) {
-    return <DoneStage lang={lang} t={t} outcome={outcome} onAgain={resetToIdle} />;
+    return (
+      <DoneStage
+        lang={lang}
+        t={t}
+        outcome={outcome}
+        importId={importId}
+        returnTo="/import/link"
+        onAgain={resetToIdle}
+      />
+    );
   }
 
   const busy = stage === 'validating';

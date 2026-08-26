@@ -69,6 +69,11 @@ function clientFor(request: Request) {
  * The single-place form exists so a place card can ask about itself without
  * fetching the whole library. A LIST of cards must not use it once per card —
  * `savedPlaceIdsAmong` answers a whole screen in one query.
+ *
+ * ?limit=…&offset=… page the list form. `destinations` is always the traveler's
+ * FULL set of countries, unaffected by both — narrowing the list must not
+ * narrow the way back out of it, same reasoning /you/saved's own filter keeps
+ * the country chips visible while one is selected.
  */
 export const GET = route(
   async (request) => {
@@ -90,9 +95,16 @@ export const GET = route(
     const destination = url.searchParams.get('destination')?.trim() || null;
     const limitParam = Number(url.searchParams.get('limit'));
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : SAVED_PLACES_PAGE_SIZE;
+    // "Load more" on /you/saved. getSavedPlaces re-clamps limit itself and
+    // clamps offset to non-negative — this is a second, redundant clamp at
+    // the boundary, same reasoning as isPlaceSaved keeping its own user_id
+    // filter alongside RLS: a query that states its own intent does not
+    // depend on a callee being right to be correct.
+    const offsetParam = Number(url.searchParams.get('offset'));
+    const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? Math.floor(offsetParam) : 0;
 
     const [places, destinations] = await Promise.all([
-      getSavedPlaces(supabase, user.id, { destination, limit }),
+      getSavedPlaces(supabase, user.id, { destination, limit, offset }),
       getSavedDestinations(supabase, user.id),
     ]);
 

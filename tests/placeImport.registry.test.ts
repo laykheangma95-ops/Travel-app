@@ -315,6 +315,87 @@ describe('Phase 9 — the canonical id surfaced for a "View place" link', () => 
   });
 });
 
+// Phase 12 — per-place results. Each entry in `addedPlaces` must point at the
+// place it actually came from, never at another place in the same batch, and
+// `addedPlaces` must contain exactly the places that were actually written —
+// not one entry per input place.
+describe('addedPlaces — per-place result correctness', () => {
+  it('gives each of two resolved places its own, correct canonical id', async () => {
+    const alice = harness.clientFor(ALICE);
+    const watArun: ImportablePlace = {
+      name: 'Wat Arun',
+      description: 'Temple of Dawn.',
+      category: 'spot',
+      lat: WAT_PHO.lat! + 0.5,
+      lng: WAT_PHO.lng! + 0.5,
+    };
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO, watArun], { destination: 'Thailand' });
+
+    expect(result.addedPlaces).toHaveLength(2);
+    // Backward compatible: `added` is still every name, in order, derived
+    // from the same array `addedPlaces` is.
+    expect(result.added).toEqual(['Wat Pho', 'Wat Arun']);
+
+    const places = (await harness.rows('places')) as { id: string; name: string }[];
+    const watPhoRow = places.find((row) => row.name === 'Wat Pho');
+    const watArunRow = places.find((row) => row.name === 'Wat Arun');
+
+    const watPhoEntry = result.addedPlaces.find((entry) => entry.name === 'Wat Pho');
+    const watArunEntry = result.addedPlaces.find((entry) => entry.name === 'Wat Arun');
+
+    expect(watPhoEntry?.canonicalPlaceId).toBe(watPhoRow?.id);
+    expect(watArunEntry?.canonicalPlaceId).toBe(watArunRow?.id);
+    // The one thing a swapped pair of parallel arrays would fail to catch:
+    // two different places must not end up pointing at the same, or each
+    // other's, canonical row.
+    expect(watPhoEntry?.canonicalPlaceId).not.toBe(watArunEntry?.canonicalPlaceId);
+  });
+
+  it('gives a coordinate-less place a null canonical id without failing the import', async () => {
+    const alice = harness.clientFor(ALICE);
+    const watArun: ImportablePlace = {
+      name: 'Wat Arun',
+      description: 'Temple of Dawn.',
+      category: 'spot',
+      lat: null,
+      lng: null,
+    };
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO, watArun], { destination: 'Thailand' });
+
+    expect(result.addedPlaces).toHaveLength(2);
+    expect(result.addedPlaces.find((entry) => entry.name === 'Wat Pho')?.canonicalPlaceId).not.toBeNull();
+    expect(result.addedPlaces.find((entry) => entry.name === 'Wat Arun')?.canonicalPlaceId).toBeNull();
+  });
+
+  it('excludes a skipped place — same name, same trip, imported twice', async () => {
+    const alice = harness.clientFor(ALICE);
+    const first = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
+
+    const second = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { tripId: first.tripId, destination: 'Thailand' });
+
+    expect(second.skipped).toEqual(['Wat Pho']);
+    expect(second.addedPlaces).toEqual([]);
+    expect(second.added).toEqual([]);
+  });
+});
+
+// Phase 12 kept the trip-save and the library-save deliberately apart (manual
+// heart, no auto-save — see docs/SOCIAL-SAVE.md Part 15). This is the
+// half of that separation importPlacesToTrip itself is responsible for:
+// importing must never, on its own, put anything in the library.
+describe('import alone never touches the library', () => {
+  it('writes no saved_places row for a resolved, canonically-linked place', async () => {
+    const alice = harness.clientFor(ALICE);
+
+    const result = await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
+
+    expect(result.addedPlaces[0]?.canonicalPlaceId).not.toBeNull();
+    expect(await harness.rows('saved_places')).toHaveLength(0);
+  });
+});
+
 describe('failure isolation', () => {
   it('a registry failure does not fail the place save, the import, or trip creation', async () => {
     vi.mocked(registry.resolvePlaceForTraveler).mockRejectedValueOnce(new Error('boom'));

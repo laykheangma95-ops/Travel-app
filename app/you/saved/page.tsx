@@ -18,7 +18,7 @@
 // this phase was told to avoid.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Heart, MapPin } from 'lucide-react';
 import { SignInLink } from '@/components/ui/SignInLink';
@@ -27,6 +27,7 @@ import { AddToTripButton } from '@/components/travel/AddToTripButton';
 import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
+import { RequestGeneration } from '@/lib/travel/requestGeneration';
 
 interface SavedPlaceRow {
   savedId: string;
@@ -45,6 +46,14 @@ interface Destination {
   count: number;
 }
 
+// One page of the "Load more" button. Deliberately smaller than the server's
+// own SAVED_PLACES_PAGE_SIZE (50, see lib/places/saved.ts) — that number is a
+// safety ceiling on the route, not a UI page size, and the two are free to
+// differ as long as this stays at or under it. A response shorter than a full
+// page is how "no more pages" is detected; no separate total-count field
+// exists to ask for instead.
+const PAGE_SIZE = 20;
+
 export default function SavedPlacesPage() {
   const { t, lang } = useLang();
   const { user, loading: sessionLoading } = useSession();
@@ -53,13 +62,29 @@ export default function SavedPlacesPage() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // A ticket for whichever request is allowed to touch `places`/`hasMore`
+  // right now. `load` is authoritative — a fresh one invalidates anything
+  // already in flight, `loadMore` included. `loadMore` only ever holds a
+  // ticket, never mints one, so two overlapping "Load more" taps do not
+  // invalidate each other, only a filter change does. See
+  // lib/travel/requestGeneration.ts for why this exists and how it is tested.
+  const generation = useRef(new RequestGeneration()).current;
 
   const load = useCallback(
     async (destination: string | null) => {
+      const ticket = generation.next();
+      // A fresh load supersedes any "Load more" already in flight — its
+      // spinner is now for a request whose answer, even if it arrives, will
+      // never be applied.
+      setLoadingMore(false);
       setError(null);
       try {
-        const query = destination ? `?destination=${encodeURIComponent(destination)}` : '';
-        const response = await fetch(`/api/travel/places/saved${query}`, {
+        const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
+        if (destination) query.set('destination', destination);
+        const response = await fetch(`/api/travel/places/saved?${query}`, {
           credentials: 'include',
         });
         if (!response.ok) throw new Error('load failed');
@@ -67,18 +92,62 @@ export default function SavedPlacesPage() {
           places?: SavedPlaceRow[];
           destinations?: Destination[];
         };
-        setPlaces(body.places ?? []);
+        if (!generation.isCurrent(ticket)) return; // superseded while this was in flight
+        const page = body.places ?? [];
+        setPlaces(page);
+        setHasMore(page.length === PAGE_SIZE);
         // The country list is deliberately NOT refreshed while a filter is
         // applied: it is the set of countries the traveler has saves in, and
         // narrowing the list must not narrow the way back out of it.
         if (!destination) setDestinations(body.destinations ?? []);
       } catch {
+        if (!generation.isCurrent(ticket)) return;
         setPlaces([]);
+        setHasMore(false);
         setError(t('saved.loadError'));
       }
     },
-    [t]
+    [generation, t]
   );
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    const ticket = generation.peek();
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const query = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(places?.length ?? 0),
+      });
+      if (filter) query.set('destination', filter);
+      const response = await fetch(`/api/travel/places/saved?${query}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('load failed');
+      const body = (await response.json()) as { places?: SavedPlaceRow[] };
+      // A `load` that started after this request must own the screen from
+      // here — applying a stale page now would append the OLD filter's rows
+      // onto the NEW filter's list.
+      if (!generation.isCurrent(ticket)) return;
+      const page = body.places ?? [];
+      // Guards against a duplicate card if a save landed between two page
+      // requests and shifted the newest-first ordering by one row.
+      setPlaces((current) => {
+        const seen = new Set((current ?? []).map((row) => row.savedId));
+        return [...(current ?? []), ...page.filter((row) => !seen.has(row.savedId))];
+      });
+      setHasMore(page.length === PAGE_SIZE);
+    } catch {
+      if (!generation.isCurrent(ticket)) return;
+      setError(t('saved.loadError'));
+    } finally {
+      // Only this request's OWN spinner — a newer `load` already cleared it
+      // for the generation it superseded, and must not have that reset
+      // undone by a stale response settling after.
+      if (generation.isCurrent(ticket)) setLoadingMore(false);
+    }
+  }, [filter, places, loadingMore, hasMore, generation, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -243,6 +312,18 @@ export default function SavedPlacesPage() {
                 </li>
               ))}
             </ul>
+            {hasMore && (
+              <div className="mt-5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40 disabled:opacity-60"
+                >
+                  {loadingMore ? t('saved.loadingMore') : t('saved.loadMore')}
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>

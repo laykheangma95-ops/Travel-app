@@ -43,6 +43,16 @@ interface SavedPlaceButtonProps {
   initialSaved: boolean;
   /** Where sign-in should return to. */
   returnTo: string;
+  /**
+   * The import this place came from, when the caller has one — e.g. the
+   * import "saved" screen hearting a place it just added. Provenance only:
+   * omitting it (the default, every other mount of this button) saves with no
+   * import attached, exactly as before. The server is the actual boundary —
+   * `saved_places_insert_own`'s WITH CHECK and its guard trigger (migration
+   * 014) are what refuse an id naming another traveler's import; this prop is
+   * never trusted as authorization on its own.
+   */
+  sourceImportId?: string | null;
   /** Told after a successful toggle, so a list can update its own counts. */
   onChange?: (saved: boolean) => void;
 }
@@ -52,6 +62,7 @@ export function SavedPlaceButton({
   placeName,
   initialSaved,
   returnTo,
+  sourceImportId,
   onChange,
 }: SavedPlaceButtonProps) {
   const { t } = useLang();
@@ -82,7 +93,9 @@ export function SavedPlaceButton({
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ placeId }),
+            body: JSON.stringify(
+              sourceImportId ? { placeId, sourceImportId } : { placeId }
+            ),
           })
         : await fetch(`/api/travel/places/saved?placeId=${encodeURIComponent(placeId)}`, {
             method: 'DELETE',
@@ -125,7 +138,7 @@ export function SavedPlaceButton({
         message: navigator.onLine === false ? t('v3.save.offline') : t('saved.error'),
       });
     }
-  }, [saved, placeId, onChange, t]);
+  }, [saved, placeId, sourceImportId, onChange, t]);
 
   if (state.kind === 'signIn') {
     return (

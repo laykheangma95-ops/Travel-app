@@ -63,7 +63,7 @@ export interface ImportResult {
   tripId: string;
   tripTitle: string;
   createdTrip: boolean;
-  /** Names that were written, in the order they were given. */
+  /** Names that were written, in the order they were given. Derived from `addedPlaces` — kept for existing callers. */
   added: string[];
   /** Names already on this trip. Not an error — a second import of one post. */
   skipped: string[];
@@ -74,11 +74,19 @@ export interface ImportResult {
    * added, when there was exactly one and it resolved. Null for a multi-place
    * import — there is no single place left to point a "View place" link at —
    * and null whenever the place didn't resolve (no coordinates, a registry
-   * miss, a race lost to another traveler). Additive, nullable, and nothing
-   * but the id: no submitter, no registry ownership, matching the same shape
-   * GET /api/travel/places/:id already hands back.
+   * miss, a race lost to another traveler). Kept for existing callers; derived
+   * from `addedPlaces` the same way `added` is.
    */
   canonicalPlaceId: string | null;
+  /**
+   * Phase 12. One entry per place actually written, in the same order as
+   * `added` — the single source both are derived from, so a name and its
+   * canonical id can never drift apart the way two parallel arrays could.
+   * Lets the "saved" screen offer a View-place link and a library heart for
+   * EVERY resolved place in a multi-place import, not only when exactly one
+   * place was added.
+   */
+  addedPlaces: { name: string; canonicalPlaceId: string | null }[];
 }
 
 /**
@@ -124,12 +132,14 @@ export async function importPlacesToTrip(
     ? await loadImportProvenance(supabase, options.importId)
     : null;
 
-  const added: string[] = [];
+  // The single source of truth for what was actually written. `added` (below)
+  // is derived from it rather than kept as a second, parallel array — one
+  // `.push()` per successful write means a name and its canonical id can never
+  // land at different indexes the way two arrays filled by two statements
+  // could drift.
+  const addedPlaces: { name: string; canonicalPlaceId: string | null }[] = [];
   const skipped: string[] = [];
   const failed: string[] = [];
-  // Parallel to `added`, one entry per place actually written — never per
-  // input place, so a skip never shifts this out of alignment with `added`.
-  const addedCanonicalIds: (string | null)[] = [];
 
   for (const place of places) {
     const name = place.name.trim().slice(0, PLACE_NAME_MAX);
@@ -163,8 +173,7 @@ export async function importPlacesToTrip(
         await markCandidateAccepted(supabase, options.importId, name, placeId);
       }
       existingNames.add(fold(name));
-      added.push(name);
-      addedCanonicalIds.push(canonicalPlaceId);
+      addedPlaces.push({ name, canonicalPlaceId });
     } catch {
       // One bad row must not cost the traveler the other eight.
       failed.push(name);
@@ -175,13 +184,15 @@ export async function importPlacesToTrip(
     tripId: trip.id,
     tripTitle: trip.title,
     createdTrip: trip.created,
-    added,
+    added: addedPlaces.map((entry) => entry.name),
     skipped,
     failed,
     // Only meaningful for "I imported one place" — the common single-link
     // paste. A multi-place import has no single place a "View place" link
     // could point at, so this stays null rather than picking one arbitrarily.
-    canonicalPlaceId: added.length === 1 ? addedCanonicalIds[0] : null,
+    // `addedPlaces` (below) carries every place's own id regardless of count.
+    canonicalPlaceId: addedPlaces.length === 1 ? addedPlaces[0].canonicalPlaceId : null,
+    addedPlaces,
   };
 }
 

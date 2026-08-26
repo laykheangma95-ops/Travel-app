@@ -23,6 +23,8 @@ export interface ImportOutcome {
   failed: string[];
   /** The one added place's canonical registry id, when there was one. See lib/travel/placeImport.ts. */
   canonicalPlaceId: string | null;
+  /** One entry per added place, own id included. See lib/travel/placeImport.ts's ImportResult. */
+  addedPlaces: { name: string; canonicalPlaceId: string | null }[];
 }
 
 /**

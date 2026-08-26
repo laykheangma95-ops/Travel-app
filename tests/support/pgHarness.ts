@@ -347,6 +347,7 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
     let head = false;
     let wantCount = false;
     let limit: number | null = null;
+    let offset: number | null = null;
     // Writes are deferred rather than built at call time, because .update() and
     // .delete() take their filters AFTER the verb.
     let pending: {
@@ -501,6 +502,13 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
         limit = count;
         return api;
       },
+      // .range() is inclusive on both ends, same as PostgREST's own — lib/places/
+      // saved.ts's getSavedPlaces pages the saved-place library with it.
+      range(from: number, to: number) {
+        offset = from;
+        limit = to - from + 1;
+        return api;
+      },
       insert(row: Record<string, unknown> | Record<string, unknown>[]) {
         // One row or many. lib/travel/importJobs.ts writes a whole extraction's
         // candidates in one statement, and a harness that only understood a
@@ -608,8 +616,9 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
 
             const order = orderBy.length ? ` ORDER BY ${orderBy.join(', ')}` : '';
             const cap = limit === null ? '' : ` LIMIT ${limit}`;
+            const off = offset === null ? '' : ` OFFSET ${offset}`;
             const result = await run(
-              `SELECT ${selection.columns} FROM ${table}${clause}${order}${cap}`,
+              `SELECT ${selection.columns} FROM ${table}${clause}${order}${cap}${off}`,
               params
             );
             const rows = await withEmbeds((result.rows ?? []) as Record<string, unknown>[]);
