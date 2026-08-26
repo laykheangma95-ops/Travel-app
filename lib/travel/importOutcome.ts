@@ -13,6 +13,8 @@
 // lib/travel/itinerary.ts's placeDetailHref.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { AddedPlace } from './placeImport';
+
 /** What POST /api/travel/places/import always returns, whichever flow called it. */
 export interface ImportOutcome {
   tripId: string;
@@ -23,8 +25,10 @@ export interface ImportOutcome {
   failed: string[];
   /** The one added place's canonical registry id, when there was one. See lib/travel/placeImport.ts. */
   canonicalPlaceId: string | null;
-  /** One entry per added place, own id included. See lib/travel/placeImport.ts's ImportResult. */
-  addedPlaces: { name: string; canonicalPlaceId: string | null }[];
+  /** One entry per added place, own id included — and, since Phase 13, an
+   *  optional `resolution` proposal awaiting confirmation. See
+   *  lib/travel/placeImport.ts's ImportResult/AddedPlace. */
+  addedPlaces: AddedPlace[];
 }
 
 /**

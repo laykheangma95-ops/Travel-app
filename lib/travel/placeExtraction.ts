@@ -52,6 +52,15 @@ export interface PlaceCandidate {
   confidence: number;
   /** How this candidate was arrived at. Shown to the traveler, plainly. */
   source: 'maps-link' | 'model' | 'caption';
+  /**
+   * How many candidates Nominatim itself returned when this pin was geocoded
+   * (lib/travel/geocode.ts's GeocodeHit.resultCount). null for a candidate
+   * whose pin came straight from a maps-link connector, or that has no pin at
+   * all — a geocoder result count means nothing when no geocoder ran.
+   * Phase 13's resolver (lib/places/resolutionConfidence.ts) reads this as a
+   * free ambiguity signal; nothing before Phase 13 reads it.
+   */
+  geocodeResultCount: number | null;
 }
 
 /** At or above this, a candidate is pre-ticked in the review list. */
@@ -377,6 +386,10 @@ export function normaliseCandidate(
     lng: lat !== null && lng !== null ? lng : null,
     confidence,
     source: input.source === 'model' || input.source === 'maps-link' ? input.source : 'caption',
+    geocodeResultCount:
+      typeof input.geocodeResultCount === 'number' && Number.isFinite(input.geocodeResultCount)
+        ? input.geocodeResultCount
+        : null,
   };
 }
 

@@ -56,6 +56,12 @@ const MIGRATIONS = [
   // run, and what stops the reaper's `failed` being overwritten by a late
   // completion.
   '016_import_status_terminal.sql',
+  // Phase 13: canonical-resolution confidence and confirmation feedback. Its
+  // policies are what stop a traveler writing feedback about another
+  // traveler's place, or pointing canonical_place_id at a place they cannot
+  // see — and its RPC is what makes the feedback write and the
+  // destination_places pointer update atomic.
+  '017_place_resolution_feedback.sql',
 ];
 
 /**
@@ -247,7 +253,7 @@ export async function createHarness(): Promise<Harness> {
     async reset() {
       await asAdmin(
         `TRUNCATE saved_places, place_stats, place_external_ids, places,
-                  ai_usage_log, place_sources,
+                  ai_usage_log, place_sources, place_resolution_feedback,
                   import_candidates, place_imports,
                   itinerary_places, itinerary_days, trip_plans, destination_places,
                   saved_flights, esim_orders, profiles, auth.users CASCADE`
@@ -653,5 +659,47 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
     return api;
   }
 
-  return { from } as unknown as SupabaseClient;
+  /**
+   * `.rpc(name, params)` — a Postgres function call, named-parameter style
+   * (`p_foo := $1`), through the same `run()` every table query uses, so it
+   * gets the same SET ROLE / request.jwt.claims context and therefore the
+   * same RLS a SECURITY INVOKER function like
+   * apply_place_resolution_feedback (migration 017) actually runs under.
+   *
+   * Real PostgREST returns a function's result as a single JSON object (not
+   * an array) when the function RETURNS one row of a composite type rather
+   * than SETOF/TABLE — apply_place_resolution_feedback is declared exactly
+   * that way, so this mirrors that rather than always returning an array.
+   */
+  async function rpc(fn: string, params: Record<string, unknown> = {}) {
+    const keys = Object.keys(params);
+    const call = `SELECT * FROM ${fn}(${keys.map((key, index) => `${key} := $${index + 1}`).join(', ')})`;
+    // Real PostgREST accepts a plain JS object/array for a jsonb parameter and
+    // casts it on the way in; the underlying pg driver here does not, so an
+    // object or array value is stringified first — this is what lets
+    // application code pass a plain object exactly as it would to the real
+    // supabase-js client.
+    const values = keys.map((key) => {
+      const value = params[key];
+      return value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
+    });
+    try {
+      const result = await run(call, values);
+      const row = (result.rows as Record<string, unknown>[] | undefined)?.[0] ?? null;
+      return { data: row, error: null };
+    } catch (cause) {
+      const failure = cause as Error & { code?: string; constraint?: string; detail?: string };
+      return {
+        data: null,
+        error: {
+          message: failure.message,
+          code: failure.code,
+          constraint: failure.constraint,
+          details: failure.detail,
+        },
+      };
+    }
+  }
+
+  return { from, rpc } as unknown as SupabaseClient;
 }

@@ -476,6 +476,15 @@ again.
   (migration 015) reserves it for a future connector that can signal genuine
   ambiguity — "this could be one of three places" — rather than the
   deterministic completed/failed the current connector produces.
+  **Still true after Phase 13** (`docs/SOCIAL-SAVE.md` Part 16): Phase 13
+  added canonical-*resolution* confidence and confirmation, but that
+  ambiguity is discovered AFTER a place is already saved to a trip — a
+  different problem, downstream of the review/save stage this status
+  vocabulary describes. Nothing in Phase 13 sets `place_imports.status` to
+  `needs_confirmation`, changes the orchestrator's transitions, touches the
+  reaper, or touches `place_imports_open_idx`. This value stays reserved for
+  the pre-review, connector/geocoder-level ambiguity it always meant; the
+  two must never be conflated by a future reader.
 - **M1 and the rest of Part 10's known limitations** (`docs/SOCIAL-SAVE.md`,
   Part 10) are unchanged by this phase. (Note: this line previously read "M1
   and M2" — Part 10 only ever labeled one item, M1; there is no M2. Corrected

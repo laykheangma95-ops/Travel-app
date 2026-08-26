@@ -181,6 +181,7 @@ describe('dedupeCandidates', () => {
     lng: null,
     confidence: 0.5,
     source: 'caption',
+    geocodeResultCount: null,
     ...over,
   });
 

@@ -340,6 +340,8 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
               category: row.category,
               lat: row.lat,
               lng: row.lng,
+              pinSource: row.source,
+              geocodeResultCount: row.geocodeResultCount,
             })),
             ...target,
             ...(importId ? { importId } : {}),

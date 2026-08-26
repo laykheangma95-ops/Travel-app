@@ -1584,3 +1584,229 @@ replacing the earlier, weaker 55-row version of the tied-order test in
 phase's first pass — remediation did not and could not close that gap. No
 migration, no RLS change, no `service_role` use, and no AI/provider work was
 introduced by this remediation.
+
+## Part 16 — Phase 13
+
+**Status: implemented.** The Phase 12 readiness inspection found that
+`resolvePlaceForTraveler` (Phase 7) attached the nearest same-name match
+within 150m unconditionally — two branches of one café, a mall unit and a
+street unit, a caption naming a landmark next to the place it was actually
+about, all silently linked a traveler's saved place to whichever canonical
+row happened to be nearest, with no record a decision was even made. Phase
+13 closes that: canonical resolution now has its own confidence, an
+ambiguous match asks the traveler instead of guessing, and every confirm,
+reject or correct decision is recorded as ground truth.
+
+**Owner decisions this was built under, all explicit and all binding:**
+confirmation happens on the "saved" screen, strictly AFTER the trip save —
+it must never block the core import flow, and ignoring the question leaves
+the place exactly as it is, on the trip, with no canonical link. Thresholds
+are `AUTO_LINK_CONFIDENCE = 0.85`, `AMBIGUOUS_FLOOR_CONFIDENCE = 0.50`,
+stamped as `resolver-version = 'resolution-v1'` on every score so a future
+re-tuning cannot be read as having applied retroactively. Traveler
+confirmation **never** promotes `verification_status` — not on one
+confirmation, not on a hundred; that ceiling is migration 013's RLS and
+trigger, unmodified here. One additive migration only
+(`017_place_resolution_feedback.sql`), no existing table repurposed.
+`place_imports.needs_confirmation` (reserved since migration 015) stays
+**reserved and unused** — Phase 13's ambiguity is discovered AFTER the
+review/trip-save stage, a different problem from the pre-review connector
+ambiguity that status is reserved for; nothing in this phase touches the
+import orchestrator's transitions, the reaper, or `place_imports_open_idx`.
+No AI, no paid places provider, no `service_role` client anywhere in the
+path.
+
+**Extraction confidence and resolution confidence are two different
+numbers, and Phase 13 does not conflate them.** `import_candidates
+.confidence` (Phase 1) answers "does this text name a place?" and is
+unchanged — `AUTO_SELECT_CONFIDENCE` (0.55, the review-screen pre-tick
+threshold) is untouched. `resolution_confidence` (new) answers "which
+real-world canonical place is this?" — a pure, deterministic score
+(`lib/places/resolutionConfidence.ts`'s `scoreResolution`), no I/O, no AI,
+built entirely from evidence already on hand: `proximityConfidence`
+(migration 013's own 150m/name-match distance curve) as the base, then
+multiplicative penalties — ×0.85 for a country disagreement, ×0.80 for a
+geocoded (rather than exact platform) pin, ×0.70 when at least one other
+candidate also matched inside the radius (the heaviest penalty — a second
+plausible candidate is exactly the "which branch?" failure this phase
+exists to stop resolving silently), ×0.90 for a city disagreement. A
+comparison that could not be made (no city/country on one side) applies no
+penalty — asserting doubt about something never compared would itself be a
+fabricated signal.
+
+**The resolver.** `resolvePlaceForTraveler` (`lib/places/repository.ts`) no
+longer takes `nearby[0]` unconditionally. The name+proximity half of
+resolution is now `proposeCanonicalResolution` — a read-only function, no
+write of any kind — shared by two callers: `resolvePlaceForTraveler` itself
+(which still creates a fresh `unverified` row when nothing matched at all,
+exactly as before — creating is never ambiguous, it is definitionally a new
+place) and `lib/places/resolutionFeedback.ts` (which re-derives the SAME
+proposal a traveler is confirming later, rather than trusting anything
+stored or client-supplied about it). Both get `decision: 'auto' |
+'ambiguous' | 'none'`: `auto` behaves exactly as before Phase 13 and
+attaches the canonical id immediately; `ambiguous` returns a proposal AND
+up to four alternatives but attaches nothing —
+`lib/travel/placeImport.ts`'s `linkCanonicalPlace` now branches on this and
+leaves `canonical_place_id` null, carrying a `PlaceResolutionSummary`
+(proposed place, alternatives, confidence, `resolverVersion` — never
+`createdBy`/`verificationStatus`/other registry-internal fields) back on the
+`AddedPlace` entry instead; `none` behaves like an unresolved place always
+has — nothing attached, nothing asked. **The trip save can never fail or
+degrade because of this** — Phase 7's failure-isolation guarantee is
+unchanged: a registry error still costs a link, never a save.
+
+**Where the pin-origin and geocoder-ambiguity signals come from.** Neither
+needed new I/O. `pinOrigin` is derived from the already-existing
+`PlaceCandidate.source` (`'maps-link'` → an exact platform pin; `'model'`/
+`'caption'` with coordinates present → `'geocoder'`, since the model/caption
+pipeline has never itself produced coordinates — `lib/travel/placeAgent.ts`'s
+schema has none). `geocodeResultCount` is new: `PlaceCandidate` gained the
+field, set by `addCoordinates` in both `app/api/travel/extract/route.ts` and
+`lib/travel/importOrchestrator.ts` from `GeocodeHit.resultCount`, round-tripped
+to the save request as `pinSource`/`geocodeResultCount` (optional, additive,
+never trusted as fact — `lib/places/repository.ts` only ever uses either to
+weigh a score, never to decide visibility or writability). A queued-pipeline
+replay degrades to no geocoder signal (`import_candidates` has no column for
+it — a Phase 13 scoring input, not stored provenance) rather than a schema
+change for a secondary signal.
+
+**Three free geocoder improvements, all inside ONE request per lookup**
+(`lib/travel/geocode.ts`): `limit` raised from 1 to 5 and `addressdetails`
+turned on (was off) — same request, same `MIN_GAP_MS`/1-req/sec budget,
+same `MAX_LOOKUPS_PER_IMPORT` cap. `GeocodeHit.displayName` — already
+returned since before Phase 13, previously read by nothing — is now
+genuinely surfaced (kept on the type, available to a future UI). A new
+`countryMismatch: boolean | null` prefers a same-country candidate among the
+up-to-5 results over blindly taking Nominatim's own top rank, and flags
+`true` only when EVERY returned candidate disagrees with the expected
+country (mapped from the country name via `data/countries.ts`'s existing
+name→alpha-2 table, read-only, not modified — 🔒 locked); `null`, never
+coerced to a mismatch, when no country was expected or Nominatim's address
+data did not include one. This does not reject a wrong-country hit outright
+— a text country match is evidence, not proof, given Nominatim's own address
+metadata can be incomplete — it lets the resolver weigh it instead.
+
+**Data model — migration 017, additive only.** One new table,
+`place_resolution_feedback`: `user_id`, `destination_place_id` (the
+traveler's own row — not `places.id`, because a row can be mid-decision with
+`canonical_place_id` still null), `import_id`/`import_candidate_id`
+(provenance, both nullable), `proposed_place_id`, `decision` (`confirmed` |
+`rejected` | `corrected`, CHECK-enforced), `corrected_place_id` (a CHECK ties
+it to `decision = 'corrected'` in both directions — required exactly then,
+forbidden otherwise), `resolution_confidence`, `resolver_version`,
+`reason_signals` (jsonb, the exact evidence a score was built from — kept so
+a wrong decision is explainable, the same reasoning migration 013 gives
+`place_external_ids.match_confidence`), `decided_at`. `UNIQUE (user_id,
+destination_place_id)` — one standing decision per traveler per place, a
+double-tap or a changed mind updates rather than duplicates. No existing
+table's columns, indexes or policies were touched; `import_candidates
+.resolved_place_id` (extraction ground truth, "which guess did the human
+keep") was deliberately NOT reused for canonical identity — conflating the
+two would make one column answer different questions depending on which
+phase wrote it.
+
+**Security — re-checked at every layer that touches it, not assumed from a
+higher one.** `POST /api/travel/destination-places/:id/resolution` (a
+DELIBERATELY separate path from `POST /api/travel/places/:id` — that `:id`
+is a canonical `places.id`, this one's is a traveler's own
+`destination_place_id`, and conflating the two path shapes is exactly the
+kind of ambiguity a forged-id attack looks for) accepts only `{ decision,
+correctedPlaceId? }` — no `userId`, `proposedPlaceId`, `confidence`,
+`resolverVersion` or `decidedAt` of any kind; every one of those is
+re-derived server-side (`lib/places/resolutionFeedback.ts`) from the
+traveler's own `destination_places` row, never trusted from the client.
+Ownership is re-checked (not assumed from the URL) both in that
+re-derivation and again inside migration 017's RPC. **The actual write is
+one atomic call**, `apply_place_resolution_feedback` — SECURITY INVOKER, not
+DEFINER: every statement inside runs AS THE CALLING ROLE, bound by exactly
+`destination_places_update_own` and `places_read_public_or_own`, the same as
+if the caller had run each statement themselves; this adds atomicity, not
+privilege, closing the "feedback says CONFIRMED but the pointer never
+updated" gap a naive two-call sequence would risk on a dropped connection
+mid-way. Ownership of the target `destination_places` row is the UPDATE's
+own `WHERE ... AND created_by = auth.uid()` clause, not a pre-check — a
+foreign or fabricated id updates zero rows and the function raises rather
+than silently no-opping. Visibility of whatever place id it is about to
+attach is re-checked inside the function itself via `places_read_public_or_own`
+— proven adversarially with a real, existing, unverified place another
+traveler created: invisible under RLS, and the RPC refuses it even when
+called directly, bypassing the app layer's own re-derivation entirely (a
+mutation-checked test — removing that re-check makes the attack succeed,
+confirmed and then reverted before this phase shipped). `corrected_place_id`
+gets the identical visibility boundary. **Traveler confirmation cannot
+promote `verification_status` by any value of the request body** — that
+ceiling is migration 013's trigger and RLS, unmodified by Phase 13,
+adversarially re-verified (confirming a proposal built from an `unverified`
+place leaves it `unverified`). No `service_role` client anywhere in this
+phase's path — every read, write and the RPC call itself run on the
+caller's own session client.
+
+**Status-lifecycle note.** `place_imports.status`'s `needs_confirmation`
+value (migration 015) is untouched: still reserved, still unreachable from
+any code path, still meaning "a future connector-level ambiguity", not this
+phase's canonical-identity ambiguity. `docs/PLACE-IMPORT.md` states this
+explicitly so the two are never conflated by a future reader.
+
+**UX.** The confirmation lives inside `DoneStage`
+(`components/travel/PlaceImportReview.tsx`) — no new page, no modal. A
+single ambiguous candidate renders name/address/distance with **That's
+it**/**Not this place**; two or more render **Which one did they mean?**
+with a candidate list and **None of these**. Rejecting any of these reads
+"Kept as your own place." — never an error, never a dead end. The component
+(`ResolutionConfirm`) is self-contained exactly like `SavedPlaceButton`: it
+owns its own fetch and busy/error state and reports the outcome through one
+callback, an unmount guard included. Ignoring the question entirely (closing
+the tab, tapping "Import another") leaves the place exactly as it already
+is — on the trip, `canonical_place_id` still null; nothing times out,
+nothing escalates, because nothing anywhere persisted a "pending" state to
+begin with (the proposal is re-derived on demand, never stored).
+
+**Tests.** `tests/resolutionConfidence.test.ts` — pure, no I/O — pins every
+threshold boundary and every multiplicative penalty, including that a
+comparison that could not be made applies none, and confidence never leaves
+[0,1]. `tests/geocode.test.ts` — fetch spied on, network never reached —
+proves the one-request `limit=5`/`addressdetails=1` change, `displayName`
+retention, and the same-country preference over a higher-ranked
+wrong-country hit. `tests/resolvePlaceForTraveler.ambiguity.test.ts` —
+real Postgres, real policies — is the direct regression test for the
+exact failure this phase closes: two same-name published branches 100m
+apart now produce `decision: 'ambiguous'` with the other branch as the one
+alternative, not an arbitrary pick, end to end through
+`importPlacesToTrip`. `tests/destinationPlaceResolution.route.test.ts` and
+`tests/placeResolutionFeedback.rls.test.ts` — real Postgres, real policies,
+the route AND direct-table/RPC access both exercised — cover confirm/
+reject/correct, the corrected-must-be-one-of-the-alternatives boundary, a
+foreign destination-place id reading as `NOT_FOUND`, `decided_at`/ownership
+fields being unforgeable, no DELETE policy, idempotent double-submission,
+`verification_status` never moving, and (mutation-checked) the RPC's own
+visibility re-check on a real invisible place, independent of the app
+layer.
+
+**Verification.** `npm run typecheck` and `npm run lint` are clean (the one
+pre-existing `<img>` warning, unchanged). `npm run test` —
+**1093 tests across 77 files** (1041 carried forward from Phase 12
+unchanged, 52 new) — passes, as does `npm run build`. `npm run verify:runtime`
+still reports **SKIPPED** — no Playwright package in this environment; not
+claimed as a pass. Staging/live-Supabase validation remains outstanding and
+is not blocking, unchanged from every phase since Part 9.
+
+**Carried debt, unchanged by this phase:** `canonical_place_id` remains a
+writable pointer on `destination_places` (Phase 7/8 debt, unscheduled); M1
+(rejected-place `save_count` inflation, Part 10) unscheduled; the stuck-job
+reaper remains an external operator task; staging registry/backfill
+validation (Part 9's checklist) remains outstanding. New debt this phase is
+aware of and leaves open: a re-derived proposal can disagree with what a
+traveler was actually shown if the registry changed in the interval between
+the import "saved" screen and the confirm tap (reported as `outcome:
+'no-proposal'`, never applied as a stale decision — documented, not
+silent); `resolvePlaceForTraveler`'s alternatives cap (four) means a fifth
+or later same-name candidate inside the radius is never offered, only ever
+counted toward the ambiguity penalty.
+
+**Out of scope, confirmed absent from this phase's diff:** no
+`place_imports.needs_confirmation` activation, no orchestrator/reaper/open-index
+change, no multi-signal resolution (hashtags, POI tags, transcripts), no
+Places/search provider activation, no `provider_verified`/`domner_public`
+promotion path change, no AI in the confirmation or scoring path, no OCR or
+vision, no SSRF-allowlist change, no collections/search/ratings work, and no
+`docs/LOCKED.md` file touched.

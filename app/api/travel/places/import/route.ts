@@ -35,6 +35,18 @@ const place = z
     category: z.enum(['spot', 'food', 'shopping', 'transport', 'stay', 'other']).default('other'),
     lat: z.number().min(-90).max(90).nullable().default(null),
     lng: z.number().min(-180).max(180).nullable().default(null),
+    /**
+     * Phase 13 resolution-confidence evidence, not a place attribute: where
+     * this pin came from (review.tsx echoes back what the extractor already
+     * told it) and how many candidates the geocoder itself returned. Neither
+     * is trusted as fact — lib/places/repository.ts only ever uses them to
+     * weigh a confidence score, never to decide what is visible or writable.
+     * A stale or fabricated value can only make an ambiguous match look more
+     * or less confident than it is; it can never attach a place the RLS-scoped
+     * resolver itself would not have matched.
+     */
+    pinSource: z.enum(['maps-link', 'model', 'caption']).nullable().default(null),
+    geocodeResultCount: z.number().int().min(0).nullable().default(null),
   })
   .strict();
 
@@ -87,6 +99,8 @@ export const POST = route(
         category: entry.category,
         lat: entry.lat,
         lng: entry.lng,
+        pinSource: entry.pinSource,
+        geocodeResultCount: entry.geocodeResultCount,
       })),
       { tripId, destination, title, forceNew: newTrip },
       { importId }

@@ -178,6 +178,11 @@ function toCandidate(row: CandidateRow): StoredCandidate {
     lng: number(row.lng),
     confidence: number(row.confidence) ?? 0,
     source,
+    // import_candidates has no column for this (it is a Phase 13 signal, not
+    // stored provenance) — a candidate read back from a queued job's storage
+    // degrades to no geocoder-ambiguity signal, same as one that never had a
+    // geocoder run at all. Phase 13's resolver treats both identically.
+    geocodeResultCount: null,
   };
 }
 
