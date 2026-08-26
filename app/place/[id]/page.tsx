@@ -25,7 +25,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ShieldQuestion } from 'lucide-react';
+import { MapPin, MapPinned, ShieldQuestion } from 'lucide-react';
 import { SignInLink } from '@/components/ui/SignInLink';
 import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
 import { AddToTripButton } from '@/components/travel/AddToTripButton';
@@ -33,6 +33,7 @@ import { useLang } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { safeWebsiteHref } from '@/lib/places/safeLink';
+import { placeMapsHref } from '@/lib/places/mapsHref';
 
 interface PlaceDetail {
   id: string;
@@ -50,6 +51,13 @@ interface PlaceDetail {
   website: string | null;
   phone: string | null;
   verificationStatus: 'unverified' | 'provider_verified' | 'domner_public' | 'rejected';
+  /**
+   * Already on the wire since Phase 8 (GET /api/travel/places/:id spreads
+   * every RegistryPlace field except createdBy) — Phase 11 is the first
+   * reader. See lib/places/mapsHref.ts for what makes a pair usable.
+   */
+  latitude: number;
+  longitude: number;
 }
 
 type LoadState =
@@ -208,6 +216,23 @@ export default function PlaceDetailPage() {
               {state.place.phone && (
                 <p className="text-sm text-white/70">{state.place.phone}</p>
               )}
+              {(() => {
+                const mapsHref = placeMapsHref(state.place.latitude, state.place.longitude);
+                if (!mapsHref) return null;
+                return (
+                  <p className="text-sm">
+                    <a
+                      href={mapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-accent underline underline-offset-2"
+                    >
+                      <MapPinned size={14} aria-hidden="true" className="flex-none" />
+                      {t('place.openInMaps')}
+                    </a>
+                  </p>
+                );
+              })()}
               {state.place.verificationStatus === 'unverified' && (
                 <p className="text-xs text-white/45">{t('place.unverified')}</p>
               )}

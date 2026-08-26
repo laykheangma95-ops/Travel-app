@@ -168,12 +168,21 @@ export default function SavedPlacesPage() {
             <p className="mx-auto mt-1 max-w-xs text-sm leading-relaxed text-white/60">
               {t('saved.emptyHint')}
             </p>
-            <Link
-              href="/explore"
-              className="v3-save mt-5 inline-flex"
-            >
-              {lang === 'km' ? 'រុករក' : 'Explore'}
-            </Link>
+            {/* The actual next action for an empty library: paste a link and
+                let the importer resolve it into a saved place (the pipeline
+                Phases 1-7 built). /explore stays as a secondary route for
+                someone without a link handy yet. */}
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link href="/import/link" className="v3-save inline-flex">
+                {t('saved.emptyCta')}
+              </Link>
+              <Link
+                href="/explore"
+                className="inline-flex min-h-[2.75rem] items-center rounded-btn border border-white/15 px-5 text-sm font-semibold text-white transition-colors hover:border-gold-light/40"
+              >
+                {lang === 'km' ? 'រុករក' : 'Explore'}
+              </Link>
+            </div>
           </div>
         ) : (
           <>
