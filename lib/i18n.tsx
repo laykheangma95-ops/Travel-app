@@ -292,6 +292,8 @@ const dicts = {
     'place.saveCount.one': 'Saved by 1 traveler',
     'place.saveCount.many': 'Saved by {n} travelers',
     'place.unverified': 'Not yet verified by Domner',
+    'place.openInMaps': 'Open in maps',
+    'saved.emptyCta': 'Paste a link to start saving places',
     // Adding a canonical place onto a trip (Phase 10) — the same shape as
     // v3.save.*, kept as its own namespace because "save to library" and
     // "add to trip" are different actions that can sit on the same screen.
@@ -667,6 +669,8 @@ const dicts = {
     'place.saveCount.one': 'អ្នកដំណើរ ១ នាក់បានរក្សាទុក',
     'place.saveCount.many': 'អ្នកដំណើរ {n} នាក់បានរក្សាទុក',
     'place.unverified': 'មិនទាន់បានផ្ទៀងផ្ទាត់ដោយ Domner ទេ',
+    'place.openInMaps': 'បើកនៅក្នុងផែនទី',
+    'saved.emptyCta': 'ថតតំណភ្ជាប់ដើម្បីចាប់ផ្តើមរក្សាទុកកន្លែង',
     'addToTrip.action': 'បន្ថែមទៅដំណើរកម្សាន្ត',
     'addToTrip.adding': 'កំពុងបន្ថែម…',
     'addToTrip.added': 'បានបន្ថែមទៅ {trip}',

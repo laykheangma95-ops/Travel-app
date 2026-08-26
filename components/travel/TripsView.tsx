@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Map, Plus, WifiOff } from 'lucide-react';
+import { Compass, Heart, Map, Plus, WifiOff } from 'lucide-react';
 import type { TripSummary } from '@/lib/travel/state';
 import { TripCard } from './TripCard';
 import { SignInLink } from '@/components/ui/SignInLink';
@@ -116,6 +116,19 @@ export function TripsView() {
             {lang === 'km' ? 'ដំណើរថ្មី' : 'New trip'}
           </Link>
         </header>
+
+        {/* Secondary, deliberately: "New trip" above is the one gold CTA in
+            this viewport (ui-ux §5). Places kept from a guide or an import
+            live in the saved library independent of any trip — this is the
+            one route into it from the trips surface, always shown regardless
+            of whether this traveler has any trips yet. */}
+        <Link
+          href="/you/saved"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white"
+        >
+          <Heart size={14} aria-hidden="true" />
+          {lang === 'km' ? 'កន្លែងដែលបានរក្សាទុក' : 'Saved places'}
+        </Link>
 
         {state === 'guest' ? (
           <div className="night-card mt-8 p-8 text-center">

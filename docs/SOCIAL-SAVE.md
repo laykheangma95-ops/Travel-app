@@ -410,11 +410,11 @@ Each phase is independently shippable, additive, and reversible.
 > work; this note exists so a future session does not have to rediscover that
 > the hard way.
 >
-> **The actually-current phase is Phase 6**, continuing the PLACE-IMPORT.md
-> track (production-completing the shipped async pipeline), not this table's
-> Phase 3 or Phase 5 — see *Part 12 — Phase 6* below. This table's own Phase 3
-> and Phase 5 remain real, scoped, future work — owner-approved cost/security
-> decisions away, not "next" by default.
+> **The actually-current phase is Phase 11**, continuing the same track
+> Phase 6 started (production-completing and wiring what Phases 1–7 built),
+> not this table's Phase 3 or Phase 5 — see *Part 14 — Phases 8–11* below.
+> This table's own Phase 3 and Phase 5 remain real, scoped, future work —
+> owner-approved cost/security decisions away, not "next" by default.
 
 ### Phase 1 — Persistence + cost control ✅ **shipped — see Part 8**
 
@@ -1185,3 +1185,149 @@ sampled round-trip) remains unrun. Phase 7 adds a fifth, specific to what it
 wires in — recorded in Part 9's own "Open items carried forward" list rather
 than duplicated here — and it must not be reported as passed until an
 owner or a session with real staging access runs it.
+
+---
+
+## Part 14 — Phases 8–11
+
+Concise, factual record. None of these are this document's own Part 5 Phase 3
+or Phase 5 — see the numbering note at the top of Part 5. Full detail for each
+lives in the PR that shipped it; this entry exists so the phase trail does not
+stop being written down at Phase 7.
+
+### Phase 8 — the first traveler-visible canonical place page
+
+**Status: shipped.** `GET /api/travel/places/:id` and `/place/[id]`
+(authenticated-only by decision — no anonymous variant): the first screen
+that renders a canonical `places` row on its own, rather than only through an
+import or a trip. **No migration.** The `saved_places`/`place_stats` schema
+(migration `014_saved_place_library.sql`) and `SavedPlaceButton` already
+existed — they shipped earlier, ahead of Phase 8 in commit order, and are
+documented in Part 10. Phase 8's own contribution is reusing that
+already-shipped save-to-library infrastructure on the new page (mounting
+`SavedPlaceButton`, reading `place_stats` for the save count) rather than
+building any of it. Authorization is `getPlaceById` on the caller's own
+session client — `places_read_public_or_own` decides visibility, and an
+invisible place 404s identically to a nonexistent one, matching the pattern
+`app/api/travel/places/saved/route.ts` had already settled. No AI, no paid
+provider.
+
+### Phase 9 — canonical place reachability wiring
+
+**Status: shipped.** Phase 8 built the page and mounted the (already-shipped,
+see Part 10) save-to-library action on it; nothing in the app linked to
+either. Phase 9 is pure wiring, no new tables, no RLS
+change: `/you/saved` cards link to `/place/[canonicalId]`; the import "saved"
+screen shows "View place" for a single-place import that resolved a canonical
+place (`ImportOutcome.canonicalPlaceId`, additive on the wire); the itinerary
+edit sheet shows "View place" for a scheduled place carrying
+`canonical_place_id` (on the wire since Phase 7, unread until now).
+`viewPlaceHref`/`placeDetailHref` moved to plain `.ts` modules
+(`lib/travel/importOutcome.ts`, `lib/travel/itinerary.ts`) so the link-visibility
+logic is unit-testable under this repo's Vitest config, which has no JSX
+transform. `/place/[id]` remains the sole authorization boundary — every new
+link is a navigation target only, re-checked against RLS on request.
+
+### Phase 10 — add a canonical/saved place to a trip
+
+**Status: shipped, with remediation.** `POST /api/travel/places/:id/add-to-trip`
+(a canonical `places.id` in the URL, never the body) reuses the existing
+trip-resolution machinery verbatim (`resolveTrip`/`chosenTrip`/
+`isAlreadyOnTrip`/`addIdeaToTrip`, now exported from `lib/travel/savedPlaces.ts`)
+rather than a second "which trip?" interpretation. `lib/places/addToTrip.ts`'s
+`materializeDestinationPlace` is the one new piece: a canonical `places` row
+still needs a traveler-owned `destination_places` row before `addIdeaToTrip`
+can point an `itinerary_places` row at it. `AddToTripButton` is one shared
+component mounted on both `/place/[id]` and `/you/saved`.
+
+**A Principal Engineer review found four issues before this shipped to the
+default branch, all fixed in the same PR:**
+
+- **HIGH-1** — the `(created_by, canonical_place_id)` reuse lookup used
+  `.maybeSingle()` against a pair with no unique constraint; two rows for one
+  traveler can share one `canonical_place_id` (raw-name variants that pass
+  `owner_name_idx` as distinct rows but fold onto one canonical place by
+  normalized name), which 500'd permanently. Fixed with `.limit(1)` plus an
+  explicit read of the first row.
+- **MEDIUM-1 / MEDIUM-2** — the `owner_name_idx` collision fallback used to
+  reuse, and for a NULL-linked row silently mutate, an unrelated same-named row
+  on any insert collision — risking success-while-filing-the-wrong-place, or
+  rewriting a pre-existing row's identity on a guess. Collision reuse is now
+  permitted only when the existing row's `canonical_place_id` already equals
+  the requested place's id; otherwise a new row is created under a name
+  deterministically disambiguated from the canonical place's own id (never
+  randomness, so retries converge), or the call fails honestly.
+- **LOW-1** — an explicit `tripId` is now checked for destination
+  compatibility *before* anything is materialized, so a mismatched trip is
+  refused outright instead of leaving an orphan `destination_places` row.
+
+`tests/support/pgHarness.ts`'s `maybeSingle()` was also corrected to match real
+PostgREST (more than one matching row is a PGRST116-style error, not "return
+the first one") — the gap that let HIGH-1 ship undetected in the first place.
+
+**Known limitation, carried forward, not touched by this phase:** the
+`canonical_place_id` writable-pointer debt from Phase 7/8 — a traveler can, via
+a direct PostgREST write, point their own `destination_places.canonical_place_id`
+at any existing `places.id`. Every route that reads it re-derives visibility
+from RLS on request, so it is not a new exploitation path here, but it remains
+unscheduled.
+
+### Phase 11 — library reachability + a maps action
+
+**Status: shipped.** The Phase 10 readiness inspection found that Phases 8–10
+had built a working saved-place library with no way to reach it: a codebase
+grep found exactly one link to `/you/saved` in the entire app (inside
+`/place/[id]`'s own not-found branch), and `/place/[id]` rendered no location
+affordance despite `latitude`/`longitude` already being on the wire since
+Phase 8. Phase 11 closes both gaps. No migration, no RLS change, no AI, no
+paid Places/search provider, no service-role client.
+
+**What it does:**
+
+- `app/you/page.tsx` gets a "Saved places" row in the *Your travel* group,
+  linking to `/you/saved` (signed-in only, matching `/trips`). The row data
+  moved to `lib/travel/youNav.ts` — a plain `.ts` module, for the same reason
+  `importOutcome.ts` exists: this repo's `tsconfig.json` sets
+  `jsx: "preserve"`, so Vitest cannot import a `.tsx` file at all, and a
+  regression test needed something to import.
+- `components/travel/TripsView.tsx` gets one secondary link to `/you/saved`
+  in the header, always shown regardless of trip state — deliberately not
+  gold (the "New trip" CTA keeps that budget) and deliberately not added
+  inside individual trip workspaces, per the owner's scoping.
+- `app/you/saved/page.tsx`'s empty state now offers `/import/link` ("paste a
+  link and start saving places") as the primary next action, with `/explore`
+  kept as a secondary route for a traveler without a link handy. The existing
+  signed-out (`SignInLink`) and load-error states are unchanged.
+- `app/place/[id]/page.tsx`'s `PlaceDetail` type gains `latitude`/`longitude`
+  — no API change, both fields were already in `GET /api/travel/places/:id`'s
+  response (`RegistryPlace` spread minus `createdBy`). A new
+  `lib/places/mapsHref.ts::placeMapsHref` (pure, unit-tested, the same shape
+  as `safeWebsiteHref`) turns a coordinate pair into a
+  `https://www.google.com/maps/search/?api=1&query=` link — Google's
+  documented, key-free "Maps URLs" format, chosen because
+  `lib/travel/mapsLink.ts` already parses this exact family of URL apart
+  elsewhere in the codebase, rather than adding a second provider or an SDK.
+  Rejects non-finite/non-numeric input, out-of-globe values, and the `(0, 0)`
+  null-island sentinel `insertPlace()` substitutes for an ungeocoded place
+  (same guard Phase 7's registry resolution uses) — never a plain string
+  interpolation, always `rel="noopener noreferrer"` and `target="_blank"`.
+  No map is embedded and `RouteMap` (which lives inline inside
+  `ItineraryEditor.tsx`, not extracted) was not touched — that remains a
+  separate, larger decision.
+
+**What it deliberately does not do:** touch `RouteMap`, add a map SDK or
+embedded map, add a saved-place entry inside individual trip workspaces, add
+collections or ratings, activate a Places/search provider, change AI
+extraction, add OCR/RED, or address the Phase 7/8 `canonical_place_id`
+writable-pointer debt.
+
+**Verification.** `npm run typecheck`, `npm run lint`, and the full
+`npm run test` (1020 tests across 71 files, including the new
+`placeMapsHref`, `placeLibraryReachability`, and `i18nParity` suites) all
+pass, as does `npm run build`. **Runtime verification
+(`npm run verify:runtime`) reports SKIPPED** — the `playwright` package is not
+a project dependency in this environment — and no staging or authenticated
+runtime check was performed. This is stated rather than implied: per
+`docs/VERIFICATION.md`, a skip is not a pass. All staging-validation debt
+recorded in Part 9's "Open items carried forward" and this section's own
+Phase 10 entry remains exactly as outstanding as before this phase.
