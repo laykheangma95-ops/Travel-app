@@ -35,6 +35,26 @@ const place = z
     category: z.enum(['spot', 'food', 'shopping', 'transport', 'stay', 'other']).default('other'),
     lat: z.number().min(-90).max(90).nullable().default(null),
     lng: z.number().min(-180).max(180).nullable().default(null),
+    /**
+     * Phase 13 resolution evidence, not place attributes: how this pin was
+     * obtained, and what the geocoder saw when it produced one. The review
+     * screen echoes back what the extractor already told it.
+     *
+     * These are the ONLY scoring inputs a client supplies, and they are
+     * supplied because they are facts about the pipeline that the database
+     * genuinely cannot observe. Everything else the score is built from —
+     * the distance, how many canonical rows compete, whether the countries
+     * agree — is measured by migration 017's
+     * create_place_resolution_proposal inside the transaction that stores it,
+     * so no caller states a confidence, a resolver version or a set of reason
+     * signals. Nor do these decide anything about visibility or ownership:
+     * a stale or fabricated value can only make an ambiguous match look
+     * somewhat more or less confident, never attach a place the RLS-scoped
+     * resolver would not itself have matched.
+     */
+    pinSource: z.enum(['maps-link', 'model', 'caption']).nullable().default(null),
+    geocodeResultCount: z.number().int().min(0).nullable().default(null),
+    geocodeCountryMismatch: z.boolean().nullable().default(null),
   })
   .strict();
 
@@ -87,6 +107,9 @@ export const POST = route(
         category: entry.category,
         lat: entry.lat,
         lng: entry.lng,
+        pinSource: entry.pinSource,
+        geocodeResultCount: entry.geocodeResultCount,
+        geocodeCountryMismatch: entry.geocodeCountryMismatch,
       })),
       { tripId, destination, title, forceNew: newTrip },
       { importId }

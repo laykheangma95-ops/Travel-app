@@ -24,8 +24,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
 import { log } from '@/lib/logger';
-import { attachCanonicalPlace, resolvePlaceForTraveler } from '@/lib/places/repository';
+import { attachCanonicalPlace, resolvePlaceForTraveler, type RegistryPlace } from '@/lib/places/repository';
 import type { CanonicalPlaceInput } from '@/lib/places/validation';
+import type { PinOrigin } from '@/lib/places/resolutionConfidence';
 import type { ItineraryCategory } from './itinerary';
 import { PLACE_DESCRIPTION_MAX, PLACE_NAME_MAX } from './itinerary';
 import { addIdeaToTrip } from './savedPlaces';
@@ -39,6 +40,60 @@ export interface ImportablePlace {
   category: ItineraryCategory;
   lat: number | null;
   lng: number | null;
+  /** Phase 13 resolution-confidence evidence, echoed from the review screen.
+   *  See app/api/travel/places/import/route.ts's `place` schema — never
+   *  trusted as fact, only ever weighed by lib/places/repository.ts. */
+  pinSource?: 'maps-link' | 'model' | 'caption' | null;
+  geocodeResultCount?: number | null;
+  geocodeCountryMismatch?: boolean | null;
+}
+
+/** A canonical place stripped to what a confirmation screen needs — never
+ *  `createdBy`, never `verificationStatus`/`verifiedAt`: those are internal
+ *  registry/ownership metadata, not something a traveler picking between two
+ *  cafés needs to see. */
+export interface ResolutionCandidateSummary {
+  id: string;
+  name: string;
+  localName: string | null;
+  address: string | null;
+  city: string | null;
+  countryName: string;
+  latitude: number;
+  longitude: number;
+  category: string;
+  /** Distance from the traveler's own saved place, in metres. */
+  meters: number;
+}
+
+function toCandidateSummary(place: RegistryPlace, meters: number): ResolutionCandidateSummary {
+  return {
+    id: place.id,
+    name: place.name,
+    localName: place.localName,
+    address: place.address,
+    city: place.city,
+    countryName: place.countryName,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    category: place.category,
+    meters,
+  };
+}
+
+/** What the traveler sees about a place's canonical-resolution outcome.
+ *  Present only when there is something to show or ask — a place that never
+ *  resolved (no coordinates, a registry miss) carries no `resolution` at
+ *  all, exactly as before Phase 13. */
+export interface PlaceResolutionSummary {
+  decision: 'auto' | 'ambiguous';
+  confidence: number;
+  resolverVersion: string;
+  /** The top match. Already attached when `decision === 'auto'`; a proposal
+   *  awaiting confirmation when `decision === 'ambiguous'`. */
+  proposed: ResolutionCandidateSummary;
+  /** Only populated when `decision === 'ambiguous'`. */
+  alternatives: ResolutionCandidateSummary[];
 }
 
 /** The most places one import writes. Matches MAX_CANDIDATES on the read side. */
@@ -86,7 +141,23 @@ export interface ImportResult {
    * EVERY resolved place in a multi-place import, not only when exactly one
    * place was added.
    */
-  addedPlaces: { name: string; canonicalPlaceId: string | null }[];
+  addedPlaces: AddedPlace[];
+}
+
+export interface AddedPlace {
+  name: string;
+  /** The traveler's own `destination_places` row — always present, always
+   *  written, whatever happens to canonical resolution. This is what the
+   *  Phase 13 confirmation route (`POST /api/travel/destination-places/:id/resolution`)
+   *  is keyed on. */
+  destinationPlaceId: string;
+  /** Non-null only when resolution already attached a canonical place
+   *  (`resolution?.decision === 'auto'`, or absent). Null while a proposal is
+   *  awaiting confirmation, and null when nothing resolved at all. */
+  canonicalPlaceId: string | null;
+  /** Absent when there was nothing to resolve (no coordinates) or nothing
+   *  matched closely enough to be worth asking about. */
+  resolution?: PlaceResolutionSummary;
 }
 
 /**
@@ -137,7 +208,7 @@ export async function importPlacesToTrip(
   // `.push()` per successful write means a name and its canonical id can never
   // land at different indexes the way two arrays filled by two statements
   // could drift.
-  const addedPlaces: { name: string; canonicalPlaceId: string | null }[] = [];
+  const addedPlaces: AddedPlace[] = [];
   const skipped: string[] = [];
   const failed: string[] = [];
 
@@ -151,10 +222,18 @@ export async function importPlacesToTrip(
     }
 
     try {
-      const { placeId, canonicalPlaceId } = await insertPlace(supabase, userId, destination, {
-        ...place,
-        name,
-      });
+      // Looked up BEFORE the write so an ambiguous proposal can carry its
+      // extraction provenance from the moment it is recorded, rather than
+      // being back-filled by a later lookup that might find nothing.
+      const importCandidateId = await candidateIdFor(supabase, options.importId ?? null, name);
+
+      const { placeId, canonicalPlaceId, resolution } = await insertPlace(
+        supabase,
+        userId,
+        destination,
+        { ...place, name },
+        { importId: options.importId ?? null, importCandidateId }
+      );
       await addIdeaToTrip(supabase, trip.id, placeId);
 
       // Provenance and the accepted-candidate mark. Both are ledger writes and
@@ -173,7 +252,7 @@ export async function importPlacesToTrip(
         await markCandidateAccepted(supabase, options.importId, name, placeId);
       }
       existingNames.add(fold(name));
-      addedPlaces.push({ name, canonicalPlaceId });
+      addedPlaces.push({ name, destinationPlaceId: placeId, canonicalPlaceId, ...(resolution ? { resolution } : {}) });
     } catch {
       // One bad row must not cost the traveler the other eight.
       failed.push(name);
@@ -309,8 +388,9 @@ async function insertPlace(
   supabase: SupabaseClient,
   userId: string,
   destination: string,
-  place: ImportablePlace
-): Promise<{ placeId: string; canonicalPlaceId: string | null }> {
+  place: ImportablePlace,
+  provenance: { importId: string | null; importCandidateId: string | null }
+): Promise<{ placeId: string; canonicalPlaceId: string | null; resolution: PlaceResolutionSummary | undefined }> {
   const { data, error } = await supabase
     .from('destination_places')
     .insert({
@@ -337,16 +417,19 @@ async function insertPlace(
   // never a location, and (0, 0) sent into a 150m proximity search would
   // silently merge every coordinate-less import from every traveler into one
   // row at null island. A place with no real coordinates is left unlinked.
-  const canonicalPlaceId =
+  const linked =
     place.lat !== null && place.lng !== null
-      ? await linkCanonicalPlace(supabase, userId, placeId, destination, {
-          ...place,
-          lat: place.lat,
-          lng: place.lng,
-        })
-      : null;
+      ? await linkCanonicalPlace(
+          supabase,
+          userId,
+          placeId,
+          destination,
+          { ...place, lat: place.lat, lng: place.lng },
+          provenance
+        )
+      : { canonicalPlaceId: null, resolution: undefined };
 
-  return { placeId, canonicalPlaceId };
+  return { placeId, canonicalPlaceId: linked.canonicalPlaceId, resolution: linked.resolution };
 }
 
 /**
@@ -366,13 +449,22 @@ async function insertPlace(
  * rows), and anything it creates must land as `unverified` — the ceiling RLS
  * enforces on that client and nothing here overrides.
  */
+/**
+ * Phase 13: `resolvePlaceForTraveler` no longer means "attach whatever it
+ * found". `decision === 'ambiguous'` returns a proposal that must NOT be
+ * attached — `canonical_place_id` stays null, exactly like an unresolved
+ * place, and the caller gets a `resolution` summary to show the traveler
+ * instead. Only `decision === 'auto'` (a confident match, or a freshly
+ * created row) is attached here.
+ */
 async function linkCanonicalPlace(
   supabase: SupabaseClient,
   userId: string,
   destinationPlaceId: string,
   destination: string,
-  place: ImportablePlace & { lat: number; lng: number }
-): Promise<string | null> {
+  place: ImportablePlace & { lat: number; lng: number },
+  provenance: { importId: string | null; importCandidateId: string | null }
+): Promise<{ canonicalPlaceId: string | null; resolution: PlaceResolutionSummary | undefined }> {
   try {
     const input: CanonicalPlaceInput = {
       name: place.name,
@@ -381,20 +473,164 @@ async function linkCanonicalPlace(
       latitude: place.lat,
       longitude: place.lng,
     };
-    const resolution = await resolvePlaceForTraveler(supabase, userId, input);
-    if (resolution) {
+    // The model/caption pipeline never produces its own coordinates
+    // (lib/travel/placeAgent.ts's schema has none) — a pin on one of those
+    // candidates always came from the geocoder. A maps-link candidate's pin
+    // is the platform's own exact location.
+    const pinOrigin: PinOrigin =
+      place.pinSource === 'maps-link' ? 'maps-link' : place.pinSource ? 'geocoder' : 'unknown';
+
+    const resolution = await resolvePlaceForTraveler(supabase, userId, input, {
+      pinOrigin,
+      geocoderResultCount: place.geocodeResultCount ?? null,
+      geocoderCountryMismatch: place.geocodeCountryMismatch ?? null,
+    });
+    if (!resolution) return { canonicalPlaceId: null, resolution: undefined };
+
+    if (resolution.decision === 'auto') {
       // The returned id must mean "this row is actually linked", not "a
       // resolution merely happened" — a failed write here must not make
       // ImportResult.canonicalPlaceId claim a link destination_places itself
       // does not have.
       const attached = await attachCanonicalPlace(supabase, destinationPlaceId, resolution.place.id);
-      return attached ? resolution.place.id : null;
+      return {
+        canonicalPlaceId: attached ? resolution.place.id : null,
+        resolution: undefined,
+      };
     }
-    return null;
+
+    if (resolution.decision === 'ambiguous') {
+      // ── The proposal is RECORDED before it is shown ───────────────────────
+      //
+      // The Phase 13 review proved what happens when it is not: the confirm
+      // route re-derived the proposal from the destination_places row, could
+      // not see how the pin had been obtained, scored it 1.25x higher without
+      // the geocoder penalty, and answered "no-proposal" to a card the
+      // traveler was looking at.
+      //
+      // So the ambiguous proposal becomes a `pending` row here, and the
+      // DATABASE computes its confidence and signals (migration 017's
+      // create_place_resolution_proposal). What the screen renders below is
+      // read back out of that row, so the number shown and the number stored
+      // are not two computations that have to agree — they are one value.
+      const recorded = await recordProposal(supabase, {
+        destinationPlaceId,
+        proposedPlaceId: resolution.place.id,
+        alternativePlaceIds: resolution.alternatives.map((a) => a.place.id),
+        pinOrigin,
+        geocoderResultCount: place.geocodeResultCount ?? null,
+        geocoderCountryMismatch: place.geocodeCountryMismatch ?? null,
+        importId: provenance.importId,
+        importCandidateId: provenance.importCandidateId,
+      });
+
+      // A proposal that could not be recorded is not shown. Asking a question
+      // whose answer has nowhere to land would put the traveler back in
+      // exactly the dead-button state this remediation exists to remove.
+      if (!recorded) return { canonicalPlaceId: null, resolution: undefined };
+
+      return {
+        canonicalPlaceId: null,
+        resolution: {
+          decision: 'ambiguous',
+          confidence: recorded.confidence,
+          resolverVersion: recorded.resolverVersion,
+          proposed: toCandidateSummary(resolution.place, recorded.distanceMeters),
+          alternatives: resolution.alternatives.map((a) => toCandidateSummary(a.place, a.meters)),
+        },
+      };
+    }
+
+    // 'none' — not enough evidence to link OR to ask. Behaves exactly like an
+    // unresolved place.
+    return { canonicalPlaceId: null, resolution: undefined };
   } catch (cause) {
     log.warn('place_import.registry_link_failed', {
       reason: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
     });
+    return { canonicalPlaceId: null, resolution: undefined };
+  }
+}
+
+/**
+ * Write the `pending` proposal, and read back the evidence the database
+ * derived for it.
+ *
+ * The RPC takes NO confidence, NO resolver version and NO reason signals —
+ * only facts this side actually knows and the database cannot (which place was
+ * proposed, what else was offered, how the pin was obtained). Everything a
+ * later analysis would read is computed inside the transaction that stores it,
+ * which is what makes the row un-forgeable through a plain PostgREST call.
+ */
+async function recordProposal(
+  supabase: SupabaseClient,
+  input: {
+    destinationPlaceId: string;
+    proposedPlaceId: string;
+    alternativePlaceIds: string[];
+    pinOrigin: PinOrigin;
+    geocoderResultCount: number | null;
+    geocoderCountryMismatch: boolean | null;
+    importId: string | null;
+    importCandidateId: string | null;
+  }
+): Promise<{ confidence: number; resolverVersion: string; distanceMeters: number } | null> {
+  const { data, error } = await supabase.rpc('create_place_resolution_proposal', {
+    p_destination_place_id: input.destinationPlaceId,
+    p_proposed_place_id: input.proposedPlaceId,
+    p_alternative_place_ids: input.alternativePlaceIds,
+    p_pin_origin: input.pinOrigin,
+    p_geocoder_result_count: input.geocoderResultCount,
+    p_geocoder_country_mismatch: input.geocoderCountryMismatch,
+    p_import_id: input.importId,
+    p_import_candidate_id: input.importCandidateId,
+  });
+
+  if (error || !data) {
+    log.warn('place_import.proposal_not_recorded', {
+      reason:
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: unknown }).message).slice(0, 160)
+          : 'unknown',
+    });
+    return null;
+  }
+
+  const row = data as { resolution_confidence: number | string; resolver_version: string; reason_signals: unknown };
+  const signals = (row.reason_signals ?? {}) as { distanceMeters?: unknown };
+  return {
+    confidence: typeof row.resolution_confidence === 'number'
+      ? row.resolution_confidence
+      : Number(row.resolution_confidence),
+    resolverVersion: row.resolver_version,
+    distanceMeters: typeof signals.distanceMeters === 'number' ? signals.distanceMeters : 0,
+  };
+}
+
+/**
+ * The extraction candidate a saved place came from, when it came from an
+ * import. Looked up by name because `markCandidateAccepted` has not run yet at
+ * proposal time — and because a name is what actually ties the two together
+ * (dedupeCandidates guarantees one candidate per name per import).
+ */
+async function candidateIdFor(
+  supabase: SupabaseClient,
+  importId: string | null,
+  name: string
+): Promise<string | null> {
+  if (!importId) return null;
+  try {
+    const { data } = await supabase
+      .from('import_candidates')
+      .select('id')
+      .eq('import_id', importId)
+      .eq('name', name)
+      .order('position', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data ? ((data as { id: string }).id ?? null) : null;
+  } catch {
+    // Provenance only — never worth failing a save over.
     return null;
   }
 }

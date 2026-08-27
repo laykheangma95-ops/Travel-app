@@ -83,7 +83,8 @@ describe('a place with real coordinates gets linked', () => {
     expect(registry.resolvePlaceForTraveler).toHaveBeenCalledWith(
       alice,
       ALICE,
-      expect.objectContaining({ name: 'Wat Pho', countryName: 'Thailand' })
+      expect.objectContaining({ name: 'Wat Pho', countryName: 'Thailand' }),
+      expect.objectContaining({ pinOrigin: 'unknown' })
     );
   });
 });

@@ -186,6 +186,15 @@ export function ImportPlacesView({
             category: row.category,
             lat: row.lat,
             lng: row.lng,
+            // Phase 13 resolution-confidence evidence — where the pin came
+            // from and how ambiguous the geocoder itself found it. Optional
+            // on the wire; the server never trusts it as anything but a hint
+            // (lib/places/repository.ts recomputes the actual match; this can
+            // only ever soften or sharpen a score, never grant access to
+            // anything).
+            pinSource: row.source,
+            geocodeResultCount: row.geocodeResultCount,
+            geocodeCountryMismatch: row.geocodeCountryMismatch,
           })),
           ...target,
           // Optional on the wire, and only ever an id: the server reads the

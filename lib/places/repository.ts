@@ -40,6 +40,14 @@ import {
   SAME_PLACE_RADIUS_M,
 } from './normalize';
 import { canonicalPlaceInput, type CanonicalPlaceInput, type PlaceCategory } from './validation';
+import {
+  createdPlaceScore,
+  RESOLVER_VERSION,
+  scoreResolution,
+  type PinOrigin,
+  type ResolutionDecision,
+  type ResolutionReasonSignals,
+} from './resolutionConfidence';
 
 /** Every column the application reads. Listed once so a shape change is one edit. */
 const COLUMNS =
@@ -192,6 +200,30 @@ export interface PlaceResolution {
   matchedBy: MatchStrategy;
   /** 0–1 for a match; 1 for a row we just created (it is trivially itself). */
   confidence: number;
+  /**
+   * Phase 13. What the caller should do with `place`:
+   *   auto       — attach it. This is every decision this function returned
+   *                before Phase 13 existed.
+   *   ambiguous  — do NOT attach it. `place` is the proposal, `alternatives`
+   *                are what else matched; ask the traveler.
+   *   none       — do NOT attach it, and do not ask. Not enough evidence to
+   *                bother a traveler about.
+   */
+  decision: ResolutionDecision;
+  /** Other candidates that also matched inside the radius, nearest first,
+   *  capped for display. Empty except when `decision === 'ambiguous'`. */
+  alternatives: PlaceAlternative[];
+  reasonSignals: ResolutionReasonSignals;
+  resolverVersion: string;
+}
+
+/** One alternative candidate a traveler could pick instead of the proposal —
+ *  carries the same distance evidence the proposal itself was scored on, so
+ *  a confirmation UI can show "40m away" for every option, not only the top
+ *  one. */
+export interface PlaceAlternative {
+  place: RegistryPlace;
+  meters: number;
 }
 
 // ── Lookups ──────────────────────────────────────────────────────────────────
@@ -382,6 +414,59 @@ async function insertPlace(
   return null;
 }
 
+/** Alternatives shown to a traveler, capped — a wall of nine candidates is not
+ *  a confirmation UX, it is a second review screen. */
+const MAX_ALTERNATIVES = 4;
+
+/** Phase 13 evidence the caller has that `resolvePlaceForTraveler` itself has
+ *  no way to derive — where the pin came from, and how ambiguous the geocoder
+ *  itself found the query. Everything else the score needs (distance, country
+ *  and city agreement) is computed from `input` against the nearby match
+ *  found here, not passed in, so it can never disagree with what was actually
+ *  matched. */
+export interface ResolutionContext {
+  pinOrigin: PinOrigin;
+  geocoderResultCount: number | null;
+  /**
+   * The geocoder's own country verdict for the pin being resolved
+   * (GeocodeHit.countryMismatch). Folded together with the matched canonical
+   * row's country below into ONE signal — see the note on
+   * ResolutionScoreInput.countryMismatch for why this is not a second,
+   * separately-charged penalty.
+   */
+  geocoderCountryMismatch: boolean | null;
+}
+
+const DEFAULT_RESOLUTION_CONTEXT: ResolutionContext = {
+  pinOrigin: 'unknown',
+  geocoderResultCount: null,
+  geocoderCountryMismatch: null,
+};
+
+/**
+ * The one country signal, from the two facts that can raise country doubt.
+ *
+ * `true` from either side is doubt. Otherwise the registry comparison stands,
+ * and `null` (nothing comparable on one side) stays `null` rather than being
+ * flattened into "they agree" — mirrored exactly by migration 017's
+ * create_place_resolution_proposal, which recomputes this in SQL.
+ */
+function combinedCountryMismatch(
+  geocoderVerdict: boolean | null,
+  candidateCountry: string | null,
+  matchedCountry: string | null
+): boolean | null {
+  if (geocoderVerdict === true) return true;
+  return fieldMismatch(candidateCountry, matchedCountry);
+}
+
+/** null when either side has nothing to compare — never coerced into a match
+ *  or a mismatch. */
+function fieldMismatch(a: string | null, b: string | null): boolean | null {
+  if (!a || !b) return null;
+  return normalizePlaceName(a) !== normalizePlaceName(b);
+}
+
 /**
  * Find or create the canonical place for something a traveler is saving.
  *
@@ -395,11 +480,72 @@ async function insertPlace(
  * treats that as "no canonical record", not as a failure of their save — which
  * is what keeps this phase additive: `destination_places` remains the thing a
  * trip actually points at.
+ *
+ * PHASE 13: this no longer takes `nearby[0]` unconditionally. Multiple
+ * plausible candidates, a country/city disagreement, or a geocoded (rather
+ * than exact) pin all lower the score `scoreResolution` computes from the
+ * match already found; below AUTO_LINK_CONFIDENCE the caller gets `decision:
+ * 'ambiguous'` and must NOT attach the place — see lib/places/resolutionConfidence.ts.
  */
+/**
+ * The name+proximity half of resolution, with no write of any kind — reused
+ * by `resolvePlaceForTraveler` (which inserts when this finds nothing) AND by
+ * lib/places/resolutionFeedback.ts, which re-derives the SAME proposal a
+ * traveler is confirming/rejecting/correcting rather than trusting anything
+ * the client claims about it. Both callers get identical scoring for
+ * identical input, which is the whole point of a deterministic resolver
+ * version — see lib/places/resolutionConfidence.ts.
+ *
+ * Returns null when nothing matched nearby at all — the caller decides what
+ * "nothing" means (resolvePlaceForTraveler creates a row; a re-derivation for
+ * confirmation treats it as "there is no longer a proposal to confirm").
+ */
+export async function proposeCanonicalResolution(
+  supabase: SupabaseClient,
+  place: { name: string; countryName: string; latitude: number; longitude: number },
+  context: ResolutionContext
+): Promise<Omit<PlaceResolution, 'matchedBy'> | null> {
+  const nearby = await findNearbyByName(supabase, {
+    name: place.name,
+    lat: place.latitude,
+    lng: place.longitude,
+  });
+  if (!nearby.length) return null;
+
+  const top = nearby[0];
+  const others = nearby.slice(1);
+
+  const score = scoreResolution({
+    distanceMeters: top.meters,
+    alternativeCount: others.length,
+    countryMismatch: combinedCountryMismatch(
+      context.geocoderCountryMismatch,
+      place.countryName,
+      top.place.countryName
+    ),
+    pinOrigin: context.pinOrigin,
+    geocoderResultCount: context.geocoderResultCount,
+  });
+
+  return {
+    place: top.place,
+    confidence: score.confidence,
+    decision: score.decision,
+    // Only worth returning when there is a question to ask with them.
+    alternatives:
+      score.decision === 'ambiguous'
+        ? others.slice(0, MAX_ALTERNATIVES).map((m) => ({ place: m.place, meters: m.meters }))
+        : [],
+    reasonSignals: score.reasonSignals,
+    resolverVersion: score.resolverVersion,
+  };
+}
+
 export async function resolvePlaceForTraveler(
   supabase: SupabaseClient,
   userId: string,
-  input: CanonicalPlaceInput
+  input: CanonicalPlaceInput,
+  context: ResolutionContext = DEFAULT_RESOLUTION_CONTEXT
 ): Promise<PlaceResolution | null> {
   const parsed = canonicalPlaceInput.safeParse(input);
   if (!parsed.success) {
@@ -408,22 +554,23 @@ export async function resolvePlaceForTraveler(
   }
   const place = parsed.data;
 
-  const nearby = await findNearbyByName(supabase, {
-    name: place.name,
-    lat: place.latitude,
-    lng: place.longitude,
-  });
-  if (nearby.length) {
-    return { place: nearby[0].place, matchedBy: 'proximity', confidence: nearby[0].confidence };
+  const proposal = await proposeCanonicalResolution(supabase, place, context);
+  if (proposal) {
+    return { ...proposal, matchedBy: 'proximity' };
   }
 
   const inserted = await insertPlace(supabase, place, { createdBy: userId });
   if (!inserted) return null;
 
+  const created = createdPlaceScore();
   return {
     place: inserted.place,
     matchedBy: inserted.created ? 'created' : 'proximity',
     confidence: 1,
+    decision: 'auto',
+    alternatives: [],
+    reasonSignals: created.reasonSignals,
+    resolverVersion: created.resolverVersion,
   };
 }
 
@@ -485,7 +632,20 @@ export async function resolveProviderPlace(
 ): Promise<PlaceResolution | null> {
   // 1. Strongest evidence: we have seen this exact provider id before.
   const byId = await findPlaceByProviderId(admin, provider.providerId, provider.providerPlaceId);
-  if (byId) return { place: byId, matchedBy: 'provider-id', confidence: 1 };
+  if (byId) {
+    return {
+      place: byId,
+      matchedBy: 'provider-id',
+      confidence: 1,
+      // Provider-id resolution is exact by construction — Phase 13's
+      // ambiguity scoring is about the name+proximity path below, which this
+      // is not. Out of Phase 13's scope: no behavior here changed.
+      decision: 'auto',
+      alternatives: [],
+      reasonSignals: createdPlaceScore().reasonSignals,
+      resolverVersion: RESOLVER_VERSION,
+    };
+  }
 
   const parsed = canonicalPlaceInput.safeParse({
     name: provider.name,
@@ -554,7 +714,17 @@ export async function resolveProviderPlace(
     reason: 'matched a trusted provider record',
   });
 
-  return { place: promoted.place ?? place, matchedBy, confidence };
+  return {
+    place: promoted.place ?? place,
+    matchedBy,
+    confidence,
+    // As above: provider verification is untouched by Phase 13, which is
+    // about the traveler-facing name+proximity resolver only.
+    decision: 'auto',
+    alternatives: [],
+    reasonSignals: createdPlaceScore().reasonSignals,
+    resolverVersion: RESOLVER_VERSION,
+  };
 }
 
 // ── Promotion ────────────────────────────────────────────────────────────────

@@ -52,6 +52,26 @@ export interface PlaceCandidate {
   confidence: number;
   /** How this candidate was arrived at. Shown to the traveler, plainly. */
   source: 'maps-link' | 'model' | 'caption';
+  /**
+   * How many candidates Nominatim itself returned when this pin was geocoded
+   * (lib/travel/geocode.ts's GeocodeHit.resultCount). null for a candidate
+   * whose pin came straight from a maps-link connector, or that has no pin at
+   * all — a geocoder result count means nothing when no geocoder ran.
+   * Recorded as evidence, not scored — see ResolutionReasonSignals in
+   * lib/places/resolutionConfidence.ts for why counting it on top of the
+   * registry's own alternativeCount would charge the same doubt twice.
+   */
+  geocodeResultCount: number | null;
+  /**
+   * The geocoder's own verdict on whether the pin it returned is in the
+   * country the caption pointed at (lib/travel/geocode.ts's
+   * GeocodeHit.countryMismatch). true only when EVERY candidate it returned
+   * disagreed; null when nothing was expected, when its address data carried
+   * no country, or when no geocoder ran at all — never coerced into a
+   * mismatch. This IS scored: lib/places/repository.ts folds it together with
+   * the matched canonical row's own country into one combined signal.
+   */
+  geocodeCountryMismatch: boolean | null;
 }
 
 /** At or above this, a candidate is pre-ticked in the review list. */
@@ -377,6 +397,12 @@ export function normaliseCandidate(
     lng: lat !== null && lng !== null ? lng : null,
     confidence,
     source: input.source === 'model' || input.source === 'maps-link' ? input.source : 'caption',
+    geocodeResultCount:
+      typeof input.geocodeResultCount === 'number' && Number.isFinite(input.geocodeResultCount)
+        ? input.geocodeResultCount
+        : null,
+    geocodeCountryMismatch:
+      typeof input.geocodeCountryMismatch === 'boolean' ? input.geocodeCountryMismatch : null,
   };
 }
 

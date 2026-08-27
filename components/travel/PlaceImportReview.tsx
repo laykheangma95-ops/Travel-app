@@ -36,6 +36,7 @@ import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import type { PlaceCandidate } from '@/lib/travel/placeExtraction';
 import { viewPlaceHref, type ImportOutcome } from '@/lib/travel/importOutcome';
+import type { PlaceResolutionSummary } from '@/lib/travel/placeImport';
 import type { CopyKey, Translate } from './placeImportCopy';
 
 /** A candidate plus the state the review list keeps about it. */
@@ -498,6 +499,150 @@ export function TripSheet({
   );
 }
 
+// ─── Phase 13: canonical-resolution confirmation ────────────────────────────
+//
+// Rendered on the "saved" screen, never before — the trip save has already
+// happened by the time a traveler sees this, and ignoring the question
+// entirely (closing the tab, tapping "Import another") leaves the place
+// exactly as it is: on the trip, canonical_place_id still null. This is a
+// self-contained fetcher, the same pattern SavedPlaceButton already uses: it
+// owns its own request and its own busy/error state, and tells its parent the
+// outcome through one callback rather than the parent driving the fetch.
+
+type ResolutionRequestState = 'idle' | 'busy' | 'error';
+
+function ResolutionConfirm({
+  t,
+  destinationPlaceId,
+  resolution,
+  onResolved,
+}: {
+  t: Translate;
+  destinationPlaceId: string;
+  resolution: PlaceResolutionSummary;
+  /** null = the traveler rejected every option (kept as their own place); a
+   *  string = the canonical id that ended up attached. */
+  onResolved: (canonicalPlaceId: string | null) => void;
+}) {
+  const [state, setState] = useState<ResolutionRequestState>('idle');
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+
+  const decide = async (decision: 'confirmed' | 'rejected' | 'corrected', correctedPlaceId?: string) => {
+    if (state === 'busy') return;
+    setState('busy');
+    try {
+      const response = await fetch(`/api/travel/destination-places/${destinationPlaceId}/resolution`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, ...(correctedPlaceId ? { correctedPlaceId } : {}) }),
+      });
+      const body = (await response.json().catch(() => null)) as { canonicalPlaceId?: string | null } | null;
+      if (!live.current) return;
+      if (!response.ok) {
+        setState('error');
+        return;
+      }
+      // Every outcome — applied, or the registry moving on under us
+      // (`outcome: 'no-proposal'`) — collapses this card. The traveler asked
+      // a question and got an answer either way; there is nothing left for
+      // them to do here.
+      onResolved(body?.canonicalPlaceId ?? null);
+    } catch {
+      if (live.current) setState('error');
+    }
+  };
+
+  const candidates = [resolution.proposed, ...resolution.alternatives];
+  const away = (meters: number) => t('resolutionAway').replace('{n}', String(Math.round(meters)));
+
+  return (
+    <div className="mt-3 rounded-card border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-xs text-white/60">
+        {resolution.alternatives.length > 0 ? t('resolutionWhichOne') : t('resolutionQuestion')}
+      </p>
+
+      {resolution.alternatives.length === 0 ? (
+        <>
+          <div className="mt-2 flex items-start gap-2">
+            <MapPin size={14} className="mt-0.5 flex-none text-gold-light" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{resolution.proposed.name}</p>
+              {(resolution.proposed.address || resolution.proposed.city) && (
+                <p className="truncate text-xs text-white/50">
+                  {resolution.proposed.address ?? resolution.proposed.city}
+                </p>
+              )}
+              <p className="text-[11px] text-white/35">{away(resolution.proposed.meters)}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={state === 'busy'}
+              onClick={() => void decide('confirmed')}
+              className="liquid-glass-accent liquid-press min-h-[2.5rem] flex-1 rounded-btn px-3 text-xs font-semibold text-primary-deep disabled:opacity-60"
+            >
+              {t('resolutionThatsIt')}
+            </button>
+            <button
+              type="button"
+              disabled={state === 'busy'}
+              onClick={() => void decide('rejected')}
+              className="min-h-[2.5rem] flex-1 rounded-btn border border-white/15 px-3 text-xs font-semibold text-white/75 transition-colors hover:border-gold-light/40 disabled:opacity-60"
+            >
+              {t('resolutionNotThisPlace')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="mt-2 space-y-1.5">
+          {candidates.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              disabled={state === 'busy'}
+              onClick={() =>
+                void decide(
+                  candidate.id === resolution.proposed.id ? 'confirmed' : 'corrected',
+                  candidate.id === resolution.proposed.id ? undefined : candidate.id
+                )
+              }
+              className="flex w-full min-h-[2.75rem] items-center justify-between gap-2 rounded-btn border border-white/12 bg-white/[0.03] px-3 text-left text-xs text-white/85 transition-colors hover:border-gold-light/40 disabled:opacity-60"
+            >
+              <span className="min-w-0 truncate">
+                {candidate.name}
+                {candidate.city ? ` · ${candidate.city}` : ''}
+              </span>
+              <span className="flex-none text-[11px] text-white/40">{away(candidate.meters)}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={state === 'busy'}
+            onClick={() => void decide('rejected')}
+            className="flex w-full min-h-[2.5rem] items-center justify-center rounded-btn px-3 text-xs font-semibold text-white/60 transition-colors hover:text-white disabled:opacity-60"
+          >
+            {t('resolutionNoneOfThese')}
+          </button>
+        </div>
+      )}
+
+      {state === 'error' && (
+        <p role="alert" className="mt-2 text-xs text-amber-200">
+          {t('resolutionFailed')}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── The "saved" screen ──────────────────────────────────────────────────────
 
 export function DoneStage({
@@ -522,6 +667,14 @@ export function DoneStage({
   returnTo: string;
   onAgain: () => void;
 }) {
+  // Phase 13. `outcome` is the server's answer at the moment of the save —
+  // immutable for the life of this render. A traveler's confirm/reject/correct
+  // tap happens after that, so its result is tracked here rather than by
+  // mutating `outcome`: undefined = still awaiting a decision, null = the
+  // traveler kept it as their own (rejected, or nothing survived), a string =
+  // the canonical id the decision actually attached.
+  const [resolved, setResolved] = useState<Record<string, string | null>>({});
+
   return (
     <Reveal className="night-card mt-6 p-6 text-center">
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gold-light/12 text-gold-light">
@@ -555,28 +708,49 @@ export function DoneStage({
           mount — so hearting here is a real library save, not a preview of one. */}
       {outcome.addedPlaces.length > 0 && (
         <ul className="mt-5 space-y-2 text-left" aria-label={t('saved')}>
-          {outcome.addedPlaces.map((place, index) => (
-            <li key={`${place.name}-${index}`} className="night-card rounded-card p-3">
-              <p className="text-sm font-semibold text-white">{place.name}</p>
-              {place.canonicalPlaceId && (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <Link
-                    href={`/place/${place.canonicalPlaceId}`}
-                    className="text-xs font-semibold text-gold-light hover:text-gold-bright"
-                  >
-                    {t('viewPlace')}
-                  </Link>
-                  <SavedPlaceButton
-                    placeId={place.canonicalPlaceId}
-                    placeName={place.name}
-                    initialSaved={false}
-                    returnTo={returnTo}
-                    sourceImportId={importId}
+          {outcome.addedPlaces.map((place, index) => {
+            // A decision made in THIS render session overrides the server's
+            // original answer; before any decision, the server's own
+            // canonicalPlaceId (already attached when resolution was 'auto',
+            // per lib/travel/placeImport.ts) stands.
+            const decided = resolved[place.destinationPlaceId];
+            const canonicalPlaceId = decided !== undefined ? decided : place.canonicalPlaceId;
+
+            return (
+              <li key={`${place.name}-${index}`} className="night-card rounded-card p-3">
+                <p className="text-sm font-semibold text-white">{place.name}</p>
+                {canonicalPlaceId && (
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <Link
+                      href={`/place/${canonicalPlaceId}`}
+                      className="text-xs font-semibold text-gold-light hover:text-gold-bright"
+                    >
+                      {t('viewPlace')}
+                    </Link>
+                    <SavedPlaceButton
+                      placeId={canonicalPlaceId}
+                      placeName={place.name}
+                      initialSaved={false}
+                      returnTo={returnTo}
+                      sourceImportId={importId}
+                    />
+                  </div>
+                )}
+                {/* Phase 13: an ambiguous proposal, not yet decided. Never
+                    shown once `decided` holds any value (including null —
+                    the traveler already said "not this place"). */}
+                {!canonicalPlaceId && place.resolution && decided === undefined && (
+                  <ResolutionConfirm
+                    t={t}
+                    destinationPlaceId={place.destinationPlaceId}
+                    resolution={place.resolution}
+                    onResolved={(id) => setResolved((current) => ({ ...current, [place.destinationPlaceId]: id }))}
                   />
-                </div>
-              )}
-            </li>
-          ))}
+                )}
+                {decided === null && <p className="mt-2 text-xs text-white/45">{t('resolutionKept')}</p>}
+              </li>
+            );
+          })}
         </ul>
       )}
 

@@ -71,6 +71,24 @@ export const COPY = {
     en: 'Reading captions without AI — simple lists work best.',
     km: 'កំពុងអានអត្ថបទដោយគ្មាន AI — បញ្ជីសាមញ្ញដំណើរការល្អបំផុត។',
   },
+  // Phase 13 — canonical-resolution confirmation on the "saved" screen.
+  resolutionQuestion: {
+    en: 'We found this place — is it right?',
+    km: 'យើងបានរកឃើញទីតាំងនេះ — តើវាត្រឹមត្រូវទេ?',
+  },
+  resolutionThatsIt: { en: "That's it", km: 'មែនហើយ' },
+  resolutionNotThisPlace: { en: 'Not this place', km: 'មិនមែនកន្លែងនេះទេ' },
+  resolutionWhichOne: { en: 'Which one did they mean?', km: 'តើគាត់មានន័យថាមួយណា?' },
+  resolutionNoneOfThese: { en: 'None of these', km: 'គ្មានមួយណាត្រឹមត្រូវទេ' },
+  resolutionKept: {
+    en: 'Kept as your own place.',
+    km: 'បានរក្សាទុកជាទីតាំងផ្ទាល់ខ្លួនរបស់អ្នក។',
+  },
+  resolutionFailed: {
+    en: 'That could not be saved. Try again.',
+    km: 'មិនអាចរក្សាទុកបានទេ។ សូមព្យាយាមម្តងទៀត។',
+  },
+  resolutionAway: { en: '{n}m away', km: 'ចម្ងាយ {n}ម៉ែត្រ' },
 } as const;
 
 export type CopyKey = keyof typeof COPY;
