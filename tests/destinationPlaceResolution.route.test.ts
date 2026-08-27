@@ -96,6 +96,33 @@ async function ownDestinationPlace(userId: string): Promise<string> {
   return (data as { id: string }).id;
 }
 
+/**
+ * Record the pending proposal the importer would have recorded.
+ *
+ * Since the remediation the route CONSUMES a stored proposal rather than
+ * rebuilding one, so a fixture that only creates a destination place has
+ * nothing to decide about — which is exactly the state the `no-proposal`
+ * test below asserts.
+ */
+async function proposeFor(
+  userId: string,
+  destinationPlaceId: string,
+  proposedPlaceId: string,
+  alternatives: string[] = []
+) {
+  const { error } = await harness.clientFor(userId).rpc('create_place_resolution_proposal', {
+    p_destination_place_id: destinationPlaceId,
+    p_proposed_place_id: proposedPlaceId,
+    p_alternative_place_ids: alternatives,
+    p_pin_origin: 'geocoder',
+    p_geocoder_result_count: 2,
+    p_geocoder_country_mismatch: null,
+    p_import_id: null,
+    p_import_candidate_id: null,
+  });
+  expect(error).toBeNull();
+}
+
 beforeAll(async () => {
   harness = await createHarness();
 });
@@ -114,8 +141,9 @@ afterAll(async () => {
 
 describe('confirming a proposal', () => {
   it('attaches the proposed canonical place and records feedback', async () => {
-    const { a } = await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     const response = await post(dpId, { decision: 'confirmed' });
     expect(response.status).toBe(200);
@@ -140,8 +168,9 @@ describe('confirming a proposal', () => {
 
 describe('rejecting a proposal', () => {
   it('leaves canonical_place_id null and the trip place untouched', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     const response = await post(dpId, { decision: 'rejected' });
     expect(response.status).toBe(200);
@@ -160,6 +189,7 @@ describe('correcting to the other candidate', () => {
   it('applies the selected alternative, never the original proposal', async () => {
     const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     const response = await post(dpId, { decision: 'corrected', correctedPlaceId: b });
     expect(response.status).toBe(200);
@@ -172,8 +202,9 @@ describe('correcting to the other candidate', () => {
   });
 
   it('refuses a correction naming a place that is not one of the offered alternatives', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     // A real, visible, but entirely unrelated published place.
     const service = harness.serviceClient();
@@ -198,12 +229,17 @@ describe('correcting to the other candidate', () => {
 
     const rows = await harness.rows('destination_places');
     expect(rows.find((r) => r.id === dpId)?.canonical_place_id).toBeNull();
-    expect(await harness.rows('place_resolution_feedback')).toHaveLength(0);
+    // The proposal is still there, still undecided — a refused correction must
+    // not consume or corrupt it.
+    const feedback = await harness.rows('place_resolution_feedback');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0].decision).toBe('pending');
   });
 
   it('refuses "corrected" with no correctedPlaceId at the wire boundary', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     const response = await post(dpId, { decision: 'corrected' });
     expect(response.status).toBe(400);
@@ -212,8 +248,9 @@ describe('correcting to the other candidate', () => {
 
 describe('authorization', () => {
   it('a signed-out caller gets 401', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
     session.signedIn = false;
 
     const response = await post(dpId, { decision: 'confirmed' });
@@ -221,8 +258,9 @@ describe('authorization', () => {
   });
 
   it('a foreign destination_places id reads as NOT_FOUND, not another traveler\'s data', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
     signIn(BOB);
 
     const response = await post(dpId, { decision: 'confirmed' });
@@ -230,7 +268,11 @@ describe('authorization', () => {
 
     const rows = await harness.rows('destination_places');
     expect(rows.find((r) => r.id === dpId)?.canonical_place_id).toBeNull();
-    expect(await harness.rows('place_resolution_feedback')).toHaveLength(0);
+    // Alice's proposal is untouched by Bob's attempt.
+    const feedback = await harness.rows('place_resolution_feedback');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0].decision).toBe('pending');
+    expect(feedback[0].user_id).toBe(ALICE);
   });
 
   it('a malformed id is refused the same way as an invisible one', async () => {
@@ -239,8 +281,9 @@ describe('authorization', () => {
   });
 
   it('extra body keys are rejected', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     const response = await post(dpId, { decision: 'confirmed', userId: BOB });
     expect(response.status).toBe(400);
@@ -248,8 +291,11 @@ describe('authorization', () => {
 });
 
 describe('when the registry has moved on', () => {
-  it('a place with nothing ambiguous about it any more reports no-proposal rather than applying a stale decision', async () => {
-    // No branches seeded at all — there is nothing nearby to propose.
+  it('a place that never had a proposal recorded reports no-proposal', async () => {
+    // Auto-linked or too-weak places never get a pending row, so there is
+    // nothing to decide. This is now the ONLY way to reach no-proposal — it
+    // can no longer be produced by the server scoring the same place
+    // differently than the screen did.
     const dpId = await ownDestinationPlace(ALICE);
 
     const response = await post(dpId, { decision: 'confirmed' });
@@ -263,8 +309,9 @@ describe('when the registry has moved on', () => {
 
 describe('verification_status is never touched', () => {
   it('confirming a proposal does not promote the canonical place', async () => {
-    const { a } = await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     await post(dpId, { decision: 'confirmed' });
 
@@ -294,15 +341,20 @@ describe('verification_status is never touched', () => {
 
     // A second same-name row within range, still Alice's own, so both are
     // visible to her and the match is genuinely ambiguous.
-    await service.from('places').insert({
-      slug: 'alice-own-guess-2',
-      name: 'Alice Own Guess',
-      country_name: 'Thailand',
-      latitude: 13.7474,
-      longitude: 100.4927,
-      verification_status: 'unverified',
-      created_by: ALICE,
-    });
+    const { data: second } = await service
+      .from('places')
+      .insert({
+        slug: 'alice-own-guess-2',
+        name: 'Alice Own Guess',
+        country_name: 'Thailand',
+        latitude: 13.7474,
+        longitude: 100.4927,
+        verification_status: 'unverified',
+        created_by: ALICE,
+      })
+      .select('id')
+      .single();
+    const secondId = (second as { id: string }).id;
 
     const client = harness.clientFor(ALICE);
     const { data: dp } = await client
@@ -319,7 +371,10 @@ describe('verification_status is never touched', () => {
       .select('id')
       .single();
 
-    const response = await post((dp as { id: string }).id, { decision: 'confirmed' });
+    const dpId2 = (dp as { id: string }).id;
+    await proposeFor(ALICE, dpId2, placeId, [secondId]);
+
+    const response = await post(dpId2, { decision: 'confirmed' });
     expect(response.status).toBe(200);
 
     const places = await harness.rows('places');
@@ -329,8 +384,9 @@ describe('verification_status is never touched', () => {
 
 describe('idempotency', () => {
   it('a double submission updates the one standing decision rather than creating two', async () => {
-    await seedTwoBranches();
+    const { a, b } = await seedTwoBranches();
     const dpId = await ownDestinationPlace(ALICE);
+    await proposeFor(ALICE, dpId, a, [b]);
 
     await post(dpId, { decision: 'rejected' });
     await post(dpId, { decision: 'confirmed' });

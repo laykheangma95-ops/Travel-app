@@ -674,14 +674,17 @@ function supabaseLike(db: PGlite, userId: string | null): SupabaseClient {
   async function rpc(fn: string, params: Record<string, unknown> = {}) {
     const keys = Object.keys(params);
     const call = `SELECT * FROM ${fn}(${keys.map((key, index) => `${key} := $${index + 1}`).join(', ')})`;
-    // Real PostgREST accepts a plain JS object/array for a jsonb parameter and
-    // casts it on the way in; the underlying pg driver here does not, so an
-    // object or array value is stringified first — this is what lets
-    // application code pass a plain object exactly as it would to the real
-    // supabase-js client.
+    // Real PostgREST accepts a plain JS object for a jsonb parameter and casts
+    // it on the way in; the underlying pg driver here does not, so a plain
+    // object is stringified first. ARRAYS ARE LEFT ALONE — the driver encodes
+    // a JS array as a Postgres array literal natively, which is what a `uuid[]`
+    // parameter needs; stringifying one produces the JSON text "[]" and
+    // Postgres rejects it as a malformed array literal.
     const values = keys.map((key) => {
       const value = params[key];
-      return value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
+      return value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? JSON.stringify(value)
+        : value;
     });
     try {
       const result = await run(call, values);

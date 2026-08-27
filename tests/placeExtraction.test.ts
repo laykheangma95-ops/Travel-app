@@ -182,6 +182,7 @@ describe('dedupeCandidates', () => {
     confidence: 0.5,
     source: 'caption',
     geocodeResultCount: null,
+    geocodeCountryMismatch: null,
     ...over,
   });
 

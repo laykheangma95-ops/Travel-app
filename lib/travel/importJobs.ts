@@ -178,11 +178,13 @@ function toCandidate(row: CandidateRow): StoredCandidate {
     lng: number(row.lng),
     confidence: number(row.confidence) ?? 0,
     source,
-    // import_candidates has no column for this (it is a Phase 13 signal, not
-    // stored provenance) — a candidate read back from a queued job's storage
-    // degrades to no geocoder-ambiguity signal, same as one that never had a
-    // geocoder run at all. Phase 13's resolver treats both identically.
+    // import_candidates has no column for either (they are Phase 13 scoring
+    // inputs, not stored provenance) — a candidate read back from a queued
+    // job's storage degrades to no geocoder evidence at all, exactly like one
+    // whose pin never came from a geocoder. Both are treated as "not known",
+    // never as "no mismatch".
     geocodeResultCount: null,
+    geocodeCountryMismatch: null,
   };
 }
 

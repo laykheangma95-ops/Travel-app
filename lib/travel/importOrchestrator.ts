@@ -123,21 +123,33 @@ async function addCoordinates(candidates: PlaceCandidate[], hint: string | null)
 
   const ordered = [...candidates].sort((a, b) => b.confidence - a.confidence);
   let budget = MAX_LOOKUPS_PER_IMPORT;
-  const located = new Map<string, { lat: number; lng: number; resultCount: number }>();
+  const located = new Map<string, { lat: number; lng: number; resultCount: number; countryMismatch: boolean | null }>();
 
   for (const candidate of ordered) {
     if (budget <= 0) break;
     if (candidate.lat !== null && candidate.lng !== null) continue;
     budget -= 1;
     const hit = await geocodePlace(candidate.name, { city: candidate.city ?? hint, country: candidate.country });
-    if (hit) located.set(candidate.name, { lat: hit.lat, lng: hit.lng, resultCount: hit.resultCount });
+    if (hit)
+      located.set(candidate.name, {
+        lat: hit.lat,
+        lng: hit.lng,
+        resultCount: hit.resultCount,
+        countryMismatch: hit.countryMismatch,
+      });
   }
 
   return candidates
     .map((candidate) => {
       const hit = located.get(candidate.name);
       return hit
-        ? { ...candidate, lat: hit.lat, lng: hit.lng, geocodeResultCount: hit.resultCount }
+        ? {
+            ...candidate,
+            lat: hit.lat,
+            lng: hit.lng,
+            geocodeResultCount: hit.resultCount,
+            geocodeCountryMismatch: hit.countryMismatch,
+          }
         : candidate;
     })
     .slice(0, MAX_CANDIDATES);

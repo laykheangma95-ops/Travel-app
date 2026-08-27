@@ -194,6 +194,7 @@ export function ImportPlacesView({
             // anything).
             pinSource: row.source,
             geocodeResultCount: row.geocodeResultCount,
+            geocodeCountryMismatch: row.geocodeCountryMismatch,
           })),
           ...target,
           // Optional on the wire, and only ever an id: the server reads the

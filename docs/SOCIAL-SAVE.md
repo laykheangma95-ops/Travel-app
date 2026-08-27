@@ -1623,16 +1623,42 @@ unchanged — `AUTO_SELECT_CONFIDENCE` (0.55, the review-screen pre-tick
 threshold) is untouched. `resolution_confidence` (new) answers "which
 real-world canonical place is this?" — a pure, deterministic score
 (`lib/places/resolutionConfidence.ts`'s `scoreResolution`), no I/O, no AI,
-built entirely from evidence already on hand: `proximityConfidence`
-(migration 013's own 150m/name-match distance curve) as the base, then
-multiplicative penalties — ×0.85 for a country disagreement, ×0.80 for a
-geocoded (rather than exact platform) pin, ×0.70 when at least one other
-candidate also matched inside the radius (the heaviest penalty — a second
-plausible candidate is exactly the "which branch?" failure this phase
-exists to stop resolving silently), ×0.90 for a city disagreement. A
-comparison that could not be made (no city/country on one side) applies no
-penalty — asserting doubt about something never compared would itself be a
-fabricated signal.
+built entirely from evidence already on hand: migration 013's own
+150m/name-match distance curve as the base, then multiplicative penalties —
+**×0.85** for a country disagreement, **×0.80** for a geocoded (rather than
+exact platform) pin, **×0.70** when at least one other candidate also
+matched inside the radius (the heaviest penalty — a second plausible
+candidate is exactly the "which branch?" failure this phase exists to stop
+resolving silently). A comparison that could not be made (no country on one
+side) applies no penalty — asserting doubt about something never compared
+would itself be a fabricated signal.
+
+**Three factors, and every one of them is reachable from the real import
+path.** The Principal Engineer review found two that were not, and both were
+corrected rather than left as decoration: a fourth `×0.90` city factor that
+nothing in production could ever set (the importer never supplies a city) was
+**removed** from resolution-v1, and the geocoder's own country verdict — which
+`geocode.ts` computed and every caller then discarded — is now **wired
+through** and folded together with the matched canonical row's country into
+the single `×0.85` signal, so the same doubt is charged once rather than
+twice. `geocodeResultCount` is **recorded as evidence but deliberately not
+scored**: `alternativeCount` already carries the ambiguity that matters, and
+penalising a geocoder's result count on top of it would double-count. Earlier
+wording in this document and in a code comment claimed the resolver "reads" it
+as a signal; that was not true and has been corrected.
+
+**The score has a SQL twin, and the database is authoritative.**
+`place_resolution_score` in migration 017 implements the identical formula,
+because the database — not the application — is what writes a stored
+confidence. `tests/resolutionConfidence.sqlTwin.test.ts` runs both over a
+full matrix of distances, alternative counts, country verdicts and pin
+origins and asserts they agree exactly, the same treatment
+`tests/places.normalize.test.ts` gives `normalizePlaceName` and
+`geohash_encode`. Building it caught a real divergence: the score used to be
+rounded twice (once inside `proximityConfidence`, once at the end) and
+`Number(x.toFixed(3))` rounds on a double's exact binary expansion in a way
+no Postgres expression reproduces. Both sides now round **once**, on the
+scaled double, and the matrix is green.
 
 **The resolver.** `resolvePlaceForTraveler` (`lib/places/repository.ts`) no
 longer takes `nearby[0]` unconditionally. The name+proximity half of
@@ -1673,9 +1699,11 @@ change for a secondary signal.
 **Three free geocoder improvements, all inside ONE request per lookup**
 (`lib/travel/geocode.ts`): `limit` raised from 1 to 5 and `addressdetails`
 turned on (was off) — same request, same `MIN_GAP_MS`/1-req/sec budget,
-same `MAX_LOOKUPS_PER_IMPORT` cap. `GeocodeHit.displayName` — already
-returned since before Phase 13, previously read by nothing — is now
-genuinely surfaced (kept on the type, available to a future UI). A new
+same `MAX_LOOKUPS_PER_IMPORT` cap. `GeocodeHit.displayName` is **preserved
+and now reflects the chosen candidate** rather than always Nominatim's
+first result — it is not yet read by anything, and is kept available for a
+later surface rather than claimed as one (the confirmation card shows the
+CANONICAL place's own address, which is a different string). A new
 `countryMismatch: boolean | null` prefers a same-country candidate among the
 up-to-5 results over blindly taking Nominatim's own top rank, and flags
 `true` only when EVERY returned candidate disagrees with the expected
@@ -1810,3 +1838,139 @@ Places/search provider activation, no `provider_verified`/`domner_public`
 promotion path change, no AI in the confirmation or scoring path, no OCR or
 vision, no SSRF-allowlist change, no collections/search/ratings work, and no
 `docs/LOCKED.md` file touched.
+
+## Part 17 — Phase 13 review remediation
+
+**Status: implemented.** The Phase 13 Principal Engineer review returned
+**FAIL** with one blocker and two highs. The architecture passed and is
+preserved; what follows changed only what the review proved wrong.
+
+### BLOCKER-1 — confirming an ambiguous proposal did nothing
+
+`lib/places/resolutionFeedback.ts` used to **re-derive** the proposal at
+decision time from the traveler's `destination_places` row. That row does not
+record how its pin was obtained, so re-derivation scored with
+`pinOrigin='unknown'` where the import had scored with `'geocoder'`. The
+`×0.80` penalty vanished, confidence rose by 1.25×, and **every
+geocoder-pinned match within 45m** re-derived as `auto` — so the server
+answered `no-proposal` to a card the traveler was looking at. The tap did
+nothing, `canonical_place_id` stayed NULL, no feedback row was written, and
+the screen read "Kept as your own place": the opposite of the traveler's
+choice. The review reproduced it end to end at a shown confidence of 0.774.
+
+**The proposal is now persisted before it is shown, and read back to decide.**
+An ambiguous resolution becomes a `pending` row the moment it is made
+(`create_place_resolution_proposal`), carrying the evidence that produced it.
+The decision RPC updates that row. Nothing is recomputed at decision time, so
+shown and stored cannot disagree — not because two computations are careful,
+but because there is only one.
+
+`tests/resolutionProposal.blocker1.test.ts` is the regression, and it uses the
+shape the original suite never did: ONE canonical match, geocoder-pinned, well
+inside 45m. (The old suites missed it because the two-branch fixture's `×0.70`
+penalty keeps both sides ambiguous, so the divergence cancels, and the route
+tests built `destination_places` rows directly with no pin origin at all.)
+**Mutation-checked**: restoring the re-derivation makes five of its six cases
+fail with exactly `no-proposal`.
+
+### HIGH-1 — stored ground truth did not match what was shown
+
+Same root cause. Where re-derivation still landed in the ambiguous band the
+decision *was* applied, but with the re-derived numbers: the review measured
+0.677 stored against 0.542 shown, `pinOrigin` recorded as `unknown` when it
+was `geocoder`, `geocoderResultCount` as null when it was 3.
+
+Fixed by the same change. The evidence is written once, by the database, at
+proposal time, and migration 017's guard pins `proposed_place_id`,
+`resolution_confidence`, `resolver_version`, `reason_signals` and
+`alternative_place_ids` on every UPDATE — a decision may change the decision
+and its correction, and nothing else. The blocker regression asserts stored
+confidence is **exactly** the confidence shown, that `resolver_version`
+matches, and that `reason_signals.pinOrigin` is still `geocoder` after the
+decision.
+
+### HIGH-2 — the evidence ledger was client-writable
+
+A plain authenticated PostgREST call could write `resolution_confidence = 1`,
+`resolver_version = 'resolution-v999'` and fabricated `reason_signals`. This
+is the shape migration 012 had already diagnosed for `ai_usage_log` — *"the
+policy constrained WHOSE row could be written but not what was in it… A ledger
+anybody can write is not a ledger"* — and Phase 13 had reintroduced it. Worse,
+`tests/placeResolutionFeedback.rls.test.ts` asserted it as intended behaviour;
+that file is **deleted**, superseded by
+`tests/placeResolutionFeedback.ledger.test.ts`.
+
+Closed two ways at once:
+
+- **The path is enforced.** Migration 017's guard refuses any INSERT or UPDATE
+  that did not set a transaction-local marker
+  (`set_config('domner.resolution_trusted','1',true)`), which only the two
+  resolution functions set. PostgREST runs each request in its own transaction
+  and offers no way to set the marker and then write in that same one, so a
+  direct POST/PATCH arrives without it. **This is not `service_role` and not
+  `SECURITY DEFINER`** — both functions remain `SECURITY INVOKER`, every
+  statement inside them runs as the caller, and RLS remains the boundary that
+  decides whose rows these are.
+- **The evidence is no longer a parameter.** `create_place_resolution_proposal`
+  takes no confidence, no version and no signals. It measures the distance
+  itself, counts the competing candidates itself, checks the countries itself,
+  and computes the score with the SQL twin. `apply_place_resolution_feedback`
+  now takes only `(destination_place_id, decision, corrected_place_id)` — its
+  old nine-parameter form is dropped.
+
+A proposal must also be **genuine**, not merely well-formed: the proposed place
+and every alternative must be a real same-normalized-name match inside the 150m
+radius of the traveler's own coordinates, and the recorded score must land in
+the ambiguous band. A caller cannot nominate an unrelated place and have the
+registry record that it was ever offered.
+
+**Mutation-checked**: removing the trusted-write requirement makes four attack
+tests fail.
+
+### Medium findings
+
+| Finding | Resolution |
+|---|---|
+| **MEDIUM-1** geocoder `countryMismatch` computed then discarded | **Wired.** `PlaceCandidate.geocodeCountryMismatch` carries it from `geocode.ts` through both pipelines and the wire schema into `ResolutionContext`, folded into the single `×0.85` country signal (not a second penalty). Production-path coverage added. |
+| **MEDIUM-2** `cityMismatch` unreachable in production | **Removed** from resolution-v1. Wiring a city would have changed what `places.city` gets written for newly-created canonical rows — a registry behaviour change beyond remediation scope. |
+| **MEDIUM-3** `geocodeResultCount` carried but never scored | **Documentation and comment corrected.** It stays recorded-not-scored; `alternativeCount` already carries that ambiguity and double-penalising it was explicitly not wanted. |
+| **MEDIUM-4** `displayName` overclaimed as surfaced | **Documentation corrected.** It is preserved and now reflects the chosen candidate; no UI was invented to justify the earlier wording. |
+
+### Deliberately unchanged
+
+Latest-state-only feedback (no revision history), the four-alternative cap, and
+every other LOW finding stand as reviewed. No Phase 14 work.
+
+### Lifecycle
+
+```
+resolver says ambiguous
+  → create_place_resolution_proposal   (pending, evidence derived in SQL)
+  → DoneStage renders that row's proposal
+  → traveler confirms / rejects / corrects
+  → apply_place_resolution_feedback    (one transaction)
+       pending → confirmed | rejected | corrected
+       canonical_place_id applied (confirmed/corrected) or left NULL (rejected)
+```
+
+`auto` and `none` resolutions record no row at all — nothing was asked, so
+nothing goes on the record as having been asked. A re-import re-states a
+`pending` proposal but never reopens a decision already made. A decision can be
+changed; the evidence cannot.
+
+### Verification
+
+`npm run typecheck` and `npm run lint` clean (the one pre-existing `<img>`
+warning, unchanged). `npm run test` — **1117 tests across 79 files** — passes,
+as does `npm run build`. `npm run verify:runtime` still reports **SKIPPED**
+(no Playwright package); it is not a pass, and it is worth noting that BLOCKER-1
+is exactly the class of defect a runtime walkthrough catches first. Staging
+validation against a live Supabase remains **BLOCKED/OUTSTANDING** — no
+credentials in this environment — unchanged since Part 9.
+
+**Migration 017 was amended in place**, not superseded: it is unmerged, so
+there is no deployed database carrying the old shape. No `018` was created.
+No AI, no paid provider, no `service_role`, no new infrastructure, and no
+change to `place_imports.needs_confirmation` (still reserved and unused for
+canonical confirmation — see `docs/PLACE-IMPORT.md`), the import reaper, the
+poll lifecycle, or `place_imports_open_idx`.

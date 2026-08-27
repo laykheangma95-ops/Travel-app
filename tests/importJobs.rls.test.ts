@@ -59,6 +59,7 @@ const WAT_PHO: PlaceCandidate = {
   confidence: 0.9,
   source: 'model',
   geocodeResultCount: null,
+  geocodeCountryMismatch: null,
 };
 
 let harness: Harness;

@@ -427,9 +427,38 @@ const MAX_ALTERNATIVES = 4;
 export interface ResolutionContext {
   pinOrigin: PinOrigin;
   geocoderResultCount: number | null;
+  /**
+   * The geocoder's own country verdict for the pin being resolved
+   * (GeocodeHit.countryMismatch). Folded together with the matched canonical
+   * row's country below into ONE signal — see the note on
+   * ResolutionScoreInput.countryMismatch for why this is not a second,
+   * separately-charged penalty.
+   */
+  geocoderCountryMismatch: boolean | null;
 }
 
-const DEFAULT_RESOLUTION_CONTEXT: ResolutionContext = { pinOrigin: 'unknown', geocoderResultCount: null };
+const DEFAULT_RESOLUTION_CONTEXT: ResolutionContext = {
+  pinOrigin: 'unknown',
+  geocoderResultCount: null,
+  geocoderCountryMismatch: null,
+};
+
+/**
+ * The one country signal, from the two facts that can raise country doubt.
+ *
+ * `true` from either side is doubt. Otherwise the registry comparison stands,
+ * and `null` (nothing comparable on one side) stays `null` rather than being
+ * flattened into "they agree" — mirrored exactly by migration 017's
+ * create_place_resolution_proposal, which recomputes this in SQL.
+ */
+function combinedCountryMismatch(
+  geocoderVerdict: boolean | null,
+  candidateCountry: string | null,
+  matchedCountry: string | null
+): boolean | null {
+  if (geocoderVerdict === true) return true;
+  return fieldMismatch(candidateCountry, matchedCountry);
+}
 
 /** null when either side has nothing to compare — never coerced into a match
  *  or a mismatch. */
@@ -473,7 +502,7 @@ function fieldMismatch(a: string | null, b: string | null): boolean | null {
  */
 export async function proposeCanonicalResolution(
   supabase: SupabaseClient,
-  place: { name: string; countryName: string; city: string | null; latitude: number; longitude: number },
+  place: { name: string; countryName: string; latitude: number; longitude: number },
   context: ResolutionContext
 ): Promise<Omit<PlaceResolution, 'matchedBy'> | null> {
   const nearby = await findNearbyByName(supabase, {
@@ -489,8 +518,11 @@ export async function proposeCanonicalResolution(
   const score = scoreResolution({
     distanceMeters: top.meters,
     alternativeCount: others.length,
-    countryMismatch: fieldMismatch(place.countryName, top.place.countryName),
-    cityMismatch: fieldMismatch(place.city, top.place.city),
+    countryMismatch: combinedCountryMismatch(
+      context.geocoderCountryMismatch,
+      place.countryName,
+      top.place.countryName
+    ),
     pinOrigin: context.pinOrigin,
     geocoderResultCount: context.geocoderResultCount,
   });

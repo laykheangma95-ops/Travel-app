@@ -18,7 +18,6 @@ const base: ResolutionScoreInput = {
   distanceMeters: 0,
   alternativeCount: 0,
   countryMismatch: null,
-  cityMismatch: null,
   pinOrigin: 'maps-link',
   geocoderResultCount: null,
 };
@@ -68,29 +67,39 @@ describe('scoreResolution — individual signals', () => {
     expect(score.confidence).toBe(0.75);
   });
 
+  // Each multiplier is asserted at distance 0, where the proximity base is
+  // exactly 1 — so the assertion is the multiplier itself rather than a
+  // comparison between two separately-rounded scores. (Those comparisons were
+  // subtly wrong: the score is rounded ONCE, at the end, so
+  // round3(base * 0.8) is not round3(base) * 0.8.)
   it('a second candidate in range is the heaviest single penalty', () => {
-    const alone = scoreResolution({ ...base, distanceMeters: 10 });
-    const withAlternative = scoreResolution({ ...base, distanceMeters: 10, alternativeCount: 1 });
+    const alone = scoreResolution({ ...base, distanceMeters: 0 });
+    const withAlternative = scoreResolution({ ...base, distanceMeters: 0, alternativeCount: 1 });
+    expect(alone.confidence).toBe(1);
+    expect(withAlternative.confidence).toBe(0.7);
     expect(withAlternative.confidence).toBeLessThan(alone.confidence);
-    expect(withAlternative.confidence).toBeCloseTo(alone.confidence * 0.7, 3);
   });
 
   it('a country disagreement multiplies confidence by 0.85', () => {
-    const agree = scoreResolution({ ...base, distanceMeters: 10, countryMismatch: false });
-    const disagree = scoreResolution({ ...base, distanceMeters: 10, countryMismatch: true });
-    expect(disagree.confidence).toBeCloseTo(agree.confidence * 0.85, 3);
+    expect(scoreResolution({ ...base, distanceMeters: 0, countryMismatch: false }).confidence).toBe(1);
+    expect(scoreResolution({ ...base, distanceMeters: 0, countryMismatch: true }).confidence).toBe(0.85);
   });
 
   it('a geocoded (non-exact) pin multiplies confidence by 0.8', () => {
-    const exact = scoreResolution({ ...base, distanceMeters: 10, pinOrigin: 'maps-link' });
-    const geocoded = scoreResolution({ ...base, distanceMeters: 10, pinOrigin: 'geocoder' });
-    expect(geocoded.confidence).toBeCloseTo(exact.confidence * 0.8, 3);
+    expect(scoreResolution({ ...base, distanceMeters: 0, pinOrigin: 'maps-link' }).confidence).toBe(1);
+    expect(scoreResolution({ ...base, distanceMeters: 0, pinOrigin: 'geocoder' }).confidence).toBe(0.8);
   });
 
-  it('a city disagreement multiplies confidence by 0.9', () => {
-    const agree = scoreResolution({ ...base, distanceMeters: 10, cityMismatch: false });
-    const disagree = scoreResolution({ ...base, distanceMeters: 10, cityMismatch: true });
-    expect(disagree.confidence).toBeCloseTo(agree.confidence * 0.9, 3);
+  it('the multipliers compose in the documented order', () => {
+    // 1 x 0.85 x 0.8 x 0.7 = 0.476, rounded once.
+    const all = scoreResolution({
+      distanceMeters: 0,
+      alternativeCount: 2,
+      countryMismatch: true,
+      pinOrigin: 'geocoder',
+      geocoderResultCount: null,
+    });
+    expect(all.confidence).toBe(0.476);
   });
 
   it('a comparison that could not be made (null) applies no penalty', () => {
@@ -99,12 +108,19 @@ describe('scoreResolution — individual signals', () => {
     expect(unknown.confidence).toBe(known.confidence);
   });
 
+  it('is rounded exactly once, so the score is not a rounded value re-multiplied', () => {
+    // base(10m) = 0.96666…; the score is round3(0.96666… x 0.8) = 0.773, NOT
+    // round3(round3(0.96666…) x 0.8) = round3(0.967 x 0.8) = 0.774. The SQL
+    // twin can only reproduce the former — see round3 in the module header.
+    const geocoded = scoreResolution({ ...base, distanceMeters: 10, pinOrigin: 'geocoder' });
+    expect(geocoded.confidence).toBe(0.773);
+  });
+
   it('penalties compound multiplicatively rather than flattening to zero', () => {
     const score = scoreResolution({
       distanceMeters: 10,
       alternativeCount: 1,
       countryMismatch: true,
-      cityMismatch: true,
       pinOrigin: 'geocoder',
       geocoderResultCount: 3,
     });
@@ -117,7 +133,6 @@ describe('scoreResolution — individual signals', () => {
       distanceMeters: 149,
       alternativeCount: 5,
       countryMismatch: true,
-      cityMismatch: true,
       pinOrigin: 'geocoder',
       geocoderResultCount: 5,
     });
@@ -137,7 +152,6 @@ describe('scoreResolution — transparency', () => {
       distanceMeters: 42,
       alternativeCount: 2,
       countryMismatch: true,
-      cityMismatch: false,
       pinOrigin: 'geocoder',
       geocoderResultCount: 4,
     });
@@ -145,7 +159,6 @@ describe('scoreResolution — transparency', () => {
       distanceMeters: 42,
       alternativeCount: 2,
       countryMatch: false,
-      cityMatch: true,
       pinOrigin: 'geocoder',
       geocoderResultCount: 4,
     });

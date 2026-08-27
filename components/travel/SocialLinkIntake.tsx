@@ -342,6 +342,7 @@ export function SocialLinkIntake({ initialUrl = '' }: { initialUrl?: string }) {
               lng: row.lng,
               pinSource: row.source,
               geocodeResultCount: row.geocodeResultCount,
+              geocodeCountryMismatch: row.geocodeCountryMismatch,
             })),
             ...target,
             ...(importId ? { importId } : {}),
