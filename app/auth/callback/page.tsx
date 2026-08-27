@@ -37,7 +37,6 @@ export default function AuthCallbackPage() {
   const busy = authCallbackBusyCopy();
 
   useEffect(() => {
-    const supabase = getSupabase();
     let cancelled = false;
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) setSlow(true);
@@ -62,6 +61,7 @@ export default function AuthCallbackPage() {
         return;
       }
 
+      const supabase = getSupabase();
       if (!supabase) {
         finish();
         return;

@@ -111,6 +111,33 @@ function redirectToSignIn(request: NextRequest): NextResponse {
   return response;
 }
 
+function callbackError(searchParams: URLSearchParams): string | null {
+  return searchParams.get('error_description') ?? searchParams.get('error');
+}
+
+function callbackErrorResponse(request: NextRequest): NextResponse {
+  const search = request.nextUrl.searchParams;
+  const returnTo = readReturnTo(search);
+  const type = callbackType(search.get('type'));
+  const destination = applyReturnTo(
+    new URL(type === 'recovery' ? '/reset-password' : AUTH_CALLBACK_PATH, request.url),
+    returnTo
+  );
+  const error = search.get('error');
+  const errorDescription = search.get('error_description');
+
+  if (error) {
+    destination.searchParams.set('error', error);
+  }
+  if (errorDescription) {
+    destination.searchParams.set('error_description', errorDescription);
+  }
+
+  const response = NextResponse.redirect(destination);
+  setReturnToCookie(request, response, returnTo);
+  return response;
+}
+
 async function handleAuthCallback(
   request: NextRequest,
   url: string,
@@ -277,6 +304,11 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === AUTH_CALLBACK_PATH) {
     const search = request.nextUrl.searchParams;
+    const hasAuthMaterial =
+      search.has('code') || search.has('token_hash') || search.has('sb_flow_id');
+    if (callbackError(search) && hasAuthMaterial) {
+      return callbackErrorResponse(request);
+    }
     if (search.has('code') || (search.has('token_hash') && callbackType(search.get('type')))) {
       return handleAuthCallback(request, url, anonKey);
     }
