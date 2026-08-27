@@ -72,6 +72,55 @@ describe('D: the exact reported candidate shape saves', () => {
     const ideaRows = await harness.rows('itinerary_places');
     expect(ideaRows).toHaveLength(1);
   });
+
+  it('the same shape, but the existing Ideas list has non-contiguous sort_order — the actual reported condition, re-verified after remediation', async () => {
+    const alice = harness.clientFor(ALICE);
+    const { data: trip } = await alice
+      .from('trip_plans')
+      .insert({ user_id: ALICE, title: 'Saigon trip', destination: 'Vietnam' })
+      .select('id')
+      .single();
+    const tripId = (trip as { id: string }).id;
+
+    const [{ id: dayId }] = await harness.asAdmin(
+      `INSERT INTO itinerary_days (trip_id, day_index, date) VALUES ($1, 0, NULL) RETURNING id`,
+      [tripId]
+    );
+    // A gap left by an earlier delete or move — sort_order {0, 2, 5}, exactly
+    // the shape a real, already-organised trip ends up in.
+    for (const [i, sortOrder] of [0, 2, 5].entries()) {
+      const [{ id: placeId }] = await harness.asAdmin(
+        `INSERT INTO destination_places (destination,name,category,lat,lng,description,source,created_by)
+         VALUES ('Vietnam',$1,'spot',0,0,'','ai_generated',$2) RETURNING id`,
+        [`Existing ${i}`, ALICE]
+      );
+      await harness.asAdmin(
+        `INSERT INTO itinerary_places (itinerary_day_id,place_id,category,sort_order) VALUES ($1,$2,'spot',$3)`,
+        [dayId, placeId, sortOrder]
+      );
+    }
+
+    const candidate: ImportablePlace = {
+      name: 'lẩu 2',
+      description: '190 Đề Thám, phường Cầu Ông Lãnh, quận 1, TpHCM',
+      category: 'food',
+      lat: 10.7657,
+      lng: 106.6933,
+      pinSource: 'caption',
+      geocodeResultCount: 1,
+      geocodeCountryMismatch: false,
+    };
+
+    const result = await importPlacesToTrip(alice, ALICE, [candidate], { destination: 'Vietnam', tripId });
+
+    expect(result.added).toEqual(['lẩu 2']);
+    expect(result.failed).toEqual([]);
+
+    const rows = await harness.rows('itinerary_places');
+    expect(rows).toHaveLength(4);
+    const sortOrders = rows.map((row) => row.sort_order).sort((a, b) => (a as number) - (b as number));
+    expect(new Set(sortOrders).size).toBe(4); // no collision on the gap at 2
+  });
 });
 
 describe('E: canonical ambiguity/pending must never block the trip save — Phase 13 invariant, re-asserted', () => {
@@ -122,42 +171,152 @@ describe('E: canonical ambiguity/pending must never block the trip save — Phas
   });
 });
 
-describe('F: destination_places name collision — safe reuse when the existing row has no established identity', () => {
-  it('a second import under the same name, same traveler, same destination reuses the orphaned row rather than failing', async () => {
+describe('F/HIGH-1: destination_places name collision — NAME ALONE IS NEVER SUFFICIENT IDENTITY EVIDENCE', () => {
+  // Phase 13.5's first cut healed a same-name collision by reusing any
+  // unlinked row outright. The principal engineer review proved that reuse
+  // silently merges two DIFFERENT real places that merely share a name — the
+  // incoming coordinates and description were discarded, and the NEW
+  // canonical identity got attached to the OLD row. This block is the
+  // remediation's regression suite: the exact Starbucks reproduction from the
+  // review, plus the convergence and non-convergence cases around it.
+
+  it('existing row: NULL canonical, location A. Incoming: canonical B, location B, same name → NEVER merged, both preserved', async () => {
     const alice = harness.clientFor(ALICE);
 
-    // First import: no coordinates, so it never resolves — this is exactly
-    // the orphan shape Phase 13.5's investigation found (also what a save
-    // that failed after the destination_places insert, but before
-    // addIdeaToTrip, would leave behind).
+    // Existing row: no coordinates, so it never resolves — canonical stays
+    // NULL. This is the exact orphan shape Phase 13.5's investigation found.
     const first = await importPlacesToTrip(
       alice,
       ALICE,
-      [{ name: 'My Hotel', description: '', category: 'stay', lat: null, lng: null }],
+      [{ name: 'Starbucks', description: 'Old location', category: 'food', lat: null, lng: null }],
       { destination: 'Vietnam' }
     );
-    expect(first.added).toEqual(['My Hotel']);
+    expect(first.added).toEqual(['Starbucks']);
 
     const afterFirst = await harness.rows('destination_places');
     expect(afterFirst).toHaveLength(1);
-    expect(afterFirst[0].canonical_place_id).toBeNull();
+    const oldRow = afterFirst[0];
+    expect(oldRow.canonical_place_id).toBeNull();
 
-    // Second import, same exact name — would hit
-    // destination_places_owner_name_idx head-on. Healed forward: reused, not
-    // rejected, and the traveler's save succeeds instead of permanently
-    // blocking on this name for this destination.
+    // Incoming: the exact same name, but a genuinely different real branch —
+    // real coordinates, a registry miss (so it resolves to a FRESH canonical
+    // place, decision 'auto', matchedBy 'created' — exactly the Tan Binh
+    // branch the review reproduced against a live database).
     const second = await importPlacesToTrip(
       alice,
       ALICE,
-      [{ name: 'My Hotel', description: 'front desk note', category: 'stay', lat: 21.0285, lng: 105.8542 }],
+      [{ name: 'Starbucks', description: 'New location', category: 'food', lat: 10.8006, lng: 106.6528 }],
       { destination: 'Vietnam', forceNew: true }
     );
 
     expect(second.failed).toEqual([]);
+    expect(second.added).toEqual(['Starbucks']);
 
-    // Still one destination_places row — reused, not duplicated.
+    const afterSecond = await harness.rows('destination_places');
+    expect(afterSecond).toHaveLength(2);
+
+    // The OLD row is byte-for-byte unchanged: same id, still NULL canonical,
+    // still its own coordinates and description. This is the assertion the
+    // unsafe version failed — it silently rewrote this exact row.
+    const oldRowAfter = afterSecond.find((row) => row.id === oldRow.id)!;
+    expect(oldRowAfter).toEqual(oldRow);
+    expect(oldRowAfter.canonical_place_id).toBeNull();
+
+    // The NEW row carries the NEW coordinates and description — never
+    // discarded — under its own canonical identity.
+    const newRow = afterSecond.find((row) => row.id !== oldRow.id)!;
+    expect(newRow.description).toBe('New location');
+    expect(Number(newRow.lat)).toBeCloseTo(10.8006, 4);
+    expect(Number(newRow.lng)).toBeCloseTo(106.6528, 4);
+    expect(newRow.canonical_place_id).not.toBeNull();
+    expect(newRow.canonical_place_id).not.toBe(oldRow.canonical_place_id);
+  });
+
+  it('existing canonical A, incoming canonical B, same name → never reuse A', async () => {
+    const alice = harness.clientFor(ALICE);
+
+    const first = await importPlacesToTrip(
+      alice,
+      ALICE,
+      [{ name: 'Highlands Coffee', description: 'District 1', category: 'food', lat: 10.7657, lng: 106.6933 }],
+      { destination: 'Vietnam' }
+    );
+    expect(first.added).toEqual(['Highlands Coffee']);
+    const afterFirst = await harness.rows('destination_places');
+    const canonicalA = afterFirst[0].canonical_place_id;
+    expect(canonicalA).not.toBeNull();
+
+    const second = await importPlacesToTrip(
+      alice,
+      ALICE,
+      [{ name: 'Highlands Coffee', description: 'Tan Binh', category: 'food', lat: 10.8006, lng: 106.6528 }],
+      { destination: 'Vietnam', forceNew: true }
+    );
+    expect(second.failed).toEqual([]);
+
+    const afterSecond = await harness.rows('destination_places');
+    expect(afterSecond).toHaveLength(2);
+    const rowA = afterSecond.find((row) => row.canonical_place_id === canonicalA)!;
+    const rowB = afterSecond.find((row) => row.canonical_place_id !== canonicalA)!;
+    expect(rowA.description).toBe('District 1'); // untouched
+    expect(rowB.description).toBe('Tan Binh');
+    expect(rowB.canonical_place_id).not.toBeNull();
+    expect(rowB.canonical_place_id).not.toBe(canonicalA);
+  });
+
+  it('existing canonical B, incoming canonical B, same name → reuse/converge safely (one row, not two)', async () => {
+    const alice = harness.clientFor(ALICE);
+
+    const first = await importPlacesToTrip(
+      alice,
+      ALICE,
+      [{ name: 'Phuc Long', description: 'first caption', category: 'food', lat: 10.7657, lng: 106.6933 }],
+      { destination: 'Vietnam' }
+    );
+    expect(first.added).toEqual(['Phuc Long']);
+    const afterFirst = await harness.rows('destination_places');
+    expect(afterFirst).toHaveLength(1);
+    const canonicalB = afterFirst[0].canonical_place_id;
+    expect(canonicalB).not.toBeNull();
+
+    // Same real place, re-imported (a different caption spelling would also
+    // converge via the registry's own name-fold matching — this uses the
+    // identical name to isolate the destination_places-level convergence
+    // this block is about, from Phase 10's own proximity matching).
+    const second = await importPlacesToTrip(
+      alice,
+      ALICE,
+      [{ name: 'Phuc Long', description: 'second caption', category: 'food', lat: 10.7657, lng: 106.6933 }],
+      { destination: 'Vietnam', forceNew: true }
+    );
+    expect(second.failed).toEqual([]);
+
+    // ONE row — reused, not duplicated, and the traveler's original
+    // description was not silently overwritten by the second attempt.
     const afterSecond = await harness.rows('destination_places');
     expect(afterSecond).toHaveLength(1);
+    expect(afterSecond[0].id).toBe(afterFirst[0].id);
+    expect(afterSecond[0].description).toBe('first caption');
+  });
+
+  it('deterministic convergence: the SAME canonical place imported 3 times results in ONE destination_places row, never three', async () => {
+    const alice = harness.clientFor(ALICE);
+    const coords = { lat: 10.7676, lng: 106.6903 };
+
+    for (let i = 0; i < 3; i += 1) {
+      const result = await importPlacesToTrip(
+        alice,
+        ALICE,
+        [{ name: 'Banh Mi Huynh Hoa', description: `attempt ${i}`, category: 'food', ...coords }],
+        { destination: 'Vietnam', forceNew: true }
+      );
+      expect(result.failed).toEqual([]);
+    }
+
+    const rows = await harness.rows('destination_places');
+    expect(rows).toHaveLength(1);
+    const canonicals = await harness.rows('places');
+    expect(canonicals).toHaveLength(1);
   });
 });
 

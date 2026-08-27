@@ -13,14 +13,48 @@
 // functions those routes are thin wrappers over.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { savePlace, getSavedPlaces } from '@/lib/places/saved';
 import { addPlaceToTrip } from '@/lib/places/addToTrip';
 import { createHarness, type Harness } from './support/pgHarness';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 
+// MEDIUM-5 remediation. The mutation check in the review's principal
+// engineer pass found that reverting the itinerary "Saved" tab's rewiring —
+// back to reading the trip's own Ideas list — left this file's original
+// tests fully green, because they only ever exercised getSavedPlaces/
+// addPlaceToTrip in isolation, never anything that could distinguish "reads
+// the global library" from "reads this trip's Ideas". The new describe
+// block below drives the REAL exported GET handler
+// (app/api/travel/places/saved/route.ts) — the consumer's actual network
+// call, not the library function underneath it — and seeds a trip Idea and
+// a global save as two DIFFERENT places, so a regression to the old source
+// has a concrete, distinguishable symptom to fail on: place A would appear.
+const session = vi.hoisted(() => ({ client: null as unknown, userId: '' }));
+vi.mock('@/lib/supabase', () => ({ getSupabase: () => ({}) }));
+vi.mock('@/lib/serverAuth', () => ({
+  requireUser: async () => ({ id: session.userId }),
+  supabaseFromRequest: () => session.client,
+}));
+const { GET: getSavedRoute } = await import('@/app/api/travel/places/saved/route');
+
 let harness: Harness;
+
+function signIn(userId: string) {
+  session.userId = userId;
+  session.client = harness.clientFor(userId);
+}
+
+function getSaved(destination: string) {
+  // The EXACT URL components/travel/ItineraryEditor.tsx's picker builds when
+  // the "Saved" filter is selected.
+  const request = new Request(
+    `https://domner.test/api/travel/places/saved?destination=${encodeURIComponent(destination)}`,
+    { headers: { 'x-forwarded-for': '203.0.113.9' } }
+  );
+  return getSavedRoute(request);
+}
 
 beforeAll(async () => {
   harness = await createHarness();
@@ -29,6 +63,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await harness.reset();
   await harness.createUser(ALICE);
+  signIn(ALICE);
 });
 
 afterAll(async () => {
@@ -84,6 +119,38 @@ describe('K/L: /you/saved and the itinerary "Saved" tab read the same saved_plac
     await savePlace(bob, BOB, placeId);
 
     expect(await getSavedPlaces(alice, ALICE)).toHaveLength(0);
+  });
+});
+
+describe('MEDIUM-5: the itinerary Saved tab consumer, driven through the real GET route — never the trip Ideas source', () => {
+  it('trip Ideas = Place A, global Saved = Place B → opening Saved shows B, never A', async () => {
+    const alice = harness.clientFor(ALICE);
+    const placeA = await seedPublishedPlace('Place A (Idea only)', 'Vietnam');
+    const placeB = await seedPublishedPlace('Place B (globally saved)', 'Vietnam');
+
+    // Place A: on the trip's Ideas list, NEVER hearted into saved_places —
+    // this is exactly what the old, buggy source would have surfaced under
+    // the "Saved" label.
+    const { data: trip } = await alice
+      .from('trip_plans')
+      .insert({ user_id: ALICE, title: 'Vietnam trip', destination: 'Vietnam' })
+      .select('id')
+      .single();
+    await addPlaceToTrip(alice, ALICE, placeA, (trip as { id: string }).id);
+    expect(await harness.rows('saved_places')).toHaveLength(0);
+
+    // Place B: hearted into the GLOBAL library, never added to any trip.
+    const saveResult = await savePlace(alice, ALICE, placeB);
+    expect(saveResult?.saved).toBe(true);
+
+    // The real network call the itinerary editor's "Saved" filter makes.
+    const response = await getSaved('Vietnam');
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { places: { placeId: string; name: string }[] };
+
+    const shownIds = body.places.map((p) => p.placeId);
+    expect(shownIds).toContain(placeB); // the actual saved_places source
+    expect(shownIds).not.toContain(placeA); // never surfaced merely for being an Idea
   });
 });
 

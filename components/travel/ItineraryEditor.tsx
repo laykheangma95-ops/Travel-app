@@ -65,6 +65,7 @@ import {
   type ScheduleWarning,
 } from '@/lib/travel/itinerary';
 import { useLang } from '@/lib/i18n';
+import { RequestGeneration } from '@/lib/travel/requestGeneration';
 import { cn } from '@/lib/utils';
 
 type Tab = 'summary' | 'ideas' | string;
@@ -212,33 +213,69 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
     return () => controller.abort();
   }, [routeDay]);
 
-  // Fetched once per sheet-open, not once per keystroke on the "Saved" filter
-  // chip: the picker sheet is the only place this list is used, so there is
-  // nothing to gain from fetching it before the traveler opens "Add a place".
+  // Phase 13.5 HIGH-2 remediation. The original version put `libraryState`
+  // in this effect's own dependency array, and set that same state INSIDE
+  // the effect body. That made the effect self-invalidating: setting
+  // `loading` triggered React to run the PREVIOUS render's cleanup before
+  // committing the new one, the cleanup called `controller.abort()` on the
+  // fetch that same effect had just started, and the AbortError handler
+  // returned without resetting `libraryState` — leaving the tab stuck on
+  // "Loading…" forever, every single time the sheet opened. Proven by
+  // driving the exact control flow through React's documented effect
+  // contract in the principal engineer review; no live browser needed to see
+  // it, and none was needed to fix it either.
+  //
+  // The fix: no state in this effect's own dependency list AT ALL — only the
+  // two genuinely external triggers, `picker` and the trip's destination —
+  // and no cleanup function, so there is nothing for a re-run to abort.
+  // `libraryFetchStarted` (a ref, not state) replaces the old
+  // `libraryPlaces !== null` guard without making the effect reactive to its
+  // own output. Staleness across overlapping requests (a manual retry firing
+  // while an earlier attempt is still in flight) is handled the same way
+  // app/you/saved/page.tsx's own `load` already handles it — a
+  // RequestGeneration ticket, checked only when a response actually arrives,
+  // never a second, subtly different race guard.
+  const libraryGeneration = useRef(new RequestGeneration()).current;
+  const libraryFetchStarted = useRef(false);
+
+  const loadLibrary = useCallback(
+    (destination: string) => {
+      const ticket = libraryGeneration.next();
+      setLibraryState('loading');
+      fetch(`/api/travel/places/saved?destination=${encodeURIComponent(destination)}`, {
+        credentials: 'include',
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error('library unavailable');
+          return response.json() as Promise<{ places: LibraryPlace[] }>;
+        })
+        .then((result) => {
+          if (!libraryGeneration.isCurrent(ticket)) return; // superseded
+          setLibraryPlaces(result.places);
+          setLibraryState('idle');
+        })
+        .catch(() => {
+          if (!libraryGeneration.isCurrent(ticket)) return;
+          setLibraryState('error');
+        });
+    },
+    [libraryGeneration]
+  );
+
   useEffect(() => {
-    if (!picker || libraryPlaces !== null || libraryState === 'loading') return;
+    if (!picker) return;
     const destination = data?.trip.destination;
     if (!destination) return;
-    const controller = new AbortController();
-    setLibraryState('loading');
-    fetch(`/api/travel/places/saved?destination=${encodeURIComponent(destination)}`, {
-      credentials: 'include',
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('library unavailable');
-        return response.json() as Promise<{ places: LibraryPlace[] }>;
-      })
-      .then((result) => {
-        setLibraryPlaces(result.places);
-        setLibraryState('idle');
-      })
-      .catch((cause) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setLibraryState('error');
-      });
-    return () => controller.abort();
-  }, [picker, data?.trip.destination, libraryPlaces, libraryState]);
+    // Fetched once per component lifetime, not once per keystroke on the
+    // "Saved" filter chip, and not once per sheet-open either — a
+    // successful load is cached for the rest of the session, same as the
+    // original design intended. A failed load resets this on the NEXT
+    // successful `loadLibrary` call site (the retry button below), never by
+    // this effect re-running on its own.
+    if (libraryFetchStarted.current) return;
+    libraryFetchStarted.current = true;
+    loadLibrary(destination);
+  }, [picker, data?.trip.destination, loadLibrary]);
 
   if (loadState === 'loading') return <EditorSkeleton />;
 
@@ -288,19 +325,30 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
 
   /**
    * Add a place from the traveler's global saved_places library onto this
-   * trip. NOT `mutate()` — this is a different route (`/api/travel/places/
-   * :id/add-to-trip`, lib/places/addToTrip.ts), because the library holds
-   * CANONICAL place ids (migration 013's `places`), not `destination_places`
-   * ids the itinerary PATCH route's actions take. Reusing that route rather
-   * than a new one is rule 9/11 — it already does exactly this (materialize
-   * the traveler's own `destination_places` row, then file it into Ideas)
-   * for /you/saved's own AddToTripButton.
+   * trip. NOT `mutate()` for the add itself — this is a different route
+   * (`/api/travel/places/:id/add-to-trip`, lib/places/addToTrip.ts), because
+   * the library holds CANONICAL place ids (migration 013's `places`), not
+   * `destination_places` ids the itinerary PATCH route's actions take.
+   * Reusing that route rather than a new one is rule 9/11 — it already does
+   * exactly this (materialize the traveler's own `destination_places` row,
+   * then file it into Ideas) for /you/saved's own AddToTripButton.
    *
-   * Lands in Ideas, same as every other add-to-trip entry point — there is no
-   * route today that can place a canonical library place directly onto a
-   * scheduled day, and adding one is a bigger change than this phase scopes.
-   * Never touches saved_places: adding to a trip is not the same act as
-   * hearting one, and must not create or remove a library row.
+   * Phase 13.5 MEDIUM-4 remediation: the sheet's own header reads "Add to
+   * {targetLabel}" — Day 3, say — so landing in Ideas regardless of that
+   * label was a silent target mismatch: the traveler taps a saved place,
+   * sees "added", and Day 3 is unchanged because the place is sitting in
+   * Ideas instead. `addPlaceToTrip` still only ever knows how to file into
+   * Ideas (there is no route that can place a canonical library place
+   * directly onto a scheduled day, and building one is a bigger change than
+   * this phase scopes), so the SAME primitive `addExisting`/`addCustom`
+   * already use for exactly this — the existing `move` action, itinerary
+   * PATCH route, sort_order collisions fixed the same way this phase fixed
+   * them everywhere else — relocates it from Ideas onto the selected day
+   * right after. `alreadyAdded` is what keeps this idempotent-safe: a place
+   * already somewhere on the trip is left exactly where it is, never
+   * relocated on a second tap. Never touches saved_places: adding to a trip
+   * is not the same act as hearting one, and must not create or remove a
+   * library row.
    */
   const addFromLibrary = async (place: LibraryPlace) => {
     setBusy(true);
@@ -313,11 +361,25 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tripId }),
       });
-      const body = (await response.json().catch(() => null)) as { status?: string; error?: { message?: string } } | null;
+      const body = (await response.json().catch(() => null)) as
+        | { status?: string; alreadyAdded?: boolean; error?: { message?: string } }
+        | null;
       if (!response.ok || body?.status !== 'added') {
         throw new Error(body?.error?.message ?? '');
       }
-      await request();
+
+      const refreshed = await request();
+
+      // A specific scheduled day is selected, and this add just created a
+      // fresh Ideas row (not a no-op on one already sitting somewhere) —
+      // relocate it onto that day so "Add to {targetLabel}" is true.
+      if (!body.alreadyAdded && tab !== 'ideas' && active) {
+        const filed = refreshed.ideas.find((item) => item.place.canonical_place_id === place.placeId);
+        if (filed) {
+          await request({ action: 'move', dayId: active.id, placeId: filed.id });
+        }
+      }
+
       setNotice(mutationSuccess('addIdea', lang));
       setPicker(false);
     } catch (cause) {
@@ -520,6 +582,10 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
           places={data.curatedPlaces}
           libraryPlaces={libraryPlaces}
           libraryState={libraryState}
+          onRetryLibrary={() => {
+            const destination = data?.trip.destination;
+            if (destination) loadLibrary(destination);
+          }}
           // Canonical ids already somewhere on this trip (any day, not just
           // Ideas) — so a library place already added shows that, rather than
           // offering to add a second copy.
@@ -934,6 +1000,7 @@ function AddPlaceSheet({
   places,
   libraryPlaces,
   libraryState,
+  onRetryLibrary,
   libraryOnTripIds,
   busy,
   onAdd,
@@ -948,6 +1015,7 @@ function AddPlaceSheet({
    *  destination. Null while it has not loaded yet. */
   libraryPlaces: LibraryPlace[] | null;
   libraryState: 'idle' | 'loading' | 'error';
+  onRetryLibrary: () => void;
   libraryOnTripIds: Set<string>;
   busy: boolean;
   onAdd: (place: CuratedPlace) => void;
@@ -1317,11 +1385,20 @@ function AddPlaceSheet({
                     </p>
                   )}
                   {libraryState === 'error' && (
-                    <p className="py-8 text-center text-sm text-amber-200">
-                      {lang === 'km'
-                        ? 'មិនអាចផ្ទុកទីតាំងដែលបានរក្សាទុករបស់អ្នកបានទេ។'
-                        : 'Could not load your saved places.'}
-                    </p>
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-amber-200">
+                        {lang === 'km'
+                          ? 'មិនអាចផ្ទុកទីតាំងដែលបានរក្សាទុករបស់អ្នកបានទេ។'
+                          : 'Could not load your saved places.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={onRetryLibrary}
+                        className="mt-3 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-gold-light/40 px-4 text-sm font-semibold text-gold-bright transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                      >
+                        {lang === 'km' ? 'ព្យាយាមម្តងទៀត' : 'Try again'}
+                      </button>
+                    </div>
                   )}
                   {libraryState === 'idle' &&
                     matchingLibrary.map((place) => {
