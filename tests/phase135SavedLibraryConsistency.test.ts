@@ -16,21 +16,25 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { savePlace, getSavedPlaces } from '@/lib/places/saved';
 import { addPlaceToTrip } from '@/lib/places/addToTrip';
+import { fetchSavedLibrary } from '@/lib/travel/savedLibraryController';
 import { createHarness, type Harness } from './support/pgHarness';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 
-// MEDIUM-5 remediation. The mutation check in the review's principal
-// engineer pass found that reverting the itinerary "Saved" tab's rewiring —
-// back to reading the trip's own Ideas list — left this file's original
-// tests fully green, because they only ever exercised getSavedPlaces/
-// addPlaceToTrip in isolation, never anything that could distinguish "reads
-// the global library" from "reads this trip's Ideas". The new describe
-// block below drives the REAL exported GET handler
-// (app/api/travel/places/saved/route.ts) — the consumer's actual network
-// call, not the library function underneath it — and seeds a trip Idea and
-// a global save as two DIFFERENT places, so a regression to the old source
-// has a concrete, distinguishable symptom to fail on: place A would appear.
+// MEDIUM-2/5 remediation. The final principal engineer review found that
+// reverting the itinerary "Saved" tab's rewiring back to reading the trip's
+// own Ideas list left the suite fully green — the tests only ever exercised
+// getSavedPlaces/addPlaceToTrip in isolation (a first fix, testing the
+// library), or hand-built the picker's fetch URL a second time (a second
+// fix, testing the route but not the consumer). Neither could fail if
+// ItineraryEditor.tsx stopped calling the right function.
+//
+// `fetchSavedLibrary` (lib/travel/savedLibraryController.ts) is now the
+// EXACT function the component's Saved-tab picker calls — not a
+// reconstruction of its URL, the literal same export. This test drives it
+// with a `fetchImpl` that reaches the real exported GET route handler, so
+// what's proven is: the real production consumer function, calling the real
+// production route, against real Postgres and RLS.
 const session = vi.hoisted(() => ({ client: null as unknown, userId: '' }));
 vi.mock('@/lib/supabase', () => ({ getSupabase: () => ({}) }));
 vi.mock('@/lib/serverAuth', () => ({
@@ -46,15 +50,19 @@ function signIn(userId: string) {
   session.client = harness.clientFor(userId);
 }
 
-function getSaved(destination: string) {
-  // The EXACT URL components/travel/ItineraryEditor.tsx's picker builds when
-  // the "Saved" filter is selected.
-  const request = new Request(
-    `https://domner.test/api/travel/places/saved?destination=${encodeURIComponent(destination)}`,
-    { headers: { 'x-forwarded-for': '203.0.113.9' } }
+/** A `fetch`-compatible function that reaches the real route handler instead
+ *  of the network — the only thing standing in for a browser here. Every
+ *  URL/query-string construction this test relies on is `fetchSavedLibrary`'s
+ *  own, not re-derived by the test. */
+const routeFetch: typeof fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : input.toString();
+  return getSavedRoute(
+    new Request(url.replace('/api/travel/places/saved', 'https://domner.test/api/travel/places/saved'), {
+      ...init,
+      headers: { ...(init?.headers as Record<string, string> | undefined), 'x-forwarded-for': '203.0.113.9' },
+    })
   );
-  return getSavedRoute(request);
-}
+}) as typeof fetch;
 
 beforeAll(async () => {
   harness = await createHarness();
@@ -122,8 +130,8 @@ describe('K/L: /you/saved and the itinerary "Saved" tab read the same saved_plac
   });
 });
 
-describe('MEDIUM-5: the itinerary Saved tab consumer, driven through the real GET route — never the trip Ideas source', () => {
-  it('trip Ideas = Place A, global Saved = Place B → opening Saved shows B, never A', async () => {
+describe('MEDIUM-2: fetchSavedLibrary — the actual Saved-tab consumer function — never the trip Ideas source', () => {
+  it('trip Ideas = Place A, global Saved = Place B → fetchSavedLibrary returns B, never A', async () => {
     const alice = harness.clientFor(ALICE);
     const placeA = await seedPublishedPlace('Place A (Idea only)', 'Vietnam');
     const placeB = await seedPublishedPlace('Place B (globally saved)', 'Vietnam');
@@ -143,12 +151,11 @@ describe('MEDIUM-5: the itinerary Saved tab consumer, driven through the real GE
     const saveResult = await savePlace(alice, ALICE, placeB);
     expect(saveResult?.saved).toBe(true);
 
-    // The real network call the itinerary editor's "Saved" filter makes.
-    const response = await getSaved('Vietnam');
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { places: { placeId: string; name: string }[] };
+    // The EXACT function ItineraryEditor.tsx's Saved-tab picker calls,
+    // pointed at the real route via `routeFetch`.
+    const places = await fetchSavedLibrary('Vietnam', routeFetch);
 
-    const shownIds = body.places.map((p) => p.placeId);
+    const shownIds = places.map((p) => p.placeId);
     expect(shownIds).toContain(placeB); // the actual saved_places source
     expect(shownIds).not.toContain(placeA); // never surfaced merely for being an Idea
   });

@@ -488,6 +488,41 @@ function disambiguatedImportName(name: string, place: ImportablePlace, nextSlot:
 }
 
 /**
+ * MEDIUM-1 remediation. `disambiguatedImportName`'s suffix embeds digits, and
+ * migration 017's `create_place_resolution_proposal` requires
+ * `place_name_normalized(destination_places.name)` to still equal the
+ * proposed canonical place's `name_normalized` — a genuine anti-fabrication
+ * check (the RPC is proving the row's OWN material actually looks like the
+ * candidate being proposed, not trusting the caller's word for it), which
+ * this repo's migrations are never edited to relax after they have shipped
+ * (see docs/VERIFICATION.md and CLAUDE.md rule 7/12). So an 'ambiguous'
+ * decision — the one case that DOES call that RPC — needs a disambiguated
+ * name that is STILL, after normalization, the same string as before.
+ *
+ * `place_name_normalized` (migration 013) strips space, tab, CR and LF as
+ * part of its punctuation set — confirmed against the real function, not
+ * assumed. A suffix of nothing but spaces is therefore invisible to it: the
+ * raw string still satisfies `destination_places_owner_name_idx` (UNIQUE on
+ * the RAW name), while the normalized form is untouched.
+ *
+ * Deterministic given the CURRENT count of the traveler's own colliding
+ * rows for this name — the same "next free slot" fallback
+ * `disambiguatedImportName` already uses when there is no coordinate to key
+ * on, carrying the identical honest limitation: a retry that lands after the
+ * first attempt already committed mints a new slot rather than converging
+ * on it. Accepted here for the same reason it already was there — the
+ * alternative (embedding real evidence into a normalization-invisible
+ * alphabet) trades a well-understood, already-documented edge case for a
+ * meaningfully more complex encoding, for a case this table's own migration
+ * already treats as pending/reviewable, not a silent merge.
+ */
+function normalizationSafeDisambiguation(name: string, nextSlot: number): string {
+  const suffix = ' '.repeat(Math.max(1, nextSlot));
+  const base = name.slice(0, Math.max(0, PLACE_NAME_MAX - suffix.length));
+  return `${base}${suffix}`;
+}
+
+/**
  * Insert the traveler's own `destination_places` row for an imported place,
  * or reuse an existing one — Phase 13.5, remediated after the principal
  * engineer review found the original version silently merged two different
@@ -524,7 +559,15 @@ async function insertOrReuseDestinationPlace(
   userId: string,
   destination: string,
   place: ImportablePlace,
-  canonicalCandidate: string | null
+  canonicalCandidate: string | null,
+  /**
+   * MEDIUM-1. True only when the caller's resolution came back 'ambiguous' —
+   * the one decision that still needs `create_place_resolution_proposal` to
+   * validate this row's name against the proposed candidate's afterward. See
+   * `normalizationSafeDisambiguation`'s own comment for why that changes
+   * which disambiguation suffix is safe to use.
+   */
+  preserveNormalizedName: boolean
 ): Promise<{ placeId: string; attachedCanonical: boolean }> {
   // Case A: the traveler already has a row proven to be this exact canonical
   // place. Reuse it outright — no insert attempt needed at all, and this is
@@ -588,6 +631,9 @@ async function insertOrReuseDestinationPlace(
     // same name and is caught by the reuse check below instead of minting a
     // second row.
     disambiguated = disambiguatedName(name, canonicalCandidate);
+  } else if (preserveNormalizedName) {
+    const collisions = await countNameCollisions(supabase, userId, destination, name);
+    disambiguated = normalizationSafeDisambiguation(name, collisions + 1);
   } else {
     const collisions = await countNameCollisions(supabase, userId, destination, name);
     disambiguated = disambiguatedImportName(name, place, collisions + 1);
@@ -623,12 +669,18 @@ async function countNameCollisions(
   destination: string,
   name: string
 ): Promise<number> {
+  // LOW-3. `%` and `_` are ILIKE wildcards; a place literally named e.g.
+  // "100% Coffee" would otherwise match far more rows than actually collide,
+  // inflating the disambiguation slot for no reason. Backslash is Postgres's
+  // default LIKE/ILIKE escape character — escaping the backslash itself
+  // first is what keeps a name that already contains one honest too.
+  const escaped = name.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
   const { count, error } = await supabase
     .from('destination_places')
     .select('id', { count: 'exact', head: true })
     .eq('created_by', userId)
     .eq('destination', destination)
-    .ilike('name', `${name}%`);
+    .ilike('name', `${escaped}%`);
   if (error) throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'write_failed' });
   return count ?? 1;
 }
@@ -679,7 +731,8 @@ async function insertPlace(
     userId,
     destination,
     place,
-    canonicalCandidate
+    canonicalCandidate,
+    resolution?.decision === 'ambiguous'
   );
 
   if (resolution?.decision === 'ambiguous') {

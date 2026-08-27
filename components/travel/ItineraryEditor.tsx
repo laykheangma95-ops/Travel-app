@@ -66,29 +66,17 @@ import {
 } from '@/lib/travel/itinerary';
 import { useLang } from '@/lib/i18n';
 import { RequestGeneration } from '@/lib/travel/requestGeneration';
+import {
+  addSavedPlaceToTrip,
+  fetchSavedLibrary,
+  runSavedLibraryLoad,
+  shouldStartLibraryLoad,
+  type LibraryPlace,
+} from '@/lib/travel/savedLibraryController';
 import { cn } from '@/lib/utils';
 
 type Tab = 'summary' | 'ideas' | string;
 type PickerFilter = 'all' | 'stay' | 'transport' | 'saved' | 'mine';
-
-/**
- * The wire shape GET /api/travel/places/saved returns — the same one
- * app/you/saved/page.tsx already reads, kept as its own local interface here
- * for the same reason that page does not export its: neither file is a
- * shared module, so each names the response shape it actually consumes
- * rather than the two importing a third file to save five lines.
- */
-interface LibraryPlace {
-  savedId: string;
-  placeId: string;
-  name: string;
-  localName: string | null;
-  countryName: string;
-  city: string | null;
-  category: ItineraryCategory;
-  address: string | null;
-  saveCount: number;
-}
 
 const CATEGORIES: ItineraryCategory[] = ['spot', 'food', 'shopping', 'transport', 'stay', 'other'];
 
@@ -213,68 +201,43 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
     return () => controller.abort();
   }, [routeDay]);
 
-  // Phase 13.5 HIGH-2 remediation. The original version put `libraryState`
-  // in this effect's own dependency array, and set that same state INSIDE
-  // the effect body. That made the effect self-invalidating: setting
-  // `loading` triggered React to run the PREVIOUS render's cleanup before
-  // committing the new one, the cleanup called `controller.abort()` on the
-  // fetch that same effect had just started, and the AbortError handler
-  // returned without resetting `libraryState` — leaving the tab stuck on
-  // "Loading…" forever, every single time the sheet opened. Proven by
-  // driving the exact control flow through React's documented effect
-  // contract in the principal engineer review; no live browser needed to see
-  // it, and none was needed to fix it either.
-  //
-  // The fix: no state in this effect's own dependency list AT ALL — only the
-  // two genuinely external triggers, `picker` and the trip's destination —
-  // and no cleanup function, so there is nothing for a re-run to abort.
-  // `libraryFetchStarted` (a ref, not state) replaces the old
-  // `libraryPlaces !== null` guard without making the effect reactive to its
-  // own output. Staleness across overlapping requests (a manual retry firing
-  // while an earlier attempt is still in flight) is handled the same way
-  // app/you/saved/page.tsx's own `load` already handles it — a
-  // RequestGeneration ticket, checked only when a response actually arrives,
-  // never a second, subtly different race guard.
+  // Phase 13.5 HIGH-2/MEDIUM-2 remediation. The full lifecycle state machine
+  // — the self-invalidation bug this fixed, and its staleness handling — now
+  // lives in lib/travel/savedLibraryController.ts's `shouldStartLibraryLoad`
+  // and `runSavedLibraryLoad`, not here. This effect is the thin wrapper
+  // those functions are meant to have: read state, ask the pure predicate,
+  // call the one state-machine function, apply its result through
+  // `useState`. There is nowhere left in THIS file for the self-invalidating
+  // pattern to come back — see that module's own header for why the fix
+  // being testable required moving the logic there.
   const libraryGeneration = useRef(new RequestGeneration()).current;
   const libraryFetchStarted = useRef(false);
 
   const loadLibrary = useCallback(
-    (destination: string) => {
-      const ticket = libraryGeneration.next();
-      setLibraryState('loading');
-      fetch(`/api/travel/places/saved?destination=${encodeURIComponent(destination)}`, {
-        credentials: 'include',
-      })
-        .then(async (response) => {
-          if (!response.ok) throw new Error('library unavailable');
-          return response.json() as Promise<{ places: LibraryPlace[] }>;
-        })
-        .then((result) => {
-          if (!libraryGeneration.isCurrent(ticket)) return; // superseded
-          setLibraryPlaces(result.places);
+    (destination: string) =>
+      runSavedLibraryLoad(destination, libraryGeneration, {
+        fetchImpl: fetchSavedLibrary,
+        setLoading: () => setLibraryState('loading'),
+        setLoaded: (places) => {
+          setLibraryPlaces(places);
           setLibraryState('idle');
-        })
-        .catch(() => {
-          if (!libraryGeneration.isCurrent(ticket)) return;
-          setLibraryState('error');
-        });
-    },
+        },
+        setError: () => setLibraryState('error'),
+      }),
     [libraryGeneration]
   );
 
   useEffect(() => {
-    if (!picker) return;
-    const destination = data?.trip.destination;
-    if (!destination) return;
+    const destination = data?.trip.destination ?? null;
     // Fetched once per component lifetime, not once per keystroke on the
     // "Saved" filter chip, and not once per sheet-open either — a
     // successful load is cached for the rest of the session, same as the
     // original design intended. A failed load resets this on the NEXT
     // successful `loadLibrary` call site (the retry button below), never by
     // this effect re-running on its own.
-    if (libraryFetchStarted.current) return;
+    if (!shouldStartLibraryLoad({ picker, destination, alreadyStarted: libraryFetchStarted.current })) return;
     libraryFetchStarted.current = true;
-    loadLibrary(destination);
+    void loadLibrary(destination as string);
   }, [picker, data?.trip.destination, loadLibrary]);
 
   if (loadState === 'loading') return <EditorSkeleton />;
@@ -333,52 +296,55 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
    * exactly this (materialize the traveler's own `destination_places` row,
    * then file it into Ideas) for /you/saved's own AddToTripButton.
    *
-   * Phase 13.5 MEDIUM-4 remediation: the sheet's own header reads "Add to
-   * {targetLabel}" — Day 3, say — so landing in Ideas regardless of that
-   * label was a silent target mismatch: the traveler taps a saved place,
-   * sees "added", and Day 3 is unchanged because the place is sitting in
-   * Ideas instead. `addPlaceToTrip` still only ever knows how to file into
-   * Ideas (there is no route that can place a canonical library place
-   * directly onto a scheduled day, and building one is a bigger change than
-   * this phase scopes), so the SAME primitive `addExisting`/`addCustom`
-   * already use for exactly this — the existing `move` action, itinerary
-   * PATCH route, sort_order collisions fixed the same way this phase fixed
-   * them everywhere else — relocates it from Ideas onto the selected day
-   * right after. `alreadyAdded` is what keeps this idempotent-safe: a place
-   * already somewhere on the trip is left exactly where it is, never
-   * relocated on a second tap. Never touches saved_places: adding to a trip
-   * is not the same act as hearting one, and must not create or remove a
-   * library row.
+   * Phase 13.5 MEDIUM-4/MEDIUM-2 remediation. The decision this used to make
+   * inline — file into Ideas, then relocate onto the selected day when the
+   * sheet's own "Add to {targetLabel}" header names one —
+   * now lives in `addSavedPlaceToTrip`
+   * (lib/travel/savedLibraryController.ts), the exact function this calls.
+   * This is orchestration only: build the real fetch-backed ports, hand the
+   * selected day (or null for the Ideas context) to that function, apply the
+   * result. Never touches saved_places: adding to a trip is not the same act
+   * as hearting one, and must not create or remove a library row.
    */
   const addFromLibrary = async (place: LibraryPlace) => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch(`/api/travel/places/${place.placeId}/add-to-trip`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tripId }),
-      });
-      const body = (await response.json().catch(() => null)) as
-        | { status?: string; alreadyAdded?: boolean; error?: { message?: string } }
-        | null;
-      if (!response.ok || body?.status !== 'added') {
-        throw new Error(body?.error?.message ?? '');
-      }
+      // A single shared refresh, fetched at most once — whether it happens
+      // inside `findFiledIdeaId` (the fresh-add-onto-a-day path) or at the
+      // end (every other path) the sheet's data is refreshed exactly once,
+      // same as before this was extracted.
+      let refreshed: ItineraryPayload | null = null;
+      const ensureRefreshed = async () => (refreshed ??= await request());
 
-      const refreshed = await request();
-
-      // A specific scheduled day is selected, and this add just created a
-      // fresh Ideas row (not a no-op on one already sitting somewhere) —
-      // relocate it onto that day so "Add to {targetLabel}" is true.
-      if (!body.alreadyAdded && tab !== 'ideas' && active) {
-        const filed = refreshed.ideas.find((item) => item.place.canonical_place_id === place.placeId);
-        if (filed) {
-          await request({ action: 'move', dayId: active.id, placeId: filed.id });
+      const result = await addSavedPlaceToTrip(
+        place.placeId,
+        tripId,
+        { dayId: tab !== 'ideas' && active ? active.id : null },
+        {
+          addToTrip: async (placeId, forTripId) => {
+            const response = await fetch(`/api/travel/places/${placeId}/add-to-trip`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tripId: forTripId }),
+            });
+            return response.json().catch(() => null);
+          },
+          findFiledIdeaId: async (canonicalPlaceId) => {
+            const data = await ensureRefreshed();
+            const filed = data.ideas.find((item) => item.place.canonical_place_id === canonicalPlaceId);
+            return filed?.id ?? null;
+          },
+          moveToDay: async (dayId, itineraryPlaceId) => {
+            await request({ action: 'move', dayId, placeId: itineraryPlaceId });
+          },
         }
-      }
+      );
+
+      if (!result.ok) throw new Error(result.message);
+      await ensureRefreshed();
 
       setNotice(mutationSuccess('addIdea', lang));
       setPicker(false);
