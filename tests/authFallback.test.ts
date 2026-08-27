@@ -170,6 +170,26 @@ describe('friendlyAuthError', () => {
     expect(friendlyAuthError('Invalid login credentials')).toBe('auth.error.badCredentials');
   });
 
+  it('maps callback URL mismatches to a deploy configuration error', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('redirect_uri_mismatch')).toBe('auth.error.redirectMismatch');
+  });
+
+  it('maps cancelled OAuth attempts distinctly from provider outages', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('access_denied')).toBe('auth.error.cancelled');
+  });
+
+  it('maps expired email links to a recoverable auth error', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('Email link is invalid or has expired')).toBe(
+      'auth.error.callbackExpired'
+    );
+  });
+
   it('passes an unrecognised error through unchanged', async () => {
     const { friendlyAuthError } = await loadAuth();
 

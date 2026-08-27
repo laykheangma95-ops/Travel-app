@@ -15,11 +15,31 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { classifySupabaseError, describeSupabaseError } from '@/lib/supabaseError';
+import { E2E_AUTH_COOKIE, e2eAuthEnabled, e2eCallbackCookieValue, readE2EUserFromRequest } from '@/lib/e2eAuth';
+import {
+  applyReturnTo,
+  AUTH_RETURN_TO_COOKIE,
+  AUTH_RETURN_TO_MAX_AGE_SECONDS,
+  currentPathWithSearch,
+  DEFAULT_AUTH_RETURN_TO,
+  isAdminRoute,
+  isProtectedCustomerRoute,
+  normalizeReturnTo,
+  readReturnTo,
+} from '@/lib/authRouting';
 import { log } from '@/lib/logger';
 import { demoModeAllowed } from '@/lib/env';
+import type { EmailOtpType } from '@supabase/supabase-js';
 
-const ADMIN_PREFIX = '/admin';
-const CUSTOMER_PREFIXES = ['/dashboard', '/my-esims', '/my-trips', '/settings'];
+const AUTH_CALLBACK_PATH = '/auth/callback';
+const CALLBACK_TYPES = new Set<EmailOtpType>([
+  'email',
+  'signup',
+  'invite',
+  'magiclink',
+  'recovery',
+  'email_change',
+]);
 
 /**
  * Supabase stores the session in cookies named `sb-<project-ref>-auth-token`
@@ -36,17 +56,193 @@ function adminEmails(): string[] {
     .filter(Boolean);
 }
 
+function callbackType(type: string | null): EmailOtpType | null {
+  if (!type || !CALLBACK_TYPES.has(type as EmailOtpType)) return null;
+  return type as EmailOtpType;
+}
+
+function signInRedirect(request: NextRequest): URL {
+  const signIn = new URL('/sign-in', request.url);
+  return applyReturnTo(
+    signIn,
+    normalizeReturnTo(currentPathWithSearch(request.nextUrl.pathname, request.nextUrl.search), '')
+  );
+}
+
+function setReturnToCookie(
+  request: NextRequest,
+  response: NextResponse,
+  value: string | null | undefined
+): void {
+  const normalized = normalizeReturnTo(value, '');
+  if (!normalized) {
+    response.cookies.delete(AUTH_RETURN_TO_COOKIE);
+    return;
+  }
+
+  response.cookies.set({
+    name: AUTH_RETURN_TO_COOKIE,
+    value: normalized,
+    path: '/',
+    sameSite: 'lax',
+    secure: request.nextUrl.protocol === 'https:',
+    maxAge: AUTH_RETURN_TO_MAX_AGE_SECONDS,
+  });
+}
+
+function clearReturnToCookie(request: NextRequest, response: NextResponse): void {
+  response.cookies.set({
+    name: AUTH_RETURN_TO_COOKIE,
+    value: '',
+    path: '/',
+    sameSite: 'lax',
+    secure: request.nextUrl.protocol === 'https:',
+    maxAge: 0,
+  });
+}
+
+function redirectToSignIn(request: NextRequest): NextResponse {
+  const returnTo = normalizeReturnTo(
+    currentPathWithSearch(request.nextUrl.pathname, request.nextUrl.search),
+    ''
+  );
+  const response = NextResponse.redirect(signInRedirect(request));
+  setReturnToCookie(request, response, returnTo);
+  return response;
+}
+
+async function handleAuthCallback(
+  request: NextRequest,
+  url: string,
+  anonKey: string
+): Promise<NextResponse> {
+  const returnTo = readReturnTo(request.nextUrl.searchParams);
+  const type = callbackType(request.nextUrl.searchParams.get('type'));
+  const successDestination =
+    type === 'recovery'
+      ? applyReturnTo(new URL('/reset-password', request.url), returnTo)
+      : new URL(normalizeReturnTo(returnTo, DEFAULT_AUTH_RETURN_TO), request.url);
+  const errorDestination = applyReturnTo(
+    new URL(type === 'recovery' ? '/reset-password' : AUTH_CALLBACK_PATH, request.url),
+    returnTo
+  );
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.redirect(successDestination);
+        if (type === 'recovery') {
+          setReturnToCookie(request, response, returnTo);
+        } else {
+          clearReturnToCookie(request, response);
+        }
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
+
+  const code = request.nextUrl.searchParams.get('code');
+  const flowId = request.nextUrl.searchParams.get('sb_flow_id');
+  const tokenHash = request.nextUrl.searchParams.get('token_hash');
+  let response = NextResponse.redirect(successDestination);
+  if (type === 'recovery') {
+    setReturnToCookie(request, response, returnTo);
+  } else {
+    clearReturnToCookie(request, response);
+  }
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(
+      code,
+      flowId ? { flowId } : undefined
+    );
+    if (error) {
+      log.warn('auth.callback_exchange_failed', {
+        path: request.nextUrl.pathname,
+        ...describeSupabaseError(error),
+      });
+      errorDestination.searchParams.set('error_description', error.message);
+      response = NextResponse.redirect(errorDestination);
+      setReturnToCookie(request, response, returnTo);
+    }
+    return response;
+  }
+
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (error) {
+      log.warn('auth.callback_verify_failed', {
+        path: request.nextUrl.pathname,
+        type,
+        ...describeSupabaseError(error),
+      });
+      errorDestination.searchParams.set('error_description', error.message);
+      response = NextResponse.redirect(errorDestination);
+      setReturnToCookie(request, response, returnTo);
+    }
+  }
+
+  return response;
+}
+
+function handleE2EAuthCallback(request: NextRequest): NextResponse {
+  const returnTo = readReturnTo(request.nextUrl.searchParams);
+  const destination = new URL(normalizeReturnTo(returnTo, DEFAULT_AUTH_RETURN_TO), request.url);
+  const response = NextResponse.redirect(destination);
+  clearReturnToCookie(request, response);
+
+  const code = request.nextUrl.searchParams.get('code');
+  const sessionCookie = code ? e2eCallbackCookieValue(code) : null;
+  if (!sessionCookie) {
+    const failed = applyReturnTo(new URL(AUTH_CALLBACK_PATH, request.url), returnTo);
+    failed.searchParams.set('error_description', 'Email link is invalid or has expired');
+    const errorResponse = NextResponse.redirect(failed);
+    setReturnToCookie(request, errorResponse, returnTo);
+    return errorResponse;
+  }
+
+  response.cookies.set({
+    name: E2E_AUTH_COOKIE,
+    value: sessionCookie,
+    path: '/',
+    sameSite: 'lax',
+    secure: request.nextUrl.protocol === 'https:',
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAdminRoute = pathname.startsWith(ADMIN_PREFIX);
-  const isCustomerRoute = CUSTOMER_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  const adminRoute = isAdminRoute(pathname);
+  const customerRoute = isProtectedCustomerRoute(pathname);
   // Only the dashboard root redirects staff onward. Deeper customer pages
   // (/my-esims, /settings) are places staff may legitimately want to be.
   const isCustomerDashboard = pathname === '/dashboard';
 
   let response = NextResponse.next({ request });
+
+  if (e2eAuthEnabled()) {
+    if (pathname === AUTH_CALLBACK_PATH && request.nextUrl.searchParams.has('code')) {
+      return handleE2EAuthCallback(request);
+    }
+
+    const user = readE2EUserFromRequest(request);
+
+    if (adminRoute) {
+      if (!user) return redirectToSignIn(request);
+      return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+    }
+
+    if (customerRoute && !user) {
+      return redirectToSignIn(request);
+    }
+
+    return response;
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -69,16 +265,21 @@ export async function middleware(request: NextRequest) {
         'NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy.'
     );
 
-    if (isAdminRoute) {
+    if (adminRoute) {
       return NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
     }
-    if (isCustomerRoute) {
-      const signIn = new URL('/sign-in', request.url);
-      signIn.searchParams.set('returnTo', pathname);
-      return NextResponse.redirect(signIn);
+    if (customerRoute) {
+      return redirectToSignIn(request);
     }
     // The public site — storefront, destinations, checkout — is untouched.
     return response;
+  }
+
+  if (pathname === AUTH_CALLBACK_PATH) {
+    const search = request.nextUrl.searchParams;
+    if (search.has('code') || (search.has('token_hash') && callbackType(search.get('type')))) {
+      return handleAuthCallback(request, url, anonKey);
+    }
   }
 
   // An anonymous visitor carries no Supabase cookie, so there is no session to
@@ -87,20 +288,16 @@ export async function middleware(request: NextRequest) {
   // Supabase auth endpoint — fewer requests billed, and fewer lines of noise
   // between the failures that matter.
   if (!hasAuthCookie(request)) {
-    if (isCustomerRoute) {
-      const signIn = new URL('/sign-in', request.url);
-      signIn.searchParams.set('returnTo', pathname);
-      return NextResponse.redirect(signIn);
+    if (customerRoute) {
+      return redirectToSignIn(request);
     }
     // No cookie means nobody is signed in, which is the same case the admin
     // gate below answers with a sign-in redirect. It has to answer it the same
     // way here: this early return sits in front of that check, so returning a
     // 404 would quietly restore the behaviour that told staff arriving from a
     // bookmark that the panel did not exist.
-    if (isAdminRoute) {
-      const signIn = new URL('/sign-in', request.url);
-      signIn.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
-      return NextResponse.redirect(signIn);
+    if (adminRoute) {
+      return redirectToSignIn(request);
     }
     return response;
   }
@@ -145,7 +342,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (isAdminRoute) {
+  if (adminRoute) {
     // Two ways in, checked in this order:
     //
     //   1. ADMIN_EMAIL — the owner's break-glass access, which works even when
@@ -193,9 +390,7 @@ export async function middleware(request: NextRequest) {
       // deliberate trade the owner made: the path is guessable on any site, so
       // hiding it bought little, while locking out staff cost real time.
       if (user === null) {
-        const signIn = new URL('/sign-in', request.url);
-        signIn.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
-        return NextResponse.redirect(signIn);
+        return redirectToSignIn(request);
       }
 
       // SIGNED IN, BUT NOT STAFF — still a 404, and this is the case worth
@@ -235,10 +430,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (isCustomerRoute && !user) {
-    const signIn = new URL('/sign-in', request.url);
-    signIn.searchParams.set('returnTo', pathname);
-    return NextResponse.redirect(signIn);
+  if (customerRoute && !user) {
+    return redirectToSignIn(request);
   }
 
   return response;

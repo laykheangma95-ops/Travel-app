@@ -65,6 +65,20 @@ export function demoAllowed(): boolean {
 
 /** Demo fallbacks are permitted only outside production, or with the explicit opt-in. */
 export const demoModeAllowed = !isProduction || allowDemoInProduction;
+export const phoneAuthConfigured = process.env.NEXT_PUBLIC_PHONE_AUTH_ENABLED === 'true';
+export const phoneAuthCaptchaConfigured = Boolean(
+  process.env.NEXT_PUBLIC_PHONE_AUTH_CAPTCHA_SITE_KEY?.trim()
+);
+export const phoneAuthProtectionConfigured =
+  process.env.NEXT_PUBLIC_PHONE_AUTH_PROTECTED === 'true';
+export const phoneAuthEnabled =
+  phoneAuthConfigured && phoneAuthCaptchaConfigured && phoneAuthProtectionConfigured;
+export const phoneOtpResendSeconds = Number(
+  process.env.NEXT_PUBLIC_PHONE_OTP_RESEND_SECONDS?.trim() || '60'
+);
+export const phoneOtpExpirySeconds = Number(
+  process.env.NEXT_PUBLIC_PHONE_OTP_EXPIRY_SECONDS?.trim() || '60'
+);
 
 const required: Record<ServiceName, string[]> = {
   supabase: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
