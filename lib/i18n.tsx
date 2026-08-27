@@ -42,11 +42,26 @@ const dicts = {
       'This sign-in method is not available yet. Please use your email address instead.',
     'auth.error.phoneUnavailable':
       'Phone sign-in is not available yet. Please use your email address — it works even with no mobile signal.',
+    'auth.error.phoneDisabled':
+      'Phone sign-in is not live yet. Please use email or Google for now.',
     'auth.error.badCredentials': 'That email or password is not right. Please check and try again.',
     'auth.error.emailNotConfirmed':
       'Please confirm your email first. Check your inbox for the message we sent you.',
+    'auth.error.emailUnavailable':
+      'We could not send email to that address yet. Please try a different inbox or contact support.',
     'auth.error.codeExpired': 'That code has expired. Ask for a new one and try again.',
     'auth.error.codeInvalid': 'That code is not correct. Please check it and try again.',
+    'auth.error.redirectMismatch':
+      'Sign-in is temporarily misconfigured. Please try your email instead while we fix it.',
+    'auth.error.cancelled': 'Sign-in was cancelled before it finished. Please try again.',
+    'auth.error.network':
+      'We could not reach the network just now. Check your connection and try again.',
+    'auth.error.callbackSync':
+      'We could not finish signing you in on this device. Please go back and try again.',
+    'auth.error.callbackExpired':
+      'That sign-in or verification link has expired, been used already, or opened in the wrong browser. Please request a new one.',
+    'auth.error.recoveryExpired':
+      'That reset link has expired or already been used. Ask for a new reset email, or enter the 6-digit code instead.',
     'auth.error.tooMany': 'Too many attempts. Please wait a few minutes and try again.',
     'auth.error.emailTaken':
       'An account already exists with this email. Try signing in instead.',
@@ -344,11 +359,26 @@ const dicts = {
       'វិធីចូលនេះមិនទាន់មានទេ។ សូមប្រើអាសយដ្ឋានអ៊ីមែលរបស់អ្នកជំនួសវិញ។',
     'auth.error.phoneUnavailable':
       'ការចូលដោយលេខទូរស័ព្ទមិនទាន់មានទេ។ សូមប្រើអ៊ីមែល — វាដំណើរការទោះបីគ្មានសេវាទូរស័ព្ទក៏ដោយ។',
+    'auth.error.phoneDisabled':
+      'ការចូលដោយលេខទូរស័ព្ទមិនទាន់បើកប្រើទេ។ សូមប្រើអ៊ីមែល ឬ Google សិន។',
     'auth.error.badCredentials': 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ។ សូមពិនិត្យ ហើយព្យាយាមម្តងទៀត។',
     'auth.error.emailNotConfirmed':
       'សូមបញ្ជាក់អ៊ីមែលរបស់អ្នកជាមុនសិន។ សូមពិនិត្យប្រអប់សំបុត្ររបស់អ្នក។',
+    'auth.error.emailUnavailable':
+      'យើងមិនអាចផ្ញើអ៊ីមែលទៅអាសយដ្ឋាននេះបាននៅឡើយទេ។ សូមសាកល្បងប្រអប់សំបុត្រផ្សេង ឬទាក់ទងជំនួយ។',
     'auth.error.codeExpired': 'លេខកូដនេះផុតកំណត់ហើយ។ សូមស្នើសុំលេខកូដថ្មី។',
     'auth.error.codeInvalid': 'លេខកូដមិនត្រឹមត្រូវទេ។ សូមពិនិត្យ ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.redirectMismatch':
+      'ការចូលត្រូវបានកំណត់មិនត្រឹមត្រូវជាបណ្តោះអាសន្ន។ សូមប្រើអ៊ីមែលសិន ខណៈពេលយើងកំពុងជួសជុល។',
+    'auth.error.cancelled': 'ការចូលត្រូវបានបោះបង់មុនពេលបញ្ចប់។ សូមព្យាយាមម្តងទៀត។',
+    'auth.error.network':
+      'យើងមិនអាចភ្ជាប់បណ្តាញបានភ្លាមៗនេះទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.callbackSync':
+      'យើងមិនអាចបញ្ចប់ការចូលនៅលើឧបករណ៍នេះបានទេ។ សូមត្រឡប់ក្រោយ ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.callbackExpired':
+      'តំណចូល ឬតំណបញ្ជាក់នេះផុតកំណត់ ប្រើរួចហើយ ឬត្រូវបានបើកនៅក្នុងកម្មវិធីរុករកផ្សេង។ សូមស្នើសុំតំណថ្មី។',
+    'auth.error.recoveryExpired':
+      'តំណកំណត់ពាក្យសម្ងាត់នេះផុតកំណត់ ឬប្រើរួចហើយ។ សូមស្នើសុំអ៊ីមែលថ្មី ឬបញ្ចូលលេខកូដ 6 ខ្ទង់ជំនួស។',
     'auth.error.tooMany': 'ព្យាយាមច្រើនដងពេក។ សូមរង់ចាំពីរបីនាទី ហើយព្យាយាមម្តងទៀត។',
     'auth.error.emailTaken': 'មានគណនីរួចហើយជាមួយអ៊ីមែលនេះ។ សូមព្យាយាមចូលគណនីវិញ។',
     // Hero

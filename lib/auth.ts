@@ -1,8 +1,22 @@
 // 🔒 LOCKED — see docs/LOCKED.md. Do not modify without the owner's explicit permission.
 import { getSupabase } from '@/lib/supabase';
-import { demoModeAllowed } from '@/lib/env';
+import {
+  demoModeAllowed,
+  phoneAuthEnabled,
+  phoneOtpExpirySeconds,
+  phoneOtpResendSeconds,
+} from '@/lib/env';
+import {
+  AUTH_RETURN_TO_COOKIE,
+  AUTH_RETURN_TO_MAX_AGE_SECONDS,
+  DEFAULT_AUTH_RETURN_TO,
+  normalizeReturnTo,
+  readReturnTo,
+} from '@/lib/authRouting';
 
 export type OAuthProvider = 'google' | 'apple';
+const RETURN_TO_STORAGE_KEY = 'domner-return-to';
+const PHONE_AUTH_CAPTCHA_ACTION = 'phone-auth';
 
 export interface AuthResult {
   error: string | null;
@@ -10,7 +24,78 @@ export interface AuthResult {
   demo?: boolean;
 }
 
+export interface PhoneAuthProof {
+  /**
+   * Reserved for the future CAPTCHA handshake. The current shipping SDK in this
+   * repo does not yet expose a typed browser hook for it, so phone auth remains
+   * disabled unless the production-hardening flags are explicitly present.
+   */
+  captchaToken?: string | null;
+}
+
+export interface AuthStatus {
+  signedIn: boolean;
+  userId: string | null;
+}
+
 const DEMO: AuthResult = { error: null, demo: true };
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${name}=`;
+  for (const part of document.cookie.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    return decodeURIComponent(trimmed.slice(prefix.length));
+  }
+  return null;
+}
+
+function writeCookie(name: string, value: string, maxAgeSeconds: number): void {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie =
+    `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+}
+
+function clearCookie(name: string): void {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+}
+
+function currentReturnTo(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const fromQuery = readReturnTo(new URLSearchParams(window.location.search));
+  if (fromQuery) return fromQuery;
+
+  const fromCookie = normalizeReturnTo(readCookie(AUTH_RETURN_TO_COOKIE), '');
+  if (fromCookie) return fromCookie;
+
+  try {
+    const fromStorage = normalizeReturnTo(sessionStorage.getItem(RETURN_TO_STORAGE_KEY), '');
+    return fromStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+function clearReturnTo(): void {
+  if (typeof window === 'undefined') return;
+  clearCookie(AUTH_RETURN_TO_COOKIE);
+  try {
+    sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+  } catch {
+    // Private-browsing contexts can reject sessionStorage; the cookie is the
+    // cross-tab and cross-context fallback.
+  }
+}
+
+function phoneAuthBlocked(): AuthResult | null {
+  if (phoneAuthEnabled) return null;
+  return { error: 'auth.error.phoneDisabled' };
+}
 
 /**
  * Shown when Supabase is missing on a real deployment. Deliberately vague about
@@ -64,11 +149,52 @@ export function friendlyAuthError(raw: string | null | undefined): string | null
 
   if (text.includes('invalid login credentials')) return 'auth.error.badCredentials';
   if (text.includes('email not confirmed')) return 'auth.error.emailNotConfirmed';
+  if (text.includes('email address not authorized')) return 'auth.error.emailUnavailable';
+  if (
+    text.includes('email link is invalid or has expired') ||
+    text.includes('link is invalid or has expired') ||
+    text.includes('expired_action_link') ||
+    text.includes('otp has expired')
+  ) {
+    return 'auth.error.callbackExpired';
+  }
   if (text.includes('token has expired') || text.includes('otp_expired')) {
     return 'auth.error.codeExpired';
   }
   if (text.includes('invalid token') || text.includes('token is invalid')) {
     return 'auth.error.codeInvalid';
+  }
+  if (
+    text.includes('redirect_uri_mismatch') ||
+    text.includes('redirect url') ||
+    text.includes('redirect_to') ||
+    text.includes('callback url mismatch')
+  ) {
+    return 'auth.error.redirectMismatch';
+  }
+  if (
+    text.includes('access denied') ||
+    text.includes('access_denied') ||
+    text.includes('cancelled') ||
+    text.includes('canceled')
+  ) {
+    return 'auth.error.cancelled';
+  }
+  if (
+    text.includes('network') ||
+    text.includes('fetch failed') ||
+    text.includes('failed to fetch') ||
+    text.includes('load failed')
+  ) {
+    return 'auth.error.network';
+  }
+  if (
+    text.includes('code verifier') ||
+    text.includes('auth code') ||
+    text.includes('invalid grant') ||
+    text.includes('pkce')
+  ) {
+    return 'auth.error.callbackSync';
   }
   if (text.includes('rate limit') || text.includes('too many')) return 'auth.error.tooMany';
   if (text.includes('already registered') || text.includes('already been registered')) {
@@ -108,7 +234,10 @@ function unconfigured(): AuthResult {
 
 function redirectUrl(path = '/auth/callback'): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  return `${window.location.origin}${path}`;
+  const url = new URL(path, window.location.origin);
+  const returnTo = currentReturnTo();
+  if (returnTo) url.searchParams.set('returnTo', returnTo);
+  return url.toString();
 }
 
 /**
@@ -116,14 +245,55 @@ function redirectUrl(path = '/auth/callback'): string | undefined {
  * a traveller who signs in mid-purchase lands back on their cart.
  */
 export function consumeReturnTo(fallback = '/dashboard'): string {
-  if (typeof window === 'undefined') return fallback;
-  const stored = sessionStorage.getItem('domner-return-to');
-  sessionStorage.removeItem('domner-return-to');
+  const stored = currentReturnTo();
+  clearReturnTo();
   return stored ?? fallback;
 }
 
 export function setReturnTo(path: string): void {
-  if (typeof window !== 'undefined') sessionStorage.setItem('domner-return-to', path);
+  if (typeof window === 'undefined') return;
+  const normalized = normalizeReturnTo(path, DEFAULT_AUTH_RETURN_TO);
+  writeCookie(AUTH_RETURN_TO_COOKIE, normalized, AUTH_RETURN_TO_MAX_AGE_SECONDS);
+  try {
+    sessionStorage.setItem(RETURN_TO_STORAGE_KEY, normalized);
+  } catch {
+    // The cookie is the durable path across tabs, mail apps and PWA contexts.
+  }
+}
+
+export function authCallbackBusyCopy(): { title: string; subtitle: string; detail: string } {
+  return {
+    title: 'Signing you in',
+    subtitle: 'One moment…',
+    detail: 'We are finishing your sign-in securely.',
+  };
+}
+
+export function isPhoneAuthEnabled(): boolean {
+  return phoneAuthEnabled;
+}
+
+export function phoneAuthTiming() {
+  return {
+    resendSeconds: Number.isFinite(phoneOtpResendSeconds) ? Math.max(1, phoneOtpResendSeconds) : 60,
+    expirySeconds: Number.isFinite(phoneOtpExpirySeconds) ? Math.max(1, phoneOtpExpirySeconds) : 60,
+    captchaAction: PHONE_AUTH_CAPTCHA_ACTION,
+  };
+}
+
+export async function readServerAuthStatus(): Promise<AuthStatus> {
+  const response = await fetch('/api/auth/session', {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error('auth.error.callbackSync');
+  const body = (await response.json()) as Partial<AuthStatus>;
+  return {
+    signedIn: body.signedIn === true,
+    userId: typeof body.userId === 'string' ? body.userId : null,
+  };
 }
 
 export async function signInWithProvider(provider: OAuthProvider): Promise<AuthResult> {
@@ -202,9 +372,15 @@ export async function verifyEmailCode(email: string, token: string): Promise<Aut
 }
 
 /** SMS one-time code. Offered, never required — see docs/AUTH.md. */
-export async function sendPhoneCode(phoneE164: string, createUser: boolean): Promise<AuthResult> {
+export async function sendPhoneCode(
+  phoneE164: string,
+  createUser: boolean,
+  _proof?: PhoneAuthProof
+): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
+  const blocked = phoneAuthBlocked();
+  if (blocked) return blocked;
   const { error } = await supabase.auth.signInWithOtp({
     phone: phoneE164,
     options: { shouldCreateUser: createUser },
@@ -215,14 +391,21 @@ export async function sendPhoneCode(phoneE164: string, createUser: boolean): Pro
 export async function verifyPhoneCode(phoneE164: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
+  const blocked = phoneAuthBlocked();
+  if (blocked) return blocked;
   const { error } = await supabase.auth.verifyOtp({ phone: phoneE164, token, type: 'sms' });
   return { error: friendlyAuthError(error?.message) };
 }
 
 /** Attach a phone to an already signed-in account (Settings → verify later). */
-export async function startPhoneLink(phoneE164: string): Promise<AuthResult> {
+export async function startPhoneLink(
+  phoneE164: string,
+  _proof?: PhoneAuthProof
+): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
+  const blocked = phoneAuthBlocked();
+  if (blocked) return blocked;
   const { error } = await supabase.auth.updateUser({ phone: phoneE164 });
   return { error: friendlyAuthError(error?.message) };
 }
@@ -230,12 +413,14 @@ export async function startPhoneLink(phoneE164: string): Promise<AuthResult> {
 export async function confirmPhoneLink(phoneE164: string, token: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return unconfigured();
+  const blocked = phoneAuthBlocked();
+  if (blocked) return blocked;
   const { error } = await supabase.auth.verifyOtp({
     phone: phoneE164,
     token,
     type: 'phone_change',
   });
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyAuthError(error.message) };
 
   const { data } = await supabase.auth.getUser();
   if (data.user) {
@@ -291,15 +476,34 @@ export async function consumeRecoveryLink(): Promise<RecoveryLink> {
   const query = new URLSearchParams(window.location.search);
   const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const linkError = query.get('error_description') ?? fragment.get('error_description');
-  if (linkError) return { error: linkError, ready: false };
+  if (linkError) {
+    const friendly = friendlyAuthError(linkError);
+    return {
+      error: friendly === 'auth.error.callbackExpired' ? 'auth.error.recoveryExpired' : friendly,
+      ready: false,
+    };
+  }
 
   const tokenHash = query.get('token_hash');
   if (tokenHash && query.get('type') === 'recovery') {
     const { error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
-    if (error) return { error: error.message, ready: false };
+    if (error) {
+      const friendly = friendlyAuthError(error.message);
+      return {
+        error: friendly === 'auth.error.callbackExpired' ? 'auth.error.recoveryExpired' : friendly,
+        ready: false,
+      };
+    }
   }
 
-  const { data } = await supabase.auth.getSession();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    const friendly = friendlyAuthError(error.message);
+    return {
+      error: friendly === 'auth.error.callbackExpired' ? 'auth.error.recoveryExpired' : friendly,
+      ready: false,
+    };
+  }
   return { error: null, ready: Boolean(data.session) };
 }
 

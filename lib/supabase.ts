@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createBrowserClient } from '@supabase/ssr';
+import { createE2EBrowserSupabase, e2eAuthEnabled } from './e2eAuth';
 
 /**
  * Browser Supabase client.
@@ -15,6 +16,10 @@ import { createBrowserClient } from '@supabase/ssr';
 let browserClient: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
+  const e2e = createE2EBrowserSupabase();
+  if (e2e) return e2e;
+  if (e2eAuthEnabled()) return {} as SupabaseClient;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return null;

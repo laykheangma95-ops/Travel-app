@@ -27,6 +27,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { adminConfigured, isConfigured } from './env';
 import { ApiError } from './http';
 import { log, redactEmail } from './logger';
+import { e2eAuthEnabled, e2eSupabaseFromRequest, readE2EUserFromRequest } from './e2eAuth';
 import {
   isBootstrapAdmin,
   mfaRequired,
@@ -59,6 +60,7 @@ function parseCookies(header: string | null): Array<{ name: string; value: strin
  * Security, so a bug here cannot leak another user's rows.
  */
 export function supabaseFromRequest(request: Request): SupabaseClient | null {
+  if (e2eAuthEnabled()) return e2eSupabaseFromRequest(request);
   if (!isConfigured('supabase')) return null;
 
   const cookies = parseCookies(request.headers.get('cookie'));
@@ -98,6 +100,7 @@ function bearerToken(request: Request): string | null {
  * rather than being trusted locally.
  */
 export async function getUser(request: Request): Promise<User | null> {
+  if (e2eAuthEnabled()) return readE2EUserFromRequest(request);
   const supabase = supabaseFromRequest(request);
   if (!supabase) return null;
 
