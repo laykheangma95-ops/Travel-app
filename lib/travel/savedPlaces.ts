@@ -20,8 +20,66 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
+import { isUniqueViolation } from '@/lib/supabaseError';
 import type { ItineraryCategory } from '@/lib/travel/itinerary';
 import { normalizeTripDraft, suggestTripTitle } from '@/lib/travel/trips';
+
+/**
+ * The next free `sort_order` in one itinerary day.
+ *
+ * NOT `COUNT(*)`. `itinerary_places` carries `UNIQUE (itinerary_day_id,
+ * sort_order)` (migration 007), and a count is only the correct "next slot"
+ * when every existing row is dense from 0. A `delete`, or a `move` that only
+ * updates the row leaving (not the ones behind it), leaves a gap — Ideas
+ * {0,1,2} loses row 1 to a move onto a day, count reports 2, and an insert at
+ * `sort_order: 2` collides with the row still sitting there. `MAX + 1` is
+ * correct regardless of gaps; an empty day still yields 0 via the `?? -1`.
+ */
+export async function nextSortOrder(
+  supabase: SupabaseClient,
+  itineraryDayId: string
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('itinerary_places')
+    .select('sort_order')
+    .eq('itinerary_day_id', itineraryDayId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw new ApiError('INTERNAL', 'Could not place that in your itinerary.', { reason: 'write_failed' });
+  }
+  return ((data?.sort_order as number | undefined) ?? -1) + 1;
+}
+
+/**
+ * Insert one `itinerary_places` row at the next free `sort_order`, with ONE
+ * bounded retry against a freshly-read `MAX(sort_order)` if a concurrent
+ * write claimed that slot first (SQLSTATE 23505 on the day's own unique
+ * index). Never an unbounded loop — a second collision after a fresh re-read
+ * is treated as a real, reportable failure rather than retried again.
+ */
+export async function insertAtNextSortOrder(
+  supabase: SupabaseClient,
+  itineraryDayId: string,
+  row: { place_id: string; category: ItineraryCategory }
+): Promise<{ id: string } | null> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const sortOrder = await nextSortOrder(supabase, itineraryDayId);
+    const { data, error } = await supabase
+      .from('itinerary_places')
+      .insert({ itinerary_day_id: itineraryDayId, sort_order: sortOrder, ...row })
+      .select('id')
+      .single();
+    if (!error && data) return { id: data.id as string };
+    if (!isUniqueViolation(error)) {
+      throw new ApiError('INTERNAL', 'Could not add that idea.', { reason: 'write_failed' });
+    }
+    // One retry only: a concurrent writer won this exact slot. Re-reading
+    // MAX(sort_order) on the next loop iteration reflects that write.
+  }
+  return null;
+}
 
 /**
  * File a catalogue place into a trip's unscheduled Ideas list, creating that
@@ -45,7 +103,11 @@ export async function addIdeaToTrip(
     .select('id,destination')
     .eq('id', tripId)
     .maybeSingle();
-  if (!trip) throw new ApiError('NOT_FOUND', 'We could not find that trip to save this place into.');
+  if (!trip) {
+    throw new ApiError('NOT_FOUND', 'We could not find that trip to save this place into.', {
+      reason: 'invalid_trip',
+    });
+  }
 
   let { data: ideasDay } = await supabase
     .from('itinerary_days')
@@ -59,7 +121,9 @@ export async function addIdeaToTrip(
       .insert({ trip_id: tripId, day_index: 0, date: null })
       .select('id')
       .single();
-    if (error || !data) throw new ApiError('INTERNAL', 'Could not prepare your Ideas list.');
+    if (error || !data) {
+      throw new ApiError('INTERNAL', 'Could not prepare your Ideas list.', { reason: 'write_failed' });
+    }
     ideasDay = data;
   }
 
@@ -69,26 +133,25 @@ export async function addIdeaToTrip(
     .eq('id', placeId)
     .eq('destination', trip.destination)
     .maybeSingle();
-  if (!place) throw new ApiError('NOT_FOUND', 'That place could not be found.');
+  if (!place) {
+    // The row this function was handed does not belong to this trip's
+    // destination. In practice that only happens when a caller inserted it
+    // under a different destination string than the trip's own — a
+    // destination mismatch, not a missing row.
+    throw new ApiError('NOT_FOUND', 'That place could not be found.', {
+      reason: 'destination_mismatch',
+    });
+  }
 
-  const { count } = await supabase
-    .from('itinerary_places')
-    .select('*', { count: 'exact', head: true })
-    .eq('itinerary_day_id', ideasDay.id);
+  const added = await insertAtNextSortOrder(supabase, ideasDay.id, {
+    place_id: place.id,
+    category: place.category as ItineraryCategory,
+  });
+  if (!added) {
+    throw new ApiError('INTERNAL', 'Could not add that idea.', { reason: 'itinerary_conflict' });
+  }
 
-  const { data: added, error } = await supabase
-    .from('itinerary_places')
-    .insert({
-      itinerary_day_id: ideasDay.id,
-      place_id: place.id,
-      category: place.category as ItineraryCategory,
-      sort_order: count ?? 0,
-    })
-    .select('id')
-    .single();
-  if (error || !added) throw new ApiError('INTERNAL', 'Could not add that idea.');
-
-  return added.id as string;
+  return added.id;
 }
 
 /**

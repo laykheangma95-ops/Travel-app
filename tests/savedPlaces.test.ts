@@ -32,8 +32,22 @@ function fakeSupabase(seed: Record<string, Row[]> = {}) {
     const filters: Array<(row: Row) => boolean> = [];
     let written: Row[] | null = null;
     let head = false;
+    let orderBy: { column: string; ascending: boolean } | null = null;
+    let limitTo: number | null = null;
 
-    const matched = () => written ?? rows().filter((row) => filters.every((test) => test(row)));
+    const matched = () => {
+      let result = written ?? rows().filter((row) => filters.every((test) => test(row)));
+      if (orderBy) {
+        const { column, ascending } = orderBy;
+        result = [...result].sort((a, b) => {
+          const av = a[column] as number;
+          const bv = b[column] as number;
+          return ascending ? av - bv : bv - av;
+        });
+      }
+      if (limitTo !== null) result = result.slice(0, limitTo);
+      return result;
+    };
 
     const api = {
       select(_columns?: string, options?: { count?: string; head?: boolean }) {
@@ -46,6 +60,14 @@ function fakeSupabase(seed: Record<string, Row[]> = {}) {
       },
       in(column: string, values: unknown[]) {
         filters.push((row) => values.includes(row[column]));
+        return api;
+      },
+      order(column: string, options?: { ascending?: boolean }) {
+        orderBy = { column, ascending: options?.ascending !== false };
+        return api;
+      },
+      limit(count: number) {
+        limitTo = count;
         return api;
       },
       ilike(column: string, value: string) {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ApiError, ok, readJson, requireParam, route } from '@/lib/http';
 import { requireUser, supabaseFromRequest } from '@/lib/serverAuth';
 import { getSupabase } from '@/lib/supabase';
+import { isUniqueViolation } from '@/lib/supabaseError';
 import {
   nextDayDate,
   minutesFromTime,
@@ -9,7 +10,7 @@ import {
   PLACE_NAME_MAX,
   type ItineraryCategory,
 } from '@/lib/travel/itinerary';
-import { addIdeaToTrip } from '@/lib/travel/savedPlaces';
+import { addIdeaToTrip, insertAtNextSortOrder, nextSortOrder } from '@/lib/travel/savedPlaces';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,9 +120,11 @@ export const PATCH = route(async (request, context) => {
       supabase.from('destination_places').select('id,category').eq('id', body.data.placeId).eq('destination', trip.destination).maybeSingle(),
     ]);
     if (!day || !place) throw new ApiError('NOT_FOUND', 'That place or day could not be found.');
-    const { count } = await supabase.from('itinerary_places').select('*', { count: 'exact', head: true }).eq('itinerary_day_id', day.id);
-    const { error } = await supabase.from('itinerary_places').insert({ itinerary_day_id: day.id, place_id: place.id, category: place.category as ItineraryCategory, sort_order: count ?? 0 });
-    if (error) throw new ApiError('INTERNAL', 'Could not add that place.');
+    const added = await insertAtNextSortOrder(supabase, day.id, {
+      place_id: place.id,
+      category: place.category as ItineraryCategory,
+    });
+    if (!added) throw new ApiError('INTERNAL', 'Could not add that place.');
   }
 
   // Lives in lib/travel/savedPlaces.ts because saving a place from a
@@ -148,9 +151,24 @@ export const PATCH = route(async (request, context) => {
   if (body.data.action === 'move') {
     const { data: day } = await supabase.from('itinerary_days').select('id').eq('id', body.data.dayId).eq('trip_id', tripId).maybeSingle();
     if (!day) throw new ApiError('NOT_FOUND', 'That day could not be found.');
-    const { count } = await supabase.from('itinerary_places').select('*', { count: 'exact', head: true }).eq('itinerary_day_id', day.id);
-    const { error } = await supabase.from('itinerary_places').update({ itinerary_day_id: day.id, sort_order: count ?? 0 }).eq('id', body.data.placeId);
-    if (error) throw new ApiError('INTERNAL', 'Could not move that place.');
+    // Same MAX(sort_order)+1 reasoning as insertAtNextSortOrder — a moved-into
+    // day is not guaranteed dense, so COUNT(*) can hand back a slot another
+    // row already occupies. One bounded retry against a fresh MAX on a
+    // concurrent collision (23505); a second collision is a real failure.
+    let moved = false;
+    for (let attempt = 0; attempt < 2 && !moved; attempt += 1) {
+      const sortOrder = await nextSortOrder(supabase, day.id);
+      const { error } = await supabase
+        .from('itinerary_places')
+        .update({ itinerary_day_id: day.id, sort_order: sortOrder })
+        .eq('id', body.data.placeId);
+      if (!error) {
+        moved = true;
+      } else if (!isUniqueViolation(error)) {
+        throw new ApiError('INTERNAL', 'Could not move that place.');
+      }
+    }
+    if (!moved) throw new ApiError('INTERNAL', 'Could not move that place.');
   }
 
   if (body.data.action === 'update') {
@@ -234,17 +252,12 @@ export const PATCH = route(async (request, context) => {
       dayId = day.id;
     }
 
-    const { count } = await supabase
-      .from('itinerary_places')
-      .select('*', { count: 'exact', head: true })
-      .eq('itinerary_day_id', dayId);
-    const { error } = await supabase.from('itinerary_places').insert({
-      itinerary_day_id: dayId,
+    if (!dayId) throw new ApiError('INTERNAL', 'Could not prepare your itinerary.');
+    const added = await insertAtNextSortOrder(supabase, dayId, {
       place_id: place.id,
       category: place.category as ItineraryCategory,
-      sort_order: count ?? 0,
     });
-    if (error) throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
+    if (!added) throw new ApiError('INTERNAL', 'Could not add that place to your trip.');
   }
 
   if (body.data.action === 'share') {

@@ -28,14 +28,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check, Loader2, MapPin, Pencil, Plus, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, Loader2, MapPin, Pencil, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/ui/Reveal';
 import { SavedPlaceButton } from '@/components/travel/SavedPlaceButton';
 import { CATEGORY_LABEL, type ItineraryCategory } from '@/lib/travel/itinerary';
 import { PLATFORM_LABEL, type LinkPlatform } from '@/lib/travel/socialLink';
 import type { PlaceCandidate } from '@/lib/travel/placeExtraction';
-import { viewPlaceHref, type ImportOutcome } from '@/lib/travel/importOutcome';
+import { importOutcomeStatus, viewPlaceHref, type ImportOutcome } from '@/lib/travel/importOutcome';
 import type { PlaceResolutionSummary } from '@/lib/travel/placeImport';
 import type { CopyKey, Translate } from './placeImportCopy';
 
@@ -675,14 +675,33 @@ export function DoneStage({
   // the canonical id the decision actually attached.
   const [resolved, setResolved] = useState<Record<string, string | null>>({});
 
+  // Phase 13.5: the headline must never claim a save that did not happen.
+  // Zero added and at least one failed is a failure state, not the same green
+  // check a full batch gets — see lib/travel/importOutcome.ts's
+  // importOutcomeStatus.
+  const status = importOutcomeStatus(outcome);
+
   return (
     <Reveal className="night-card mt-6 p-6 text-center">
-      <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gold-light/12 text-gold-light">
-        <Check size={24} aria-hidden="true" />
+      <span
+        className={cn(
+          'mx-auto grid h-14 w-14 place-items-center rounded-full',
+          status === 'failure' ? 'bg-amber-500/15 text-amber-200' : 'bg-gold-light/12 text-gold-light'
+        )}
+      >
+        {status === 'failure' ? (
+          <AlertTriangle size={24} aria-hidden="true" />
+        ) : (
+          <Check size={24} aria-hidden="true" />
+        )}
       </span>
 
       <h2 className="mt-4 font-display text-2xl text-white">
-        {outcome.added.length} {t('saved')}
+        {status === 'failure'
+          ? t('nothingSaved')
+          : status === 'partial'
+            ? `${outcome.added.length} ${t('addedLabel')} · ${outcome.failed.length} ${t('needsAttention')}`
+            : `${outcome.added.length} ${t('saved')}`}
       </h2>
       <p className="mt-1 text-sm text-white/60">{outcome.tripTitle}</p>
 
@@ -693,10 +712,21 @@ export function DoneStage({
           {outcome.skipped.length} {t('alreadyThere')}
         </p>
       )}
-      {outcome.failed.length > 0 && (
-        <p role="alert" className="mt-1 text-xs text-amber-200">
-          {outcome.failed.length} {t('couldNotSave')}
-        </p>
+      {/* Phase 13.5: each failed place with its own reason, not a bare count —
+          the backend now classifies why (lib/travel/placeImport.ts's
+          classifyImportFailure) instead of the loop's old bare `catch`. */}
+      {outcome.failedPlaces.length > 0 && (
+        <ul className="mt-3 space-y-1 text-left" aria-label={t('couldNotSave')}>
+          {outcome.failedPlaces.map((place, index) => (
+            <li
+              key={`${place.name}-${index}`}
+              role="alert"
+              className="rounded-card border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200"
+            >
+              {place.message}
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Every place actually written, own row each — not only the "exactly

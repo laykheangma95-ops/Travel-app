@@ -24,9 +24,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
 import { log } from '@/lib/logger';
-import { attachCanonicalPlace, resolvePlaceForTraveler, type RegistryPlace } from '@/lib/places/repository';
+import { disambiguatedName, findMaterializedRow, findNameCollision } from '@/lib/places/addToTrip';
+import { resolvePlaceForTraveler, type PlaceResolution, type RegistryPlace } from '@/lib/places/repository';
 import type { CanonicalPlaceInput } from '@/lib/places/validation';
 import type { PinOrigin } from '@/lib/places/resolutionConfidence';
+import { isUniqueViolation } from '@/lib/supabaseError';
 import type { ItineraryCategory } from './itinerary';
 import { PLACE_DESCRIPTION_MAX, PLACE_NAME_MAX } from './itinerary';
 import { addIdeaToTrip } from './savedPlaces';
@@ -114,6 +116,37 @@ export interface ImportTarget {
   forceNew?: boolean;
 }
 
+/**
+ * Phase 13.5. Why a place did not get saved — never a SQLSTATE, a constraint
+ * name or a uuid, because this reaches the traveler's screen verbatim.
+ * `message` is already the bilingual-safe, human copy; `code` is for a test
+ * or a future "try again differently" branch, not for display.
+ */
+export type ImportFailureCode =
+  /** A concurrent write kept winning the same itinerary slot, even after the
+   *  one bounded retry against a freshly-read position. */
+  | 'itinerary_conflict'
+  /** The traveler already has a different place under this exact name for
+   *  this destination, and it could not be safely told apart from this one. */
+  | 'name_conflict'
+  /** The trip this batch was saving to no longer exists or is not the
+   *  traveler's. */
+  | 'invalid_trip'
+  /** The place resolved to a different country than the trip it was going
+   *  into. */
+  | 'destination_mismatch'
+  /** The database refused the write for a reason that is ours to fix, not
+   *  the traveler's (a constraint the app sent bad data against). */
+  | 'write_failed'
+  | 'unknown';
+
+export interface FailedPlace {
+  name: string;
+  code: ImportFailureCode;
+  /** Human-readable, bilingual-safe. Never a SQLSTATE, constraint name or id. */
+  message: string;
+}
+
 export interface ImportResult {
   tripId: string;
   tripTitle: string;
@@ -122,8 +155,11 @@ export interface ImportResult {
   added: string[];
   /** Names already on this trip. Not an error — a second import of one post. */
   skipped: string[];
-  /** Names that could not be written. Reported, never swallowed. */
+  /** Names that could not be written. Kept for existing callers — derived
+   *  from `failedPlaces`, same relationship `added` has to `addedPlaces`. */
   failed: string[];
+  /** Phase 13.5. One entry per place that could not be saved, WITH why. */
+  failedPlaces: FailedPlace[];
   /**
    * The canonical registry id (migration 013) for the one place this import
    * added, when there was exactly one and it resolved. Null for a multi-place
@@ -210,7 +246,7 @@ export async function importPlacesToTrip(
   // could drift.
   const addedPlaces: AddedPlace[] = [];
   const skipped: string[] = [];
-  const failed: string[] = [];
+  const failedPlaces: FailedPlace[] = [];
 
   for (const place of places) {
     const name = place.name.trim().slice(0, PLACE_NAME_MAX);
@@ -253,9 +289,13 @@ export async function importPlacesToTrip(
       }
       existingNames.add(fold(name));
       addedPlaces.push({ name, destinationPlaceId: placeId, canonicalPlaceId, ...(resolution ? { resolution } : {}) });
-    } catch {
-      // One bad row must not cost the traveler the other eight.
-      failed.push(name);
+    } catch (cause) {
+      // One bad row must not cost the traveler the other eight. The reason IS
+      // kept, though — Phase 13.5: a bare `catch { failed.push(name) }` here is
+      // exactly what turned a classifiable Postgres failure (23505 on a stale
+      // sort_order, or on the owner-name index) into an unexplained "could not
+      // be saved" with nothing in the log to diagnose it from.
+      failedPlaces.push(classifyImportFailure(name, cause));
     }
   }
 
@@ -265,7 +305,8 @@ export async function importPlacesToTrip(
     createdTrip: trip.created,
     added: addedPlaces.map((entry) => entry.name),
     skipped,
-    failed,
+    failed: failedPlaces.map((entry) => entry.name),
+    failedPlaces,
     // Only meaningful for "I imported one place" — the common single-link
     // paste. A multi-place import has no single place a "View place" link
     // could point at, so this stays null rather than picking one arbitrarily.
@@ -274,6 +315,41 @@ export async function importPlacesToTrip(
     addedPlaces,
   };
 }
+
+/**
+ * Turn whatever `insertPlace`/`addIdeaToTrip` threw into a reason the
+ * traveler can actually read. Reads the `reason` an internal `ApiError`
+ * carries in `details` (set at each throw site below and in
+ * lib/travel/savedPlaces.ts) rather than parsing a message string — a string
+ * match breaks the moment somebody rewords a message; a `details.reason`
+ * enum does not. `cause` itself is logged (scrubbed, code/message only, never
+ * details) so a real incident is still diagnosable from the server log even
+ * though the traveler never sees a SQLSTATE.
+ */
+function classifyImportFailure(name: string, cause: unknown): FailedPlace {
+  const reason =
+    cause instanceof ApiError && cause.details && typeof cause.details.reason === 'string'
+      ? (cause.details.reason as ImportFailureCode)
+      : 'unknown';
+
+  log.warn('place_import.save_failed', {
+    reason,
+    apiErrorCode: cause instanceof ApiError ? cause.code : null,
+    message: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
+  });
+
+  const message = IMPORT_FAILURE_COPY[reason] ?? IMPORT_FAILURE_COPY.unknown;
+  return { name, code: reason, message: `${message} (${name})` };
+}
+
+const IMPORT_FAILURE_COPY: Record<ImportFailureCode, string> = {
+  itinerary_conflict: "Domner couldn't find a free spot for this in your itinerary. Try adding it again.",
+  name_conflict: 'You already have a different place saved under this name for this destination.',
+  invalid_trip: 'That trip is no longer available.',
+  destination_mismatch: "This place isn't in the same destination as the trip.",
+  write_failed: "Domner couldn't save this. Please try again.",
+  unknown: "Domner couldn't save this. Please try again.",
+};
 
 interface ResolvedTrip {
   id: string;
@@ -376,6 +452,240 @@ async function tripForDestination(
 }
 
 /**
+ * Round a coordinate to ~1.1m precision (5 decimal places) so two floats
+ * that are "the same pin" after JSON round-tripping compare equal, without
+ * ever being loose enough to call two genuinely different addresses the same
+ * spot. This is NEVER used to decide that two rows describe the same real
+ * place — see the big comment on `insertOrReuseDestinationPlace` below for
+ * why that decision is never made on geometry here — only to make a RETRY of
+ * the identical request mint the same disambiguated name twice, instead of a
+ * fresh one every time.
+ */
+function coordKey(lat: number, lng: number): string {
+  return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+}
+
+/**
+ * A name that will never collide with an unrelated row of the traveler's,
+ * deterministically, for a place whose canonical identity is not yet known.
+ * Keyed on stable evidence about THIS attempt — never on `Date.now()`, which
+ * makes every retry of the identical request mint a brand new row — so that
+ * retrying the same import candidate converges on the same disambiguated
+ * name, and therefore the same row, rather than accumulating duplicates.
+ *
+ *   - real coordinates known: keyed on them (rounded — see `coordKey`).
+ *   - no coordinates at all: there is no stable evidence to key on, so this
+ *     falls back to the next free numbered slot given the rows that already
+ *     exist. Deterministic given the CURRENT state of the table, but not
+ *     retry-safe in the total absence of any evidence — see the caller's own
+ *     note on that honest limitation.
+ */
+function disambiguatedImportName(name: string, place: ImportablePlace, nextSlot: number): string {
+  const suffix =
+    place.lat !== null && place.lng !== null ? ` (${coordKey(place.lat, place.lng)})` : ` (${nextSlot})`;
+  const base = name.slice(0, Math.max(0, PLACE_NAME_MAX - suffix.length));
+  return `${base}${suffix}`;
+}
+
+/**
+ * MEDIUM-1 remediation. `disambiguatedImportName`'s suffix embeds digits, and
+ * migration 017's `create_place_resolution_proposal` requires
+ * `place_name_normalized(destination_places.name)` to still equal the
+ * proposed canonical place's `name_normalized` — a genuine anti-fabrication
+ * check (the RPC is proving the row's OWN material actually looks like the
+ * candidate being proposed, not trusting the caller's word for it), which
+ * this repo's migrations are never edited to relax after they have shipped
+ * (see docs/VERIFICATION.md and CLAUDE.md rule 7/12). So an 'ambiguous'
+ * decision — the one case that DOES call that RPC — needs a disambiguated
+ * name that is STILL, after normalization, the same string as before.
+ *
+ * `place_name_normalized` (migration 013) strips space, tab, CR and LF as
+ * part of its punctuation set — confirmed against the real function, not
+ * assumed. A suffix of nothing but spaces is therefore invisible to it: the
+ * raw string still satisfies `destination_places_owner_name_idx` (UNIQUE on
+ * the RAW name), while the normalized form is untouched.
+ *
+ * Deterministic given the CURRENT count of the traveler's own colliding
+ * rows for this name — the same "next free slot" fallback
+ * `disambiguatedImportName` already uses when there is no coordinate to key
+ * on, carrying the identical honest limitation: a retry that lands after the
+ * first attempt already committed mints a new slot rather than converging
+ * on it. Accepted here for the same reason it already was there — the
+ * alternative (embedding real evidence into a normalization-invisible
+ * alphabet) trades a well-understood, already-documented edge case for a
+ * meaningfully more complex encoding, for a case this table's own migration
+ * already treats as pending/reviewable, not a silent merge.
+ */
+function normalizationSafeDisambiguation(name: string, nextSlot: number): string {
+  const suffix = ' '.repeat(Math.max(1, nextSlot));
+  const base = name.slice(0, Math.max(0, PLACE_NAME_MAX - suffix.length));
+  return `${base}${suffix}`;
+}
+
+/**
+ * Insert the traveler's own `destination_places` row for an imported place,
+ * or reuse an existing one — Phase 13.5, remediated after the principal
+ * engineer review found the original version silently merged two different
+ * real places that happened to share a name (HIGH-1).
+ *
+ * THE INVARIANT: NAME EQUALITY ALONE IS NEVER SUFFICIENT IDENTITY EVIDENCE.
+ * The only thing this function ever treats as proof two rows are the same
+ * place is a MATCHING CANONICAL ID — the identical rule
+ * lib/places/addToTrip.ts's `materializeDestinationPlace` already enforces
+ * for "add to trip" (that big comment: "a same-named row that is unlinked,
+ * or linked to a DIFFERENT canonical place, is never treated as a match").
+ * This function now reuses that module's own `findMaterializedRow` and
+ * `disambiguatedName` rather than a second, looser version of the same idea.
+ *
+ * `canonicalCandidate` is resolved by the CALLER (`insertPlace`, from
+ * `resolveCanonicalCandidate`) BEFORE this runs — reordered from the
+ * previous version, which inserted first and resolved after, and so had no
+ * identity to check a collision against at the one moment it mattered.
+ * `resolvePlaceForTraveler` only ever reads/writes the shared `places`
+ * registry (migration 013), never `destination_places`, so calling it before
+ * this traveler's own row exists changes nothing about what it does.
+ *
+ * WHAT THIS NEVER DOES: reuse a same-name row whose `canonical_place_id` is
+ * NULL just because it is unlinked (case C — the traveler's incoming place
+ * might be a genuinely different real place that has never been resolved
+ * either), and never reuse — or match by proximity — two NULL-canonical rows
+ * against each other by their coordinates (case D: geometry is used only to
+ * keep a RETRY idempotent, in `disambiguatedImportName`, never to prove two
+ * imports are the same place — that proof is the canonical registry's job,
+ * via `resolvePlaceForTraveler`, and nothing here second-guesses it).
+ */
+async function insertOrReuseDestinationPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  destination: string,
+  place: ImportablePlace,
+  canonicalCandidate: string | null,
+  /**
+   * MEDIUM-1. True only when the caller's resolution came back 'ambiguous' —
+   * the one decision that still needs `create_place_resolution_proposal` to
+   * validate this row's name against the proposed candidate's afterward. See
+   * `normalizationSafeDisambiguation`'s own comment for why that changes
+   * which disambiguation suffix is safe to use.
+   */
+  preserveNormalizedName: boolean
+): Promise<{ placeId: string; attachedCanonical: boolean }> {
+  // Case A: the traveler already has a row proven to be this exact canonical
+  // place. Reuse it outright — no insert attempt needed at all, and this is
+  // what makes repeated imports of the same real place converge onto ONE row
+  // (never three), keyed on identity rather than on when the request ran.
+  if (canonicalCandidate) {
+    const materialized = await findMaterializedRow(supabase, userId, canonicalCandidate);
+    if (materialized) return { placeId: materialized, attachedCanonical: true };
+  }
+
+  const baseRow = {
+    destination,
+    category: place.category,
+    // A place with no coordinates simply does not get a map pin, exactly as
+    // in the manual add-place form. Refusing to import it would be the wrong
+    // trade: the name and the note are most of the value.
+    lat: place.lat ?? 0,
+    lng: place.lng ?? 0,
+    description: place.description.slice(0, PLACE_DESCRIPTION_MAX),
+    source: 'ai_generated' as const,
+    created_by: userId,
+    canonical_place_id: canonicalCandidate,
+  };
+
+  const tryInsert = async (name: string) => {
+    const { data, error } = await supabase
+      .from('destination_places')
+      .insert({ ...baseRow, name })
+      .select('id')
+      .single();
+    if (!error && data) return data.id as string;
+    if (!isUniqueViolation(error)) {
+      throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'write_failed' });
+    }
+    return null;
+  };
+
+  const name = place.name.trim().slice(0, PLACE_NAME_MAX);
+  const created = await tryInsert(name);
+  if (created) return { placeId: created, attachedCanonical: canonicalCandidate !== null };
+
+  // Name collision. Case A (a race — someone else's request for this exact
+  // canonical place won and committed between the check above and this
+  // insert) is the ONLY reuse this function ever performs from here on.
+  const collision = await findNameCollision(supabase, userId, destination, name);
+  if (collision && canonicalCandidate && collision.canonicalPlaceId === canonicalCandidate) {
+    return { placeId: collision.id, attachedCanonical: true };
+  }
+
+  // Every other case — collision unlinked, collision linked to a DIFFERENT
+  // canonical place, or this import itself has no canonical candidate yet —
+  // is disambiguated into its own new row. Never reused, never mutated: a
+  // same name proves nothing about identity, so the existing row is left
+  // exactly as it was, and this import's own coordinates, description and
+  // (once resolved) canonical link land on a row of their own.
+  let disambiguated: string;
+  if (canonicalCandidate) {
+    // Same suffix strategy addToTrip.ts already uses for this exact
+    // situation — deterministic on the canonical id, so a retry (or a
+    // concurrent request for the same canonical place) converges on the
+    // same name and is caught by the reuse check below instead of minting a
+    // second row.
+    disambiguated = disambiguatedName(name, canonicalCandidate);
+  } else if (preserveNormalizedName) {
+    const collisions = await countNameCollisions(supabase, userId, destination, name);
+    disambiguated = normalizationSafeDisambiguation(name, collisions + 1);
+  } else {
+    const collisions = await countNameCollisions(supabase, userId, destination, name);
+    disambiguated = disambiguatedImportName(name, place, collisions + 1);
+  }
+
+  const retried = await tryInsert(disambiguated);
+  if (retried) return { placeId: retried, attachedCanonical: canonicalCandidate !== null };
+
+  // The disambiguated name collided too. Only reachable on a genuine race:
+  // two concurrent requests for the SAME identity (canonical id, or the same
+  // rounded coordinates) minting the same disambiguated name at once. One
+  // more reuse check, exactly like addToTrip.ts's own last resort — still
+  // gated on canonical identity, never on the name alone.
+  const afterRace = await findNameCollision(supabase, userId, destination, disambiguated);
+  if (afterRace && canonicalCandidate && afterRace.canonicalPlaceId === canonicalCandidate) {
+    return { placeId: afterRace.id, attachedCanonical: true };
+  }
+
+  throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'name_conflict' });
+}
+
+/**
+ * How many of the traveler's own rows already occupy this name or a
+ * numbered variant of it, for this destination — the next free disambiguation
+ * slot when there is no canonical id and no coordinates to key on instead
+ * (`disambiguatedImportName`'s fallback). Deterministic given the CURRENT
+ * database state, never `Date.now()`; the honest limitation this carries is
+ * documented on `insertOrReuseDestinationPlace`'s caller.
+ */
+async function countNameCollisions(
+  supabase: SupabaseClient,
+  userId: string,
+  destination: string,
+  name: string
+): Promise<number> {
+  // LOW-3. `%` and `_` are ILIKE wildcards; a place literally named e.g.
+  // "100% Coffee" would otherwise match far more rows than actually collide,
+  // inflating the disambiguation slot for no reason. Backslash is Postgres's
+  // default LIKE/ILIKE escape character — escaping the backslash itself
+  // first is what keeps a name that already contains one honest too.
+  const escaped = name.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const { count, error } = await supabase
+    .from('destination_places')
+    .select('id', { count: 'exact', head: true })
+    .eq('created_by', userId)
+    .eq('destination', destination)
+    .ilike('name', `${escaped}%`);
+  if (error) throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'write_failed' });
+  return count ?? 1;
+}
+
+/**
  * A traveler's own catalogue row for an imported place.
  *
  * `created_by` is the caller's id, so migration 009's policies scope it to
@@ -383,6 +693,13 @@ async function tripForDestination(
  * editorial catalogue. `source` is 'ai_generated' — the schema's own word for
  * "not hand-written by us", and the honest label for a name read out of
  * somebody's caption.
+ *
+ * ORDER, Phase 13.5: the canonical registry is now asked BEFORE this
+ * traveler's own `destination_places` row is created or reused — see
+ * `resolveCanonicalCandidate` and `insertOrReuseDestinationPlace` above —
+ * because knowing the identity in advance is what let HIGH-1 be closed: a
+ * collision can now be checked against the ACTUAL incoming identity, instead
+ * of being resolved blind and only found out to be wrong afterward.
  */
 async function insertPlace(
   supabase: SupabaseClient,
@@ -391,80 +708,70 @@ async function insertPlace(
   place: ImportablePlace,
   provenance: { importId: string | null; importCandidateId: string | null }
 ): Promise<{ placeId: string; canonicalPlaceId: string | null; resolution: PlaceResolutionSummary | undefined }> {
-  const { data, error } = await supabase
-    .from('destination_places')
-    .insert({
-      destination,
-      name: place.name,
-      category: place.category,
-      // A place with no coordinates simply does not get a map pin, exactly as
-      // in the manual add-place form. Refusing to import it would be the wrong
-      // trade: the name and the note are most of the value.
-      lat: place.lat ?? 0,
-      lng: place.lng ?? 0,
-      description: place.description.slice(0, PLACE_DESCRIPTION_MAX),
-      source: 'ai_generated',
-      created_by: userId,
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) throw new ApiError('INTERNAL', 'Could not save that place.');
-  const placeId = data.id as string;
-
-  // Registry linking reads `place.lat`/`place.lng` BEFORE the `?? 0` fallback
-  // above — that fallback is a "no map pin" placeholder for destination_places,
-  // never a location, and (0, 0) sent into a 150m proximity search would
-  // silently merge every coordinate-less import from every traveler into one
-  // row at null island. A place with no real coordinates is left unlinked.
-  const linked =
+  // Registry resolution reads `place.lat`/`place.lng` BEFORE the `?? 0`
+  // fallback `insertOrReuseDestinationPlace` uses for the row itself — that
+  // fallback is a "no map pin" placeholder for destination_places, never a
+  // location, and (0, 0) sent into a 150m proximity search would silently
+  // merge every coordinate-less import from every traveler into one row at
+  // null island. A place with no real coordinates is never resolved.
+  const resolution =
     place.lat !== null && place.lng !== null
-      ? await linkCanonicalPlace(
-          supabase,
-          userId,
-          placeId,
-          destination,
-          { ...place, lat: place.lat, lng: place.lng },
-          provenance
-        )
-      : { canonicalPlaceId: null, resolution: undefined };
+      ? await resolveCanonicalCandidate(supabase, userId, destination, { ...place, lat: place.lat, lng: place.lng })
+      : null;
 
-  return { placeId, canonicalPlaceId: linked.canonicalPlaceId, resolution: linked.resolution };
+  // Only a CONFIDENT match is treated as this attempt's identity for the
+  // purpose of deciding destination_places reuse/disambiguation. 'ambiguous'
+  // and 'none' behave exactly like no resolution happened — Phase 13's own
+  // rule, unchanged: an unresolved or undecided identity must never be
+  // "solved" by matching (or attaching to) a same-name row.
+  const canonicalCandidate = resolution?.decision === 'auto' ? resolution.place.id : null;
+
+  const { placeId, attachedCanonical } = await insertOrReuseDestinationPlace(
+    supabase,
+    userId,
+    destination,
+    place,
+    canonicalCandidate,
+    resolution?.decision === 'ambiguous'
+  );
+
+  if (resolution?.decision === 'ambiguous') {
+    const summary = await recordAmbiguousProposal(supabase, placeId, resolution, place, provenance);
+    return { placeId, canonicalPlaceId: null, resolution: summary };
+  }
+
+  return {
+    placeId,
+    canonicalPlaceId: attachedCanonical ? canonicalCandidate : null,
+    resolution: undefined,
+  };
 }
 
 /**
- * Resolve the imported place against the shared canonical registry
- * (migration 013) and point this traveler's row at it, best-effort.
+ * Ask the shared canonical registry (migration 013) what it thinks of this
+ * place, WITHOUT writing anything to `destination_places` — a preview, not a
+ * commit. Phase 13.5: moved ahead of the traveler's own row so that row's
+ * insert/reuse decision can be made with the actual identity in hand, instead
+ * of blind. Safe to call first: `resolvePlaceForTraveler` only ever
+ * reads/writes the shared `places` registry itself (a proximity match, or a
+ * fresh `unverified` row when there is none) — it does not touch, and does
+ * not need, this traveler's own `destination_places` row to exist yet.
  *
- * WHY THIS CAN NEVER FAIL THE SAVE: `place` is already written to
- * `destination_places` by the time this runs. `resolvePlaceForTraveler` and
- * `attachCanonicalPlace` already swallow their own Supabase errors and return
- * null/false rather than throw, but this is wrapped anyway — the same "belt
- * and braces" reasoning `recordPlaceSource`/`markCandidateAccepted` already
- * use below, for the same reason: a bookkeeping/linking step must not turn a
- * successful save into a failed one.
+ * WHY THIS CAN NEVER FAIL THE SAVE: wrapped the same "belt and braces" way
+ * `recordPlaceSource`/`markCandidateAccepted` are — a registry-side lookup
+ * must never turn a successful save into a failed one.
  *
  * WHY THE CALLER'S SESSION CLIENT: resolution must only ever see places this
  * traveler's own RLS already permits (published, or their own unverified
  * rows), and anything it creates must land as `unverified` — the ceiling RLS
  * enforces on that client and nothing here overrides.
  */
-/**
- * Phase 13: `resolvePlaceForTraveler` no longer means "attach whatever it
- * found". `decision === 'ambiguous'` returns a proposal that must NOT be
- * attached — `canonical_place_id` stays null, exactly like an unresolved
- * place, and the caller gets a `resolution` summary to show the traveler
- * instead. Only `decision === 'auto'` (a confident match, or a freshly
- * created row) is attached here.
- */
-async function linkCanonicalPlace(
+async function resolveCanonicalCandidate(
   supabase: SupabaseClient,
   userId: string,
-  destinationPlaceId: string,
   destination: string,
-  place: ImportablePlace & { lat: number; lng: number },
-  provenance: { importId: string | null; importCandidateId: string | null }
-): Promise<{ canonicalPlaceId: string | null; resolution: PlaceResolutionSummary | undefined }> {
+  place: ImportablePlace & { lat: number; lng: number }
+): Promise<PlaceResolution | null> {
   try {
     const input: CanonicalPlaceInput = {
       name: place.name,
@@ -480,75 +787,83 @@ async function linkCanonicalPlace(
     const pinOrigin: PinOrigin =
       place.pinSource === 'maps-link' ? 'maps-link' : place.pinSource ? 'geocoder' : 'unknown';
 
-    const resolution = await resolvePlaceForTraveler(supabase, userId, input, {
+    return await resolvePlaceForTraveler(supabase, userId, input, {
       pinOrigin,
       geocoderResultCount: place.geocodeResultCount ?? null,
       geocoderCountryMismatch: place.geocodeCountryMismatch ?? null,
     });
-    if (!resolution) return { canonicalPlaceId: null, resolution: undefined };
-
-    if (resolution.decision === 'auto') {
-      // The returned id must mean "this row is actually linked", not "a
-      // resolution merely happened" — a failed write here must not make
-      // ImportResult.canonicalPlaceId claim a link destination_places itself
-      // does not have.
-      const attached = await attachCanonicalPlace(supabase, destinationPlaceId, resolution.place.id);
-      return {
-        canonicalPlaceId: attached ? resolution.place.id : null,
-        resolution: undefined,
-      };
-    }
-
-    if (resolution.decision === 'ambiguous') {
-      // ── The proposal is RECORDED before it is shown ───────────────────────
-      //
-      // The Phase 13 review proved what happens when it is not: the confirm
-      // route re-derived the proposal from the destination_places row, could
-      // not see how the pin had been obtained, scored it 1.25x higher without
-      // the geocoder penalty, and answered "no-proposal" to a card the
-      // traveler was looking at.
-      //
-      // So the ambiguous proposal becomes a `pending` row here, and the
-      // DATABASE computes its confidence and signals (migration 017's
-      // create_place_resolution_proposal). What the screen renders below is
-      // read back out of that row, so the number shown and the number stored
-      // are not two computations that have to agree — they are one value.
-      const recorded = await recordProposal(supabase, {
-        destinationPlaceId,
-        proposedPlaceId: resolution.place.id,
-        alternativePlaceIds: resolution.alternatives.map((a) => a.place.id),
-        pinOrigin,
-        geocoderResultCount: place.geocodeResultCount ?? null,
-        geocoderCountryMismatch: place.geocodeCountryMismatch ?? null,
-        importId: provenance.importId,
-        importCandidateId: provenance.importCandidateId,
-      });
-
-      // A proposal that could not be recorded is not shown. Asking a question
-      // whose answer has nowhere to land would put the traveler back in
-      // exactly the dead-button state this remediation exists to remove.
-      if (!recorded) return { canonicalPlaceId: null, resolution: undefined };
-
-      return {
-        canonicalPlaceId: null,
-        resolution: {
-          decision: 'ambiguous',
-          confidence: recorded.confidence,
-          resolverVersion: recorded.resolverVersion,
-          proposed: toCandidateSummary(resolution.place, recorded.distanceMeters),
-          alternatives: resolution.alternatives.map((a) => toCandidateSummary(a.place, a.meters)),
-        },
-      };
-    }
-
-    // 'none' — not enough evidence to link OR to ask. Behaves exactly like an
-    // unresolved place.
-    return { canonicalPlaceId: null, resolution: undefined };
   } catch (cause) {
     log.warn('place_import.registry_link_failed', {
       reason: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
     });
-    return { canonicalPlaceId: null, resolution: undefined };
+    return null;
+  }
+}
+
+/**
+ * Record an 'ambiguous' proposal against the traveler's own (already
+ * created) `destination_places` row. Phase 13's rule, unchanged by Phase
+ * 13.5: `canonical_place_id` stays null — this is never a link, only a
+ * question — and the row this proposal is recorded against is now always a
+ * FRESHLY created or provably-reused-by-identity row (never a same-name row
+ * this function's caller merely guessed was the same place), so there is
+ * never a risk of a second proposal landing on a row that already has one.
+ */
+async function recordAmbiguousProposal(
+  supabase: SupabaseClient,
+  destinationPlaceId: string,
+  resolution: PlaceResolution,
+  place: ImportablePlace,
+  provenance: { importId: string | null; importCandidateId: string | null }
+): Promise<PlaceResolutionSummary | undefined> {
+  try {
+    // Same derivation `resolveCanonicalCandidate` used to produce the
+    // resolution being recorded here — never re-guessed from the resolution
+    // itself, always from the place, so shown and stored agree.
+    const pinOrigin: PinOrigin =
+      place.pinSource === 'maps-link' ? 'maps-link' : place.pinSource ? 'geocoder' : 'unknown';
+
+    // ── The proposal is RECORDED before it is shown ───────────────────────
+    //
+    // The Phase 13 review proved what happens when it is not: the confirm
+    // route re-derived the proposal from the destination_places row, could
+    // not see how the pin had been obtained, scored it 1.25x higher without
+    // the geocoder penalty, and answered "no-proposal" to a card the
+    // traveler was looking at.
+    //
+    // So the ambiguous proposal becomes a `pending` row here, and the
+    // DATABASE computes its confidence and signals (migration 017's
+    // create_place_resolution_proposal). What the screen renders below is
+    // read back out of that row, so the number shown and the number stored
+    // are not two computations that have to agree — they are one value.
+    const recorded = await recordProposal(supabase, {
+      destinationPlaceId,
+      proposedPlaceId: resolution.place.id,
+      alternativePlaceIds: resolution.alternatives.map((a) => a.place.id),
+      pinOrigin,
+      geocoderResultCount: place.geocodeResultCount ?? null,
+      geocoderCountryMismatch: place.geocodeCountryMismatch ?? null,
+      importId: provenance.importId,
+      importCandidateId: provenance.importCandidateId,
+    });
+
+    // A proposal that could not be recorded is not shown. Asking a question
+    // whose answer has nowhere to land would put the traveler back in
+    // exactly the dead-button state this remediation exists to remove.
+    if (!recorded) return undefined;
+
+    return {
+      decision: 'ambiguous',
+      confidence: recorded.confidence,
+      resolverVersion: recorded.resolverVersion,
+      proposed: toCandidateSummary(resolution.place, recorded.distanceMeters),
+      alternatives: resolution.alternatives.map((a) => toCandidateSummary(a.place, a.meters)),
+    };
+  } catch (cause) {
+    log.warn('place_import.registry_link_failed', {
+      reason: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
+    });
+    return undefined;
   }
 }
 

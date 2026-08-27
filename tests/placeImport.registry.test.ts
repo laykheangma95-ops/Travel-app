@@ -90,28 +90,43 @@ describe('a place with real coordinates gets linked', () => {
 });
 
 describe('deduplication through the real save path', () => {
-  it('the same traveler importing the same real place twice resolves to one canonical row', async () => {
+  it('the same traveler importing the same real place twice, spelled differently, converges onto ONE destination_places row', async () => {
+    // Phase 13.5 remediation (HIGH-1 review): canonical resolution now runs
+    // BEFORE the traveler's own destination_places row is created, so a
+    // second import that resolves to the SAME canonical place reuses the
+    // traveler's existing row for it (lib/places/addToTrip.ts's own
+    // findMaterializedRow, case A: "existing row's canonical id === incoming
+    // canonical id → safe reuse") REGARDLESS of the raw spelling — it is
+    // never blocked by `destination_places_owner_name_idx`, because it never
+    // even attempts a second insert once the canonical match is known.
+    //
+    // Before this remediation, resolution ran AFTER insert, so a different
+    // spelling always got its own row first and was only linked to the same
+    // canonical place afterward — two rows, one canonical id. That was a
+    // side effect of the old ordering, not a deliberate design requirement;
+    // one row per real place per traveler is the better outcome, and it is
+    // what the new ordering naturally produces.
     const alice = harness.clientFor(ALICE);
 
     await importPlacesToTrip(alice, ALICE, [WAT_PHO], { destination: 'Thailand' });
-    // A different literal spelling: migration 009's destination_places_owner_
-    // name_idx forbids one owner writing the exact same (destination, name)
-    // twice, so "the same place, spelled differently" — the realistic case a
-    // second link about one place actually produces — is what is exercised
-    // here. forceNew also puts it on a second trip, so the trip-level
-    // "already have this name" skip (a separate, pre-existing mechanism) does
-    // not short-circuit the save before the registry ever sees it.
-    await importPlacesToTrip(alice, ALICE, [{ ...WAT_PHO, name: 'WAT PHO!!' }], {
+    // forceNew puts it on a second trip, so the trip-level "already have this
+    // name" skip (a separate, pre-existing mechanism) does not short-circuit
+    // the save before the registry ever sees it.
+    const second = await importPlacesToTrip(alice, ALICE, [{ ...WAT_PHO, name: 'WAT PHO!!' }], {
       destination: 'Thailand',
       forceNew: true,
     });
+    expect(second.failed).toEqual([]);
 
     const places = await harness.rows('places');
     expect(places).toHaveLength(1);
 
     const destRows = await harness.rows('destination_places');
-    expect(destRows).toHaveLength(2);
-    expect(destRows[0].canonical_place_id).toBe(destRows[1].canonical_place_id);
+    expect(destRows).toHaveLength(1);
+    expect(destRows[0].canonical_place_id).toBe(places[0].id);
+    // The traveler's ORIGINAL row and spelling — never overwritten by the
+    // second attempt's differently-spelled name.
+    expect(destRows[0].name).toBe('Wat Pho');
   });
 
   it('a hundred travelers land on one row, once it is published', async () => {

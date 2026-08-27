@@ -67,8 +67,14 @@ export type AddPlaceToTripResult =
  * and folds them onto one `places` row. `.maybeSingle()` would throw on that
  * second row (PostgREST's PGRST116, "multiple rows returned"); `.limit(1)`
  * with an explicit read of the first row degrades correctly instead.
+ *
+ * Exported for lib/travel/placeImport.ts's `insertOrReuseDestinationPlace` —
+ * Phase 13.5's remediation for the wrong-place merge finding. Reuse there is
+ * held to the SAME rule this file already enforces: a row is only ever
+ * reused when it is PROVABLY the requested canonical place, via this exact
+ * lookup, never a second one built to a looser standard.
  */
-async function findMaterializedRow(
+export async function findMaterializedRow(
   supabase: SupabaseClient,
   userId: string,
   canonicalPlaceId: string
@@ -90,7 +96,13 @@ async function findMaterializedRow(
  * destination, name), migration 009 — so at most one row can ever match.
  * `.maybeSingle()` is provably safe here, unlike the lookup above.
  */
-async function findNameCollision(
+/**
+ * Exported for lib/travel/placeImport.ts's `insertPlace`, which hits the same
+ * `destination_places_owner_name_idx` collision on a plain name (no canonical
+ * id to disambiguate by yet) and needs the identical lookup — never a second,
+ * slightly different query against the same unique index (rule 9/11).
+ */
+export async function findNameCollision(
   supabase: SupabaseClient,
   userId: string,
   destination: string,
@@ -117,8 +129,12 @@ async function findNameCollision(
  * randomness — so a retried request, or two concurrent requests, for the
  * SAME canonical place converge on the SAME disambiguated name and therefore
  * the SAME row, rather than each attempt minting a new one.
+ *
+ * Exported for lib/travel/placeImport.ts's `insertOrReuseDestinationPlace` —
+ * the SAME suffix strategy, not a second one, for the same canonical-id
+ * collision this file already solved (Phase 13.5).
  */
-function disambiguatedName(name: string, canonicalPlaceId: string): string {
+export function disambiguatedName(name: string, canonicalPlaceId: string): string {
   const suffix = ` (${canonicalPlaceId.slice(0, 8)})`;
   const base = name.slice(0, Math.max(0, PLACE_NAME_MAX - suffix.length));
   return `${base}${suffix}`;
