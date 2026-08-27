@@ -24,9 +24,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from '@/lib/http';
 import { log } from '@/lib/logger';
+import { findNameCollision } from '@/lib/places/addToTrip';
 import { attachCanonicalPlace, resolvePlaceForTraveler, type RegistryPlace } from '@/lib/places/repository';
 import type { CanonicalPlaceInput } from '@/lib/places/validation';
 import type { PinOrigin } from '@/lib/places/resolutionConfidence';
+import { isUniqueViolation } from '@/lib/supabaseError';
 import type { ItineraryCategory } from './itinerary';
 import { PLACE_DESCRIPTION_MAX, PLACE_NAME_MAX } from './itinerary';
 import { addIdeaToTrip } from './savedPlaces';
@@ -114,6 +116,37 @@ export interface ImportTarget {
   forceNew?: boolean;
 }
 
+/**
+ * Phase 13.5. Why a place did not get saved — never a SQLSTATE, a constraint
+ * name or a uuid, because this reaches the traveler's screen verbatim.
+ * `message` is already the bilingual-safe, human copy; `code` is for a test
+ * or a future "try again differently" branch, not for display.
+ */
+export type ImportFailureCode =
+  /** A concurrent write kept winning the same itinerary slot, even after the
+   *  one bounded retry against a freshly-read position. */
+  | 'itinerary_conflict'
+  /** The traveler already has a different place under this exact name for
+   *  this destination, and it could not be safely told apart from this one. */
+  | 'name_conflict'
+  /** The trip this batch was saving to no longer exists or is not the
+   *  traveler's. */
+  | 'invalid_trip'
+  /** The place resolved to a different country than the trip it was going
+   *  into. */
+  | 'destination_mismatch'
+  /** The database refused the write for a reason that is ours to fix, not
+   *  the traveler's (a constraint the app sent bad data against). */
+  | 'write_failed'
+  | 'unknown';
+
+export interface FailedPlace {
+  name: string;
+  code: ImportFailureCode;
+  /** Human-readable, bilingual-safe. Never a SQLSTATE, constraint name or id. */
+  message: string;
+}
+
 export interface ImportResult {
   tripId: string;
   tripTitle: string;
@@ -122,8 +155,11 @@ export interface ImportResult {
   added: string[];
   /** Names already on this trip. Not an error — a second import of one post. */
   skipped: string[];
-  /** Names that could not be written. Reported, never swallowed. */
+  /** Names that could not be written. Kept for existing callers — derived
+   *  from `failedPlaces`, same relationship `added` has to `addedPlaces`. */
   failed: string[];
+  /** Phase 13.5. One entry per place that could not be saved, WITH why. */
+  failedPlaces: FailedPlace[];
   /**
    * The canonical registry id (migration 013) for the one place this import
    * added, when there was exactly one and it resolved. Null for a multi-place
@@ -210,7 +246,7 @@ export async function importPlacesToTrip(
   // could drift.
   const addedPlaces: AddedPlace[] = [];
   const skipped: string[] = [];
-  const failed: string[] = [];
+  const failedPlaces: FailedPlace[] = [];
 
   for (const place of places) {
     const name = place.name.trim().slice(0, PLACE_NAME_MAX);
@@ -253,9 +289,13 @@ export async function importPlacesToTrip(
       }
       existingNames.add(fold(name));
       addedPlaces.push({ name, destinationPlaceId: placeId, canonicalPlaceId, ...(resolution ? { resolution } : {}) });
-    } catch {
-      // One bad row must not cost the traveler the other eight.
-      failed.push(name);
+    } catch (cause) {
+      // One bad row must not cost the traveler the other eight. The reason IS
+      // kept, though — Phase 13.5: a bare `catch { failed.push(name) }` here is
+      // exactly what turned a classifiable Postgres failure (23505 on a stale
+      // sort_order, or on the owner-name index) into an unexplained "could not
+      // be saved" with nothing in the log to diagnose it from.
+      failedPlaces.push(classifyImportFailure(name, cause));
     }
   }
 
@@ -265,7 +305,8 @@ export async function importPlacesToTrip(
     createdTrip: trip.created,
     added: addedPlaces.map((entry) => entry.name),
     skipped,
-    failed,
+    failed: failedPlaces.map((entry) => entry.name),
+    failedPlaces,
     // Only meaningful for "I imported one place" — the common single-link
     // paste. A multi-place import has no single place a "View place" link
     // could point at, so this stays null rather than picking one arbitrarily.
@@ -274,6 +315,41 @@ export async function importPlacesToTrip(
     addedPlaces,
   };
 }
+
+/**
+ * Turn whatever `insertPlace`/`addIdeaToTrip` threw into a reason the
+ * traveler can actually read. Reads the `reason` an internal `ApiError`
+ * carries in `details` (set at each throw site below and in
+ * lib/travel/savedPlaces.ts) rather than parsing a message string — a string
+ * match breaks the moment somebody rewords a message; a `details.reason`
+ * enum does not. `cause` itself is logged (scrubbed, code/message only, never
+ * details) so a real incident is still diagnosable from the server log even
+ * though the traveler never sees a SQLSTATE.
+ */
+function classifyImportFailure(name: string, cause: unknown): FailedPlace {
+  const reason =
+    cause instanceof ApiError && cause.details && typeof cause.details.reason === 'string'
+      ? (cause.details.reason as ImportFailureCode)
+      : 'unknown';
+
+  log.warn('place_import.save_failed', {
+    reason,
+    apiErrorCode: cause instanceof ApiError ? cause.code : null,
+    message: cause instanceof Error ? cause.message.slice(0, 160) : 'unknown',
+  });
+
+  const message = IMPORT_FAILURE_COPY[reason] ?? IMPORT_FAILURE_COPY.unknown;
+  return { name, code: reason, message: `${message} (${name})` };
+}
+
+const IMPORT_FAILURE_COPY: Record<ImportFailureCode, string> = {
+  itinerary_conflict: "Domner couldn't find a free spot for this in your itinerary. Try adding it again.",
+  name_conflict: 'You already have a different place saved under this name for this destination.',
+  invalid_trip: 'That trip is no longer available.',
+  destination_mismatch: "This place isn't in the same destination as the trip.",
+  write_failed: "Domner couldn't save this. Please try again.",
+  unknown: "Domner couldn't save this. Please try again.",
+};
 
 interface ResolvedTrip {
   id: string;
@@ -376,6 +452,90 @@ async function tripForDestination(
 }
 
 /**
+ * Insert the traveler's own `destination_places` row for an imported place,
+ * or reuse an existing one on a `destination_places_owner_name_idx` collision
+ * — Phase 13.5.
+ *
+ * WHY A COLLISION IS EXPECTED HERE, UNLIKE addToTrip.ts: that module always
+ * has a canonical place in hand before it inserts, so it can compare a
+ * collision's `canonical_place_id` against the one it is trying to file and
+ * either reuse (same identity) or disambiguate (different identity) with
+ * certainty. The importer inserts BEFORE canonical resolution has run — this
+ * is the row resolution reads coordinates from — so at insert time there is
+ * no canonical id to compare a collision against.
+ *
+ * So the rule here is narrower, and deliberately conservative:
+ *   - a collision row with NO canonical link yet (`canonical_place_id IS
+ *     NULL`) has no established identity to contradict, so it is reused.
+ *     This is also exactly what heals the orphan rows Phase 13.5 found:
+ *     `destination_places_owner_name_idx` blocked every future import of a
+ *     name after any earlier `addIdeaToTrip` failure had left one behind —
+ *     that orphan is precisely a same-name, unlinked row.
+ *   - a collision row that IS already linked to a canonical place is never
+ *     reused and never mutated — this import might be a different real place
+ *     that merely typed the same name — so a disambiguated row is inserted
+ *     instead, the same shape lib/places/addToTrip.ts's `disambiguatedName`
+ *     produces, just keyed on this attempt rather than on a canonical id this
+ *     function does not have.
+ */
+async function insertOrReuseDestinationPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  destination: string,
+  place: ImportablePlace
+): Promise<string> {
+  const row = {
+    destination,
+    name: place.name,
+    category: place.category,
+    // A place with no coordinates simply does not get a map pin, exactly as
+    // in the manual add-place form. Refusing to import it would be the wrong
+    // trade: the name and the note are most of the value.
+    lat: place.lat ?? 0,
+    lng: place.lng ?? 0,
+    description: place.description.slice(0, PLACE_DESCRIPTION_MAX),
+    source: 'ai_generated' as const,
+    created_by: userId,
+  };
+
+  const { data, error } = await supabase.from('destination_places').insert(row).select('id').single();
+  if (!error && data) return data.id as string;
+
+  if (!isUniqueViolation(error)) {
+    throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'write_failed' });
+  }
+
+  const collision = await findNameCollision(supabase, userId, destination, place.name);
+  if (collision && collision.canonicalPlaceId === null) {
+    return collision.id;
+  }
+
+  // Either no row was found (a race — the collision cleared between the
+  // insert failing and this lookup) or it is already claimed by a different
+  // canonical place. Either way, a plain retry of the same name would just
+  // collide again, so this is disambiguated the same way addToTrip.ts
+  // disambiguates: a name that cannot collide with the existing row.
+  const disambiguated = `${place.name.slice(0, Math.max(0, PLACE_NAME_MAX - 10))} (${Date.now().toString(36).slice(-6)})`;
+  const { data: retried, error: retryError } = await supabase
+    .from('destination_places')
+    .insert({ ...row, name: disambiguated })
+    .select('id')
+    .single();
+  if (!retryError && retried) return retried.id as string;
+
+  // The disambiguated name collided too. Only reachable on a genuine race
+  // (two concurrent imports minting the same disambiguated suffix in the
+  // same millisecond) — one more reuse check before giving up honestly,
+  // exactly like addToTrip.ts's own last resort.
+  if (isUniqueViolation(retryError)) {
+    const afterRace = await findNameCollision(supabase, userId, destination, disambiguated);
+    if (afterRace) return afterRace.id;
+  }
+
+  throw new ApiError('INTERNAL', 'Could not save that place.', { reason: 'name_conflict' });
+}
+
+/**
  * A traveler's own catalogue row for an imported place.
  *
  * `created_by` is the caller's id, so migration 009's policies scope it to
@@ -391,26 +551,7 @@ async function insertPlace(
   place: ImportablePlace,
   provenance: { importId: string | null; importCandidateId: string | null }
 ): Promise<{ placeId: string; canonicalPlaceId: string | null; resolution: PlaceResolutionSummary | undefined }> {
-  const { data, error } = await supabase
-    .from('destination_places')
-    .insert({
-      destination,
-      name: place.name,
-      category: place.category,
-      // A place with no coordinates simply does not get a map pin, exactly as
-      // in the manual add-place form. Refusing to import it would be the wrong
-      // trade: the name and the note are most of the value.
-      lat: place.lat ?? 0,
-      lng: place.lng ?? 0,
-      description: place.description.slice(0, PLACE_DESCRIPTION_MAX),
-      source: 'ai_generated',
-      created_by: userId,
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) throw new ApiError('INTERNAL', 'Could not save that place.');
-  const placeId = data.id as string;
+  const placeId = await insertOrReuseDestinationPlace(supabase, userId, destination, place);
 
   // Registry linking reads `place.lat`/`place.lng` BEFORE the `?? 0` fallback
   // above — that fallback is a "no map pin" placeholder for destination_places,

@@ -13,7 +13,7 @@
 // lib/travel/itinerary.ts's placeDetailHref.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { AddedPlace } from './placeImport';
+import type { AddedPlace, FailedPlace } from './placeImport';
 
 /** What POST /api/travel/places/import always returns, whichever flow called it. */
 export interface ImportOutcome {
@@ -23,6 +23,8 @@ export interface ImportOutcome {
   added: string[];
   skipped: string[];
   failed: string[];
+  /** Phase 13.5. One entry per place that could not be saved, with why. */
+  failedPlaces: FailedPlace[];
   /** The one added place's canonical registry id, when there was one. See lib/travel/placeImport.ts. */
   canonicalPlaceId: string | null;
   /** One entry per added place, own id included — and, since Phase 13, an
@@ -41,4 +43,26 @@ export function viewPlaceHref(outcome: ImportOutcome): string | null {
   return outcome.added.length === 1 && outcome.canonicalPlaceId
     ? `/place/${outcome.canonicalPlaceId}`
     : null;
+}
+
+/**
+ * Phase 13.5. What the "saved" screen's headline state actually is — the
+ * decision `DoneStage` renders from rather than assuming a batch that ran
+ * always ended in success. Before this, the screen showed the same green
+ * check and tick for `added.length === 0` as for a full batch: the traveler
+ * saw "0 Saved to your trip" under a success icon.
+ *
+ *   'success' — every place that was not already on the trip got saved.
+ *   'partial' — at least one saved, at least one did not.
+ *   'failure' — nothing was saved, and at least one place failed.
+ *
+ * A batch that was ENTIRELY `skipped` (every place was already on the trip,
+ * nothing failed) is 'success' — nothing went wrong, there was simply nothing
+ * new to do.
+ */
+export type ImportOutcomeStatus = 'success' | 'partial' | 'failure';
+
+export function importOutcomeStatus(outcome: ImportOutcome): ImportOutcomeStatus {
+  if (outcome.failed.length === 0) return 'success';
+  return outcome.added.length > 0 ? 'partial' : 'failure';
 }

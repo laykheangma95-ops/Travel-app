@@ -44,6 +44,11 @@ export const COPY = {
   edit: { en: 'Edit', km: 'កែ' },
   done: { en: 'Done', km: 'រួចរាល់' },
   saved: { en: 'Saved to your trip', km: 'បានរក្សាទុកទៅដំណើររបស់អ្នក' },
+  // Phase 13.5 — DoneStage no longer shows the same headline for zero, some
+  // and all saved. See lib/travel/importOutcome.ts's importOutcomeStatus.
+  nothingSaved: { en: 'Nothing was saved', km: 'គ្មានអ្វីត្រូវបានរក្សាទុកទេ' },
+  addedLabel: { en: 'added', km: 'បានបន្ថែម' },
+  needsAttention: { en: 'needs attention', km: 'ត្រូវការការយកចិត្តទុកដាក់' },
   viewPlace: { en: 'View place', km: 'មើលទីតាំង' },
   openTrip: { en: 'Open the trip', km: 'បើកដំណើរ' },
   openItinerary: { en: 'Open the itinerary', km: 'បើកកម្មវិធីដំណើរ' },

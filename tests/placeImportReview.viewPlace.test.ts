@@ -20,6 +20,7 @@ function outcome(overrides: Partial<ImportOutcome> = {}): ImportOutcome {
     added: ['Wat Pho'],
     skipped: [],
     failed: [],
+    failedPlaces: [],
     canonicalPlaceId: null,
     addedPlaces: [
       { name: 'Wat Pho', destinationPlaceId: '30000000-0000-4000-8000-000000000003', canonicalPlaceId: null },

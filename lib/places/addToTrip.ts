@@ -90,7 +90,13 @@ async function findMaterializedRow(
  * destination, name), migration 009 — so at most one row can ever match.
  * `.maybeSingle()` is provably safe here, unlike the lookup above.
  */
-async function findNameCollision(
+/**
+ * Exported for lib/travel/placeImport.ts's `insertPlace`, which hits the same
+ * `destination_places_owner_name_idx` collision on a plain name (no canonical
+ * id to disambiguate by yet) and needs the identical lookup — never a second,
+ * slightly different query against the same unique index (rule 9/11).
+ */
+export async function findNameCollision(
   supabase: SupabaseClient,
   userId: string,
   destination: string,

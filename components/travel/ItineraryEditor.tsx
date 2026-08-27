@@ -70,6 +70,25 @@ import { cn } from '@/lib/utils';
 type Tab = 'summary' | 'ideas' | string;
 type PickerFilter = 'all' | 'stay' | 'transport' | 'saved' | 'mine';
 
+/**
+ * The wire shape GET /api/travel/places/saved returns — the same one
+ * app/you/saved/page.tsx already reads, kept as its own local interface here
+ * for the same reason that page does not export its: neither file is a
+ * shared module, so each names the response shape it actually consumes
+ * rather than the two importing a third file to save five lines.
+ */
+interface LibraryPlace {
+  savedId: string;
+  placeId: string;
+  name: string;
+  localName: string | null;
+  countryName: string;
+  city: string | null;
+  category: ItineraryCategory;
+  address: string | null;
+  saveCount: number;
+}
+
 const CATEGORIES: ItineraryCategory[] = ['spot', 'food', 'shopping', 'transport', 'stay', 'other'];
 
 /**
@@ -94,6 +113,12 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
   const [busy, setBusy] = useState(false);
   const [journey, setJourney] = useState<RoutedJourney | null>(null);
   const [routeState, setRouteState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  // Phase 13.5. The picker's "Saved" tab reads the traveler's GLOBAL
+  // saved_places library (the same one /you/saved reads) — never the trip's
+  // own Ideas list, which is what it silently read before. See
+  // components/travel/ItineraryEditor.tsx's AddPlaceSheet below.
+  const [libraryPlaces, setLibraryPlaces] = useState<LibraryPlace[] | null>(null);
+  const [libraryState, setLibraryState] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const request = useCallback(
     async (body?: Record<string, unknown>) => {
@@ -187,6 +212,34 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
     return () => controller.abort();
   }, [routeDay]);
 
+  // Fetched once per sheet-open, not once per keystroke on the "Saved" filter
+  // chip: the picker sheet is the only place this list is used, so there is
+  // nothing to gain from fetching it before the traveler opens "Add a place".
+  useEffect(() => {
+    if (!picker || libraryPlaces !== null || libraryState === 'loading') return;
+    const destination = data?.trip.destination;
+    if (!destination) return;
+    const controller = new AbortController();
+    setLibraryState('loading');
+    fetch(`/api/travel/places/saved?destination=${encodeURIComponent(destination)}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('library unavailable');
+        return response.json() as Promise<{ places: LibraryPlace[] }>;
+      })
+      .then((result) => {
+        setLibraryPlaces(result.places);
+        setLibraryState('idle');
+      })
+      .catch((cause) => {
+        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        setLibraryState('error');
+      });
+    return () => controller.abort();
+  }, [picker, data?.trip.destination, libraryPlaces, libraryState]);
+
   if (loadState === 'loading') return <EditorSkeleton />;
 
   if (loadState === 'error' || !data) {
@@ -231,6 +284,53 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
         ? await mutate({ action: 'addIdea', placeId: place.id })
         : await mutate({ action: 'addPlace', dayId: active.id, placeId: place.id });
     if (result) setPicker(false);
+  };
+
+  /**
+   * Add a place from the traveler's global saved_places library onto this
+   * trip. NOT `mutate()` — this is a different route (`/api/travel/places/
+   * :id/add-to-trip`, lib/places/addToTrip.ts), because the library holds
+   * CANONICAL place ids (migration 013's `places`), not `destination_places`
+   * ids the itinerary PATCH route's actions take. Reusing that route rather
+   * than a new one is rule 9/11 — it already does exactly this (materialize
+   * the traveler's own `destination_places` row, then file it into Ideas)
+   * for /you/saved's own AddToTripButton.
+   *
+   * Lands in Ideas, same as every other add-to-trip entry point — there is no
+   * route today that can place a canonical library place directly onto a
+   * scheduled day, and adding one is a bigger change than this phase scopes.
+   * Never touches saved_places: adding to a trip is not the same act as
+   * hearting one, and must not create or remove a library row.
+   */
+  const addFromLibrary = async (place: LibraryPlace) => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/travel/places/${place.placeId}/add-to-trip`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tripId }),
+      });
+      const body = (await response.json().catch(() => null)) as { status?: string; error?: { message?: string } } | null;
+      if (!response.ok || body?.status !== 'added') {
+        throw new Error(body?.error?.message ?? '');
+      }
+      await request();
+      setNotice(mutationSuccess('addIdea', lang));
+      setPicker(false);
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message
+          ? cause.message
+          : lang === 'km'
+            ? 'មិនអាចបន្ថែមទីតាំងនេះបានទេ។'
+            : 'Could not add that place.'
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const addCustom = async (draft: CustomDraft) => {
@@ -418,10 +518,22 @@ export function ItineraryEditor({ tripId }: { tripId: string }) {
           targetLabel={targetLabel || (lang === 'km' ? 'គំនិត' : 'Ideas')}
           tripId={tripId}
           places={data.curatedPlaces}
-          savedPlaceIds={data.ideas.map((item) => item.place_id)}
+          libraryPlaces={libraryPlaces}
+          libraryState={libraryState}
+          // Canonical ids already somewhere on this trip (any day, not just
+          // Ideas) — so a library place already added shows that, rather than
+          // offering to add a second copy.
+          libraryOnTripIds={new Set(
+            data.days
+              .flatMap((day) => day.places)
+              .concat(data.ideas)
+              .map((item) => item.place.canonical_place_id)
+              .filter((id): id is string => id !== null)
+          )}
           busy={busy}
           onAdd={addExisting}
           onAddCustom={addCustom}
+          onAddFromLibrary={addFromLibrary}
           onClose={() => setPicker(false)}
         />
       )}
@@ -820,19 +932,27 @@ function AddPlaceSheet({
   targetLabel,
   tripId,
   places,
-  savedPlaceIds,
+  libraryPlaces,
+  libraryState,
+  libraryOnTripIds,
   busy,
   onAdd,
   onAddCustom,
+  onAddFromLibrary,
   onClose,
 }: {
   targetLabel: string;
   tripId: string;
   places: CuratedPlace[];
-  savedPlaceIds: string[];
+  /** The traveler's global saved_places library, scoped to this trip's
+   *  destination. Null while it has not loaded yet. */
+  libraryPlaces: LibraryPlace[] | null;
+  libraryState: 'idle' | 'loading' | 'error';
+  libraryOnTripIds: Set<string>;
   busy: boolean;
   onAdd: (place: CuratedPlace) => void;
   onAddCustom: (draft: CustomDraft) => void;
+  onAddFromLibrary: (place: LibraryPlace) => void;
   onClose: () => void;
 }) {
   const { lang } = useLang();
@@ -905,16 +1025,28 @@ function AddPlaceSheet({
   ];
 
   const matching = useMemo(() => {
+    // 'saved' has its own list below, sourced from libraryPlaces rather than
+    // the destination's curated catalogue — this filter must not also show
+    // curated results underneath it.
+    if (filter === 'saved') return [];
     const needle = query.trim().toLowerCase();
     return places.filter((place) => {
       if (needle && !`${place.name} ${place.description}`.toLowerCase().includes(needle)) return false;
       if (filter === 'stay') return place.category === 'stay';
       if (filter === 'transport') return place.category === 'transport';
-      if (filter === 'saved') return savedPlaceIds.includes(place.id);
       if (filter === 'mine') return place.created_by !== null;
       return true;
     });
-  }, [places, query, filter, savedPlaceIds]);
+  }, [places, query, filter]);
+
+  const matchingLibrary = useMemo(() => {
+    if (filter !== 'saved' || !libraryPlaces) return [];
+    const needle = query.trim().toLowerCase();
+    return libraryPlaces.filter((place) => {
+      if (!needle) return true;
+      return `${place.name} ${place.address ?? ''}`.toLowerCase().includes(needle);
+    });
+  }, [filter, libraryPlaces, query]);
 
   const submitCustom = (event: FormEvent) => {
     event.preventDefault();
@@ -991,7 +1123,13 @@ function AddPlaceSheet({
                 >
                   {linkBusy
                     ? lang === 'km' ? 'កំពុងអាន…' : 'Reading…'
-                    : lang === 'km' ? 'ប្រើតំណនេះ' : 'Use this link'}
+                    // Phase 13.5: this button reads the link and fills the form
+                    // below — it never saves anything by itself. "Add it"
+                    // (the form's submit button) is the only action that
+                    // writes a row. The old "Use this link" copy read as a
+                    // save; a traveler who stopped here believing it had
+                    // already persisted found nothing on their trip.
+                    : lang === 'km' ? 'បំពេញពីតំណ' : 'Fill from link'}
                 </button>
               </div>
               {linkError ? (
@@ -1001,8 +1139,8 @@ function AddPlaceSheet({
               ) : draft.lat !== null && draft.lng !== null ? (
                 <p id="custom-maps-link-hint" className="mt-1.5 text-xs text-emerald-200">
                   {lang === 'km'
-                    ? `បានរកឃើញទីតាំង (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)}) — នឹងបង្ហាញលើផែនទី។`
-                    : `Location found (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)}) — it will show on your map.`}
+                    ? `បានរកឃើញទីតាំង (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)})។ ចុច "បន្ថែម" ខាងក្រោមដើម្បីរក្សាទុកវា។`
+                    : `Location found (${draft.lat.toFixed(4)}, ${draft.lng.toFixed(4)}). Press "Add it" below to save it.`}
                 </p>
               ) : (
                 <p id="custom-maps-link-hint" className="mt-1.5 text-xs text-white/50">
@@ -1171,47 +1309,103 @@ function AddPlaceSheet({
             </label>
 
             <div className="mt-4 space-y-2">
-              {matching.map((place) => (
-                <button
-                  key={place.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onAdd(place)}
-                  className="flex min-h-[3.5rem] w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
-                >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card bg-gold-light/12 text-gold-light">
-                    <MapPin size={18} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <b className="block truncate text-sm font-semibold text-white">{place.name}</b>
-                    <span className="block truncate text-xs text-white/50">{place.description}</span>
-                  </span>
-                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/60">
-                    {CATEGORY_LABEL[place.category]?.[lang] ?? CATEGORY_LABEL.other[lang]}
-                  </span>
-                </button>
-              ))}
+              {filter === 'saved' ? (
+                <>
+                  {libraryState === 'loading' && (
+                    <p className="py-8 text-center text-sm text-white/55">
+                      {lang === 'km' ? 'កំពុងផ្ទុក…' : 'Loading…'}
+                    </p>
+                  )}
+                  {libraryState === 'error' && (
+                    <p className="py-8 text-center text-sm text-amber-200">
+                      {lang === 'km'
+                        ? 'មិនអាចផ្ទុកទីតាំងដែលបានរក្សាទុករបស់អ្នកបានទេ។'
+                        : 'Could not load your saved places.'}
+                    </p>
+                  )}
+                  {libraryState === 'idle' &&
+                    matchingLibrary.map((place) => {
+                      const already = libraryOnTripIds.has(place.placeId);
+                      return (
+                        <button
+                          key={place.savedId}
+                          type="button"
+                          disabled={busy || already}
+                          onClick={() => onAddFromLibrary(place)}
+                          className="flex min-h-[3.5rem] w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                        >
+                          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card bg-gold-light/12 text-gold-light">
+                            <Star size={18} aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <b className="block truncate text-sm font-semibold text-white">{place.name}</b>
+                            <span className="block truncate text-xs text-white/50">
+                              {place.address ?? place.city ?? place.countryName}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/60">
+                            {already
+                              ? lang === 'km'
+                                ? 'នៅលើដំណើរនេះរួចហើយ'
+                                : 'Already on this trip'
+                              : (CATEGORY_LABEL[place.category]?.[lang] ?? CATEGORY_LABEL.other[lang])}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  {libraryState === 'idle' && matchingLibrary.length === 0 && (
+                    <p className="py-8 text-center text-sm text-white/55">
+                      {lang === 'km'
+                        ? 'អ្នកមិនទាន់បានរក្សាទុកទីតាំងណាមួយសម្រាប់គោលដៅនេះទេ។'
+                        : "You haven't saved any places for this destination yet."}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {matching.map((place) => (
+                    <button
+                      key={place.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onAdd(place)}
+                      className="flex min-h-[3.5rem] w-full items-center gap-3 rounded-card border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-gold-light/40 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                    >
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card bg-gold-light/12 text-gold-light">
+                        <MapPin size={18} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <b className="block truncate text-sm font-semibold text-white">{place.name}</b>
+                        <span className="block truncate text-xs text-white/50">{place.description}</span>
+                      </span>
+                      <span className="shrink-0 text-[11px] uppercase tracking-wide text-white/60">
+                        {CATEGORY_LABEL[place.category]?.[lang] ?? CATEGORY_LABEL.other[lang]}
+                      </span>
+                    </button>
+                  ))}
 
-              {matching.length === 0 && (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-white/55">
-                    {places.length === 0
-                      ? lang === 'km'
-                        ? 'យើងមិនទាន់បានសរសេរអំពីគោលដៅនេះទេ។'
-                        : "We haven't written this destination up yet."
-                      : lang === 'km'
-                        ? 'រកមិនឃើញទីតាំងត្រូវនឹងការស្វែងរកនេះទេ។'
-                        : 'Nothing matches that search.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setCustom(true)}
-                    className="mt-3 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-gold-light/40 px-4 text-sm font-semibold text-gold-bright transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
-                  >
-                    <Plus size={15} aria-hidden="true" />
-                    {lang === 'km' ? 'បន្ថែមទីតាំងផ្ទាល់ខ្លួន' : 'Add your own place'}
-                  </button>
-                </div>
+                  {matching.length === 0 && (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-white/55">
+                        {places.length === 0
+                          ? lang === 'km'
+                            ? 'យើងមិនទាន់បានសរសេរអំពីគោលដៅនេះទេ។'
+                            : "We haven't written this destination up yet."
+                          : lang === 'km'
+                            ? 'រកមិនឃើញទីតាំងត្រូវនឹងការស្វែងរកនេះទេ។'
+                            : 'Nothing matches that search.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCustom(true)}
+                        className="mt-3 inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-btn border border-gold-light/40 px-4 text-sm font-semibold text-gold-bright transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-light"
+                      >
+                        <Plus size={15} aria-hidden="true" />
+                        {lang === 'km' ? 'បន្ថែមទីតាំងផ្ទាល់ខ្លួន' : 'Add your own place'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </>
