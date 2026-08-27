@@ -190,6 +190,14 @@ describe('friendlyAuthError', () => {
     );
   });
 
+  it('maps external OAuth code exchange failures to the callback sync path', async () => {
+    const { friendlyAuthError } = await loadAuth();
+
+    expect(friendlyAuthError('Unable to exchange external code: 4/0Aexample')).toBe(
+      'auth.error.callbackSync'
+    );
+  });
+
   it('passes an unrecognised error through unchanged', async () => {
     const { friendlyAuthError } = await loadAuth();
 

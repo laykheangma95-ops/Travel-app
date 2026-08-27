@@ -95,4 +95,22 @@ describe('middleware auth callback', () => {
     expect(response.headers.get('location')).toContain('error_description=');
     expect(response.headers.get('location')).toContain('returnTo=%2Fsettings');
   });
+
+  it('does not retry a callback when Supabase already returned an OAuth error', async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+
+    const { middleware } = await loadMiddleware();
+    const request = new NextRequest(
+      'https://travel-app-eight-eta.vercel.app/auth/callback?code=4%2F0Aexample&error_description=Unable%20to%20exchange%20external%20code%3A%204%2F0Aexample&returnTo=%2Fsettings'
+    );
+
+    const response = await middleware(request);
+    const location = response.headers.get('location');
+
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(location).toBe(
+      'https://travel-app-eight-eta.vercel.app/auth/callback?returnTo=%2Fsettings&error_description=Unable+to+exchange+external+code%3A+4%2F0Aexample'
+    );
+    expect(location).not.toContain('code=');
+  });
 });

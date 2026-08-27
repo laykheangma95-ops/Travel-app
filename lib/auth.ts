@@ -191,6 +191,7 @@ export function friendlyAuthError(raw: string | null | undefined): string | null
   if (
     text.includes('code verifier') ||
     text.includes('auth code') ||
+    text.includes('external code') ||
     text.includes('invalid grant') ||
     text.includes('pkce')
   ) {
