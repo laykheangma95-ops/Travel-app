@@ -189,9 +189,14 @@ export function friendlyAuthError(raw: string | null | undefined): string | null
     return 'auth.error.network';
   }
   if (
+    text.includes('unable to exchange external code') ||
+    text.includes('external code')
+  ) {
+    return 'auth.error.oauthExchangeFailed';
+  }
+  if (
     text.includes('code verifier') ||
     text.includes('auth code') ||
-    text.includes('external code') ||
     text.includes('invalid grant') ||
     text.includes('pkce')
   ) {

@@ -194,7 +194,7 @@ describe('friendlyAuthError', () => {
     const { friendlyAuthError } = await loadAuth();
 
     expect(friendlyAuthError('Unable to exchange external code: 4/0Aexample')).toBe(
-      'auth.error.callbackSync'
+      'auth.error.oauthExchangeFailed'
     );
   });
 
