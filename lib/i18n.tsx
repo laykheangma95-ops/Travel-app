@@ -56,6 +56,8 @@ const dicts = {
     'auth.error.cancelled': 'Sign-in was cancelled before it finished. Please try again.',
     'auth.error.network':
       'We could not reach the network just now. Check your connection and try again.',
+    'auth.error.oauthExchangeFailed':
+      'Google or Apple sign-in could not be completed right now. Please try again, or use email while we fix it.',
     'auth.error.callbackSync':
       'We could not finish signing you in on this device. Please go back and try again.',
     'auth.error.callbackExpired':
@@ -373,6 +375,8 @@ const dicts = {
     'auth.error.cancelled': 'ការចូលត្រូវបានបោះបង់មុនពេលបញ្ចប់។ សូមព្យាយាមម្តងទៀត។',
     'auth.error.network':
       'យើងមិនអាចភ្ជាប់បណ្តាញបានភ្លាមៗនេះទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។',
+    'auth.error.oauthExchangeFailed':
+      'ការចូលដោយ Google ឬ Apple មិនអាចបញ្ចប់បាននៅពេលនេះទេ។ សូមព្យាយាមម្តងទៀត ឬប្រើអ៊ីមែលសិន ខណៈពេលយើងកំពុងជួសជុល។',
     'auth.error.callbackSync':
       'យើងមិនអាចបញ្ចប់ការចូលនៅលើឧបករណ៍នេះបានទេ។ សូមត្រឡប់ក្រោយ ហើយព្យាយាមម្តងទៀត។',
     'auth.error.callbackExpired':
